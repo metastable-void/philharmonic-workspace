@@ -4,18 +4,31 @@
 # submodules are always pushed before the parent bumps their
 # pointers — the common failure mode is pushing the parent while
 # the referenced submodule commit only lives locally.
+#
+# Behavior:
+# - Submodule push failures abort before the parent is pushed,
+#   so we never push a parent pointer that origin can't resolve.
+# - Submodules in detached HEAD are skipped with a warning. This
+#   is a normal state right after `git submodule update`; the
+#   real guardrail against pushing unresolvable pointers is
+#   `push.recurseSubmodules=check` on the parent (see ROADMAP §2).
 
 set -euo pipefail
 
 cd "$(git rev-parse --show-toplevel)"
 
-# Push each submodule's current branch.
 git submodule foreach '
 branch=$(git rev-parse --abbrev-ref HEAD)
-if [ "$branch" != "HEAD" ]; then
-    git push -u origin "$branch" || true
+if [ "$branch" = "HEAD" ]; then
+    echo "!!! $name is in detached HEAD; skipping push." >&2
+    echo "    If you made local commits here, checkout a branch" >&2
+    echo "    and re-run this script before the parent is pushed." >&2
+else
+    git push -u origin "$branch"
 fi
 '
 
-# Push parent.
+# Push parent. With push.recurseSubmodules=check configured,
+# Git refuses this if any referenced submodule commit is not on
+# origin.
 git push

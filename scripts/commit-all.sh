@@ -7,6 +7,10 @@
 # Every commit is signed off (`-s`). This is the workspace
 # convention; see docs/design/13-conventions.md §Git workflow.
 #
+# Safety: refuses to commit in a submodule that's in detached HEAD
+# state if it has changes to commit — that commit would be an
+# orphan the next time the submodule is checked out.
+#
 # Usage:
 #   scripts/commit-all.sh [message]
 # Message defaults to "updates".
@@ -26,8 +30,15 @@ export MSG_FILE="$msgfile"
 
 # Commit each submodule's changes (if any).
 git submodule foreach --quiet '
+branch=$(git rev-parse --abbrev-ref HEAD)
 if ! git diff --quiet || ! git diff --cached --quiet || [ -n "$(git ls-files --others --exclude-standard)" ]; then
-    echo "=== committing in $name ==="
+    if [ "$branch" = "HEAD" ]; then
+        echo "!!! $name is in detached HEAD with uncommitted changes." >&2
+        echo "    Refusing to commit (would create an orphan)." >&2
+        echo "    Checkout a branch inside the submodule and re-run." >&2
+        exit 1
+    fi
+    echo "=== committing in $name (branch: $branch) ==="
     git add -A
     git commit -s -F "$MSG_FILE"
 else
