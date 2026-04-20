@@ -885,6 +885,27 @@ crates without her sign-off. Crypto-sensitive paths include:
 - Payload-hash binding logic.
 - API token generation (`pht_` format).
 
+### Review cadence
+
+Crypto-adjacent work is gated at both ends:
+
+1. **Pre-approval of approach, before coding.** Before Codex
+   (or Claude) writes any of the primitives above, produce a
+   short written proposal — the exact primitives, construction
+   order, HKDF inputs, AEAD associated data, nonce scheme, key
+   derivation / rotation story, zeroization points — and get
+   Yuka's sign-off on the design. This is the cheap place to
+   catch misuse; bugs found here cost nothing beyond the doc.
+2. **Post-review of code, before publish.** Once the
+   implementation exists, Yuka reviews the actual code and the
+   committed test vectors line-by-line. A crate touching the
+   list above does not get a `cargo publish` until this review
+   is complete and all review comments are resolved.
+
+Neither gate is waivable. A pre-approved approach doesn't skip
+post-review; a clean post-review doesn't retroactively bless an
+approach that was never pre-approved.
+
 **Test vector discipline.** For every crypto operation, write
 tests with known inputs and exact expected outputs. Round-trip
 tests alone (encrypt-then-decrypt, sign-then-verify) can pass

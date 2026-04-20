@@ -33,23 +33,29 @@ someone later has a concrete need.
 
 ### Per-implementation wire-protocol details
 
-For each v1 implementation, the exact request and response
-JSON shape:
+For each v1 implementation still to be shaped, the exact
+request and response JSON shape:
 
 - **`llm_generate`** — covered in `08-connector-architecture.md`;
   final structured-output dialect selector field names to
   confirm when writing the OpenAI-compat impl.
-- **`http_forward`** — templating syntax, pass-through versus
-  templated mode selection, header controls.
 - **`sql_query`** — parameter binding syntax, row timeout,
   row shape for response, error surface.
 - **`email_send`** — SMTP submission shape.
-- **`embed`** and **`vector_search`** — whether split or
-  unified; output vector format; nearest-neighbor result
-  shape.
+- **`embed`** and **`vector_search`** — output vector format;
+  nearest-neighbor result shape. (Split-vs-unified settled:
+  split.)
 
-Mostly low-stakes shaping; sketch against the first impl and
-iterate.
+Settled since the previous draft:
+
+- **`http_forward`** — reuses `mechanics_config::HttpEndpoint`
+  verbatim; full spec in `08-connector-architecture.md`
+  §Generic HTTP.
+- **`embed` vs `vector_search`** — split into two capabilities
+  (two crates).
+
+Mostly low-stakes shaping for what remains; sketch against the
+first impl and iterate.
 
 ## Non-blocking for v1 but important
 

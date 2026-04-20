@@ -26,13 +26,6 @@ members = [
     "philharmonic-api",
 ]
 
-[workspace.package]
-edition = "2024"
-rust-version = "1.85"
-license = "Apache-2.0 OR MPL-2.0"
-repository = "https://github.com/metastable-void/philharmonic-workspace"
-authors = ["metastable-void"]
-
 [patch.crates-io]
 philharmonic-types = { path = "philharmonic-types" }
 philharmonic-store = { path = "philharmonic-store" }

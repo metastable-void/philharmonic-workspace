@@ -6,8 +6,9 @@ the `WorkflowEngine`, authenticates callers, enforces policy,
 exposes CRUD on tenant resources, and mints ephemeral tokens for
 tenant end users.
 
-The crate doesn't exist yet. Design is now substantially settled
-(this document) with specific items still open.
+The crate doesn't exist yet. Design is settled (this document);
+a single small open item — an atomic create-instance-and-mint
+endpoint — is listed at the bottom.
 
 ## What the layer is responsible for
 

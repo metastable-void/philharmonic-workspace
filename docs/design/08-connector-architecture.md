@@ -502,11 +502,16 @@ Postmark, AWS SES) are served by configs pointing at
 
 #### Config shape
 
-The config reuses `mechanics_config::HttpEndpoint` — the same
-rich endpoint schema `mechanics-core` already uses for JS-side
-HTTP endpoint definitions. This keeps one schema for "how to
-describe an HTTP call-site" across the whole system rather
-than inventing a parallel one.
+**Principle.** `http_forward` does not invent its own endpoint
+schema. It reuses `mechanics_config::HttpEndpoint` verbatim —
+the same structure `mechanics-core` uses for JS-side HTTP
+endpoint definitions. One schema for "how to describe an HTTP
+call-site" across the whole system: validation, URL templating,
+query emission, header allowlisting, retry policy, body typing,
+and size caps all come from that shared type.
+
+The `config` sub-object contains exactly one key, `endpoint`,
+whose value is an `HttpEndpoint`:
 
 ```json
 {
@@ -517,100 +522,178 @@ than inventing a parallel one.
       "method": "POST",
       "url_template": "https://api.example.com/users/{user_id}/events",
       "url_param_specs": {
-        "user_id": { "type": "string", "pattern": "^[a-zA-Z0-9_]+$" }
+        "user_id": {
+          "default": null,
+          "min_bytes": 1,
+          "max_bytes": 64
+        }
       },
-      "query_specs": {
-        "api_version": { "type": "string", "default": "2024-01" }
-      },
+      "query_specs": [
+        { "type": "const",   "key": "api_version", "value": "2024-01" },
+        { "type": "slotted", "key": "trace_id",    "slot": "trace_id",
+          "mode": "optional", "default": null,
+          "min_bytes": null, "max_bytes": 128 }
+      ],
       "headers": {
         "Authorization": "Bearer sk-...",
         "Content-Type": "application/json"
       },
       "overridable_request_headers": ["Idempotency-Key"],
       "exposed_response_headers": ["X-Request-Id"],
+      "request_body_type":  "json",
+      "response_body_type": "json",
+      "response_max_bytes": 1048576,
+      "timeout_ms": 30000,
+      "allow_non_2xx_status": false,
       "retry_policy": {
         "max_attempts": 3,
-        "base_delay_ms": 200,
-        "max_delay_ms": 5000
-      },
-      "timeout_ms": 30000,
-      "response_max_bytes": 1048576
+        "base_backoff_ms": 200,
+        "max_backoff_ms": 5000,
+        "max_retry_delay_ms": 30000,
+        "rate_limit_backoff_ms": 1000,
+        "retry_on_io_errors": true,
+        "retry_on_timeout": true,
+        "respect_retry_after": true,
+        "retry_on_status": [429, 500, 502, 503, 504]
+      }
     }
   }
 }
 ```
 
-The `endpoint` sub-object is validated by
-`HttpEndpoint::validate_config` (the same validation that runs
-for JS-side HTTP endpoints). The connector service validates
-the config at deserialization time; invalid configs return a
-deserialization error before any external call happens.
+Field semantics follow `mechanics_config::HttpEndpoint`
+exactly. Summarized for reference:
 
-The baked-in credential (`Authorization` header above) is what
-makes this an `http_forward` use case rather than a plain
-script-driven HTTP call: the script never sees the API key.
+- **`method`**: HTTP verb (`GET`, `POST`, etc.).
+- **`url_template`**: absolute URL with `{slot}` placeholders.
+  Must not carry a fragment or pre-baked query string.
+- **`url_param_specs`**: per-slot constraints — optional
+  `default`, `min_bytes`, `max_bytes` (UTF-8 byte lengths).
+  Every slot appearing in `url_template` must be declared.
+- **`query_specs`**: array of query emission rules.
+  - `{"type":"const","key":..,"value":..}` emits a fixed pair.
+  - `{"type":"slotted","key":..,"slot":..,"mode":..,
+    "default":..,"min_bytes":..,"max_bytes":..}` reads from
+    the request's `queries[slot]` under one of four modes:
+    `required`, `required_allow_empty`, `optional`,
+    `optional_allow_empty`.
+- **`headers`**: baked-in request headers. This is where
+  credentials live — the script never sees the API key.
+- **`overridable_request_headers`**: case-insensitive
+  allowlist of header names the script may set on a per-call
+  basis. Names outside this list are rejected.
+- **`exposed_response_headers`**: case-insensitive allowlist
+  of response headers surfaced to the script. Everything else
+  is dropped before returning.
+- **`request_body_type`**: `json` | `utf8` | `bytes`. Controls
+  how the script-provided `body` is serialized and which
+  `Content-Type` the client defaults to. Optional; defaults
+  to `json`.
+- **`response_body_type`**: `json` | `utf8` | `bytes`.
+  Defaults to `json`.
+- **`response_max_bytes`**: optional per-endpoint response-size
+  cap. When absent, the framework default applies.
+- **`timeout_ms`**: optional per-endpoint request timeout.
+- **`allow_non_2xx_status`**: when `false` (default), non-2xx
+  responses surface as `upstream_error`. When `true`, the
+  response is returned normally and the script inspects
+  `status`/`ok`.
+- **`retry_policy`**: `EndpointRetryPolicy` — `max_attempts`,
+  `base_backoff_ms`, `max_backoff_ms`, `max_retry_delay_ms`,
+  `rate_limit_backoff_ms`, `retry_on_io_errors`,
+  `retry_on_timeout`, `respect_retry_after` (honors
+  `Retry-After` on 429), `retry_on_status` (list of HTTP
+  statuses eligible for retry).
+
+The connector service deserializes the `endpoint` object and
+calls `HttpEndpoint::validate_config` at load time; invalid
+configs fail before any external call happens.
 
 #### Request shape (from script)
 
+Fields are camelCase over the wire (matching the JS surface
+that `mechanics-core` already exposes) and `serde`-rename to
+snake_case internally.
+
 ```json
 {
-  "url_params": { "user_id": "u_12345" },
-  "query": { "api_version": "2024-03" },
-  "headers": { "Idempotency-Key": "req-abc-123" },
-  "body": { ... }
+  "urlParams": { "user_id": "u_12345" },
+  "queries":  { "trace_id": "req-abc-123" },
+  "headers":  { "Idempotency-Key": "req-abc-123" },
+  "body":     { ... }
 }
 ```
 
-- `url_params`: values for `url_template` slots. Validated
-  against `url_param_specs`. Missing required slots or values
-  failing pattern/type checks return an error.
-- `query`: query-string values. Validated against
-  `query_specs`.
-- `headers`: header values restricted to the names listed in
-  `overridable_request_headers`. Other header names are
-  rejected.
-- `body`: the request body. For `Content-Type:
-  application/json`, an object is serialized; for other
-  types, a string is sent verbatim.
+- **`urlParams`**: values for `url_template` slots. Resolved
+  through `url_param_specs` (default / min / max byte length).
+  Unknown slot keys are rejected. Percent-encoded during URL
+  construction.
+- **`queries`**: values for `slotted` query rules. Keys outside
+  the declared slot set are rejected.
+- **`headers`**: values for headers in
+  `overridable_request_headers`. Matching is case-insensitive;
+  duplicates are rejected. Unknown names are rejected.
+- **`body`**: request body. Interpreted according to
+  `request_body_type`:
+  - `json` → any JSON value; serialized as the request body
+    with `Content-Type: application/json`.
+  - `utf8` → JSON string; sent as a UTF-8 `text/plain` body.
+  - `bytes` → base64-encoded JSON string; sent as a raw
+    `application/octet-stream` body.
+  - Missing / `null` → no body sent.
 
-Fields with defaults in the config's param/query specs may be
-omitted from the request.
+Fields with defaults in `url_param_specs` / `query_specs` may
+be omitted from the request.
 
 #### Response shape
 
 ```json
 {
-  "status": 200,
+  "status":  200,
+  "ok":      true,
   "headers": { "X-Request-Id": "xyz" },
-  "body": { ... }
+  "body":    { ... }
 }
 ```
 
-- `status`: HTTP status code as integer.
-- `headers`: only headers listed in `exposed_response_headers`.
-  Hides provider-specific headers from scripts by default.
-- `body`: parsed JSON if response is `application/json`;
-  string otherwise (UTF-8 decoded). Body size is capped at
-  `response_max_bytes`.
+- **`status`**: HTTP status code (integer).
+- **`ok`**: convenience flag, `true` iff `status` is in
+  2xx. (Mirrors `mechanics-core`'s
+  `EndpointResponse.ok`.)
+- **`headers`**: only response headers listed in
+  `exposed_response_headers`, normalized to lowercase names.
+- **`body`**: decoded according to `response_body_type`:
+  - `json` → parsed JSON value (or `null` if the response was
+    empty).
+  - `utf8` → UTF-8 string.
+  - `bytes` → base64-encoded string.
 
 #### Error cases
 
-- `upstream_error` — the external call returned a 4xx/5xx
-  response. Response status and body are still returned via
-  the normal response shape; errors here are at the script's
-  discretion to handle. The implementation doesn't treat
-  non-2xx as an error at its own layer.
-- `upstream_unreachable` — network-level failure, retries
-  exhausted. Returned as an `ImplementationError`.
-- `upstream_timeout` — request exceeded `timeout_ms`.
-- `response_too_large` — response body exceeded
-  `response_max_bytes`.
-- `invalid_request` — script's request didn't match the
-  endpoint's param/query/header specs.
+Mapped to `ImplementationError` variants:
 
-Scripts can distinguish "4xx/5xx received, examine body" from
-"call didn't complete" by checking whether the tool call
-returned a response object or raised an error.
+- **`upstream_error`** — non-2xx response, and
+  `allow_non_2xx_status` is `false`. Carries the upstream
+  `status`, the exposed response headers, and the decoded body
+  so the script can still inspect what came back.
+- **`upstream_unreachable`** — transport error; all retries
+  exhausted. Carries the underlying error kind.
+- **`upstream_timeout`** — request exceeded `timeout_ms`
+  (including retries, subject to `max_retry_delay_ms`).
+- **`response_too_large`** — response body exceeded
+  `response_max_bytes`.
+- **`invalid_request`** — the script's request didn't match
+  the endpoint schema (missing required slot, header not in
+  the override allowlist, body type mismatch, etc.).
+- **`invalid_config`** — the `endpoint` object failed
+  validation at load time. Surfaces as a deserialization
+  failure rather than a runtime error.
+
+Scripts distinguish "upstream returned a response I should
+handle" from "the call never completed" by whether the
+implementation returned a response object or raised an error
+— identical to the error model for JS-side
+`mechanics-core` HTTP endpoint calls.
 
 ### LLM — specialized HTTP implementations
 
@@ -925,15 +1008,18 @@ backed configs, not distinct email implementations.
 
 ### Embedding and vector search
 
-Probably two capabilities:
+**Decision (settled): split.** Two capabilities in separate
+crates.
 
 - **`embed`** — text in, vector out. Implementations: local
   embedding model, hosted APIs, provider-bundled.
 - **`vector_search`** — vector in, nearest neighbors out.
   Implementations: Qdrant; possibly others.
 
-At least one of each ships in v1. Split-vs-unified decision
-stays open.
+At least one implementation of each ships in v1. Splitting
+keeps the two concerns independent: an embedding change
+doesn't force a vector-store release and vice versa, and
+tenants can mix embedders with vector stores freely.
 
 ### State management for stateful external services
 

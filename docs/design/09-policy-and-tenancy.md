@@ -730,13 +730,12 @@ impl Entity for AuditEvent {
 
 ## Open questions
 
-- **Permission atom vocabulary finalization** — the list above
-  is close; final enumeration pending once API layer endpoints
-  are all concretely listed.
-- **Minting endpoint request/response shape** — standard JSON
-  request with authority credential + requested claims +
-  lifetime + optional instance scope; response shape is the
-  token string plus expiry. Exact field names pending.
+- **Minting endpoint request/response shape** — the *shape* is
+  settled: request carries authority credential + requested
+  claims + lifetime + optional instance scope; response
+  carries the token string plus expiry. Exact field names
+  are locked down when `philharmonic-api` begins
+  implementation (Phase 8).
 
 ## What this crate doesn't do
 

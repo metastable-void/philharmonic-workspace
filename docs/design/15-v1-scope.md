@@ -188,13 +188,12 @@ database wire protocol directly.
 Transactional email providers are served by `http_forward`-
 backed configs.
 
-**Embedding and vector search** — probably two capabilities:
+**Embedding and vector search** — two capabilities, separate
+crates (split, settled):
 
 - `embed` — text in, vector out. At least one implementation.
-- `vector_search` — vector or text in, nearest-neighbor
-  results out. At least one implementation.
-
-Split-vs-unified decision stays open.
+- `vector_search` — vector in, nearest-neighbor results out.
+  At least one implementation.
 
 ### Doesn't ship with v1
 
@@ -391,17 +390,22 @@ Order of work, with parallelism noted.
 
 1. **Close remaining design questions** (mostly done):
 
-   - **Still open:** full permission atom vocabulary
-     enumeration (final pass against API endpoints);
-     per-implementation wire-protocol details (SQL row shape,
-     HTTP templating syntax, embedding output format);
-     embedding/vector split-vs-unified.
-   - **Already settled** (this conversation): no global
-     endpoint registry; `TenantEndpointConfig` minimal shape;
-     per-tenant free-form JSON configs; SCK restored with
-     operator-visible decryption; `Principal.epoch` reserved;
-     token claim set; simplified role schema; committed
-     simplifications list in `14-open-questions.md`.
+   - **Still open:** per-implementation wire-protocol details
+     for SQL (row shape, parameter binding, timeouts, errors),
+     email (SMTP submission shape), and vector-search (output
+     vector format, nearest-neighbor result shape). Resolve
+     when each implementation begins.
+   - **Already settled:** permission atom vocabulary (closed
+     for v1; adjustable via deliberate doc updates — see
+     `14-open-questions.md`); `http_forward` wire protocol
+     (reuses `mechanics_config::HttpEndpoint`; full spec in
+     `08-connector-architecture.md`); embedding and vector
+     search split into two capabilities; no global endpoint
+     registry; `TenantEndpointConfig` minimal shape; per-tenant
+     free-form JSON configs; SCK restored with operator-visible
+     decryption; `Principal.epoch` reserved; token claim set;
+     simplified role schema; committed simplifications list in
+     `14-open-questions.md`.
 
 2. **Claim remaining crate names** as 0.0.0 stubs on
    crates.io:
