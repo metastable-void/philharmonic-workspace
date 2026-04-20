@@ -12,8 +12,15 @@
 
 set -euo pipefail
 
-cd "$(git rev-parse --show-toplevel)"
+script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+workspace_root="$(cd -- "$script_dir/.." && pwd)"
 
+if ! git -C "$workspace_root" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    printf 'setup.sh: unable to locate workspace Git repository from script path: %s\n' "$workspace_root" >&2
+    exit 1
+fi
+
+cd "$workspace_root"
 YELLOW=$'\e[33m'
 GREEN=$'\e[32m'
 BOLD=$'\e[1m'
