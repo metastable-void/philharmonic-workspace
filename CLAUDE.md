@@ -11,3 +11,9 @@ Developer: Yuka MORI.
   ROADMAP.md §5.
 - Submodule discipline: commit inside submodule first, push, then
   bump parent pointer. See ROADMAP.md §2.
+- Git workflow: all Git operations go through `scripts/*.sh`
+  (`status.sh`, `pull-all.sh`, `commit-all.sh`, `push-all.sh`).
+  If a script doesn't cover what you need, extend the script
+  first rather than running ad-hoc git commands. Every commit is
+  signed off (`-s`). See docs/design/13-conventions.md §Git
+  workflow.

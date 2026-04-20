@@ -101,16 +101,26 @@ Designed, not yet implemented:
 - `philharmonic-connector-client`
 - `philharmonic-connector-router`
 - `philharmonic-connector-service`
-- Per-implementation crates (naming convention pending)
+- Per-implementation crates (one crate each, named
+  `philharmonic-connector-impl-<n>`)
 - `philharmonic-api`
 
-The biggest remaining design gaps, per `14-open-questions.md`:
+Remaining items blocking v1, per `14-open-questions.md`:
 
-- Capability definition schema language, particularly the
-  payload template mechanism.
-- Full permission atom vocabulary and role definition document
-  schema.
-- Per-implementation crate naming convention.
+- Per-implementation wire-protocol details — the exact
+  request/response JSON shapes for each v1 implementation
+  (`llm_generate`, `http_forward`, `sql_query`, `email_send`,
+  `embed`, `vector_search`), to be sketched against the first
+  impl and iterated.
+
+The permission atom vocabulary in `09-policy-and-tenancy.md`
+is treated as closed for v1 and adjusted deliberately if
+implementation reveals a concrete need.
+
+Other items (multi-region, OTLP export, authoring patterns
+documentation, stateful-connector concerns, admin UI form
+rendering) are non-blocking for v1. See `14-open-questions.md`
+for the full list and the resolved-questions archive.
 
 ## Status of the docs published at metastable-void.github.io/philharmonic
 

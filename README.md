@@ -153,6 +153,9 @@ The `scripts/` directory contains conveniences:
 - `scripts/status.sh` — status across all submodules plus the parent.
 - `scripts/pull-all.sh` — update all submodules to their tracked
   branches' latest commits.
+- `scripts/commit-all.sh [msg]` — commit pending changes in each
+  submodule, then commit the parent (which bumps the submodule
+  pointers). Message defaults to `updates`.
 - `scripts/push-all.sh` — push uncommitted work across submodules
   before pushing the parent.
 

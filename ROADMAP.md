@@ -47,12 +47,17 @@ Six layers, each with a clean dependency boundary upward:
 You are operating inside `philharmonic-workspace`, a parent Git
 repo containing:
 
-- `Cargo.toml` — workspace manifest with `[workspace.dependencies]`
-  carrying both `version` and `path` entries for each member.
-- 22 submodule directories, one per crate, each being a separate
+- `Cargo.toml` — workspace manifest listing all members, shared
+  third-party pins in `[workspace.dependencies]`, and a
+  `[patch.crates-io]` block redirecting each Philharmonic crate
+  dependency to its local submodule path. Crate manifests keep
+  normal versioned deps so they remain independently
+  buildable/publishable; the patch table rewrites them to local
+  paths when building from the workspace.
+- 23 submodule directories, one per crate, each being a separate
   Git repo at `github.com/metastable-void/<crate-name>`.
 - `scripts/` — helper scripts (`status.sh`, `pull-all.sh`,
-  `push-all.sh`).
+  `push-all.sh`, `commit-all.sh`).
 - `docs/design/` (expected) — design documentation this roadmap
   references.
 
@@ -105,6 +110,16 @@ Never commit in the parent referencing an unpushed submodule
 commit. The parent's Git config should have
 `push.recurseSubmodules=check` set to catch this.
 
+**Git via scripts.** All Git operations go through the helpers in
+`scripts/` (`status.sh`, `pull-all.sh`, `commit-all.sh`,
+`push-all.sh`). They encode the submodule-first ordering and the
+signoff rule. If a script doesn't do what you need, extend it
+first and update `docs/design/13-conventions.md §Git workflow`.
+
+**Every commit is signed off.** Commits in the parent and every
+submodule must carry a `Signed-off-by:` trailer (the scripts pass
+`-s`). Non-negotiable.
+
 **Test the workspace as a whole.** Before merging any change,
 `cargo check --workspace` and `cargo test --workspace` at the
 parent root must pass. Per-crate `cargo test` passing is
@@ -116,12 +131,8 @@ soft-deletes are revisions with an `is_retired` scalar set true.
 If you find yourself wanting to "just update a field," re-read
 `02-design-principles.md` and `05-storage-substrate.md`.
 
-**Use workspace dependencies.** Every crate's `Cargo.toml` should
-use `dep = { workspace = true }` wherever possible. Version pins
-live in `[workspace.dependencies]` at the parent.
-
-**MSRV and edition.** Edition 2024, `rust-version = "1.85"`. Set
-via workspace inheritance.
+**MSRV and edition.** Edition 2024, `rust-version = "1.85"`, set
+in every crate's own `Cargo.toml`.
 
 **Licensing.** All crates: `license = "Apache-2.0 OR MPL-2.0"`.
 Include `LICENSE-APACHE` and `LICENSE-MPL` in each submodule.
@@ -263,7 +274,7 @@ not, do it first.
 
 **Tasks**:
 - `philharmonic-workspace` repo initialized with submodules for
-  each of the 22 crates.
+  each of the 23 crates.
 - Workspace `Cargo.toml` with all members listed and
   `[workspace.dependencies]` populated.
 - Helper scripts in `scripts/` executable.
@@ -275,7 +286,7 @@ not, do it first.
   `push.recurseSubmodules=check`.
 
 **Acceptance criteria**:
-- `git submodule status` shows all 22 submodules at a clean
+- `git submodule status` shows all 23 submodules at a clean
   commit.
 - `cargo check --workspace` succeeds (all placeholder crates
   compile to empty libraries).
@@ -993,7 +1004,7 @@ otherwise."
 
 Philharmonic v1 is shipped when:
 
-- All 22 crates published at `0.1.0` or higher on crates.io.
+- All 23 crates published at `0.1.0` or higher on crates.io.
 - Reference deployment live on the developer's infrastructure with:
   - TLS-terminated API subdomain pattern working.
   - At least one tenant provisioned.
@@ -1040,6 +1051,13 @@ From the workspace root:
 
 # Pull latest on all submodules' tracked branches
 ./scripts/pull-all.sh
+
+# Commit pending changes in each submodule, then the parent
+# (bumps submodule pointers). Message defaults to "updates".
+./scripts/commit-all.sh "your message"
+
+# Push pushed-pending commits across every submodule
+./scripts/push-all.sh
 
 # Check the whole workspace compiles
 cargo check --workspace

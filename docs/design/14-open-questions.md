@@ -31,15 +31,6 @@ someone later has a concrete need.
 
 ## Blocking v1 implementation
 
-### Permission atom vocabulary finalization
-
-The atom list in `09-policy-and-tenancy.md` is a near-final
-sketch. The final pass enumerates every API endpoint in `10`
-and writes out the exact permission each requires, then
-reconciles with the sketched vocabulary. About thirty
-minutes' focused work; hard to hand to Codex because it's a
-cross-referencing task.
-
 ### Per-implementation wire-protocol details
 
 For each v1 implementation, the exact request and response
@@ -165,6 +156,11 @@ settled.
 - **Role definition schema**: JSON array of permission atoms.
   No scoped/conditional/ABAC for v1. Array-to-object
   extension remains additive.
+- **Permission atom vocabulary**: the list in
+  `09-policy-and-tenancy.md` is treated as closed for v1.
+  Adjustments (additions, renames) are allowed as development
+  surfaces concrete needs, but should go through a deliberate
+  doc update rather than accreting silently.
 - **Subject claim persistence in step records**: identifier +
   authority only. Full injected claims are never persisted.
   No per-tenant knob.

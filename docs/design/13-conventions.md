@@ -65,6 +65,38 @@ while protecting against minor-version breakage.
 Peer crates within the workspace pin loosely to each other
 (`philharmonic-store = "0.1"`) — the workspace evolves together.
 
+**Pinning to a patch version.** When a crate relies on a feature
+or fix introduced in a specific patch, pin to that exact patch
+(`philharmonic-types = "0.3.3"`) so `cargo` refuses to resolve
+against an older patch that lacks the required feature. This is
+the *only* reason to tighten beyond a minor pin; don't pin to a
+patch for hygiene or habit. When the dependency publishes a
+further patch whose feature set you start using, bump the pin.
+
+## Git workflow
+
+All Git operations on this workspace go through the helper
+scripts in `scripts/`:
+
+- `status.sh` — parent + every submodule's working tree.
+- `pull-all.sh` — update submodules to their tracked branches.
+- `commit-all.sh [msg]` — commit pending changes in each
+  submodule first, then the parent (bumping submodule pointers).
+- `push-all.sh` — push each submodule's current branch, then the
+  parent.
+
+**Don't invoke `git commit` or `git push` ad-hoc.** The scripts
+encode submodule ordering, default arguments, and the signoff
+rule below. Ad-hoc invocations drift from those defaults. If the
+script doesn't support what you need, extend the script (and
+document the change here) before proceeding.
+
+**Every commit is signed off.** The scripts pass `-s` to
+`git commit`; a `Signed-off-by:` trailer is mandatory on every
+commit in every repo in this workspace (parent and submodules).
+This is a Developer Certificate of Origin-style assertion and is
+a hard requirement, not a preference.
+
 ## Edition and MSRV
 
 - **Edition 2024.**
