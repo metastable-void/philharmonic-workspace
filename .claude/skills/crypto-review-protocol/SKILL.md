@@ -63,10 +63,13 @@ proposal** and get Yuka's sign-off. The proposal names:
 - Test-vector plan (see below).
 
 Deliver the proposal as a Markdown file under
-`docs/design/crypto-proposals/<date>-<topic>.md` or as a comment
-in the relevant GitHub issue; either way it gets committed before
-code starts. Wait for explicit sign-off. A pre-approved approach
-doesn't skip Gate 2.
+`docs/design/crypto-proposals/<date>-<topic>.md` (create
+`docs/design/crypto-proposals/` if it does not exist yet), or as
+a comment in the relevant GitHub issue. In either case, the
+proposal must exist before code starts; if it lives in GitHub,
+reference that issue in the implementation PR or commit history.
+Wait for explicit sign-off. A pre-approved approach doesn't skip
+Gate 2.
 
 ### Gate 2: post-review of code, before publish
 
