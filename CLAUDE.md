@@ -17,6 +17,14 @@ Developer: Yuka MORI.
   first rather than running ad-hoc git commands. Every commit is
   signed off (`-s`). See docs/design/13-conventions.md §Git
   workflow.
+- Fresh clone: run `scripts/setup.sh` once — it initializes all
+  submodules recursively and warns if the Rust toolchain is
+  missing.
+- Claude-side procedures live as skills under `.claude/skills/`:
+  `git-workflow` (the scripts-only rule above),
+  `codex-prompt-archive` (how to hand off to Codex), and
+  `crypto-review-protocol` (Yuka's two-gate review on
+  crypto-sensitive paths). Consult them when their triggers fire.
 
 ## Claude vs. Codex division of labor
 
