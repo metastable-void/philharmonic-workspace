@@ -1906,7 +1906,7 @@ dependencies = [
  "http-body-util",
  "hyper",
  "hyper-util",
- "mechanics-core 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "mechanics-core",
  "parking_lot",
  "serde_json",
  "tokio",
@@ -1919,29 +1919,6 @@ version = "0.0.0"
 [[package]]
 name = "mechanics-core"
 version = "0.2.2"
-dependencies = [
- "boa_engine",
- "boa_gc",
- "crossbeam-channel",
- "data-encoding",
- "futures-concurrency",
- "futures-lite",
- "getrandom 0.4.2",
- "hex",
- "parking_lot",
- "reqwest",
- "serde",
- "serde_json",
- "tokio",
- "url",
- "uuid",
-]
-
-[[package]]
-name = "mechanics-core"
-version = "0.2.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "68ac673d0db7f239703166340fbced8b835742815553cdb898122c2a3307160f"
 dependencies = [
  "boa_engine",
  "boa_gc",
@@ -2318,22 +2295,10 @@ name = "philharmonic-store"
 version = "0.1.0"
 dependencies = [
  "async-trait",
- "philharmonic-types 0.3.3 (registry+https://github.com/rust-lang/crates.io-index)",
+ "philharmonic-types",
  "serde",
  "thiserror 2.0.18",
  "tokio",
-]
-
-[[package]]
-name = "philharmonic-store"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4264cc0ff2b0a306af5e695e310b420c60ce8b06f0fcc7e0ade7eccf2804a5b1"
-dependencies = [
- "async-trait",
- "philharmonic-types 0.3.3 (registry+https://github.com/rust-lang/crates.io-index)",
- "serde",
- "thiserror 2.0.18",
 ]
 
 [[package]]
@@ -2341,8 +2306,8 @@ name = "philharmonic-store-sqlx-mysql"
 version = "0.1.0"
 dependencies = [
  "async-trait",
- "philharmonic-store 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "philharmonic-types 0.3.3 (registry+https://github.com/rust-lang/crates.io-index)",
+ "philharmonic-store",
+ "philharmonic-types",
  "sqlx",
  "testcontainers",
  "testcontainers-modules",
@@ -2353,21 +2318,6 @@ dependencies = [
 [[package]]
 name = "philharmonic-types"
 version = "0.3.3"
-dependencies = [
- "hex",
- "serde",
- "serde_jcs",
- "serde_json",
- "sha2 0.11.0",
- "thiserror 2.0.18",
- "uuid",
-]
-
-[[package]]
-name = "philharmonic-types"
-version = "0.3.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3fdd189d3bb4ec3b9f65da596d2f4393370a31dcb839e7f856061a4eaeda9341"
 dependencies = [
  "hex",
  "serde",

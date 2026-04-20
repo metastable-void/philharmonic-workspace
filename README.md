@@ -188,23 +188,35 @@ cargo clippy --workspace         # lint everything
 ```
 
 Individual crates can also be built standalone from their own
-directories; each crate's `Cargo.toml` inherits workspace settings
-but resolves dependencies with `path` pointing at its siblings, so
-local changes in one crate are instantly visible to dependents.
+directories, using only that crate's own manifest and dependency
+graph. This is important because each submodule is its own published
+crate and CI pipeline.
 
-### The dual-dependency-spec pattern
+### Standalone crates + workspace integration
 
-Workspace `[workspace.dependencies]` entries carry both `version` and
-`path`:
+Crate manifests use normal versioned dependencies so they remain
+independently buildable and publishable from within the submodule
+itself.
+
+At the workspace root, this repository uses `[patch.crates-io]` to
+redirect Philharmonic crate dependencies to local submodule paths:
 
 ```toml
-philharmonic-types = { version = "0.3.3", path = "philharmonic-types" }
+[patch.crates-io]
+philharmonic-types = { path = "philharmonic-types" }
+philharmonic-store = { path = "philharmonic-store" }
+mechanics-core = { path = "mechanics-core" }
 ```
 
-Cargo uses `path` for local builds (seeing source changes instantly)
-and `version` for publishing (Cargo strips `path` automatically on
-`cargo publish`). This is the standard pattern for path-linked
-workspaces that publish crates independently.
+This gives the best of both modes:
+- standalone crate builds from each submodule still work as published
+  crates would.
+- workspace builds resolve to local sources, so cross-crate changes are
+  visible immediately without publishing intermediate versions.
+
+When bumping crate versions, keep semver requirements and local crate
+versions in sync so patched local crates satisfy all dependency
+constraints.
 
 ## Publishing
 
@@ -241,8 +253,7 @@ docs describing an aspirational past are worse than nothing.
 - Edition 2024.
 - MSRV 1.85.
 
-Set in workspace-level `[workspace.package]` and inherited by each
-crate.
+Declared in workspace policy and mirrored in each crate manifest.
 
 ## License
 

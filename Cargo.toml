@@ -34,17 +34,6 @@ repository = "https://github.com/metastable-void/philharmonic-workspace"
 authors = ["metastable-void"]
 
 [workspace.dependencies]
-philharmonic-types = { version = "0.3.3", path = "philharmonic-types" }
-philharmonic-store = { version = "0.1.0", path = "philharmonic-store" }
-philharmonic-store-sqlx-mysql = { version = "0.1.0", path = "philharmonic-store-sqlx-mysql" }
-mechanics-config = { version = "0.1.0", path = "mechanics-config" }
-mechanics-core = { version = "0.2.3", path = "mechanics-core" }
-philharmonic-policy = { version = "0.1.0", path = "philharmonic-policy" }
-philharmonic-workflow = { version = "0.1.0", path = "philharmonic-workflow" }
-philharmonic-connector-common = { version = "0.1.0", path = "philharmonic-connector-common" }
-philharmonic-connector-client = { version = "0.1.0", path = "philharmonic-connector-client" }
-philharmonic-connector-service = { version = "0.1.0", path = "philharmonic-connector-service" }
-
 # Third-party
 tokio = { version = "1", features = ["full"] }
 serde = { version = "1", features = ["derive"] }
@@ -67,6 +56,31 @@ sqlx = { version = "0.8", features = ["runtime-tokio", "tls-rustls"] }
 lettre = "0.11"
 thiserror = "2"
 async-trait = "0.1"
+
+[patch.crates-io]
+philharmonic-types = { path = "philharmonic-types" }
+philharmonic-store = { path = "philharmonic-store" }
+philharmonic-store-sqlx-mysql = { path = "philharmonic-store-sqlx-mysql" }
+mechanics-config = { path = "mechanics-config" }
+mechanics-core = { path = "mechanics-core" }
+mechanics = { path = "mechanics" }
+philharmonic = { path = "philharmonic" }
+philharmonic-policy = { path = "philharmonic-policy" }
+philharmonic-workflow = { path = "philharmonic-workflow" }
+philharmonic-connector-common = { path = "philharmonic-connector-common" }
+philharmonic-connector-client = { path = "philharmonic-connector-client" }
+philharmonic-connector-router = { path = "philharmonic-connector-router" }
+philharmonic-connector-service = { path = "philharmonic-connector-service" }
+philharmonic-connector-impl-http-forward = { path = "philharmonic-connector-impl-http-forward" }
+philharmonic-connector-impl-llm-openai-compat = { path = "philharmonic-connector-impl-llm-openai-compat" }
+philharmonic-connector-impl-llm-anthropic = { path = "philharmonic-connector-impl-llm-anthropic" }
+philharmonic-connector-impl-llm-gemini = { path = "philharmonic-connector-impl-llm-gemini" }
+philharmonic-connector-impl-sql-postgres = { path = "philharmonic-connector-impl-sql-postgres" }
+philharmonic-connector-impl-sql-mysql = { path = "philharmonic-connector-impl-sql-mysql" }
+philharmonic-connector-impl-email-smtp = { path = "philharmonic-connector-impl-email-smtp" }
+philharmonic-connector-impl-embed = { path = "philharmonic-connector-impl-embed" }
+philharmonic-connector-impl-vector-search = { path = "philharmonic-connector-impl-vector-search" }
+philharmonic-api = { path = "philharmonic-api" }
 
 [profile.release]
 opt-level = 3
