@@ -43,7 +43,8 @@ philharmonic-workspace/
 ├── philharmonic-connector-router/             # submodule
 ├── philharmonic-connector-service/            # submodule
 ├── philharmonic-connector-impl-*/             # submodules (one per impl)
-└── philharmonic-api/                          # submodule
+├── philharmonic-api/                          # submodule
+└── philharmonic/                              # submodule
 ```
 
 Each submodule is a standalone Git repository at
@@ -86,6 +87,9 @@ Each submodule is a standalone Git repository at
 
 **API:**
 - `philharmonic-api` — public HTTP API
+
+**Meta-crate:**
+- `philharmonic` — meta crate
 
 ## Status
 
