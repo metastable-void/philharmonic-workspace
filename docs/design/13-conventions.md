@@ -78,6 +78,9 @@ further patch whose feature set you start using, bump the pin.
 All Git operations on this workspace go through the helper
 scripts in `scripts/`:
 
+- `setup.sh` — one-time (or post-fresh-clone) initialization.
+  Initializes every submodule recursively and warns if the Rust
+  toolchain isn't on PATH. Idempotent; safe to rerun.
 - `status.sh` — parent + every submodule's working tree.
 - `pull-all.sh` — update submodules to their tracked branches.
 - `commit-all.sh [--parent-only] [msg]` — commit pending changes
