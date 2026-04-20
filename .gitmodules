@@ -62,7 +62,7 @@
 	path = philharmonic-connector-impl-embed
 	url = https://github.com/metastable-void/philharmonic-connector-impl-embed.git
 [submodule "philharmonic-connector-impl-vector-searc"]
-	path = philharmonic-connector-impl-vector-searc
+	path = philharmonic-connector-impl-vector-search
 	url = https://github.com/metastable-void/philharmonic-connector-impl-vector-search.git
 [submodule "mechanics-config"]
 	path = mechanics-config
