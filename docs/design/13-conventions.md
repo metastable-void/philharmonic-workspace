@@ -80,8 +80,13 @@ scripts in `scripts/`:
 
 - `status.sh` — parent + every submodule's working tree.
 - `pull-all.sh` — update submodules to their tracked branches.
-- `commit-all.sh [msg]` — commit pending changes in each
-  submodule first, then the parent (bumping submodule pointers).
+- `commit-all.sh [--parent-only] [msg]` — commit pending changes
+  in each submodule first, then the parent (bumping submodule
+  pointers). With `--parent-only`, skip the submodule walk and
+  commit only the parent — useful when the parent has its own
+  pending work (docs, scripts) that should land independently
+  of whatever state the submodules are in (e.g. while Codex has
+  in-progress uncommitted work).
 - `push-all.sh` — push each submodule's current branch, then the
   parent.
 
@@ -96,6 +101,39 @@ document the change here) before proceeding.
 commit in every repo in this workspace (parent and submodules).
 This is a Developer Certificate of Origin-style assertion and is
 a hard requirement, not a preference.
+
+## Codex prompt archive
+
+Claude hands substantive coding to Codex (see CLAUDE.md §Claude
+vs. Codex division of labor). Every prompt Claude writes for
+Codex is archived and committed — there are no ephemeral Codex
+invocations.
+
+**Location.** `docs/codex-prompts/YYYY-MM-DD-<slug>.md`, where
+`<slug>` names the task (`auth-middleware-rewrite`,
+`sqlx-mysql-store-skeleton`). One file per prompt. If a task
+needs multiple rounds of Codex work, use a numeric suffix
+(`-01`, `-02`) rather than overwriting.
+
+**Contents.** The full prompt text Claude sent to Codex,
+verbatim, plus a short preamble with:
+
+- The task's motivation (one or two sentences).
+- Links to the relevant design doc sections or ROADMAP entries.
+- Any context files Claude pointed Codex at.
+
+**Commit cadence.** Commit the prompt file *before* spawning
+Codex, via `scripts/commit-all.sh`. The resulting code changes
+land in a subsequent commit (or commits). Ordering the prompt
+first means the archive is complete even if the Codex run is
+abandoned partway through.
+
+**Why.** The prompts are where design intent gets translated
+into implementation instructions; they're the most useful
+artifact for reconstructing why a chunk of code looks the way
+it does, and they're where Claude/Codex collaboration mistakes
+become visible in review. Losing them to chat history defeats
+the reviewability of the workflow.
 
 ## Edition and MSRV
 

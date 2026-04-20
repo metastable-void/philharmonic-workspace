@@ -41,3 +41,9 @@ Rule of thumb: if the question is "what should this look like?"
 Claude answers. If the question is "now write the thing," Claude
 hands off to Codex unless it's plumbing/housekeeping that
 doesn't warrant the round-trip.
+
+**Archive every Codex prompt.** Before spawning Codex, write the
+prompt to `docs/codex-prompts/YYYY-MM-DD-<slug>.md` and commit
+it (via `scripts/commit-all.sh`). No Codex invocation is
+ephemeral — the prompt is part of the project record. See
+docs/design/13-conventions.md §Codex prompt archive.

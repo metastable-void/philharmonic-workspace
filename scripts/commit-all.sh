@@ -12,12 +12,24 @@
 # orphan the next time the submodule is checked out.
 #
 # Usage:
-#   scripts/commit-all.sh [message]
+#   scripts/commit-all.sh [--parent-only] [message]
+#
+# --parent-only: skip the submodule walk. Use this when the parent
+#   has its own pending work (e.g. docs, scripts) that should land
+#   independently of whatever the submodules are currently doing.
+#   Handy when submodules hold in-progress Codex work that shouldn't
+#   be committed yet.
 # Message defaults to "updates".
 
 set -euo pipefail
 
 cd "$(git rev-parse --show-toplevel)"
+
+parent_only=0
+if [ "${1:-}" = "--parent-only" ]; then
+    parent_only=1
+    shift
+fi
 
 msg="${1:-updates}"
 
@@ -28,8 +40,9 @@ trap 'rm -f "$msgfile"' EXIT
 printf '%s\n' "$msg" > "$msgfile"
 export MSG_FILE="$msgfile"
 
-# Commit each submodule's changes (if any).
-git submodule foreach --quiet '
+# Commit each submodule's changes (if any), unless --parent-only.
+if [ "$parent_only" -eq 0 ]; then
+    git submodule foreach --quiet '
 branch=$(git rev-parse --abbrev-ref HEAD)
 if ! git diff --quiet || ! git diff --cached --quiet || [ -n "$(git ls-files --others --exclude-standard)" ]; then
     if [ "$branch" = "HEAD" ]; then
@@ -45,6 +58,9 @@ else
     echo "=== $name clean ==="
 fi
 '
+else
+    echo "=== --parent-only: skipping submodules ==="
+fi
 
 # Commit parent's changes (including bumped submodule pointers).
 if ! git diff --quiet || ! git diff --cached --quiet || [ -n "$(git ls-files --others --exclude-standard)" ]; then
