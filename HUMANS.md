@@ -9,7 +9,6 @@ this file, but never edit this file.
 
 ## Short-term TODOs
 
-- settle on the file structure of notes by coding agents
-  left to human reviewers.
+- review changes on mechanics-config/mechanics-core.
 - run a full test on mechanics-config/mechanics-core.
 - update ROADMAP.md.
