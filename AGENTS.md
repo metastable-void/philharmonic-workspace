@@ -53,8 +53,8 @@ a branch and open a PR"), stop and surface that — don't guess.
 
 ## Rust conventions
 
-- **Edition 2024, MSRV 1.85.** Every `Cargo.toml` already carries
-  `edition = "2024"` and `rust-version = "1.85"` — match.
+- **Edition 2024, MSRV 1.88.** Every `Cargo.toml` already carries
+  `edition = "2024"` and `rust-version = "1.88"` — match.
 - **License.** All crates are `Apache-2.0 OR MPL-2.0` with both
   license files at the crate root. **Do not add per-file copyright
   or license headers** — this workspace doesn't use them.

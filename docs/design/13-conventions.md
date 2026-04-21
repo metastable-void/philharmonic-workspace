@@ -392,13 +392,13 @@ the reviewability of the workflow.
 ## Edition and MSRV
 
 - **Edition 2024.**
-- **MSRV 1.85.**
+- **MSRV 1.88.**
 
 Documented in each `Cargo.toml`:
 
 ```toml
 edition = "2024"
-rust-version = "1.85"
+rust-version = "1.88"
 ```
 
 MSRV bumps happen in coordinated minor releases across the

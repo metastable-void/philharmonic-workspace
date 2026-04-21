@@ -60,7 +60,7 @@ EOF
 name = "$repo"
 version = "0.0.0"
 edition = "2024"
-rust-version = "1.85"
+rust-version = "1.88"
 license = "Apache-2.0 OR MPL-2.0"
 repository = "https://github.com/metastable-void/$repo"
 description = "Placeholder. Part of the Philharmonic workspace."

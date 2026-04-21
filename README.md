@@ -112,7 +112,7 @@ Already published with substantive content:
 
 ## Prerequisites
 
-- Rust 1.85 or newer (edition 2024).
+- Rust 1.88 or newer (edition 2024).
 - Git 2.30 or newer (for modern submodule semantics).
 - A MySQL-family database (MySQL 8, MariaDB 10.5+, or TiDB) for
   running storage backend tests. Containerized setups via Docker
@@ -491,7 +491,7 @@ docs describing an aspirational past are worse than nothing.
 ## Editions and MSRV
 
 - Edition 2024.
-- MSRV 1.85.
+- MSRV 1.88.
 
 Declared in workspace policy and mirrored in each crate manifest.
 

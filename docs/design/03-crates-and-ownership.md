@@ -244,9 +244,9 @@ every client, router, service, and implementation simultaneously.
 ## Edition and MSRV
 
 - Edition 2024.
-- MSRV 1.85.
+- MSRV 1.88.
 
-Documented in each crate's `Cargo.toml` via `rust-version = "1.85"`.
+Documented in each crate's `Cargo.toml` via `rust-version = "1.88"`.
 
 ## Build targets
 

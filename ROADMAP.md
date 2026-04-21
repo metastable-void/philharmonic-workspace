@@ -158,7 +158,7 @@ soft-deletes are revisions with an `is_retired` scalar set true.
 If you find yourself wanting to "just update a field," re-read
 `02-design-principles.md` and `05-storage-substrate.md`.
 
-**MSRV and edition.** Edition 2024, `rust-version = "1.85"`, set
+**MSRV and edition.** Edition 2024, `rust-version = "1.88"`, set
 in every crate's own `Cargo.toml`.
 
 **Licensing.** All crates: `license = "Apache-2.0 OR MPL-2.0"`.
