@@ -17,7 +17,7 @@
 # orphan the next time the submodule is checked out.
 #
 # Usage:
-#   scripts/commit-all.sh [--parent-only] [message]
+#   scripts/commit-all.sh [--anonymize] [--parent-only] [message]
 #
 # --parent-only: skip the submodule walk. Use this when the parent
 #   has its own pending work (e.g. docs, scripts) that should land
@@ -33,18 +33,35 @@ set -eu
 . "$(dirname -- "$0")/lib/workspace-cd.sh"
 
 parent_only=0
-if [ "${1:-}" = "--parent-only" ]; then
-    parent_only=1
-    shift
-fi
+anonymize=0
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --parent-only) parent_only=1; shift ;;
+        --anonymize) anonymize=1; shift ;;
+        --help)
+            echo "Usage: $0 [--anonymize] [--parent-only] [message]"
+            exit
+            ;;
+        --)                           shift; break ;;
+        -*) printf 'unknown flag: %s\n' "$1" >&2; exit 2 ;;
+        *) break ;;
+    esac
+done
 
 msg="${1:-updates}"
+
+if [ "${anonymize}" -eq 1 ] ; then
+    audit_flags="--anonymize"
+else
+    audit_flags=
+fi
 
 # Stash the message in a temp file so we don't have to escape it
 # through `git submodule foreach`'s nested shell.
 msgfile="$(mktemp)"
 trap 'rm -f "$msgfile"' EXIT
-printf '%s\n' "$msg" > "$msgfile"
+printf '%s\n\n' "$msg" > "$msgfile"
+printf 'Audit-Info: %s\n' "$( "$(dirname "$0")"/print-audit-info.sh $audit_flags )" >> "$msgfile"
 export MSG_FILE="$msgfile"
 
 # Commit each submodule's changes (if any), unless --parent-only.

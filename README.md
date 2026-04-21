@@ -196,9 +196,23 @@ Invoke by path (`./scripts/foo.sh`), not via `bash`.
 - `./scripts/pull-all.sh` — rebase-pull the parent and update
   each submodule to the tip of its tracked remote branch. Does
   *not* commit the bumped submodule pointers.
-- `./scripts/commit-all.sh [--parent-only] [message]` — commit
-  pending changes. Walks each dirty submodule first (committing
-  with `-s`), then the parent.
+- `./scripts/commit-all.sh [--anonymize] [--parent-only] [message]` —
+  commit pending changes. Walks each dirty submodule first
+  (committing with `-s -S`), then the parent. Every commit gets
+  an `Audit-Info:` trailer recording the environment that
+  produced it — timestamp, hostname, user/uid, group/gid, public
+  IPv4+v6 with geolocation (queried once per invocation from
+  `1.1.1.1`, not per submodule), kernel/release, arch, and OS.
+  The line is produced by
+  [`./scripts/print-audit-info.sh`](scripts/print-audit-info.sh)
+  and parsed as a standard git trailer (queryable via
+  `git log --format='%(trailers)'`). Pass `--anonymize` to
+  replace the IPv4 and IPv6 fields with `hidden/ZZ` while
+  keeping the rest; host/user/kernel/os are always recorded.
+  The audit line is not a substitute for the DCO `Signed-off-by:`
+  or the GPG/SSH signature — all three travel together in the
+  trailer block. See [§Commit audit trailer](#commit-audit-trailer)
+  below for the full rationale.
 - `./scripts/push-all.sh` — push each submodule's current
   branch, then the parent. Aborts before pushing the parent if
   any submodule push fails.
@@ -287,6 +301,73 @@ git config fetch.recurseSubmodules on-demand
 They make `git status` / `git diff` show submodule context and
 let `git fetch` pick up submodule updates on demand — useful for
 the read-only git the scripts invoke under the hood.
+
+### Commit audit trailer
+
+Every commit produced by `./scripts/commit-all.sh` carries an
+`Audit-Info:` git trailer alongside `Signed-off-by:` (DCO) and
+the GPG/SSH signature. The line is produced by
+[`./scripts/print-audit-info.sh`](scripts/print-audit-info.sh) —
+run once at the start of `commit-all.sh` and reused for every
+submodule + parent commit in that invocation — so each commit
+records the environment that created it without re-hitting the
+network per submodule.
+
+Shape of the line:
+
+```
+Audit-Info: t=<unix-ts> h=<hostname> u=<user>/<uid> g=<group>/<gid> \
+            4=<ipv4>/<geo> 6=<ipv6>/<geo> k=<kernel>/<release> \
+            a=<arch> o=<os-id>_<version-id>
+```
+
+Query trailers across history with git's native tools:
+
+```bash
+# Audit line on a specific commit
+git log -n 1 --format='%(trailers:key=Audit-Info,valueonly)'
+
+# All audit lines, with the commit they came from, across history
+git log --format='%h %s%n  %(trailers:key=Audit-Info,valueonly)'
+
+# Commits made from a specific host (audit host field is `h=`)
+git log --grep='^Audit-Info: .* h=analysis-mori01' -P
+```
+
+**Why this exists.** Commits are already DCO-signed off and
+cryptographically signed. The audit trailer adds a machine/
+network fingerprint — "which box, which user, from which
+network did this commit originate?" — useful for forensic
+attribution after the fact and for catching "wait, that commit
+claims to be mine but came from somewhere I don't recognize"
+kinds of situations. The signature is the strong claim about
+*who*; the audit line is a contextual claim about *where*.
+
+**Why it's a trailer, not a file.** Trailers are git's native
+metadata mechanism (same slot as `Signed-off-by:` and
+`Co-authored-by:`). They travel with the commit through
+rebase, cherry-pick, push, amend — no bookkeeping needed.
+`git log --format='%(trailers)'` extracts them cleanly. They
+also avoid polluting the tree with audit files that would have
+to be kept in sync with every commit across 23+ submodules.
+
+**Privacy and opt-out.** The default audit line includes the
+public IPv4 and IPv6 addresses your machine exits to, plus
+Cloudflare's geolocation guess for each. Pushing to a public
+GitHub repo makes those addresses part of the permanent public
+history — commit messages are effectively immutable (hiding
+them later requires a destructive `git filter-repo` + force-push
+cascade across every cloned copy). If that's unacceptable for
+a given machine or session, pass `--anonymize` to replace both
+IP/geo fields with `hidden/ZZ` while preserving host, user,
+kernel, arch, and OS:
+
+```bash
+./scripts/commit-all.sh --anonymize "your message"
+```
+
+Hostnames are never anonymized — if your hostname is sensitive,
+change it before committing from that box.
 
 ## AI-assisted development
 
