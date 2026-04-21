@@ -1,69 +1,92 @@
 [submodule "philharmonic-types"]
 	path = philharmonic-types
 	url = https://github.com/metastable-void/philharmonic-types.git
+	branch = main
 [submodule "philharmonic-store"]
 	path = philharmonic-store
 	url = https://github.com/metastable-void/philharmonic-store.git
+	branch = main
 [submodule "philharmonic-store-sqlx-mysql"]
 	path = philharmonic-store-sqlx-mysql
 	url = https://github.com/metastable-void/philharmonic-store-sqlx-mysql.git
+	branch = main
 [submodule "mechanics-core"]
 	path = mechanics-core
 	url = https://github.com/metastable-void/mechanics-core.git
+	branch = main
 [submodule "mechanics"]
 	path = mechanics
 	url = https://github.com/metastable-void/mechanics-rs.git
+	branch = main
 [submodule "philharmonic"]
 	path = philharmonic
 	url = https://github.com/metastable-void/philharmonic.git
+	branch = main
 [submodule "philharmonic-policy"]
 	path = philharmonic-policy
 	url = https://github.com/metastable-void/philharmonic-policy.git
+	branch = main
 [submodule "philharmonic-workflow"]
 	path = philharmonic-workflow
 	url = https://github.com/metastable-void/philharmonic-workflow.git
+	branch = main
 [submodule "philharmonic-connector-common"]
 	path = philharmonic-connector-common
 	url = https://github.com/metastable-void/philharmonic-connector-common.git
+	branch = main
 [submodule "philharmonic-connector-client"]
 	path = philharmonic-connector-client
 	url = https://github.com/metastable-void/philharmonic-connector-client.git
+	branch = main
 [submodule "philharmonic-connector-router"]
 	path = philharmonic-connector-router
 	url = https://github.com/metastable-void/philharmonic-connector-router.git
+	branch = main
 [submodule "philharmonic-connector-service"]
 	path = philharmonic-connector-service
 	url = https://github.com/metastable-void/philharmonic-connector-service.git
+	branch = main
 [submodule "philharmonic-api"]
 	path = philharmonic-api
 	url = https://github.com/metastable-void/philharmonic-api.git
+	branch = main
 [submodule "philharmonic-connector-impl-http-forward"]
 	path = philharmonic-connector-impl-http-forward
 	url = https://github.com/metastable-void/philharmonic-connector-impl-http-forward.git
+	branch = main
 [submodule "philharmonic-connector-impl-llm-openai-compat"]
 	path = philharmonic-connector-impl-llm-openai-compat
 	url = https://github.com/metastable-void/philharmonic-connector-impl-llm-openai-compat.git
+	branch = main
 [submodule "philharmonic-connector-impl-llm-anthropic"]
 	path = philharmonic-connector-impl-llm-anthropic
 	url = https://github.com/metastable-void/philharmonic-connector-impl-llm-anthropic.git
+	branch = main
 [submodule "philharmonic-connector-impl-llm-gemini"]
 	path = philharmonic-connector-impl-llm-gemini
 	url = https://github.com/metastable-void/philharmonic-connector-impl-llm-gemini.git
+	branch = main
 [submodule "philharmonic-connector-impl-sql-postgres"]
 	path = philharmonic-connector-impl-sql-postgres
 	url = https://github.com/metastable-void/philharmonic-connector-impl-sql-postgres.git
+	branch = main
 [submodule "philharmonic-connector-impl-sql-mysql"]
 	path = philharmonic-connector-impl-sql-mysql
 	url = https://github.com/metastable-void/philharmonic-connector-impl-sql-mysql.git
+	branch = main
 [submodule "philharmonic-connector-impl-email-smtp"]
 	path = philharmonic-connector-impl-email-smtp
 	url = https://github.com/metastable-void/philharmonic-connector-impl-email-smtp.git
+	branch = main
 [submodule "philharmonic-connector-impl-embed"]
 	path = philharmonic-connector-impl-embed
 	url = https://github.com/metastable-void/philharmonic-connector-impl-embed.git
+	branch = main
 [submodule "philharmonic-connector-impl-vector-search"]
 	path = philharmonic-connector-impl-vector-search
 	url = https://github.com/metastable-void/philharmonic-connector-impl-vector-search.git
+	branch = main
 [submodule "mechanics-config"]
 	path = mechanics-config
 	url = https://github.com/metastable-void/mechanics-config.git
+	branch = main
