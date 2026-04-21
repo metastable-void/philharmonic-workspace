@@ -8,8 +8,11 @@ set -euo pipefail
 
 cd "$(git rev-parse --show-toplevel)"
 
-# Fetch parent so its ahead/behind count is meaningful.
-git fetch
+# Integrate remote changes into the parent. Rebase keeps history
+# linear — local parent commits (usually submodule-pointer bumps)
+# get replayed on top of origin. Fails loudly on conflicts or a
+# dirty working tree rather than auto-merging.
+git pull --rebase
 
 # Update each submodule's working tree to the tip of its tracked
 # remote branch. (.gitmodules can specify per-submodule branch;
