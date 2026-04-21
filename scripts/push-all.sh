@@ -24,7 +24,7 @@ if [ "$branch" = "HEAD" ]; then
     echo "    If you made local commits here, checkout a branch" >&2
     echo "    and re-run this script before the parent is pushed." >&2
 else
-    git push -u origin "$branch"
+    git push origin "$branch"
 fi
 '
 

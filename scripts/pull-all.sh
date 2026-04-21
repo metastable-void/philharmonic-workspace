@@ -15,9 +15,11 @@ cd "$(git rev-parse --show-toplevel)"
 git pull --rebase
 
 # Update each submodule's working tree to the tip of its tracked
-# remote branch. (.gitmodules can specify per-submodule branch;
-# otherwise git uses each submodule's origin HEAD.)
-git submodule update --remote --recursive
+# remote branch (branch = ... in .gitmodules). --rebase replays
+# any local submodule commits on top of the remote branch instead
+# of detaching HEAD at the remote SHA, which the default checkout
+# mode would do when origin is ahead.
+git submodule update --remote --rebase --recursive
 
 # Show resulting state. Parent may now be dirty due to bumped
 # submodule pointers; that's the signal to commit.

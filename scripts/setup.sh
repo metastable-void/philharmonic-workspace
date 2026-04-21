@@ -37,6 +37,14 @@ ok() {
 ok "Initializing submodules recursively"
 git submodule update --init --recursive
 
+# push.recurseSubmodules=check makes `git push` on the parent refuse
+# to advance if any referenced submodule commit is not on its remote.
+# push-all.sh's guardrail depends on this being set; we configure it
+# locally (not via .gitmodules, which can't carry arbitrary config)
+# so a fresh clone is safe from the first push onward.
+ok "Configuring push.recurseSubmodules=check"
+git config --local push.recurseSubmodules check
+
 ok "Submodule status"
 git submodule status --recursive
 
