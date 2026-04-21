@@ -397,9 +397,11 @@ for the Codex prompts and the commits they produced):
 - Behavior change: schema validation now fails at config-
   construction time instead of job-call time (noted in
   `mechanics-core/CHANGELOG.md 0.3.0`).
-- `mechanics/Cargo.toml` bumped to `mechanics-core = "0.3.0"` in
-  lockstep so the http-server crate opts in explicitly rather
-  than being held back on the 0.2.x line.
+- `mechanics` bumped `0.2.1 → 0.3.0` in lockstep: its own
+  version and its `mechanics-core` dep pin both moved to the 0.3
+  line, so downstream consumers opt into the new `mechanics-core`
+  type identity explicitly rather than crossing it silently under
+  a caret-range upgrade of either crate.
 - Post-extraction cleanup: 5 orphan `.rs` files removed from
   `mechanics-core/src/internal/http/` that were no longer
   compiled but would still have shipped in the crates.io

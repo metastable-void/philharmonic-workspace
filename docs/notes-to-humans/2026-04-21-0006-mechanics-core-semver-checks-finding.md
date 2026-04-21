@@ -5,12 +5,19 @@
 `./scripts/check-api-breakage.sh mechanics-core` after the script
 was rewritten (same session — see §"Script fix" below).
 **Status:** **Resolved (2026-04-21, same session): Path A chosen.**
-`mechanics-core/Cargo.toml` bumped to `0.3.0`, CHANGELOG's
-`[0.2.3]` heading re-cut as `[0.3.0]` with the reasoning recorded
-in the section preamble, and `mechanics/Cargo.toml` updated from
-`mechanics-core = "0.2.2"` to `"0.3.0"` in the same session so
-downstream consumers opt in explicitly. Publish still pending —
-next steps in `ROADMAP.md` §Phase 1 Remaining work.
+- `mechanics-core/Cargo.toml` bumped to `0.3.0`; CHANGELOG's
+  `[0.2.3]` heading re-cut as `[0.3.0]` with the reasoning
+  recorded in the section preamble.
+- `mechanics/Cargo.toml`: dep pin moved from
+  `mechanics-core = "0.2.2"` to `"0.3.0"`, and `mechanics`'s own
+  version bumped `0.2.1 → 0.3.0` in the same session with a
+  CHANGELOG `[0.3.0]` entry. Bumping `mechanics`'s own version
+  (not just the dep pin) is what forces downstream consumers of
+  `mechanics` to opt into the new `mechanics-core` type identity
+  explicitly — otherwise a caret-range upgrade of `mechanics`
+  alone would cross the boundary silently via the re-exports.
+- Publish still pending — next steps in `ROADMAP.md` §Phase 1
+  Remaining work.
 
 ## The finding
 
