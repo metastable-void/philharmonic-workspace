@@ -96,6 +96,24 @@ Developer: Yuka MORI.
   canonical source — `xtask.sh` — so nobody accidentally
   commits a value they generated ad-hoc and meant to throw
   away.
+- **Never recall a Rust crate's published version from memory
+  — always look it up via
+  `./scripts/xtask.sh crates-io-versions -- <crate>`.**
+  Applies to every question about "what's the latest version of
+  X on crates.io?", "has Y.Z.W been published yet?", or "what
+  versions exist for this crate?" — whether it's a third-party
+  crate or one of this workspace's own crates. Published
+  versions drift constantly (new releases, yanks, pre-releases),
+  model training data is months to years stale, and prior-
+  session memory is frozen in time. Echoing a remembered number
+  — even one that was right last week — is how wrong pins and
+  wrong changelogs get written. The wrapper hits the crates.io
+  sparse index and is authoritative. The only exception is the
+  version declared *in this workspace's own `Cargo.toml`*, which
+  `./scripts/crate-version.sh <crate>` reports — that's
+  "what we're about to publish", not "what's on crates.io",
+  and the two can legitimately differ. See
+  docs/design/13-conventions.md §Crate version lookup.
 - **Same rule for `mktemp`, `curl`, `wget`, and other external
   non-Rust tools.** Never call `mktemp`, `curl`, or `wget`
   directly from a workspace script. Use the wrappers:

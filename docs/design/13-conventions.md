@@ -73,6 +73,66 @@ the *only* reason to tighten beyond a minor pin; don't pin to a
 patch for hygiene or habit. When the dependency publishes a
 further patch whose feature set you start using, bump the pin.
 
+## Crate version lookup
+
+**Rule: never recall a crate's published version from memory.
+Every question about "what's on crates.io for crate X?" is
+answered by running the lookup wrapper:**
+
+```bash
+./scripts/xtask.sh crates-io-versions -- <crate>
+```
+
+The wrapper queries the crates.io sparse index in-process (via
+the `xtask/` `crates-io-versions` bin) and prints every
+non-yanked published version. That's the authoritative answer.
+Applies to third-party crates (checking whether a new `tokio` /
+`serde` / `sqlx` release exists before bumping) *and* this
+workspace's own crates (confirming whether `philharmonic-types
+0.3.4` is already out before cutting `0.3.5`).
+
+**Why the rule exists:**
+
+- **Model memory is stale.** Claude's and Codex's training data
+  is months to years behind the present. A version remembered
+  from training is almost certainly wrong for anything that has
+  released in the last year, and it's wrong in a way that is
+  hard to notice — the remembered number *sounds* right.
+- **Session memory is frozen in time.** A version confirmed
+  three sessions ago may have been superseded, yanked, or
+  replaced by a security patch in the meantime. Memory records
+  persist across sessions; crates.io state doesn't.
+- **Echoing a remembered number is how wrong pins land.** Pins
+  are checked into `Cargo.toml` and `Cargo.lock`, and a pin to a
+  non-existent version fails only at resolve time — after the
+  commit lands and CI tries to build it.
+- **The lookup is cheap.** One HTTP round-trip to the sparse
+  index, no auth required, sub-second in practice.
+
+**When the rule *doesn't* apply — local version declarations.**
+The version a workspace crate currently declares *in its own
+`Cargo.toml`* (the "what we're about to publish" number) is
+separate from the crates.io state and has its own wrapper:
+
+```bash
+./scripts/crate-version.sh <crate>       # single-crate (for scripting)
+./scripts/crate-version.sh --all         # every workspace member
+```
+
+`crate-version.sh` parses the local `Cargo.toml`;
+`crates-io-versions` queries crates.io. The two can legitimately
+disagree — e.g. `Cargo.toml` declares `0.3.5` locally while
+crates.io only has up through `0.3.4`, because we're mid-release.
+Pick the wrapper that matches the question. Neither answer should
+come from memory.
+
+**Applies to agents and humans equally.** The rule reads as
+agent-facing because Claude and Codex are the most likely
+offenders — they have memory stores and training priors to lean
+on. But humans forget versions too, and the wrapper is the same
+cost for either. If you're writing changelog text, release notes,
+or a dependency bump, run the wrapper.
+
 ## Git workflow
 
 All Git operations on this workspace go through the helper
