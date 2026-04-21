@@ -102,7 +102,9 @@ workspace:
 - **Invoke by path**: `./scripts/foo.sh`, not `bash scripts/foo.sh`.
   Prefixing `bash` hides bashisms that would break on Alpine /
   FreeBSD / macOS.
-- **Validate with `dash -n`** before concluding.
+- **Validate with `./scripts/test-scripts.sh`** (runs `dash -n`
+  against every `scripts/*.sh`, falling back to `sh -n`) before
+  concluding. CI runs the same check.
 - Explicit POSIX deviations (e.g. `ps -o rss=`) are tracked in
   `docs/design/13-conventions.md §Shell scripts`. Don't introduce
   new ones without a recorded reason.
@@ -150,26 +152,35 @@ and surface that rather than proceeding.
 ## Before you hand off
 
 Before concluding any task that touched a `.rs` file (including
-transitive effects — e.g. a `Cargo.toml` dep bump), run these
-three at the workspace root and confirm all pass:
+transitive effects — e.g. a `Cargo.toml` dep bump), run all of
+the following at the workspace root and confirm they pass:
 
 ```bash
-cargo fmt --all --check
-cargo clippy --workspace --all-targets -- -D warnings
-cargo test --workspace
+./scripts/rust-lint.sh                      # fmt + check + clippy -D warnings
+./scripts/rust-test.sh                      # cargo test --workspace, skips #[ignore]
+# Plus, for every crate you modified:
+./scripts/rust-test.sh --ignored <crate>    # its #[ignore]-gated tests
 ```
 
+- **Use the scripts**, not raw `cargo fmt/check/clippy/test`.
+  The scripts encode the mandated flags (`-D warnings`,
+  `--all-targets`, etc.) so you don't have to remember them.
+  Bespoke `cargo test <pattern>` for focused debugging is still
+  fine; the rule targets the canonical pre-landing flow.
 - Clippy runs with `-D warnings` — warnings are errors. Fix the
   root cause. Only add `#[allow(clippy::<lint>)]` at the
   *narrowest* scope, with a one-line comment explaining why,
   when a lint is genuinely wrong for a specific call site.
-- If `cargo fmt --all --check` fails, run `cargo fmt --all` to
-  apply.
-- `cargo test --workspace` (not just per-crate) — cross-crate
-  integration matters.
+- If `rust-lint.sh`'s fmt-check step fails, run `cargo fmt --all`
+  (or `cargo fmt -p <crate>`) to apply and re-run.
+- Why two test phases: `#[ignore]`-gated tests need real
+  infrastructure (testcontainers, live services) and are slow;
+  the workspace run skips them; the per-touched-crate `--ignored`
+  run exercises them for crates you actually changed. Running
+  `--ignored` against untouched crates is waste.
 
-If any of the three fails and you can't get it green within the
-task, say so in your final summary. Don't hand off red code.
+If any step fails and you can't get it green within the task,
+say so in your final summary. Don't hand off red code.
 
 Doc-only / config-only / script-only changes can skip these (no
 `.rs` file touched).

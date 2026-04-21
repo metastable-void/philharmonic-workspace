@@ -16,9 +16,12 @@ Developer: Yuka MORI.
   as a follow-up. A stale roadmap is worse than none. See
   docs/design/13-conventions.md §ROADMAP maintenance.
 - Pre-landing checks: before committing Rust changes, run
-  `cargo fmt --all --check`, `cargo clippy --workspace
-  --all-targets -- -D warnings`, and `cargo test --workspace`.
-  All three must pass. No exceptions for "small" changes. See
+  `./scripts/rust-lint.sh` (fmt + check + clippy -D warnings)
+  and `./scripts/rust-test.sh` (workspace tests, skip
+  `#[ignore]`). Plus, for **every** crate modified in the
+  commit, run `./scripts/rust-test.sh --ignored <crate>` to
+  exercise its integration tests. Don't run raw `cargo
+  fmt/check/clippy/test` when the scripts cover the case. See
   docs/design/13-conventions.md §Pre-landing checks.
 - **Notes to humans.** When you tell Yuka anything significant
   (verification results with informative "why", platform
@@ -47,7 +50,20 @@ Developer: Yuka MORI.
 - Shell scripts are **POSIX sh** (`#!/bin/sh`), not bash. No
   bashisms; explicit deviations (e.g. `ps -o rss=`) are tracked in
   docs/design/13-conventions.md §Shell scripts. Validate with
-  `dash -n scripts/*.sh` before landing.
+  `./scripts/test-scripts.sh` (mandatory after any script change;
+  CI runs the same check).
+- **Extract routines into scripts, not ad-hoc commands.** When
+  you find yourself running the same command sequence more than
+  once or twice — especially multi-line flows with flags,
+  `git submodule foreach` loops, or POSIX-compatibility guards —
+  stop and turn it into a `scripts/*.sh` file. Scripts are
+  reviewable, testable, discoverable, and they capture flag
+  choices that otherwise drift. The bar is low; a one-liner
+  becomes a two-line script. After extracting: validate with
+  `./scripts/test-scripts.sh`, update the scripts list in
+  README.md + the `git-workflow` skill (if git-related), and
+  document any associated rule here or in the conventions doc.
+  See docs/design/13-conventions.md §Shell scripts.
 - Codex has its own instruction file: `AGENTS.md` at the repo
   root. It's auto-loaded by Codex when it runs, and mirrors the
   Claude-vs-Codex division (Claude designs/commits; Codex

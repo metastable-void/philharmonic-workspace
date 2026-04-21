@@ -101,6 +101,11 @@ submodules are skipped with a warning (normal right after
 `git submodule update`). `--follow-tags` means release tags
 created by `publish-crate.sh` ship along with their branch commit.
 
+### `scripts/test-scripts.sh`
+POSIX-parse-checks every `scripts/*.sh` with `dash -n` (fallback
+`sh -n`). **Mandatory after any change under `scripts/`** before
+committing. GitHub CI runs the same check.
+
 ### `scripts/heads.sh`
 Shows the current HEAD commit for the parent and every submodule,
 with short SHA, `%G?` signature indicator, and subject. Use after

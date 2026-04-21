@@ -171,9 +171,44 @@ supported. *Extremely stripped* busybox builds (e.g. Ubuntu's
 a real target. When picking a `ps` field or flag, prefer ones
 the Alpine build supports.
 
-**Validate with dash.** `dash -n scripts/*.sh` catches most
-bashisms at parse time. Actual execution under dash (the default
-`/bin/sh` on Debian/Ubuntu) is the other half of the check.
+**Validate with `./scripts/test-scripts.sh`** (mandatory after
+any change under `scripts/`). It runs `dash -n` against every
+`.sh` under `scripts/`, falling back to `sh -n` if dash isn't
+installed. GitHub CI runs the same script, so drift between
+contributor and CI behavior is impossible. Actual execution
+under dash (the default `/bin/sh` on Debian/Ubuntu) is the
+other half of the check — worth doing manually for scripts that
+actually run state-changing logic.
+
+**Extract routines into scripts, not ad-hoc commands.** When
+you find yourself running the same command or command sequence
+more than once or twice — especially multi-line sequences with
+flags, `git submodule foreach` invocations, or POSIX-
+compatibility guards — extract it into a `scripts/*.sh` file.
+Rationale:
+
+- Scripts are reviewable: the logic lands in diffs; ad-hoc
+  commands live in chat scrollback and evaporate.
+- Scripts are testable: runnable by humans, CI, and future
+  sessions. Invariants encoded once stay encoded.
+- Scripts are discoverable: newcomers and future collaborators
+  see them in `scripts/`, not scattered across READMEs.
+- Scripts capture flag choices (`-D warnings`, `--all-targets`,
+  `--follow-tags`, `-S`) that otherwise drift between
+  invocations.
+
+The bar is low. A one-liner becomes a two-line script. Don't
+let "it's just a small thing" justify keeping a recurring pattern
+ad-hoc — and for each new script, validate with
+`./scripts/test-scripts.sh`, add it to the scripts list in
+README.md and the `git-workflow` skill (if git-related), and
+document any associated rule in `CLAUDE.md` or this file.
+
+This rule applies primarily to Claude Code (the one orchestrating
+across tasks and noticing repetition). Codex receives discrete
+tasks and doesn't typically make extraction decisions — but if
+Codex notices a pattern in its prompts that warrants a script,
+it should flag it in the final summary so Claude can extract.
 
 **Invoke by path, not by interpreter.** Run `./scripts/foo.sh`,
 never `bash scripts/foo.sh` or `sh scripts/foo.sh`. The shebang
@@ -461,33 +496,62 @@ per-commit.
 ## Pre-landing checks
 
 **Mandatory before every commit that touches Rust code.** Run
-these three at the workspace root; all three must pass:
+all of the following at the workspace root; all must pass:
 
 ```bash
-cargo fmt --all --check
-cargo clippy --workspace --all-targets -- -D warnings
-cargo test --workspace
+./scripts/rust-lint.sh                      # fmt-check + check + clippy -D warnings
+./scripts/rust-test.sh                      # cargo test --workspace (skips #[ignore])
+# Plus, for every crate you modified in this commit:
+./scripts/rust-test.sh --ignored <crate>    # its #[ignore]-gated integration tests
 ```
 
-- **`cargo fmt --all --check`** — enforces canonical formatting.
-  Run `cargo fmt --all` (without `--check`) to apply when it
-  fails. No stylistic bikeshed: `rustfmt` is the arbiter.
-- **`cargo clippy --workspace --all-targets -- -D warnings`** —
-  lints every crate, every target (lib + bins + tests +
-  examples + benches), with warnings treated as errors. No
-  ignored lints, no `#![allow(...)]` at crate scope. If a lint
-  is genuinely wrong for a specific call site, add
-  `#[allow(clippy::<lint>)]` at the *narrowest* scope with a
-  one-line comment explaining *why*.
-- **`cargo test --workspace`** — runs every crate's tests.
-  Per-crate `cargo test` is necessary but not sufficient —
-  cross-crate integration is only visible at the workspace
-  level.
+**Why split the test run.** Integration tests that need real
+infrastructure (testcontainers, live DBs, external APIs) carry
+`#[ignore]` so the default workspace run stays fast. A single
+`cargo test --workspace` with everything enabled would run for
+many minutes on unchanged crates. The split is:
 
-Doc-only commits (markdown, scripts, Cargo.toml metadata that
+- **Workspace-level, skip-ignored** (`./scripts/rust-test.sh`) —
+  catches regressions anywhere in the workspace, fast.
+- **Per-touched-crate `--ignored`** — exercises the integration
+  tests for crates you actually changed. Don't run `--ignored`
+  against untouched crates; it's waste.
+
+You are responsible for running the per-crate `--ignored` phase
+for each modified crate. Forgetting it means slow-test
+regressions slip in.
+
+### The scripts
+
+- **`./scripts/rust-lint.sh [<crate>]`** — `cargo fmt --check`,
+  `cargo check`, `cargo clippy --all-targets -- -D warnings`, in
+  that order. Workspace by default; pass a crate name to narrow.
+  Warnings are errors — no ignored lints, no `#![allow(...)]` at
+  crate scope. For a specific call site where a lint is genuinely
+  wrong, add `#[allow(clippy::<lint>)]` at the *narrowest* scope
+  with a one-line comment explaining *why*. If fmt-check fails,
+  run `cargo fmt --all` (or `cargo fmt -p <crate>`) to apply and
+  re-run.
+- **`./scripts/rust-test.sh [--include-ignored|--ignored] [<crate>]`**
+  — `cargo test`. Workspace by default; pass a crate name to
+  narrow. `--ignored` runs *only* `#[ignore]`-gated tests;
+  `--include-ignored` runs everything (ignored plus the default
+  set). No flag = default cargo behavior (skip ignored).
+
+### Don't go raw
+
+**Do not run raw `cargo fmt`, `cargo check`, `cargo clippy`, or
+`cargo test`** when the scripts above can do the job. Bespoke
+cargo invocations (e.g. `cargo test some_specific_test` for
+focused debugging, or `cargo clippy` with a specific lint toggled
+off for a one-off investigation) remain fine — the rule targets
+the canonical pre-landing flow, not exceptional cases.
+
+Doc-only commits (markdown, scripts, `Cargo.toml` metadata that
 doesn't affect code) may skip these. Anything that could affect
 a `.rs` file's compilation or test outcome — including dependency
-bumps — must run all three.
+bumps — must run all three phases (lint, workspace-test,
+per-crate-ignored for each touched crate).
 
 These rules apply equally to humans and AI agents (Claude Code
 reviewing, Codex implementing). Don't hand off or commit

@@ -124,19 +124,22 @@ signature after committing — an unsigned commit triggers a
 rollback. Non-negotiable.
 
 **Pre-landing checks (mandatory).** Before committing any
-change that touches Rust code, all three of the following must
-pass at the parent root:
+change that touches Rust code, all of the following must pass
+at the parent root:
 
 ```bash
-cargo fmt --all --check
-cargo clippy --workspace --all-targets -- -D warnings
-cargo test --workspace
+./scripts/rust-lint.sh                      # fmt-check + check + clippy -D warnings
+./scripts/rust-test.sh                      # cargo test --workspace (skips #[ignore])
+# Plus, for every crate you modified in this commit:
+./scripts/rust-test.sh --ignored <crate>    # its #[ignore]-gated integration tests
 ```
 
-Per-crate `cargo test` passing is necessary but not sufficient;
-cross-crate integration is only visible at the workspace level.
-Clippy runs with warnings treated as errors — fix the root
-cause, don't silence at crate scope. See
+`#[ignore]` is the project convention for tests that need real
+infrastructure (testcontainers, live services); the workspace
+run skips them, and you run `--ignored` per-modified-crate to
+exercise them. Don't run raw `cargo fmt/check/clippy/test` when
+the scripts cover the case. Clippy runs with `-D warnings` — fix
+the root cause, don't silence at crate scope. See
 `docs/design/13-conventions.md §Pre-landing checks` for detail.
 
 **Follow append-only discipline.** The substrate has no `UPDATE`
@@ -1094,27 +1097,28 @@ From the workspace root:
 # Push pushed-pending commits across every submodule
 ./scripts/push-all.sh
 
-# Check the whole workspace compiles
-cargo check --workspace
-
-# Pre-landing checks (all three must pass before committing Rust)
-cargo fmt --all --check
-cargo clippy --workspace --all-targets -- -D warnings
-cargo test --workspace
+# Pre-landing checks (mandatory before committing Rust code)
+./scripts/rust-lint.sh                      # fmt-check + check + clippy -D warnings
+./scripts/rust-test.sh                      # cargo test --workspace (skips #[ignore])
+# Plus, for every crate modified in the commit:
+./scripts/rust-test.sh --ignored <crate>    # its #[ignore]-gated integration tests
 ```
 
-From inside a submodule (when publishing):
+Publishing a crate (from the workspace root):
 
 ```bash
-# Pre-flight check
-cargo publish --dry-run
+# API-breakage check against the previous release (or any baseline)
+./scripts/check-api-breakage.sh v0.1.0
 
-# Actually publish
-cargo publish
+# Dry-run publish; stops before real publish, no tag created
+./scripts/publish-crate.sh --dry-run <crate>
 
-# Tag the release
-git tag -a v0.1.0 -m "Release 0.1.0"
-git push --tags
+# Real publish: runs cargo publish, tags v<version> in the submodule
+# on success, leaves the tag for the next push-all.sh to ship
+./scripts/publish-crate.sh <crate>
+
+# Push the tag alongside any other pending commits
+./scripts/push-all.sh
 ```
 
 ---

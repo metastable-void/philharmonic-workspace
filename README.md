@@ -210,6 +210,18 @@ Invoke by path (`./scripts/foo.sh`), not via `bash`.
   `push-all.sh` to verify every commit carries a cryptographic
   signature. Canonical replacement for raw `git log -n 1` across
   repos.
+- `./scripts/rust-lint.sh [<crate>]` — workspace-wide (or
+  per-crate) `cargo fmt --check` + `cargo check` + `cargo
+  clippy --all-targets -- -D warnings`. Canonical pre-landing
+  lint pass.
+- `./scripts/rust-test.sh [--include-ignored|--ignored] [<crate>]` —
+  `cargo test`, workspace or per-crate, with optional
+  `#[ignore]` control. Default skips `#[ignore]`'d tests;
+  `--ignored` runs only them (use per modified crate to exercise
+  its integration tests); `--include-ignored` runs everything.
+- `./scripts/test-scripts.sh` — POSIX-parse-checks every
+  `scripts/*.sh` with `dash -n` (fallback `sh -n`). Mandatory
+  after any script change; GitHub CI runs the same check.
 - `./scripts/check-api-breakage.sh [baseline-rev]` — run
   `cargo-semver-checks --workspace --all-features` against a git
   baseline (defaults to `origin/main`). Installs
@@ -297,30 +309,42 @@ cargo build --workspace          # build everything
 
 ### Pre-landing checks (mandatory)
 
-Every commit that touches Rust code must pass all three of the
+Every commit that touches Rust code must pass all of the
 following at the workspace root. This applies equally to humans
 and AI agents.
 
 ```bash
-cargo fmt --all --check
-cargo clippy --workspace --all-targets -- -D warnings
-cargo test --workspace
+./scripts/rust-lint.sh                      # fmt-check + check + clippy -D warnings
+./scripts/rust-test.sh                      # workspace tests, skips #[ignore]
+# Plus, for every crate modified in the commit:
+./scripts/rust-test.sh --ignored <crate>    # its #[ignore]-gated integration tests
 ```
 
-- `cargo fmt --all --check` — canonical formatting; run
-  `cargo fmt --all` to apply when it fails.
-- `cargo clippy --workspace --all-targets -- -D warnings` —
-  lints all crates and all targets with warnings treated as
-  errors. No crate-scope `#![allow(...)]`; only narrow-scope
-  `#[allow(clippy::<lint>)]` with a one-line justification.
-- `cargo test --workspace` — runs every crate's tests.
-  Per-crate `cargo test` passing is necessary but not
-  sufficient; cross-crate integration only shows up at the
-  workspace level.
+- `./scripts/rust-lint.sh` runs `cargo fmt --all --check`, then
+  `cargo check --workspace`, then `cargo clippy --workspace
+  --all-targets -- -D warnings`. Pass a crate name as the only
+  argument to scope to one crate. No crate-scope
+  `#![allow(...)]`; only narrow-scope `#[allow(clippy::<lint>)]`
+  with a one-line justification. If fmt-check fails, run
+  `cargo fmt --all` to apply and re-run.
+- `./scripts/rust-test.sh` runs `cargo test`. Default skips
+  `#[ignore]`-gated tests (the fast path). Flags:
+  `--ignored` (only ignored), `--include-ignored` (all). Pass a
+  crate name as a trailing argument to scope.
+- `#[ignore]` is reserved for integration tests that need real
+  infrastructure (testcontainers, live services, network). The
+  workspace-level run skips them for speed; the per-touched-crate
+  `--ignored` run exercises them for crates you actually
+  changed.
+
+**Do not run raw `cargo fmt/check/clippy/test`** when the
+scripts cover the case. Bespoke cargo invocations (e.g.
+`cargo test some_test` for focused debugging) remain fine for
+exceptional cases.
 
 Doc-only / script-only / config-only commits may skip these.
 Anything that could affect a `.rs` file's compilation or test
-outcome must run all three. See
+outcome must run all phases. See
 `docs/design/13-conventions.md §Pre-landing checks`.
 
 Individual crates can also be built standalone from their own
