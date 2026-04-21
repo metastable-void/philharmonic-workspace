@@ -2438,6 +2438,20 @@ version = "0.0.0"
 [[package]]
 name = "philharmonic-policy"
 version = "0.0.0"
+dependencies = [
+ "async-trait",
+ "philharmonic-store",
+ "philharmonic-store-sqlx-mysql",
+ "philharmonic-types",
+ "serde",
+ "serde_json",
+ "sqlx",
+ "testcontainers",
+ "testcontainers-modules",
+ "thiserror 2.0.18",
+ "tokio",
+ "uuid",
+]
 
 [[package]]
 name = "philharmonic-store"

@@ -1,4 +1,11 @@
 {
+  "permissions": {
+    "allow": [
+      "Bash(node *)",
+      "Bash(./scripts/test-scripts.sh)",
+      "Bash(./scripts/codex-status.sh)"
+    ]
+  },
   "enabledPlugins": {
     "codex@openai-codex": true
   }
