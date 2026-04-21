@@ -153,11 +153,16 @@ workspace:
   a task would lean on one, write a Rust bin in `xtask/` (the
   in-tree, non-submodule, multi-bin crate at the workspace root,
   `publish = false`). Existing POSIX shell scripts — `awk`,
-  `sed`, `grep`, `jq`, standard pipelines — remain fine as-is;
-  the rule is about ad-hoc `python3 -c "..."` creep, not the
-  well-written shell in `scripts/*.sh`. If you're tempted to
-  run python/perl from a script, prompt to a Rust bin extraction
-  in your final summary rather than introducing the dep.
+  `sed`, `grep`, `cut`, `tr`, standard SUSv4 pipelines — remain
+  fine as-is; the rule is about ad-hoc `python3 -c "..."` creep
+  and non-POSIX tools. **`jq`, `curl`, and `wget` also trigger
+  the Rust-bin rule** — they're not on every stripped baseline
+  (macOS ships none of them by default; Alpine base doesn't
+  either). If you'd reach for `jq`, write a Rust bin using
+  `serde_json`; HTTP fetching already lives in
+  `xtask/src/bin/web-fetch.rs`. If you're tempted to run any of
+  these from a new script, prompt for a Rust bin extraction in
+  your final summary rather than introducing the dep.
 - **UUID generation for stable wire-format constants always goes
   through `./scripts/xtask.sh gen-uuid -- --v4`.** Every
   `KIND: Uuid` constant, algorithm identifier, or any value that

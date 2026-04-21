@@ -584,13 +584,23 @@ Validate any changes with `./scripts/test-scripts.sh` as usual.
 other non-baseline scripting language from workspace tooling.
 If you're tempted, write a Rust bin in `xtask/` instead.**
 
-Well-written POSIX shell (with `awk`, `sed`, `grep`, `jq`, `cut`,
-standard text pipelines) stays where it is — shell is the right
-tool for orchestration, git workflow, cargo wrappers,
+Well-written POSIX shell (with `awk`, `sed`, `grep`, `cut`,
+`tr`, standard text pipelines) stays where it is — shell is the
+right tool for orchestration, git workflow, cargo wrappers,
 filesystem glue, and simple data pipelines. The rule targets
 ad-hoc `python3 -c "..."` / `perl -e "..."` creep, not the
 existing `scripts/*.sh`. If an existing script works and is
 POSIX-clean, leave it.
+
+**`jq` is not POSIX and is not on every baseline** (not shipped
+by default on macOS, not in Alpine base, not in stripped Debian
+minimal). If you find yourself reaching for `jq`, that's a Rust
+trigger — add a bin under `xtask/` using `serde_json` instead.
+Same for `curl` / `wget` — the `xtask/` port of `web-fetch`
+uses `ureq` + `rustls` in-process, so `scripts/*.sh` don't need
+curl/wget either. The only POSIX-shell data-manipulation tools
+considered baseline-safe are the ones in SUSv4: `awk`, `sed`,
+`grep`, `cut`, `tr`, `sort`, `uniq`, `head`, `tail`, `wc`.
 
 The categories in play:
 
@@ -600,7 +610,7 @@ The categories in play:
 | Non-baseline language reach | "parse YAML, walk DOM, emit Rust" | Rust bin in `xtask/` |
 | POSIX shell orchestration | "commit across submodules then push" | `scripts/*.sh` |
 | POSIX shell with `awk` / `sed` (baseline-present) | "enumerate workspace members from Cargo.toml" | `scripts/*.sh` (e.g. `lib/workspace-members.sh`) |
-| Depends on a marginal tool (`jq`, `curl`, `wget`) | "list non-yanked versions from crates.io" | Rust bin in `xtask/` — `jq` / curl / wget aren't on every stripped baseline; Rust has `serde_json` and `ureq` in-tree |
+| Depends on a non-POSIX / non-baseline tool (`jq`, `curl`, `wget`, anything not in SUSv4) | "list non-yanked versions from crates.io", "HTTP GET a URL" | Rust bin in `xtask/` — these aren't on every stripped baseline; Rust has `serde_json` and `ureq` in-tree. **If you'd reach for `jq`, that's the signal to write Rust.** |
 | Trivial cargo wrapper | "fmt + check + clippy + test" | `scripts/*.sh` |
 | Non-trivial parsing / cross-file validation / stateful check | "verify no two entity KINDs collide across the workspace" | Rust bin in `xtask/` |
 

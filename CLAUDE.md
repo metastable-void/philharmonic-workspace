@@ -68,12 +68,15 @@ Developer: Yuka MORI.
 - **Don't reach for `python`, `perl`, `ruby`, `node`, or any
   other non-baseline scripting language for workspace tooling.
   If you're tempted, write a Rust bin in `xtask/` instead.**
-  Well-written POSIX shell (with `awk`, `sed`, `grep`, `jq`,
-  `cut`, standard text pipelines) remains the right home for
+  Well-written POSIX shell (with `awk`, `sed`, `grep`, `cut`,
+  `tr`, standard SUSv4 pipelines) remains the right home for
   simple orchestration, git workflow, cargo wrappers,
   filesystem glue — keep those in `scripts/*.sh`. The rule
-  targets ad-hoc `python3 -c "..."` / `perl -e "..."` creep, not
-  existing shell scripts. `xtask/` is an in-tree (non-submodule)
+  targets ad-hoc `python3 -c "..."` / `perl -e "..."` creep and
+  non-POSIX / non-baseline tools (`jq`, `curl`, `wget`) — if
+  you'd reach for `jq`, that's the signal to add a Rust bin in
+  `xtask/` using `serde_json` instead. HTTP fetching already
+  lives in `xtask/src/bin/web-fetch.rs` for the same reason. `xtask/` is an in-tree (non-submodule)
   member crate at the workspace root, multi-bin layout
   (`src/bin/*.rs`, one bin per tool), `publish = false`.
   Invoke via `./scripts/xtask.sh <tool> -- <args>` — the

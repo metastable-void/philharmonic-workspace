@@ -313,15 +313,17 @@ Invoke by path (`./scripts/foo.sh`), not via `bash`.
   invocation surface stays consistent. See
   [§`xtask` and KIND UUID generation](#xtask-and-kind-uuid-generation)
   for the current bins.
-- `./scripts/web-fetch.sh <URL> [<outfile>]` — workspace-
-  canonical HTTP(S) GET for shell callers. Tries `curl` →
-  `wget` → `fetch` (FreeBSD) → `ftp` (OpenBSD HTTP mode); UA
-  overridable via `WEB_FETCH_UA`. Body goes to stdout by
-  default, or to `<outfile>` if given. All backends fail on
-  HTTP 4xx/5xx (curl is invoked with `-f`); use
-  `./scripts/web-fetch.sh ... || :` at the call site if you
-  want to tolerate HTTP errors. Never call `curl`/`wget`
-  directly from a workspace script.
+- `./scripts/web-fetch.sh <URL> [<outfile>]` — thin shim that
+  execs into `./scripts/xtask.sh web-fetch -- "$@"`. The real
+  implementation is `xtask/src/bin/web-fetch.rs` (uses `ureq` +
+  `rustls`) so there's no dependency on `curl` / `wget` /
+  `fetch` / `ftp` being installed — none of those are in every
+  stripped GNU/Linux or macOS baseline. UA overridable via
+  `WEB_FETCH_UA`, default `philharmonic-dev-agent/1.0`. Body
+  goes to stdout by default, or to `<outfile>` if given. Fails
+  on HTTP 4xx/5xx; use `./scripts/web-fetch.sh ... || :` at the
+  call site if you want to tolerate HTTP errors. Never call
+  `curl`/`wget` directly from a workspace script.
 
 See `docs/design/13-conventions.md §Shell scripts` for the POSIX-
 sh conventions the scripts follow and explicit deviations, and
@@ -426,13 +428,17 @@ workspace dev tooling written in Rust. Multi-bin layout: each
 `publish = false` — these are dev artifacts, never shipped to
 crates.io.
 
-**When to add a bin here:** the rule is narrow — never invoke
-`python`, `perl`, `ruby`, `node`, or any non-baseline scripting
-language from workspace tooling. If you'd otherwise reach for
-one, write a Rust bin in `xtask/` instead. POSIX shell (with
-`awk`, `jq`, `sed`, `grep`, standard pipelines) remains fine
-and is not a target for extraction — the existing
-`scripts/*.sh` are good as-is. See
+**When to add a bin here:** never invoke `python`, `perl`,
+`ruby`, `node`, or any non-baseline scripting language from
+workspace tooling — write a Rust bin in `xtask/` instead. The
+same rule applies to **`jq`, `curl`, and `wget`**: none of
+those are in every stripped GNU/Linux or macOS baseline, so
+reaching for them is a Rust trigger too. POSIX shell with
+SUSv4-baseline tools (`awk`, `sed`, `grep`, `cut`, `tr`,
+standard pipelines) remains fine — the existing `scripts/*.sh`
+are good as-is. HTTP fetching is already a Rust bin
+(`xtask/src/bin/web-fetch.rs`), with `scripts/web-fetch.sh`
+kept as a thin shim for shell callers. See
 [`docs/design/13-conventions.md`](docs/design/13-conventions.md)
 §In-tree workspace tooling for the decision table.
 
