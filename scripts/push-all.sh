@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/sh
 # Push every submodule's current branch to origin, then push the
 # parent. Pushes go through this script (not direct `git push`) so
 # submodules are always pushed before the parent bumps their
@@ -12,8 +12,10 @@
 #   is a normal state right after `git submodule update`; the
 #   real guardrail against pushing unresolvable pointers is
 #   `push.recurseSubmodules=check` on the parent (see ROADMAP §2).
+#
+# POSIX sh only — see docs/design/13-conventions.md §Shell scripts.
 
-set -euo pipefail
+set -eu
 
 cd "$(git rev-parse --show-toplevel)"
 

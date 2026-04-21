@@ -1,16 +1,18 @@
-#!/usr/bin/env bash
+#!/bin/sh
 # Workspace status: parent and every submodule.
 # Shows dirty working trees plus ahead/behind vs. the upstream
 # branch (when on a branch).
+#
+# POSIX sh only — see docs/design/13-conventions.md §Shell scripts.
 
-set -euo pipefail
+set -eu
 
 cd "$(git rev-parse --show-toplevel)"
 
 # The "# branch.ab +A -B" line (porcelain v2) carries ahead/behind
-# counts when an upstream is set. Parse with `cut` for POSIX-sh
-# portability — this script is bash, but the submodule block runs
-# inside `git submodule foreach`, which uses /bin/sh.
+# counts when an upstream is set. Parse with `cut`; the submodule
+# block runs inside `git submodule foreach` (also /bin/sh), so the
+# same snippet works in both contexts.
 echo "=== parent ==="
 git status -s
 status=$(git status --porcelain=v2 --branch 2>/dev/null | grep "^# branch\.ab" || true)

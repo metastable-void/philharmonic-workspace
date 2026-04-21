@@ -105,6 +105,64 @@ commit in every repo in this workspace (parent and submodules).
 This is a Developer Certificate of Origin-style assertion and is
 a hard requirement, not a preference.
 
+## Shell scripts
+
+All shell scripts in this workspace are **POSIX sh** (`#!/bin/sh`),
+not bash. No bashisms.
+
+- `set -eu`, not `set -euo pipefail`. `pipefail` isn't POSIX.
+  Structure pipelines so a silent left-side failure isn't possible
+  — e.g. `cmd | grep pat || true` instead of relying on pipefail
+  to catch a broken `cmd`.
+- No arrays (`arr=(a b c)`, `"${arr[@]}"`). Use newline- or
+  space-separated strings and iterate with `for x in $var`.
+- No `[[ ... ]]`, `=~`, `BASH_REMATCH`. Use `[ ... ]`, `case`, or
+  pipe through `sed`/`awk`/`grep` for regex.
+- No `<<<` herestrings, no `<(...)` process substitution, no
+  `mapfile`/`readarray`. Use heredocs, temp files, or `while read`
+  loops.
+- No `${var:offset:length}` substring expansion. Use `printf
+  '%.Ns'`, `cut -c`, or `expr substr`.
+- No `${BASH_SOURCE[0]}`. Use `$0`; don't source these scripts.
+- No `$'...'` ANSI-C quoting. Build escapes with `printf`, e.g.
+  `BOLD=$(printf '\033[1m')`.
+- No `local`. Namespace function-locals with a prefix
+  (`_myfunc_pid`) if shadowing matters.
+- No `pgrep`, no `/proc/$pid`, no `column -t`. Snapshot `ps -Aww
+  -o ...` once and drive everything from the snapshot; print
+  columns with `printf '%-Ns ...'`.
+
+**Why.** The workspace is expected to work on Linux distributions
+without bash installed (some minimal containers, Alpine without
+`bash` in the image), and on FreeBSD/macOS where `/proc` and
+procps-style utilities aren't guaranteed. Sticking to POSIX sh +
+POSIX utilities means every script runs on every platform Yuka
+reasonably touches, without a "this one needs bash" asterisk.
+
+**Validate with dash.** `dash -n scripts/*.sh` catches most
+bashisms at parse time. Actual execution under dash (the default
+`/bin/sh` on Debian/Ubuntu) is the other half of the check.
+
+**Invoke by path, not by interpreter.** Run `./scripts/foo.sh`,
+never `bash scripts/foo.sh` or `sh scripts/foo.sh`. The shebang
+chooses the interpreter — that is the whole point of committing
+to POSIX sh. Prefixing `bash` silently forces bash and hides any
+accidental bashism that wouldn't run on Alpine / FreeBSD / macOS,
+which defeats the portability rule.
+
+**Explicit deviations from strict POSIX.** These are allowed and
+tracked here — add to the list when a new one is introduced:
+
+- **`ps -o rss=`** (`scripts/codex-status.sh`). POSIX mandates
+  `vsz` but not `rss`. `rss` is supported identically on Linux
+  procps, FreeBSD base ps, and macOS BSD ps, and matches what the
+  user expects to see for process-memory summaries. Keeping it
+  for output fidelity.
+- **`ps -ww`** (`scripts/codex-status.sh`). `-w` is not strictly
+  POSIX but is supported across Linux/FreeBSD/macOS; it disables
+  `args` truncation, which is how the existing command-line
+  display works.
+
 ## Codex prompt archive
 
 Claude hands substantive coding to Codex (see CLAUDE.md §Claude

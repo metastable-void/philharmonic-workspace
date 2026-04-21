@@ -1,10 +1,12 @@
-#!/usr/bin/env bash
+#!/bin/sh
 # Fetch the parent and update every submodule to the tip of its
 # tracked remote branch. Does NOT commit the bumped submodule
 # pointers — run scripts/commit-all.sh when you're ready, then
 # scripts/push-all.sh.
+#
+# POSIX sh only — see docs/design/13-conventions.md §Shell scripts.
 
-set -euo pipefail
+set -eu
 
 cd "$(git rev-parse --show-toplevel)"
 
@@ -22,8 +24,9 @@ git pull --rebase
 git submodule update --remote --rebase --recursive
 
 # Show resulting state. Parent may now be dirty due to bumped
-# submodule pointers; that's the signal to commit.
-bash "$(dirname "$0")/status.sh"
+# submodule pointers; that's the signal to commit. We're already
+# at the workspace toplevel, so a relative path is unambiguous.
+./scripts/status.sh
 
 cat <<'EOF'
 Submodule pointers may have moved. When ready, commit and push

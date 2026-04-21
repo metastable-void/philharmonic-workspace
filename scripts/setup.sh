@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/sh
 # One-time (or after-fresh-clone) workspace setup.
 #
 # - Initializes and updates every submodule recursively so the other
@@ -9,10 +9,12 @@
 #   non-Rust workflows (e.g. doc-only editing) aren't blocked.
 #
 # Idempotent: safe to rerun at any time.
+#
+# POSIX sh only — see docs/design/13-conventions.md §Shell scripts.
 
-set -euo pipefail
+set -eu
 
-script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+script_dir="$(cd -- "$(dirname -- "$0")" && pwd)"
 workspace_root="$(cd -- "$script_dir/.." && pwd)"
 
 if ! git -C "$workspace_root" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
@@ -21,10 +23,10 @@ if ! git -C "$workspace_root" rev-parse --is-inside-work-tree >/dev/null 2>&1; t
 fi
 
 cd "$workspace_root"
-YELLOW=$'\e[33m'
-GREEN=$'\e[32m'
-BOLD=$'\e[1m'
-RESET=$'\e[0m'
+YELLOW=$(printf '\033[33m')
+GREEN=$(printf '\033[32m')
+BOLD=$(printf '\033[1m')
+RESET=$(printf '\033[0m')
 
 warn() {
     printf '%s!!! %s%s\n' "$YELLOW" "$*" "$RESET" >&2

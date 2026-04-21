@@ -17,6 +17,10 @@ Developer: Yuka MORI.
   first rather than running ad-hoc git commands. Every commit is
   signed off (`-s`). See docs/design/13-conventions.md §Git
   workflow.
+- Shell scripts are **POSIX sh** (`#!/bin/sh`), not bash. No
+  bashisms; explicit deviations (e.g. `ps -o rss=`) are tracked in
+  docs/design/13-conventions.md §Shell scripts. Validate with
+  `dash -n scripts/*.sh` before landing.
 - Fresh clone: run `scripts/setup.sh` once — it initializes all
   submodules recursively and warns if the Rust toolchain is
   missing.

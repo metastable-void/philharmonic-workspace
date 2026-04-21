@@ -42,6 +42,16 @@ Authoritative sources (read these if anything below is unclear):
 All live in `scripts/` at the workspace root. Run from anywhere —
 each script `cd`s to the workspace top level itself.
 
+**Invoke by path, not by interpreter.** Always run
+`./scripts/commit-all.sh "msg"`, never `bash scripts/commit-all.sh
+"msg"` or `sh scripts/commit-all.sh "msg"`. The scripts are
+POSIX-sh with `#!/bin/sh` shebangs (see
+docs/design/13-conventions.md §Shell scripts); prefixing `bash`
+silently forces bash and makes any introduced bashism "work" on
+your machine while breaking on Alpine / FreeBSD / macOS.
+Honoring the shebang is the entire point of the POSIX rule — so
+let the shebang do its job.
+
 ### `scripts/status.sh`
 Shows working-tree state of the parent and every submodule, plus
 ahead/behind vs. upstream, plus a detached-HEAD warning. Use this

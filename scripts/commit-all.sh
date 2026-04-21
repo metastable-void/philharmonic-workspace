@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/sh
 # Commit pending changes across the workspace.
 #
 # Walks each submodule, commits any dirty tree there, then commits
@@ -20,8 +20,10 @@
 #   Handy when submodules hold in-progress Codex work that shouldn't
 #   be committed yet.
 # Message defaults to "updates".
+#
+# POSIX sh only — see docs/design/13-conventions.md §Shell scripts.
 
-set -euo pipefail
+set -eu
 
 cd "$(git rev-parse --show-toplevel)"
 
