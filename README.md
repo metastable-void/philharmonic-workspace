@@ -242,6 +242,15 @@ Invoke by path (`./scripts/foo.sh`), not via `bash`.
   to list every workspace submodule's name and version in one
   pass — handy for a quick at-a-glance view when preparing a
   multi-crate release.
+- `./scripts/crates-io-versions.sh <crate>` — lists the
+  published, non-yanked versions of a crate on crates.io (one
+  per line, oldest first) by querying the sparse index
+  directly. Complements `crate-version.sh`: local version vs.
+  what's already on crates.io. Useful for release prep ("is
+  this version free?", "was an earlier release yanked?").
+  Requires `curl` AND `jq` on PATH — these aren't part of the
+  workspace baseline, so the script fails fast with a clear
+  message if either is missing.
 - `./scripts/show-dirty.sh` — prints the names of dirty
   submodules, one per line. Machine-readable (used internally by
   `pre-landing.sh`); no decoration or status lines, empty output

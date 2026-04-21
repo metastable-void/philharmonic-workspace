@@ -148,6 +148,13 @@ Internal helper; used by `publish-crate.sh`. Pass `--all` instead
 of a crate name to list every submodule's name and version in one
 aligned pass — handy when preparing a multi-crate release.
 
+### `scripts/crates-io-versions.sh <crate>`
+Lists the published (non-yanked) versions of a crate on crates.io
+by querying the sparse index directly. Complements
+`crate-version.sh`: local vs. already-published state.
+**Requires `curl` and `jq`** — not part of the workspace baseline;
+the script bails with a clear message if either is missing.
+
 ## Decision tree
 
 ```
