@@ -117,14 +117,17 @@ Fresh clone, including submodules:
 ```bash
 git clone --recurse-submodules https://github.com/metastable-void/philharmonic-workspace.git
 cd philharmonic-workspace
+./scripts/setup.sh
 ```
 
-If you already cloned without `--recurse-submodules`:
+`setup.sh` initializes all submodules recursively and configures
+`push.recurseSubmodules=check` on the local Git config (required
+for `push-all.sh`'s safety rail). It's idempotent — re-run any
+time.
 
-```bash
-cd philharmonic-workspace
-git submodule update --init --recursive
-```
+If you already cloned without `--recurse-submodules`, just run
+`./scripts/setup.sh` from the workspace root; it handles the
+`git submodule update --init --recursive` step for you.
 
 ## Development workflow
 
@@ -133,51 +136,81 @@ IDE tooling see the workspace through `Cargo.toml` and provide
 cross-crate navigation, refactoring, and type hints exactly as they
 would for a single-repo workspace.
 
-Each crate directory is an independent Git repository (a submodule).
-When you make changes inside a crate:
+**Git state changes go through the workspace scripts, never through
+raw `git`.** The repository has ~23 submodules; the scripts encode
+submodule-first commit/push ordering, mandatory `-s` signoff, and
+detached-HEAD guards that raw `git commit`/`git push` skip. They're
+the only supported path — not a convenience layer. This applies to
+every contributor (humans and AI agents alike).
 
-1. Work on the crate's files as normal.
-2. Commit and push **inside the submodule** on a feature branch.
-3. In the parent workspace, `git add` the submodule directory to
-   bump the pinned commit.
-4. Commit and push the workspace.
+Read-only git (`git log`, `git diff`, `git show`, `git status`,
+`git blame`, `git rev-parse`) is fine. The prohibition is on
+state-changing operations (`commit`, `push`, `add` outside what
+the scripts do, `reset`, `rebase`, branch create/delete, etc.).
+If a script doesn't cover a case you need, extend the script
+rather than reaching for raw git — see
+`docs/design/13-conventions.md §Git workflow`.
 
-For cross-crate changes (a type added in one crate, consumed in
-another), repeat the inside-submodule commit for each, then bump all
-the submodule pointers in a single workspace commit.
+Typical flow for a cross-crate change:
 
-### Helper scripts
+1. Edit whatever files the change touches, across the submodule
+   directories it spans. The working tree can stay dirty; don't
+   manually `git add` or `git commit`.
+2. `./scripts/commit-all.sh "message"` from the workspace root —
+   walks each dirty submodule, commits there with `-s` signoff,
+   then commits the parent (bumping every touched submodule's
+   pointer) with the same message.
+3. `./scripts/push-all.sh` — pushes submodules first, then the
+   parent. A submodule push failure aborts before the parent is
+   pushed, so origin never sees a parent pointer referencing an
+   unpushed submodule commit.
 
-The `scripts/` directory contains conveniences:
+For parent-only changes (docs, ROADMAP, the scripts themselves),
+use `./scripts/commit-all.sh --parent-only "message"`.
 
-- `scripts/status.sh` — status across all submodules plus the parent.
-- `scripts/pull-all.sh` — update all submodules to their tracked
-  branches' latest commits.
-- `scripts/commit-all.sh [msg]` — commit pending changes in each
-  submodule, then commit the parent (which bumps the submodule
-  pointers). Message defaults to `updates`.
-- `scripts/push-all.sh` — push uncommitted work across submodules
-  before pushing the parent.
+### The workspace scripts
 
-Run `scripts/status.sh` at the start of a session to see where
-everything stands.
+All live under `scripts/` at the repo root. POSIX sh (`#!/bin/sh`);
+work on Linux (including Alpine/busybox), FreeBSD, and macOS.
+Invoke by path (`./scripts/foo.sh`), not via `bash`.
+
+- `./scripts/setup.sh` — one-time (or post-fresh-clone).
+  Initializes every submodule recursively; sets
+  `push.recurseSubmodules=check`; warns if Rust isn't on PATH.
+  Idempotent.
+- `./scripts/status.sh` — working-tree status of the parent and
+  every submodule (clean submodules are hidden). Run at the
+  start of a session.
+- `./scripts/pull-all.sh` — rebase-pull the parent and update
+  each submodule to the tip of its tracked remote branch. Does
+  *not* commit the bumped submodule pointers.
+- `./scripts/commit-all.sh [--parent-only] [message]` — commit
+  pending changes. Walks each dirty submodule first (committing
+  with `-s`), then the parent.
+- `./scripts/push-all.sh` — push each submodule's current
+  branch, then the parent. Aborts before pushing the parent if
+  any submodule push fails.
+- `./scripts/codex-status.sh` — list Codex processes spawned by
+  Claude Code and their descendants.
+
+See `docs/design/13-conventions.md §Shell scripts` for the POSIX-
+sh conventions the scripts follow and explicit deviations.
 
 ### Recommended Git configuration
 
-Set these once to avoid the most common submodule footguns:
+`./scripts/setup.sh` sets `push.recurseSubmodules=check` — the
+guardrail that makes `push-all.sh` safe. The settings below are
+ergonomic (not safety-critical) and worth setting manually once:
 
 ```bash
 git config status.submoduleSummary true
 git config diff.submodule log
 git config fetch.recurseSubmodules on-demand
-git config push.recurseSubmodules check
 ```
 
-The last one — `push.recurseSubmodules=check` — causes
-`git push` on the parent to fail if any submodule has commits
-that haven't been pushed to their own remotes. This prevents the
-single most common submodule error: pushing a workspace pointer
-that references a submodule commit nobody else can fetch.
+They make `git status` / `git diff` show submodule context and
+let `git fetch` pick up submodule updates on demand — useful for
+the read-only git the scripts invoke under the hood.
 
 ## AI-assisted development
 
@@ -228,9 +261,35 @@ From the workspace root:
 ```bash
 cargo check --workspace          # fast type-check everything
 cargo build --workspace          # build everything
-cargo test --workspace           # run all tests
-cargo clippy --workspace         # lint everything
 ```
+
+### Pre-landing checks (mandatory)
+
+Every commit that touches Rust code must pass all three of the
+following at the workspace root. This applies equally to humans
+and AI agents.
+
+```bash
+cargo fmt --all --check
+cargo clippy --workspace --all-targets -- -D warnings
+cargo test --workspace
+```
+
+- `cargo fmt --all --check` — canonical formatting; run
+  `cargo fmt --all` to apply when it fails.
+- `cargo clippy --workspace --all-targets -- -D warnings` —
+  lints all crates and all targets with warnings treated as
+  errors. No crate-scope `#![allow(...)]`; only narrow-scope
+  `#[allow(clippy::<lint>)]` with a one-line justification.
+- `cargo test --workspace` — runs every crate's tests.
+  Per-crate `cargo test` passing is necessary but not
+  sufficient; cross-crate integration only shows up at the
+  workspace level.
+
+Doc-only / script-only / config-only commits may skip these.
+Anything that could affect a `.rs` file's compilation or test
+outcome must run all three. See
+`docs/design/13-conventions.md §Pre-landing checks`.
 
 Individual crates can also be built standalone from their own
 directories, using only that crate's own manifest and dependency
@@ -265,24 +324,38 @@ constraints.
 
 ## Publishing
 
-Each crate is published to crates.io independently from its own
-submodule directory:
+Each crate is published to crates.io independently. Commits and
+pushes go through the workspace scripts; `cargo publish` and
+release tagging are unchanged.
 
-1. Inside the submodule, bump the version in `Cargo.toml`, commit,
-   push, tag the release.
-2. `cargo publish --dry-run` to verify.
-3. `cargo publish`.
-4. After the crates.io index updates (a minute or two), bump the
-   workspace dependency's `version` in the parent's `Cargo.toml` to
-   match the newly-published version.
-5. Commit and push the parent workspace, which also bumps the
-   submodule pointer.
+1. Edit `Cargo.toml` inside the crate's submodule directory to
+   bump the version. Leave the tree dirty — don't commit manually.
+2. From the workspace root, `./scripts/commit-all.sh "release
+   <crate> vX.Y.Z"`. This commits the submodule (with signoff)
+   and then commits the parent (bumping the pointer) in one pass.
+3. `./scripts/push-all.sh` — pushes the submodule first, then
+   the parent.
+4. Tag inside the submodule (no workspace script covers tags
+   yet, so raw git is the current exception):
+
+   ```bash
+   cd <crate>
+   git tag -a vX.Y.Z -m 'release <crate> vX.Y.Z'
+   git push origin vX.Y.Z
+   ```
+
+5. `cargo publish --dry-run` to verify, then `cargo publish`.
+6. After the crates.io index updates (a minute or two), bump the
+   workspace dependency's `version` in the parent's `Cargo.toml`
+   to match. Commit and push with
+   `./scripts/commit-all.sh --parent-only "bump <crate> dep to vX.Y.Z"`
+   and `./scripts/push-all.sh`.
 
 Crates must be published in dependency order: cornerstone first
 (`philharmonic-types`), dependents after. For coordinated
-multi-crate releases, tooling like `cargo-workspaces` or `release-plz`
-can help — but for pre-1.0 infrequent releases, the manual process is
-fine.
+multi-crate releases, tooling like `cargo-workspaces` or
+`release-plz` can help — but for pre-1.0 infrequent releases, the
+manual process is fine.
 
 ## Design documentation
 

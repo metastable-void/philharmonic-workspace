@@ -15,6 +15,11 @@ Developer: Yuka MORI.
   change, update ROADMAP.md in the same commit as the work — not
   as a follow-up. A stale roadmap is worse than none. See
   docs/design/13-conventions.md §ROADMAP maintenance.
+- Pre-landing checks: before committing Rust changes, run
+  `cargo fmt --all --check`, `cargo clippy --workspace
+  --all-targets -- -D warnings`, and `cargo test --workspace`.
+  All three must pass. No exceptions for "small" changes. See
+  docs/design/13-conventions.md §Pre-landing checks.
 - Git workflow: all Git operations go through `scripts/*.sh`
   (`status.sh`, `pull-all.sh`, `commit-all.sh`, `push-all.sh`).
   If a script doesn't cover what you need, extend the script

@@ -125,6 +125,33 @@ review gate isn't missed. If the task *doesn't* mention these
 areas and your implementation drifts into touching them, stop
 and surface that rather than proceeding.
 
+## Before you hand off
+
+Before concluding any task that touched a `.rs` file (including
+transitive effects — e.g. a `Cargo.toml` dep bump), run these
+three at the workspace root and confirm all pass:
+
+```bash
+cargo fmt --all --check
+cargo clippy --workspace --all-targets -- -D warnings
+cargo test --workspace
+```
+
+- Clippy runs with `-D warnings` — warnings are errors. Fix the
+  root cause. Only add `#[allow(clippy::<lint>)]` at the
+  *narrowest* scope, with a one-line comment explaining why,
+  when a lint is genuinely wrong for a specific call site.
+- If `cargo fmt --all --check` fails, run `cargo fmt --all` to
+  apply.
+- `cargo test --workspace` (not just per-crate) — cross-crate
+  integration matters.
+
+If any of the three fails and you can't get it green within the
+task, say so in your final summary. Don't hand off red code.
+
+Doc-only / config-only / script-only changes can skip these (no
+`.rs` file touched).
+
 ## Documentation
 
 When a change warrants a doc update (new trait, new error

@@ -300,6 +300,41 @@ Cross-crate design docs live in the meta-crate's repository
 
 Currently published at `metastable-void.github.io/philharmonic/`.
 
+## Pre-landing checks
+
+**Mandatory before every commit that touches Rust code.** Run
+these three at the workspace root; all three must pass:
+
+```bash
+cargo fmt --all --check
+cargo clippy --workspace --all-targets -- -D warnings
+cargo test --workspace
+```
+
+- **`cargo fmt --all --check`** — enforces canonical formatting.
+  Run `cargo fmt --all` (without `--check`) to apply when it
+  fails. No stylistic bikeshed: `rustfmt` is the arbiter.
+- **`cargo clippy --workspace --all-targets -- -D warnings`** —
+  lints every crate, every target (lib + bins + tests +
+  examples + benches), with warnings treated as errors. No
+  ignored lints, no `#![allow(...)]` at crate scope. If a lint
+  is genuinely wrong for a specific call site, add
+  `#[allow(clippy::<lint>)]` at the *narrowest* scope with a
+  one-line comment explaining *why*.
+- **`cargo test --workspace`** — runs every crate's tests.
+  Per-crate `cargo test` is necessary but not sufficient —
+  cross-crate integration is only visible at the workspace
+  level.
+
+Doc-only commits (markdown, scripts, Cargo.toml metadata that
+doesn't affect code) may skip these. Anything that could affect
+a `.rs` file's compilation or test outcome — including dependency
+bumps — must run all three.
+
+These rules apply equally to humans and AI agents (Claude Code
+reviewing, Codex implementing). Don't hand off or commit
+unverified code.
+
 ## CI
 
 Each crate's CI runs at minimum:
@@ -309,6 +344,11 @@ Each crate's CI runs at minimum:
 - `cargo clippy --all-targets` with warnings as errors.
 - `cargo fmt --check`.
 - `cargo doc --no-deps`.
+
+CI mirrors the local pre-landing checks above (plus MSRV build
+and `cargo doc`). If CI fails on a check that passed locally,
+the cause is almost always a dirty working tree or MSRV drift —
+investigate before forcing through.
 
 Integration tests requiring external infrastructure (testcontainers
 for MySQL, real connector services for some tests) are gated

@@ -120,10 +120,21 @@ first and update `docs/design/13-conventions.md §Git workflow`.
 submodule must carry a `Signed-off-by:` trailer (the scripts pass
 `-s`). Non-negotiable.
 
-**Test the workspace as a whole.** Before merging any change,
-`cargo check --workspace` and `cargo test --workspace` at the
-parent root must pass. Per-crate `cargo test` passing is
-necessary but not sufficient.
+**Pre-landing checks (mandatory).** Before committing any
+change that touches Rust code, all three of the following must
+pass at the parent root:
+
+```bash
+cargo fmt --all --check
+cargo clippy --workspace --all-targets -- -D warnings
+cargo test --workspace
+```
+
+Per-crate `cargo test` passing is necessary but not sufficient;
+cross-crate integration is only visible at the workspace level.
+Clippy runs with warnings treated as errors — fix the root
+cause, don't silence at crate scope. See
+`docs/design/13-conventions.md §Pre-landing checks` for detail.
 
 **Follow append-only discipline.** The substrate has no `UPDATE`
 or `DELETE` semantics. Entity state changes are new revisions;
@@ -1083,14 +1094,10 @@ From the workspace root:
 # Check the whole workspace compiles
 cargo check --workspace
 
-# Run every test in every crate
-cargo test --workspace
-
-# Lint the whole workspace
-cargo clippy --workspace --all-targets
-
-# Format check
+# Pre-landing checks (all three must pass before committing Rust)
 cargo fmt --all --check
+cargo clippy --workspace --all-targets -- -D warnings
+cargo test --workspace
 ```
 
 From inside a submodule (when publishing):
