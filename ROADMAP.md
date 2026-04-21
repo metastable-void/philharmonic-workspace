@@ -3,9 +3,19 @@
 **Audience**: Claude Code, working in the `philharmonic-workspace` repo.
 
 **Purpose**: A linear plan for implementing the Philharmonic crate
-family from current state (design complete, implementation not
-started) to v1 MVP (working end-to-end deployment serving real
-tenants).
+family from current state to v1 MVP (working end-to-end deployment
+serving real tenants).
+
+**Current state** (2026-04-21):
+
+- Design: complete.
+- Phase 0 (workspace setup): **done**, with substantial added
+  infrastructure beyond the original scope — see the Phase 0
+  section below and §9.
+- Phase 1 (`mechanics-config` extraction): **implementation
+  complete in git** (`mechanics-config 0.1.0`, `mechanics-core
+  0.2.3`). Publish to crates.io: pending.
+- Phases 2–9: not started.
 
 Work through phases in order unless a phase is explicitly noted
 as parallel-safe. Consult the design documentation as the
@@ -286,10 +296,10 @@ arrives on the request or comes from a substrate lookup.
 
 ### Phase 0 — Workspace setup
 
-**Status**: Likely already complete before you start here. If
-not, do it first.
+**Status**: **Done**, with substantial added infrastructure
+beyond the original plan.
 
-**Tasks**:
+**Originally-planned tasks** (all complete):
 - `philharmonic-workspace` repo initialized with submodules for
   each of the 23 crates.
 - Workspace `Cargo.toml` with all members listed and
@@ -297,58 +307,124 @@ not, do it first.
 - Helper scripts in `scripts/` executable.
 - Each submodule has an initial commit (README + `.gitignore` +
   placeholder `Cargo.toml` + `src/lib.rs`).
-- Recommended Git config set:
-  `status.submoduleSummary=true`, `diff.submodule=log`,
-  `fetch.recurseSubmodules=on-demand`,
-  `push.recurseSubmodules=check`.
+- Recommended Git config (`push.recurseSubmodules=check`
+  auto-configured by `./scripts/setup.sh`; the three
+  non-safety-critical ones documented in README).
+
+**Infrastructure added beyond the plan** (see §9 for the full
+file inventory):
+
+- `scripts/` expanded from basic helpers to a full workflow:
+  `setup.sh`, `status.sh`, `pull-all.sh`, `commit-all.sh` (with
+  enforced `-s` signoff and `-S` GPG/SSH signing; rollback on
+  unsigned commits), `push-all.sh` (`--follow-tags`), `heads.sh`,
+  `check-detached.sh`, `show-dirty.sh`, `test-scripts.sh` (POSIX
+  parse check), `rust-lint.sh`, `rust-test.sh`, `pre-landing.sh`
+  (mandated pre-landing driver), `check-toolchain.sh`,
+  `check-api-breakage.sh`, `publish-crate.sh`, `cargo-audit.sh`,
+  `crate-version.sh`, `codex-status.sh`, plus
+  `scripts/lib/workspace-cd.sh` shared helper. All POSIX sh,
+  validated by `test-scripts.sh` (and CI).
+- `.github/workflows/ci.yml` at the parent level — runs
+  `setup.sh` + `pre-landing.sh` on push/PR (workspace-level; the
+  `--ignored` phase runs contributor-side only).
+- Journal infrastructure: `docs/codex-prompts/` (Codex prompt
+  archive, committed before every Codex invocation),
+  `docs/notes-to-humans/` (significant findings from Claude
+  preserved to Git, not chat scrollback), common
+  `YYYY-MM-DD-NNNN-<slug>[-NN].md` filename format.
+- Agent instructions: `CLAUDE.md` (Claude's bootstrap),
+  `AGENTS.md` (Codex's bootstrap), `docs/instructions/`
+  (human-to-agent rules), `.codex/config.toml` (project-local
+  Codex CLI config, activated via `CODEX_HOME=.codex`).
+- `HUMANS.md` at the workspace root for Yuka's own notes
+  (agent-read, agent-immutable by rule; committed by
+  `commit-all.sh` via `git add -A` when dirty).
+- `.editorconfig` and `.gitattributes` at the workspace root
+  and copied into every submodule — aligned with rustfmt
+  defaults (LF, 4-space, 100-col) and text/binary normalization.
+- Pre-landing conventions: `cargo fmt --all --check`, `cargo
+  clippy --workspace --all-targets -- -D warnings`, `cargo test
+  --workspace` mandated before every Rust-touching commit; plus
+  per-touched-crate `--ignored` phase to exercise integration
+  tests only for modified crates.
+- Publishing conventions: per-release signed annotated tag
+  `v<version>` inside the crate's submodule (created only on
+  successful `cargo publish`, pushed by the next `push-all.sh`
+  via `--follow-tags`). `./scripts/check-api-breakage.sh`
+  against the previous tag before any new release.
 
 **Acceptance criteria**:
 - `git submodule status` shows all 23 submodules at a clean
-  commit.
-- `cargo check --workspace` succeeds (all placeholder crates
-  compile to empty libraries).
-- `scripts/status.sh` runs without error.
+  commit. ✓
+- `cargo check --workspace` succeeds. ✓
+- `./scripts/status.sh` runs without error. ✓
+- `./scripts/pre-landing.sh` passes at the workspace root. ✓
+- `./scripts/test-scripts.sh` passes against every `scripts/*.sh`
+  and `scripts/lib/*.sh`. ✓
+- GitHub Actions CI green on `main`.
 
 ---
 
 ### Phase 1 — Extract `mechanics-config`
 
-**Goal**: Split `mechanics-core` schema types into a Boa-free
-`mechanics-config` crate so downstream consumers (notably the
-lowerer in `philharmonic-connector-client`) don't transitively
-depend on Boa.
+**Status**: **Implementation complete in git; publish pending.**
+
+Landed work (see `docs/codex-prompts/2026-04-20-0001-phase-1-*`
+for the Codex prompts and the commits they produced):
+
+- `mechanics-config 0.1.0` created with the Boa-free schema
+  types and pure structural validation. `cargo tree -p
+  mechanics-config | grep -iE 'boa|reqwest|tokio'` is empty.
+- `mechanics-core 0.2.3` depends on `mechanics-config = "0.1.0"`,
+  wraps the extracted types with Boa GC newtypes
+  (`#[unsafe_ignore_trace]`), re-exports at
+  `mechanics_core::endpoint::*` and
+  `mechanics_core::job::MechanicsConfig` for back-compat.
+- Behavior change: schema validation now fails at config-
+  construction time instead of job-call time (noted in
+  `mechanics-core/CHANGELOG.md 0.2.3`).
+- Post-extraction cleanup: 5 orphan `.rs` files removed from
+  `mechanics-core/src/internal/http/` that were no longer
+  compiled but would still have shipped in the crates.io
+  tarball (see
+  `docs/notes-to-humans/2026-04-21-0002-mechanics-core-pre-publish-review.md`).
+
+**Goal** (recorded for context): Split `mechanics-core` schema
+types into a Boa-free `mechanics-config` crate so downstream
+consumers (notably the lowerer in
+`philharmonic-connector-client`) don't transitively depend on
+Boa.
 
 **Reference**: `06-execution-substrate.md`, section "Schema
 extraction (settled)".
 
-**Crates touched**: `mechanics-config` (new),
-`mechanics-core` (changed).
+**Remaining work**:
 
-**Tasks**:
-1. In `mechanics-config/`, create the crate with:
-   - Extracted types: `MechanicsConfig`, `HttpEndpoint`, URL
-     template AST, slot specs, retry policy, header-name types.
-   - Pure structural validation methods (`validate`,
-     `validate_config`) — no I/O.
-   - Dependencies: `serde`, `serde_json`, standard library only.
-     No Boa, no philharmonic deps.
-2. In `mechanics-core/`, add wrapper newtypes implementing Boa's
-   GC traits (`Trace`, `Finalize`, `JsData`) over the
-   `mechanics-config` types. Use `#[unsafe_ignore_trace]` — sound
-   because these are plain data.
-3. Update `mechanics-core` to depend on `mechanics-config` and
-   re-export the extracted types for backward compatibility.
-4. Publish `mechanics-config` as `0.1.0`. Bump `mechanics-core`
-   to `0.2.3`.
+1. `./scripts/check-api-breakage.sh v0.2.2` on `mechanics-core`
+   to confirm the extraction is non-breaking at the public
+   surface. (The public API re-exports the types at the old
+   paths, so this should pass; run it to confirm before
+   publishing.)
+2. `./scripts/publish-crate.sh --dry-run mechanics-config`
+   then the real publish.
+3. `./scripts/publish-crate.sh --dry-run mechanics-core` then
+   real publish. Must be in this order — `mechanics-core 0.2.3`
+   pins `mechanics-config = "0.1.0"`, so the dep has to be on
+   crates.io first.
+4. `./scripts/push-all.sh` to ship the `v0.1.0` and `v0.2.3`
+   tags alongside branch commits.
 
-**Acceptance criteria**:
-- `mechanics-config` published at `0.1.0` on crates.io.
-- `mechanics-core` published at `0.2.3` on crates.io with
-  existing consumers (the `mechanics` binary, external test
-  code) still working.
-- `mechanics-config` has no Boa in its dependency tree. Verify:
-  `cargo tree -p mechanics-config | grep -i boa` returns nothing.
-- Tests passing on both crates.
+**Acceptance criteria** (remaining):
+- `mechanics-config 0.1.0` published on crates.io. _(pending)_
+- `mechanics-core 0.2.3` published on crates.io. _(pending)_
+- `cargo tree -p mechanics-config | grep -iE 'boa|reqwest|tokio'`
+  returns empty. ✓
+- Workspace `cargo test --workspace` passing
+  (`./scripts/rust-test.sh`). ✓
+- Mechanics-core integration tests passing
+  (`./scripts/rust-test.sh --ignored mechanics-core`).
+  _(run locally before publish)_
 
 ---
 
@@ -1062,20 +1138,77 @@ scope into v1 phases.
 
 ---
 
-## 9. Project-level files worth creating
+## 9. Project-level files (current inventory)
 
-Alongside the code work, maintain:
+The files in place at the workspace root and inside each
+submodule, as of Phase 0's completion. Maintain these through
+ongoing development.
 
-- `CLAUDE.md` at the workspace root — persistent context for
-  future Claude Code sessions. Include: brief project overview,
-  pointer to this roadmap, pointer to design docs, reminder of
-  submodule discipline, reminder of crypto-review protocol.
-- `CHANGELOG.md` in each submodule — standard Keep-a-Changelog
-  format, updated with each release.
-- `LICENSE-APACHE` and `LICENSE-MPL` in each submodule.
-- `.github/workflows/ci.yml` in each submodule — at minimum
-  `cargo check`, `cargo test`, `cargo clippy`, `cargo fmt`
-  `--check`, running on the crate standalone.
+**Workspace root** (`philharmonic-workspace`):
+
+- `Cargo.toml` — workspace manifest: members, shared
+  dependencies, `[patch.crates-io]` redirecting Philharmonic
+  crate deps to local submodule paths.
+- `README.md` — public-facing overview + contributor-facing
+  workflow (cloning, scripts, pre-landing, publishing,
+  AI-assisted development split).
+- `ROADMAP.md` — this file. Living; updated in the same commit
+  as work it describes.
+- `CLAUDE.md` — Claude Code's session bootstrap: pointers to
+  the roadmap, conventions, and the mandatory rules (scripts
+  for Git, POSIX shell, pre-landing checks, journal filename
+  format, notes-to-humans, HUMANS.md read-only, etc.).
+- `AGENTS.md` — Codex's bootstrap, mirroring the Claude/Codex
+  division from Codex's side (implementer role, no commits, no
+  branches, POSIX-sh if writing shell, crypto paths flag-only).
+- `HUMANS.md` — Yuka's own notes-to-self. Agent-readable,
+  agent-immutable (enforced by
+  `docs/instructions/README.md §HUMANS.md`). `commit-all.sh`
+  auto-includes pending edits via `git add -A`.
+- `LICENSE-APACHE`, `LICENSE-MPL` — dual-license text.
+- `.gitignore` — `target/`, editor droppings, Codex session
+  state under `.codex/`.
+- `.gitattributes` — LF normalization, text/binary boundaries,
+  `linguist-generated=true` on `Cargo.lock`.
+- `.editorconfig` — matches rustfmt defaults (space, 4-wide,
+  100-col).
+- `.codex/config.toml` — project-local Codex CLI config
+  (sandbox, approvals, reasoning effort). Activated via
+  `CODEX_HOME=$PWD/.codex`.
+- `.github/workflows/ci.yml` — GitHub Actions CI running
+  `setup.sh` + `pre-landing.sh` on push-to-main and PRs.
+- `scripts/*.sh` — the workspace script surface (see Phase 0
+  "Infrastructure added beyond the plan" above for the full
+  list).
+- `scripts/lib/workspace-cd.sh` — sourced helper for
+  workspace-root resolution with `$0`-path fallback.
+- `docs/design/*.md` — design docs (authoritative);
+  `13-conventions.md` is the one most-frequently-updated.
+- `docs/codex-prompts/YYYY-MM-DD-NNNN-<slug>[-NN].md` —
+  archived Codex prompts.
+- `docs/notes-to-humans/YYYY-MM-DD-NNNN-<slug>[-NN].md` —
+  Claude's significant-finding journal for Yuka.
+- `docs/instructions/README.md` — human-to-agent rules that
+  don't fit in CLAUDE.md or AGENTS.md (currently: HUMANS.md
+  access rule).
+
+**Per-submodule** (each crate repo):
+
+- `Cargo.toml` — package manifest. Depends on other
+  philharmonic crates via crates.io version spec; the parent's
+  `[patch.crates-io]` redirects to local paths when building
+  from the workspace.
+- `src/lib.rs` (or `src/main.rs` for binaries).
+- `README.md` — crate-level overview and usage.
+- `CHANGELOG.md` — Keep-a-Changelog format; updated with every
+  release.
+- `LICENSE-APACHE`, `LICENSE-MPL` — per-submodule copies so
+  standalone consumers get them.
+- `.editorconfig`, `.gitattributes` — synced from the parent.
+- `.github/workflows/ci.yml` — per-crate CI running `cargo
+  check`, `cargo test`, `cargo clippy`, `cargo fmt --check`
+  against the crate standalone (per-crate publishability
+  requirement).
 
 ---
 
