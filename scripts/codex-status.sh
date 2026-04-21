@@ -46,6 +46,37 @@ if [ -z "$ROOTS" ]; then
     exit 0
 fi
 
+# A `bash -c 'node .../codex-companion.mjs ...'` wrapper carries the
+# child's argv inside its own argv, so the bash pid *and* its node
+# child both match the `codex-companion.mjs` filter — we'd print the
+# same subtree twice. Keep only roots whose ancestor chain contains no
+# other root. Ancestor walk stops at pid 0/1 or when the parent falls
+# out of the snapshot.
+is_descendant_of_any() {
+    _ida_pid=$1
+    shift
+    _ida_p=$_ida_pid
+    while :; do
+        _ida_p=$(printf '%s\n' "$SNAPSHOT" | awk -v p="$_ida_p" '$1 == p { print $2; exit }')
+        case "$_ida_p" in
+            ''|0|1) return 1 ;;
+        esac
+        for _ida_other in "$@"; do
+            [ "$_ida_p" = "$_ida_other" ] && return 0
+        done
+    done
+}
+
+_filtered_roots=""
+# Word-splitting $ROOTS (newline-separated from sort -u) passes each
+# pid as its own positional arg to is_descendant_of_any.
+for _r in $ROOTS; do
+    if ! is_descendant_of_any "$_r" $ROOTS; then
+        _filtered_roots="$_filtered_roots $_r"
+    fi
+done
+ROOTS=$_filtered_roots
+
 # All descendants (including self) of a pid, via snapshot walk.
 collect_tree() {
     _ct_pid=$1
@@ -60,6 +91,21 @@ collect_tree() {
 # line. POSIX BRE with [[:space:]] character class.
 strip_env() {
     printf '%s' "$1" | sed 's/^\([A-Za-z_][A-Za-z0-9_]*=[^[:space:]]*[[:space:]]\{1,\}\)\{1,\}//'
+}
+
+# Strip a leading `node` (or `/path/to/node`) invocation so
+# `node foo.mjs arg` displays as `foo.mjs arg`. The path prefix is
+# optional; `node` must be followed by whitespace so `nodejs`/`node22`
+# are left untouched.
+strip_node() {
+    printf '%s' "$1" | sed 's|^\([^[:space:]]*/\)\{0,1\}node[[:space:]]\{1,\}||'
+}
+
+# Trim the directory path from the leading executable so only its
+# basename shows: `/usr/libexec/foo arg` -> `foo arg`. Only the first
+# token is touched; paths embedded in argv[1..] are left alone.
+strip_exe_dir() {
+    printf '%s' "$1" | sed 's|^[^[:space:]]*/||'
 }
 
 # Look up a row in the snapshot. Sets ROW_TIME, ROW_RSS_KB, ROW_ETIME,
@@ -83,6 +129,8 @@ fmt_tree() {
         row_for "$_ft_p" || continue
         _ft_rss_mb=$((ROW_RSS_KB / 1024))
         _ft_cmd=$(strip_env "$ROW_CMD")
+        _ft_cmd=$(strip_node "$_ft_cmd")
+        _ft_cmd=$(strip_exe_dir "$_ft_cmd")
         if [ "${#_ft_cmd}" -gt 80 ]; then
             _ft_cmd=$(printf '%.77s...' "$_ft_cmd")
         fi
