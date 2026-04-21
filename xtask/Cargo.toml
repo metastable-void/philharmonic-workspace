@@ -1,0 +1,12 @@
+[package]
+name = "xtask"
+version = "0.0.0"
+edition = "2024"
+rust-version = "1.88"
+license = "Apache-2.0 OR MPL-2.0"
+description = "In-tree workspace dev tooling for philharmonic-workspace. Not published — `publish = false`. Multi-bin: each `src/bin/*.rs` is a separate tool. See `docs/design/13-conventions.md §In-tree workspace tooling` for when to add a bin here vs. extending a shell script in `scripts/`."
+publish = false
+
+[dependencies]
+clap = { version = "4", features = ["derive"] }
+uuid = { version = "1", features = ["v4"] }

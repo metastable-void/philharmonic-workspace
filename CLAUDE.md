@@ -61,6 +61,27 @@ Developer: Yuka MORI.
   `cargo --version`) — nothing wraps these and they're cheap.
   See docs/design/13-conventions.md §Script wrappers for the
   authoritative statement and rationale.
+- **Prefer Rust bins in `xtask/` over shell scripts for
+  non-trivial tooling.** `xtask/` is an in-tree (non-submodule)
+  member crate at the workspace root, multi-bin layout
+  (`src/bin/*.rs`, one bin per tool), `publish = false`. Use a
+  Rust bin when the task has real logic: parsing, validation,
+  multi-step reasoning, anything that'd involve awk/sed/jq
+  gymnastics in shell. Use `scripts/*.sh` when the task is
+  simple orchestration: running commands, composing other
+  scripts, filesystem glue, git workflow. The line is fuzzy;
+  when in doubt, Rust, because it's typed, clippy-checked,
+  test-ready, and more portable. Canonical example today:
+  `cargo run -p xtask --bin gen-uuid -- --v4` — the tool we use
+  for every stable wire-format UUID (entity `KIND` constants,
+  algorithm identifiers, any value that once committed must
+  never change). See docs/design/13-conventions.md §In-tree
+  workspace tooling and §KIND UUID generation.
+- **Every stable UUID used as a wire-format constant is
+  generated via `cargo run -p xtask --bin gen-uuid -- --v4`.**
+  Not `python3 -c "import uuid"`, not `uuidgen`, not an online
+  generator. One canonical source so nobody accidentally commits
+  a value they generated ad-hoc and meant to throw away.
 - **Same rule for `mktemp`, `curl`, `wget`, and other external
   non-Rust tools.** Never call `mktemp`, `curl`, or `wget`
   directly from a workspace script. Use the wrappers:

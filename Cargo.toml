@@ -24,6 +24,11 @@ members = [
     "philharmonic-connector-impl-embed",
     "philharmonic-connector-impl-vector-search",
     "philharmonic-api",
+    # In-tree (non-submodule) member crates live below. They're
+    # workspace dev tooling — never published, never consumed by
+    # runtime crates. See `xtask/Cargo.toml` for the current home
+    # of such tooling.
+    "xtask",
 ]
 
 [patch.crates-io]

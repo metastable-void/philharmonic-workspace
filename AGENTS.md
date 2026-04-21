@@ -147,6 +147,21 @@ workspace:
 - Explicit POSIX deviations (e.g. `ps -o rss=`) are tracked in
   `docs/design/13-conventions.md §Shell scripts`. Don't introduce
   new ones without a recorded reason.
+- **Prefer a Rust bin in `xtask/` over a shell script for
+  non-trivial tooling.** `xtask/` is the in-tree (non-submodule)
+  member crate at the workspace root, multi-bin
+  (`src/bin/<tool>.rs`), `publish = false`. Reach for a new bin
+  when the task has parsing, validation, or multi-step logic;
+  shell scripts remain the right home for simple orchestration
+  (git workflow, cargo wrappers, filesystem glue). When in
+  doubt, Rust.
+- **UUID generation for stable wire-format constants always goes
+  through `cargo run -p xtask --bin gen-uuid -- --v4`.** Every
+  `KIND: Uuid` constant, algorithm identifier, or any value that
+  once committed must never change is minted through this tool.
+  Never `python3 -c "import uuid"`, `uuidgen`, or online
+  generators — the canonical source keeps randomness uniform
+  across sessions and machines.
 - **Use the wrapper scripts for `mktemp` / `curl` / `wget`, not
   the raw tools.** These tools vary across minimal environments
   (Alpine busybox, FreeBSD, OpenBSD, macOS, WSL); the wrappers

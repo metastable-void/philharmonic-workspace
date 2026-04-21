@@ -54,12 +54,16 @@ case $1 in
         usage 0
         ;;
     --all)
+        # Source the workspace-members helper; it reads the root
+        # Cargo.toml and sets `$workspace_members` (newline-
+        # separated). Covers both submodule-backed members and
+        # in-tree ones like `xtask`.
+        . "$(dirname -- "$0")/lib/workspace-members.sh"
         # Buffer via `$()` so SIGPIPE from a truncating consumer
-        # (e.g. `./scripts/crate-version.sh --all | head -3`) doesn't
-        # abort the submodule walk mid-way.
+        # (e.g. `./scripts/crate-version.sh --all | head -3`)
+        # doesn't abort mid-walk.
         output=$(
-            git submodule foreach --quiet 'printf "%s\n" "$sm_path"' \
-            | while read -r path; do
+            for path in $workspace_members; do
                 [ -f "$path/Cargo.toml" ] || continue
                 ver=$(parse_version "$path/Cargo.toml")
                 [ -n "$ver" ] || continue

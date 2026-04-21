@@ -577,6 +577,92 @@ etc.
 
 Validate any changes with `./scripts/test-scripts.sh` as usual.
 
+## In-tree workspace tooling (`xtask/`)
+
+**Rule: prefer a Rust bin in `xtask/` over a shell script for
+any non-trivial workspace tooling.** Non-trivial here means
+anything that involves real parsing (TOML, JSON, regex beyond
+trivial patterns), validation logic, multi-step reasoning, or
+anything that would turn into a fragile awk/sed/jq pipeline in
+shell. Shell remains the right home for simple orchestration:
+composing other commands, git workflow, filesystem glue,
+per-tool availability probing. When in doubt, Rust — it's
+typed, clippy-checked, testable, and more portable.
+
+`xtask/` is an **in-tree (non-submodule) member crate** at the
+workspace root. It lives alongside the submodule-backed crates
+in `[workspace] members`, but its files are tracked directly by
+the parent repo (no `.gitmodules` entry). `publish = false` —
+it's dev tooling only, never shipped to crates.io.
+
+Multi-bin layout:
+
+```
+xtask/
+├── Cargo.toml           # publish = false, name = "xtask"
+└── src/
+    └── bin/
+        ├── gen-uuid.rs  # one tool per file
+        └── <future>.rs
+```
+
+Each bin is invoked as:
+
+```bash
+cargo run -p xtask --bin <name> -- <args>
+```
+
+### When to add a bin vs. extend a script
+
+| Task | Home |
+|---|---|
+| "Generate a UUID for a KIND constant" | Rust bin (`gen-uuid`) |
+| "List workspace members" | Shell (current; awk-based) — move to Rust bin if it becomes fragile |
+| "Run cargo fmt + check + clippy" | Shell (`rust-lint.sh`) — it's orchestration |
+| "Parse a submodule's CHANGELOG and emit release notes" | Rust bin (real parsing) |
+| "Push all submodules then parent" | Shell (`push-all.sh`) — orchestration with ordering |
+| "Validate a generated entity-kind UUID isn't already in use" | Rust bin (cross-file search + comparison) |
+
+### Non-submodule member plumbing
+
+The scripts that walk "workspace members" (`show-dirty.sh`,
+`crate-version.sh --all`) enumerate members from the root
+`Cargo.toml` via `scripts/lib/workspace-members.sh`, so in-tree
+members like `xtask` are covered uniformly alongside submodule-
+backed ones. Scripts that need to distinguish the two (e.g.
+`show-dirty.sh`'s dirty-check has to run inside a submodule but
+in the parent's working tree for in-tree members) use `-f
+<member>/.git` as the classifier: submodules carry a `.git`
+pointer file at their root, in-tree directories don't.
+
+## KIND UUID generation
+
+**Every stable wire-format UUID — entity `KIND` constants,
+algorithm identifiers, key IDs, any value that once committed
+must never change — is generated via:**
+
+```bash
+cargo run -p xtask --bin gen-uuid -- --v4
+```
+
+Not `python3 -c "import uuid"`, not `uuidgen`, not online
+generators. The rule has one reason: **one canonical source of
+randomness across sessions, machines, and contributors.** Ad-hoc
+UUID generation tools scattered across shell history make it too
+easy to accidentally commit a value you meant to throw away, or
+for two contributors to mint UUIDs from imperceptibly different
+RNG sources.
+
+`--v4` is mandatory on the CLI — every KIND we mint today is v4
+random. Making the version-flag explicit means a future shift
+to v5/v7 is a deliberate CLI change at each call site rather
+than a silent default swap.
+
+Usage in practice: when authoring a new entity kind (e.g.
+`TenantEndpointConfig`), run `gen-uuid --v4` once, paste the
+result into the Rust source as a `const KIND: Uuid = uuid!("…")`,
+and commit. Never regenerate.
+
 ## Pre-landing checks
 
 **Mandatory before every commit that touches Rust code.** One

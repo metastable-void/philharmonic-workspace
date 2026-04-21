@@ -1,38 +1,66 @@
 #!/bin/sh
-# scripts/show-dirty.sh — print the names of submodules whose
-# working tree is dirty (unstaged changes, staged changes, or
-# untracked files not covered by .gitignore), one name per line.
+# scripts/show-dirty.sh — print the names of workspace member
+# crates whose contents are dirty, one name per line.
 #
-# Machine-readable — `pre-landing.sh` uses this to compute modified
-# crates, and other scripts can consume it the same way. Also
-# usable standalone to inspect dirty submodules without the noise
-# of `status.sh`.
+# Covers both:
+#   - Submodule-backed members (the majority) — dirtiness is
+#     checked via `git diff` / `git ls-files` run *inside* the
+#     submodule, because file-level changes don't appear in the
+#     parent's working tree (the parent only sees the submodule-
+#     pointer change, if any).
+#   - In-tree (non-submodule) members (e.g. `xtask`) — dirtiness
+#     is checked against the parent repo's working tree, scoped
+#     to the member's path.
+#
+# Classifier: `-f <path>/.git` — submodules carry a `.git`
+# pointer file at their root; in-tree directories have no `.git`.
+#
+# Machine-readable — `pre-landing.sh` consumes this to compute
+# modified crates for the `--ignored` phase. Also usable standalone
+# to inspect dirty members without the decoration of `status.sh`.
 #
 # Usage:
 #   ./scripts/show-dirty.sh
 #
-# Output: one crate name per line. Empty output if nothing is
-# dirty. Always exits 0 (the absence of dirty submodules isn't a
+# Output: one member path per line. Empty output if nothing is
+# dirty. Always exits 0 (the absence of dirty members isn't a
 # failure).
 #
-# Does not report the parent's own dirtiness — use `status.sh` for
-# a full picture.
+# Does not report the parent's own file-level dirtiness (docs,
+# scripts, workspace-Cargo.toml edits) — use `status.sh` for that
+# full picture. A parent-only commit lands via
+# `commit-all.sh --parent-only`.
 #
 # POSIX sh only — see docs/design/13-conventions.md §Shell scripts.
 
 set -eu
 . "$(dirname -- "$0")/lib/workspace-cd.sh"
+. "$(dirname -- "$0")/lib/workspace-members.sh"
 
-# Buffer via `$()` so SIGPIPE from a truncating consumer doesn't
-# abort the foreach walk.
+# Buffer via `$()` so SIGPIPE from a truncating consumer
+# (`./scripts/show-dirty.sh | head -3`) doesn't abort the walk
+# mid-way.
 output=$(
-    git submodule foreach --quiet '
-        if ! git diff --quiet \
-            || ! git diff --cached --quiet \
-            || [ -n "$(git ls-files --others --exclude-standard)" ]; then
-            echo "$name"
+    for member in $workspace_members; do
+        if [ -f "$member/.git" ]; then
+            # Submodule-backed: check file-level dirtiness inside.
+            if (
+                cd -- "$member"
+                ! git diff --quiet \
+                    || ! git diff --cached --quiet \
+                    || [ -n "$(git ls-files --others --exclude-standard)" ]
+            ); then
+                echo "$member"
+            fi
+        else
+            # In-tree: parent repo sees file-level changes directly.
+            if ! git diff --quiet -- "$member" \
+                || ! git diff --cached --quiet -- "$member" \
+                || [ -n "$(git ls-files --others --exclude-standard -- "$member")" ]; then
+                echo "$member"
+            fi
         fi
-    '
+    done
 )
 
 if [ -n "$output" ]; then

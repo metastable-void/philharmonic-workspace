@@ -99,6 +99,13 @@ Each submodule is a standalone Git repository at
 **Meta-crate:**
 - `philharmonic` — meta crate
 
+**In-tree workspace tooling** (not published, not a submodule —
+files tracked directly in the parent repo):
+- `xtask` — multi-bin crate for dev tools written in Rust.
+  Today's bins: `gen-uuid` (canonical source for every wire-
+  format UUID we mint). See [§xtask and KIND UUID
+  generation](#xtask-and-kind-uuid-generation) below.
+
 ## Status
 
 Design is substantially settled; implementation is in active progress.
@@ -398,6 +405,39 @@ kernel, arch, and OS:
 
 Hostnames are never anonymized — if your hostname is sensitive,
 change it before committing from that box.
+
+### `xtask` and KIND UUID generation
+
+The `xtask/` member crate is the in-tree (non-submodule) home for
+workspace dev tooling written in Rust. Multi-bin layout: each
+`xtask/src/bin/*.rs` is an independently-runnable tool.
+`publish = false` — these are dev artifacts, never shipped to
+crates.io.
+
+**When to add a bin here vs. extend a shell script in
+`scripts/`:** prefer Rust for non-trivial tooling — parsing,
+validation, multi-step reasoning, anything that would become a
+fragile awk/sed/jq pipeline. Keep shell scripts for simple
+orchestration (git workflow, cargo wrappers, filesystem glue).
+The full rubric is in
+[`docs/design/13-conventions.md`](docs/design/13-conventions.md)
+§In-tree workspace tooling.
+
+Current bins:
+
+- **`gen-uuid`** — generate a UUID and print it to stdout.
+  Usage: `cargo run -p xtask --bin gen-uuid -- --v4`.
+  `--v4` is mandatory so the version choice is always explicit
+  at the call site.
+
+  **Every stable wire-format UUID in this workspace is generated
+  via this tool** — entity `KIND` constants, algorithm
+  identifiers, key IDs, anything that once committed must never
+  change. Not `python3 -c "import uuid"`, not `uuidgen`, not
+  online generators. One canonical source keeps randomness
+  uniform across sessions and machines. See
+  [`docs/design/13-conventions.md`](docs/design/13-conventions.md)
+  §KIND UUID generation for the rule.
 
 ## AI-assisted development
 
