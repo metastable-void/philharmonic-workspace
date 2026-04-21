@@ -238,7 +238,10 @@ Invoke by path (`./scripts/foo.sh`), not via `bash`.
 - `./scripts/crate-version.sh <crate>` — prints the version
   string of a workspace crate, parsed from its own `Cargo.toml`.
   Intended for other scripts to consume (`publish-crate.sh` uses
-  it), usable standalone.
+  it), usable standalone. Pass `--all` instead of a crate name
+  to list every workspace submodule's name and version in one
+  pass — handy for a quick at-a-glance view when preparing a
+  multi-crate release.
 - `./scripts/show-dirty.sh` — prints the names of dirty
   submodules, one per line. Machine-readable (used internally by
   `pre-landing.sh`); no decoration or status lines, empty output

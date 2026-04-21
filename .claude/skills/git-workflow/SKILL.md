@@ -142,9 +142,11 @@ auto-installs `cargo-audit` via `cargo install --locked` on
 first use. Run alongside `check-api-breakage.sh` when preparing
 a release.
 
-### `scripts/crate-version.sh <crate>`
+### `scripts/crate-version.sh <crate> | --all`
 Prints a crate's version string parsed from its own `Cargo.toml`.
-Internal helper; used by `publish-crate.sh`.
+Internal helper; used by `publish-crate.sh`. Pass `--all` instead
+of a crate name to list every submodule's name and version in one
+aligned pass — handy when preparing a multi-crate release.
 
 ## Decision tree
 
