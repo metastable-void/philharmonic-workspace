@@ -2,7 +2,11 @@
 
 **Date:** 2026-04-21
 **Slug:** `phase-2-wave-1-non-crypto-foundation`
-**Round:** 01 (initial dispatch; no prior state)
+**Round:** 02 (rewritten 2026-04-21 — regenerated every UUID
+via `./scripts/xtask.sh gen-uuid -- --v4`; reworked the test
+plan to require **both** a mock-substrate tier and a real-MySQL
+tier. The original round-01 text was never dispatched to
+Codex.)
 **Subagent:** `codex:codex-rescue`
 
 ## Motivation
@@ -65,12 +69,17 @@ Wave 1 can land without waiting on the review.
   checks whether any non-retired role grants the required atom.
   Async; takes `&impl EntityStoreExt` (or whatever the correct
   typed-ext trait is — match the published crate's actual API).
-- Integration tests under `tests/` using `testcontainers` +
-  `philharmonic-store-sqlx-mysql`, matching the pattern in
-  `philharmonic-store-sqlx-mysql/tests/integration.rs` (including
-  the `#[ignore = "requires MySQL testcontainer"]` attribute on
-  every async-multi-thread test and the global async-mutex
-  container-startup pattern used there).
+- **Both tiers of tests** (see "Required tests" below):
+  - **Mock-substrate tests** — an in-crate `MockEntityStore` /
+    `MockContentStore` under `#[cfg(test)]` or `tests/common/`
+    that implements the same substrate traits with in-memory
+    backing. Exercises every permission-evaluation branch
+    deterministically, with no container startup, on every
+    `cargo test` run.
+  - **Real-MySQL integration tests** — `testcontainers` +
+    `philharmonic-store-sqlx-mysql`, gated with
+    `#[ignore = "requires MySQL testcontainer"]`, matching the
+    pattern in `philharmonic-store-sqlx-mysql/tests/integration.rs`.
 - Unit tests (colocated `#[cfg(test)] mod tests`) for in-process
   logic that doesn't touch the substrate: the `PermissionDocument`
   parser, the `Tenant.status` / `Principal.kind` enum discriminant
@@ -103,18 +112,19 @@ Wave 2's Gate-1-reviewed code.
 
 ## Stable `KIND: Uuid` constants (use verbatim)
 
-These are UUIDv4s generated once on 2026-04-21 for this phase.
-They're part of the substrate wire format and **must never
-change** after this commit. Embed them in the source code
-literally, do not regenerate, do not "clean up."
+These are UUIDv4s generated on 2026-04-21 via
+`./scripts/xtask.sh gen-uuid -- --v4` — the workspace-canonical
+UUID source. They're part of the substrate wire format and
+**must never change** after this commit. Embed them in the
+source code literally, do not regenerate, do not "clean up."
 
 ```rust
-Tenant::KIND           = uuid!("761b04bf-0448-493b-8a94-2892a743887f")
-Principal::KIND        = uuid!("34599a8f-4e94-45e3-98ad-9b25cd2bf9e5")
-RoleDefinition::KIND   = uuid!("3bc0622f-76ff-4ba1-87e5-1a4d9e79d155")
-RoleMembership::KIND   = uuid!("c174aeca-a260-4f01-85ab-ab4bc72a6eca")
-MintingAuthority::KIND = uuid!("b2810199-3e93-44b9-8543-b3ebec7f6e24")
-AuditEvent::KIND       = uuid!("a74af3a0-6f1c-429f-b7d3-a9b5f16928f6")
+Tenant::KIND           = uuid!("6a79e7a2-ea05-46d8-a578-b24c3b62c860")
+Principal::KIND        = uuid!("3676b722-928b-4b3b-9417-659c5c1ea216")
+RoleDefinition::KIND   = uuid!("da0d6fee-d989-44d1-b67e-f18b36a95043")
+RoleMembership::KIND   = uuid!("cae4d1de-8f2f-4598-9ff0-2629819ca3ba")
+MintingAuthority::KIND = uuid!("932c30fc-9b31-488d-badb-62b1c49b7d6d")
+AuditEvent::KIND       = uuid!("92474986-4b6b-48c9-b902-8629061ef619")
 ```
 
 A seventh UUID reserved for Wave 2's `TenantEndpointConfig` —
@@ -122,7 +132,7 @@ A seventh UUID reserved for Wave 2's `TenantEndpointConfig` —
 not to collide:
 
 ```
-TenantEndpointConfig::KIND = e69cbfb3-06b6-42a6-9fe8-ba71a56d1578
+TenantEndpointConfig::KIND = 19d1a8f5-6ef0-49b0-adf5-48e1cd3daea9
 ```
 
 ## Repository shape
@@ -152,9 +162,10 @@ thiserror = "2"
 
 [dev-dependencies]
 philharmonic-store-sqlx-mysql = "0.1"
-tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "sync"] }
 testcontainers = "0.27"
 testcontainers-modules = { version = "0.15", features = ["mysql"] }
+async-trait = "0.1"  # only if needed to impl substrate traits on the mock
 ```
 
 Exact minor versions: match whatever `philharmonic-store-sqlx-mysql/Cargo.toml`
@@ -184,21 +195,25 @@ Wave 2.
 - **Comments:** default to none. Only add a one-line comment when
   the *why* is non-obvious (subtle invariant, workaround, hidden
   constraint). Don't narrate the *what* — names do that.
+- **Terminology:** prose you author (doc comments, rustdoc, error
+  messages, test names, your final summary) follows the
+  workspace terminology conventions — see `README.md §Terminology
+  and language`. Short form: no `master`/`slave` for technical
+  relationships (use `primary`/`replica`, `leader`/`follower`,
+  `parent`/`child`); no gendered defaults (prefer singular
+  "they"); prefer `allowlist`/`denylist` over
+  `whitelist`/`blacklist`; `stub`/`placeholder`/`fake` over
+  "dummy"; GNU/Linux (OS) vs. Linux kernel; no `win*` shorthand
+  for Microsoft Windows; prefer "free software" / "FLOSS" over
+  standalone "open-source". Technical accuracy beats aesthetic
+  neutrality — external identifiers (HTTP `Authorization`, DB
+  `MASTER` commands) are used literally.
 - **Clippy -D warnings:** the workspace CI runs
   `cargo clippy --all-targets -- -D warnings`. Fix the root cause;
   only use `#[allow(clippy::<lint>)]` at the narrowest scope with
   a one-line explanation, when a lint is genuinely wrong for that
   call site.
-- **Tests:**
-  - Unit tests in `#[cfg(test)] mod tests` inside the module whose
-    logic they exercise.
-  - Integration tests in `tests/` — one file per concern is fine.
-  - Every test that needs a MySQL container must have both
-    `#[tokio::test(flavor = "multi_thread")]` and
-    `#[ignore = "requires MySQL testcontainer"]`. The workspace
-    convention is that pre-landing workspace-level tests skip
-    `#[ignore]`'d tests and run them only per-modified-crate via
-    `./scripts/rust-test.sh --ignored philharmonic-policy`.
+- **Tests:** see "Required tests" below.
 
 ## Entity kind definitions (from `09-policy-and-tenancy.md`, exact shapes)
 
@@ -405,44 +420,147 @@ existing helper in `philharmonic-store::ext` and use that;
 Make the parser tolerant — try array first, fall back to object
 with `permissions` key.
 
-## Required integration tests
+## Required tests
 
-Each test uses a fresh testcontainer MySQL 8 instance, matching
+### Design rationale — two tiers, both mandatory
+
+`philharmonic-policy` has two distinct classes of correctness to
+verify, and neither alone is sufficient:
+
+1. **Algorithmic correctness of `evaluate_permission`.** Does
+   the evaluation loop visit the right rows, skip retired roles,
+   deny across tenants, handle multi-role membership? This is a
+   pure data-transformation question — in-memory fakes can
+   simulate the substrate cheaply and deterministically, and the
+   tests run on every `cargo test` without containers.
+2. **Substrate contract correctness.** Do `Entity` impls
+   round-trip through real storage? Do the slot types + indices
+   the design doc specifies actually serialize, persist, and
+   query against `philharmonic-store-sqlx-mysql`? Mocks can't
+   answer this — only real MySQL can, because the mock is
+   written by the same hand writing the entity impls and any
+   divergence between them silently matches.
+
+Prior Philharmonic history: mocked-substrate-only tests once
+passed while a prod migration broke because the mock elided a
+real schema constraint. The policy since: substrate-touching
+behavior is validated against real MySQL via `testcontainers`,
+with `#[ignore = "requires MySQL testcontainer"]` so workspace-
+level CI stays fast while per-modified-crate `--ignored` runs
+exercise them. The *new* rule added in this dispatch: fast
+algorithmic coverage via a mock tier is *also* required, so
+permission-evaluation branches are reachable without container
+overhead and so every `cargo test` in CI exercises the logic.
+
+Both tiers are mandatory; neither substitutes for the other.
+
+### Tier 1 — Mock-substrate tests (fast, default `cargo test`)
+
+Implement a `MockEntityStore` + `MockContentStore` (or a single
+unified mock if the substrate traits naturally compose that way)
+under either:
+- `src/testing/mock.rs` behind `#[cfg(any(test, feature =
+  "testing"))]`, OR
+- `tests/common/mock.rs` shared via a `mod common;` declaration
+  in each integration-test file.
+
+Pick whichever composes better with the substrate traits you end
+up calling from `evaluate_permission`. Don't expose the mock in
+the crate's public API unless a `testing` feature is added
+explicitly — if you add one, document it in the crate README.
+
+The mock must:
+- Be fully in-memory (no fs, no network, no channels to other
+  processes).
+- Implement the same async traits `evaluate_permission` calls on
+  the real substrate, so the function under test is unmodified
+  between tiers.
+- Be deterministic — no `rand`, no wall-clock time, no
+  iteration-order reliance on `HashMap` for any assertion-
+  relevant ordering (use `BTreeMap` where ordering matters).
+- Not cheat on error paths — if the real substrate can return
+  "entity not found" or "content hash missing", the mock must
+  be able to return the same.
+
+Tests to implement against the mock (fast, no `#[ignore]`
+attribute, run every time):
+
+1. Permission evaluation — happy path: principal has role that
+   grants required atom → `Ok(true)`.
+2. Permission evaluation — permission denied: role exists but
+   doesn't grant the atom → `Ok(false)`.
+3. Permission evaluation — retired role: role exists, grants
+   atom, but `is_retired = true` → `Ok(false)`.
+4. Permission evaluation — retired membership: membership is
+   retired → `Ok(false)`.
+5. Permission evaluation — retired principal → `Ok(false)`.
+6. Permission evaluation — cross-tenant principal: principal
+   belongs to tenant A, caller asks about tenant B → `Ok(false)`.
+7. Permission evaluation — multi-role membership: principal has
+   two memberships, neither alone grants the atom but one of
+   them does → `Ok(true)`.
+8. Permission evaluation — principal not found → propagates
+   `PolicyError::PrincipalNotFound` (or whatever variant you
+   defined).
+9. Permission evaluation — role not found (membership points
+   at a role that doesn't exist) → propagates
+   `PolicyError::RoleNotFound`.
+10. Permission evaluation — content blob missing for a role →
+    propagates `PolicyError::MissingPermissionsBlob`.
+11. `PermissionDocument` tolerant-parser — bare array vs wrapped
+    object, against the mock pipeline (parsed via
+    `content_store.get(...)` → `serde_json::from_slice`), end
+    to end.
+
+### Tier 2 — Real-MySQL integration tests (contract, `--ignored`)
+
+Every test uses a fresh testcontainer MySQL 8 instance, matching
 the pattern in
 `philharmonic-store-sqlx-mysql/tests/integration.rs` (global
-async mutex for container startup, then per-test cleanup). All
+async mutex for container startup, per-test schema cleanup). All
 annotated `#[tokio::test(flavor = "multi_thread")]` +
 `#[ignore = "requires MySQL testcontainer"]`.
 
-Minimum coverage:
-1. Entity round-trip for each of the 6 kinds — create, append a
-   revision with every slot type populated, read it back,
-   validate all slots match.
-2. Permission evaluation — happy path: principal has role that
-   grants required atom → returns `Ok(true)`.
-3. Permission evaluation — permission denied: role exists but
-   doesn't grant the atom → `Ok(false)`.
-4. Permission evaluation — retired role: role exists, grants
-   atom, but is retired → `Ok(false)`.
-5. Permission evaluation — retired membership: membership is
-   retired → `Ok(false)`.
-6. Permission evaluation — retired principal → `Ok(false)`.
-7. Permission evaluation — cross-tenant principal: principal
-   belongs to tenant A, caller asks about tenant B → `Ok(false)`.
-8. Nested role memberships — principal has two role memberships,
-   neither alone grants the atom but one of them does → `Ok(true)`.
+Tests to implement against real MySQL:
 
-Unit tests (no substrate):
-9. `PermissionDocument` parses bare array correctly.
-10. `PermissionDocument` parses `{permissions: [...]}` object.
-11. `PermissionDocument::contains` returns true/false correctly.
-12. `validate_subdomain_name` accepts valid (e.g. `acme-corp`,
+12. **Entity round-trip for each of the 6 kinds** — create, append
+    a revision with every slot type populated (content, entity,
+    scalar), read it back, validate every slot matches. This is
+    the substrate-contract test — it's the reason Tier 2 exists
+    and why Tier 1 can't replace it.
+13. Permission evaluation — happy path end-to-end (mirror of
+    Tier 1 test 1, but through `sqlx-mysql`).
+14. Permission evaluation — retired role (mirror of Tier 1 test
+    3, real MySQL).
+15. Permission evaluation — cross-tenant denial (mirror of Tier
+    1 test 6, real MySQL).
+16. Permission evaluation — multi-role membership positive
+    (mirror of Tier 1 test 7, real MySQL).
+
+Tier 2 doesn't need to re-cover every branch Tier 1 covers —
+the point is to validate the substrate *contract*, not to
+re-run algorithmic tests. Four well-chosen end-to-end cases
+(one positive, one retirement-path, one tenant-isolation, one
+multi-role) plus the six round-trips are enough. If Tier 1 and
+Tier 2 diverge on a shared case, that's a bug — fix the mock
+or fix the impl, don't silence the test.
+
+### Tier 3 — Unit tests (no substrate at all)
+
+In-process logic that has no substrate dependency. Colocated
+(`#[cfg(test)] mod tests` inside the module whose logic they
+exercise):
+
+17. `PermissionDocument` parses bare array correctly.
+18. `PermissionDocument` parses `{permissions: [...]}` object.
+19. `PermissionDocument::contains` returns true/false correctly.
+20. `validate_subdomain_name` accepts valid (e.g. `acme-corp`,
     `a1`, 63-char max-length) and rejects invalid (too short,
     leading digit, leading/trailing hyphen, double-hyphen,
     reserved name).
-13. `Tenant.status` discriminant round-trip (Rust enum → i64 →
+21. `Tenant.status` discriminant round-trip (Rust enum → i64 →
     Rust enum).
-14. `Principal.kind` discriminant round-trip.
+22. `Principal.kind` discriminant round-trip.
 
 ## Acceptance criteria (before Claude commits your work)
 
@@ -450,20 +568,25 @@ Unit tests (no substrate):
 - `cargo check --workspace` passes at the workspace root.
 - `cargo clippy --all-targets -- -D warnings` on `philharmonic-policy`
   passes.
-- `cargo test --workspace` passes (ignored tests skipped, expected).
-- `cargo test -p philharmonic-policy -- --ignored` passes against
-  MySQL testcontainers. **Do not mock the substrate — integration
-  tests must hit a real MySQL** (feedback from Yuka: mocked
-  substrate tests masked real migration issues last time; hitting
-  real MySQL via testcontainers is the policy).
+- `cargo test --workspace` passes. **Tier 1 mock tests and Tier
+  3 unit tests must pass here** (no `#[ignore]` on them — they
+  run as part of the default workspace-level test flow); Tier 2
+  tests are `#[ignore]`d and skipped, as expected.
+- `cargo test -p philharmonic-policy -- --ignored` passes
+  against MySQL testcontainers. **Tier 2 integration tests hit
+  real MySQL — do not mock the substrate in this tier.** (The
+  mock lives in Tier 1 where it belongs; Tier 2 is specifically
+  the "mocks can't catch this" tier.)
 - `cargo tree -p philharmonic-policy | grep -iE 'aes|sha2|base64|zeroize|rand_core|getrandom|subtle|secrecy|ed25519|x25519|ml-kem|hkdf'`
   returns **nothing** (crypto deps are not introduced).
-- All 6 `KIND: Uuid` constants match the verbatim values above.
+- All 6 `KIND: Uuid` constants match the verbatim values above
+  (`6a79e7a2-…`, `3676b722-…`, `da0d6fee-…`, `cae4d1de-…`,
+  `932c30fc-…`, `92474986-…`).
 - No `unsafe`, no `anyhow`, no `println!`/`eprintln!` in library
   code.
 
 If any of these fail, flag the gap in your final summary rather
-than workaround it. Claude verifies everything before committing.
+than work around it. Claude verifies everything before committing.
 
 ## Git handling
 
@@ -480,8 +603,11 @@ review. If you need to inspect state, read-only `git status`,
 
 When you finish (or hit a wall), write a short summary covering:
 - What's implemented and where (file paths).
-- Test results — pre-landing output summary, workspace-level and
-  `--ignored` separately.
+- Where the mock lives (file path + visibility) and which
+  substrate traits it implements.
+- Test results, separately for each tier — Tier 1 + Tier 3 from
+  `cargo test --workspace`, Tier 2 from
+  `cargo test -p philharmonic-policy -- --ignored`.
 - Any deviation from this prompt, with reasoning.
 - Any places where you flagged-rather-than-fixed (crypto creep,
   `unsafe` in neighboring code, `anyhow` in neighboring code,
@@ -503,20 +629,28 @@ Implement Phase 2 Wave 1 of the Philharmonic workspace — the non-crypto founda
 - `docs/codex-prompts/2026-04-21-0001-phase-2-wave-1-non-crypto-foundation.md` — this file; read it verbatim.
 - `docs/design/09-policy-and-tenancy.md` — authoritative entity-kind shapes, permission atoms, evaluation semantics, subdomain naming.
 - `docs/design/05-storage-substrate.md` — substrate trait surfaces you'll call.
-- `docs/design/13-conventions.md` — shell-script and Rust conventions.
+- `docs/design/13-conventions.md` — shell-script and Rust conventions (including §Naming and terminology).
+- `README.md` §Terminology and language — prose conventions for code comments, rustdoc, error messages, and your final summary.
 - `ROADMAP.md` §Phase 2 — acceptance criteria at the phase level.
 
 Repository: `/home/mori/philharmonic` — a Rust cargo workspace of 23 submodules. `philharmonic-policy/` submodule is currently at `0.0.0` with only a placeholder `src/lib.rs`. `philharmonic-types = "0.3"`, `philharmonic-store = "0.1"`, and `philharmonic-store-sqlx-mysql = "0.1"` are already published and patched locally via the workspace root's `[patch.crates-io]`.
 
-Scope: implement exactly the six entity kinds listed in `09-policy-and-tenancy.md` except `TenantEndpointConfig` (which ships in Wave 2 after a crypto review). Also implement the permission atoms, `PermissionDocument` parser, permission evaluation algorithm, and the integration + unit tests listed in this prompt. Use the exact `KIND: Uuid` values listed in this prompt (do NOT regenerate them — they are wire-format-stable).
+Scope: implement exactly the six entity kinds listed in `09-policy-and-tenancy.md` except `TenantEndpointConfig` (which ships in Wave 2 after a crypto review). Also implement the permission atoms, `PermissionDocument` parser, permission evaluation algorithm, and the test matrix (Tier 1 mock-substrate, Tier 2 real-MySQL integration, Tier 3 unit) listed in this prompt. Use the exact `KIND: Uuid` values listed in this prompt — `6a79e7a2-ea05-46d8-a578-b24c3b62c860` for `Tenant`, `3676b722-928b-4b3b-9417-659c5c1ea216` for `Principal`, `da0d6fee-d989-44d1-b67e-f18b36a95043` for `RoleDefinition`, `cae4d1de-8f2f-4598-9ff0-2629819ca3ba` for `RoleMembership`, `932c30fc-9b31-488d-badb-62b1c49b7d6d` for `MintingAuthority`, `92474986-4b6b-48c9-b902-8629061ef619` for `AuditEvent` (do NOT regenerate — they are wire-format-stable; `19d1a8f5-6ef0-49b0-adf5-48e1cd3daea9` is reserved for Wave 2's `TenantEndpointConfig` and must not be used in Wave 1).
 
 Do not add any crypto crate (`aes-gcm`, `sha2`, `base64`, `zeroize`, `rand_core`, `getrandom`, `subtle`, `secrecy`, or any dalek/ML-KEM/HKDF). Do not implement `TenantEndpointConfig`, SCK encryption, or `pht_` token code. Those are Wave 2 and are blocked on a separate crypto review. If you find yourself needing a crypto primitive, stop and flag — don't improvise.
 
-No `unsafe`. No `anyhow` (this is a library crate; use `thiserror`). No `println!` / `eprintln!` in library code. `cargo clippy --all-targets -- -D warnings` must pass. `cargo fmt --check` must pass. Integration tests use `testcontainers` + `philharmonic-store-sqlx-mysql` against real MySQL (not mocks); match the pattern in `philharmonic-store-sqlx-mysql/tests/integration.rs`. All integration tests gated with `#[ignore = "requires MySQL testcontainer"]`.
+No `unsafe`. No `anyhow` (this is a library crate; use `thiserror`). No `println!` / `eprintln!` in library code. `cargo clippy --all-targets -- -D warnings` must pass. `cargo fmt --check` must pass.
+
+Tests must be implemented in **two tiers, both mandatory, neither substitutes for the other**:
+- **Tier 1 — Mock-substrate** (fast, no `#[ignore]`): write an in-memory `MockEntityStore` + `MockContentStore` under `#[cfg(any(test, feature = "testing"))]` or `tests/common/`, exercising every permission-evaluation branch deterministically. These run on every `cargo test --workspace` without any container.
+- **Tier 2 — Real MySQL** (contract, `#[ignore = "requires MySQL testcontainer"]`): `testcontainers` + `philharmonic-store-sqlx-mysql` against a real MySQL 8 container, matching the pattern in `philharmonic-store-sqlx-mysql/tests/integration.rs`. Six entity round-trips + four end-to-end permission-evaluation cases (happy path, retired role, cross-tenant denial, multi-role positive). **Do not mock the substrate in this tier — its purpose is specifically to catch drift that a mock can't.**
+- **Tier 3 — Unit**: colocated `#[cfg(test)] mod tests` for `PermissionDocument` parsing, `validate_subdomain_name`, and the discriminant round-trips.
+
+Prose conventions apply (`README.md §Terminology and language`): no `master`/`slave` for technical relationships, no gendered defaults, prefer `allowlist`/`denylist`, GNU/Linux (OS) vs. Linux kernel, no `win*` shorthand, prefer "free software"/"FLOSS" over standalone "open-source". External identifiers (HTTP `Authorization`, DB `MASTER`) are used literally.
 
 Do not run any git state-changing command. Leave the working tree dirty with your changes. Claude reviews and commits.
 
-When done, write a short summary covering: what's implemented and where (file paths); `pre-landing` and `--ignored` test results; any deviation from the prompt with reasoning; flagged-rather-than-fixed issues (crypto creep, unsafe in neighbors, anyhow in neighbors, design-doc ambiguity); and the exact trait-method names you used from `philharmonic-store`.
+When done, write a short summary covering: what's implemented and where (file paths); where the mock lives (file path + visibility) and which substrate traits it implements; test results separately for each tier (Tier 1 + Tier 3 from `cargo test --workspace`, Tier 2 from `cargo test -p philharmonic-policy -- --ignored`); any deviation from the prompt with reasoning; flagged-rather-than-fixed issues (crypto creep, unsafe in neighbors, anyhow in neighbors, design-doc ambiguity); and the exact trait-method names you used from `philharmonic-store`.
 
 Don't publish. Don't commit. Don't push.
 </task>
