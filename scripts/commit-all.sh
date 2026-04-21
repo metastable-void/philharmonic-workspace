@@ -58,8 +58,8 @@ fi
 
 # Stash the message in a temp file so we don't have to escape it
 # through `git submodule foreach`'s nested shell.
-msgfile="$(mktemp)"
-trap 'rm -f "$msgfile"' EXIT
+msgfile="$("$(dirname "$0")"/mktemp.sh commit-msg)"
+trap 'rm -f "$msgfile"' EXIT INT HUP TERM
 printf '%s\n\n' "$msg" > "$msgfile"
 printf 'Audit-Info: %s\n' "$( "$(dirname "$0")"/print-audit-info.sh $audit_flags )" >> "$msgfile"
 export MSG_FILE="$msgfile"

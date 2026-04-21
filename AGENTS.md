@@ -147,6 +147,21 @@ workspace:
 - Explicit POSIX deviations (e.g. `ps -o rss=`) are tracked in
   `docs/design/13-conventions.md §Shell scripts`. Don't introduce
   new ones without a recorded reason.
+- **Use the wrapper scripts for `mktemp` / `curl` / `wget`, not
+  the raw tools.** These tools vary across minimal environments
+  (Alpine busybox, FreeBSD, OpenBSD, macOS, WSL); the wrappers
+  encode the portable choice once so shell scripts don't have
+  to rediscover it.
+  - Temp files: `tmp=$("$(dirname "$0")"/mktemp.sh [<slug>])`,
+    paired with `trap 'rm -f "$tmp"' EXIT INT HUP TERM` in the
+    caller (the wrapper doesn't clean up for you).
+  - HTTP GET: `"$(dirname "$0")"/web-fetch.sh <URL> [<outfile>]`.
+    User-Agent overridable via `WEB_FETCH_UA`. All backends fail
+    on HTTP 4xx/5xx (curl is passed `-f`); use `... || :` if
+    you want to tolerate HTTP errors.
+  If a wrapper doesn't cover your case, extend it. Don't reach
+  around it to raw `mktemp`/`curl`/`wget`. See
+  `docs/design/13-conventions.md §External tool wrappers`.
 
 ## HUMANS.md (do not touch)
 

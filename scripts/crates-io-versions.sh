@@ -30,27 +30,26 @@
 # versions are filtered out — they're still in the index but
 # unavailable for fresh resolution.
 #
-# Requires `curl` AND `jq`:
-#   - curl — fetches the index entry. `-f` makes HTTP 4xx/5xx a
-#     non-zero exit so `set -e` aborts before jq runs on empty
-#     input. `-sSL` silences progress, still prints errors, and
-#     follows redirects.
-#   - jq   — parses the one-object-per-line JSON stream and filters
-#     out yanked releases.
+# Requires `jq`. Fetching is delegated to `./scripts/web-fetch.sh`,
+# which picks whichever of curl/wget/fetch/ftp is available and
+# fails on HTTP 4xx/5xx — exactly the behavior we need so that a
+# missing crate (sparse-index 404) surfaces as a hard error rather
+# than returning an empty body that jq would silently treat as
+# "zero non-yanked versions."
 #
-# Neither curl nor jq is part of the workspace's baseline toolchain
-# (no other script in scripts/ depends on them). This script probes
-# both via `command -v` up front and fails fast with a clear
-# message if either is missing, rather than emitting an opaque
-# "command not found". Install them per your OS (e.g. `apt install
-# curl jq`, `brew install curl jq`, `snap install jq`) before
-# relying on this helper.
+# jq isn't part of the workspace's baseline toolchain (no other
+# script in scripts/ depends on it). This script probes for jq up
+# front and fails fast with a clear message if it's missing,
+# rather than emitting an opaque "command not found". Install per
+# your OS (e.g. `apt install jq`, `brew install jq`,
+# `snap install jq`) before relying on this helper.
 #
 # Exit codes:
 #   0         — crate found, zero or more non-yanked versions
 #               printed. Empty output is possible (all yanked).
-#   non-zero  — crate not found on crates.io (curl 404), network
-#               error, curl/jq missing, or malformed argument.
+#   non-zero  — crate not found on crates.io (HTTP 404 from the
+#               sparse-index fetch), network error, fetch tool /
+#               jq missing, or malformed argument.
 #
 # POSIX sh only — see docs/design/13-conventions.md §Shell scripts.
 # No bashisms. In particular, substring parameter expansions like
@@ -65,15 +64,12 @@ if [ $# -ne 1 ] || [ -z "$1" ]; then
     exit 2
 fi
 
-# External-dep check. Fail early with a pointed message; otherwise
-# `set -e` would trip on the first unfound command with a generic
-# "not found" and the user has to guess which tool.
-for tool in curl jq; do
-    if ! command -v "$tool" >/dev/null 2>&1; then
-        printf '!!! crates-io-versions.sh: `%s` not found on PATH. Install it and retry.\n' "$tool" >&2
-        exit 1
-    fi
-done
+# External-dep check for jq. (Web fetching is delegated to
+# `./scripts/web-fetch.sh`, which handles its own tool probing.)
+if ! command -v jq >/dev/null 2>&1; then
+    printf '!!! crates-io-versions.sh: `jq` not found on PATH. Install it and retry.\n' >&2
+    exit 1
+fi
 
 # crates.io normalizes crate names to lowercase for index lookup.
 crate=$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')
@@ -108,13 +104,14 @@ case "$n" in
         ;;
 esac
 
-# Capture curl's output into a variable before piping, so that a
-# curl failure (e.g. 404 for a missing crate) aborts the script
-# under `set -e`. A naive `curl ... | jq ...` would swallow curl's
-# exit status because POSIX sh has no `pipefail`; jq on empty
-# input returns 0 silently, and we'd report "success with no
-# versions" for a crate that doesn't exist.
-body=$(curl -fsSL "https://index.crates.io/$path")
+# Capture the fetched body into a variable before piping, so that
+# a fetch failure (e.g. HTTP 404 for a missing crate) aborts the
+# script under `set -e`. A naive `web-fetch.sh ... | jq ...` would
+# swallow the fetch exit status because POSIX sh has no
+# `pipefail`; jq on empty input returns 0 silently, and we'd
+# report "success with no versions" for a crate that doesn't
+# exist.
+body=$("$(dirname "$0")"/web-fetch.sh "https://index.crates.io/$path")
 
 # `-r` emits raw strings (unquoted). `select(.yanked | not)` drops
 # yanked versions; `.vers` prints the SemVer string for what's left.

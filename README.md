@@ -287,9 +287,28 @@ Invoke by path (`./scripts/foo.sh`), not via `bash`.
 - `./scripts/publish-crate.sh [--dry-run] <crate>` — publish one
   crate to crates.io and tag the release inside the submodule.
   Tags are created only after `cargo publish` succeeds.
+- `./scripts/mktemp.sh [<slug>]` — workspace-canonical
+  replacement for raw `mktemp(1)`. Prints a temp path (under
+  `$TMPDIR` or `/tmp`) and creates the file; delegates to
+  `mktemp` when available, falls back to a `/dev/urandom`-based
+  suffix otherwise. **Callers must register their own cleanup**
+  via `trap 'rm -f "$tmp"' EXIT INT HUP TERM` — the wrapper
+  doesn't clean up for you. Never call `mktemp` directly from a
+  workspace script.
+- `./scripts/web-fetch.sh <URL> [<outfile>]` — workspace-
+  canonical HTTP(S) GET. Tries `curl` → `wget` → `fetch` (FreeBSD)
+  → `ftp` (OpenBSD HTTP mode); UA overridable via `WEB_FETCH_UA`.
+  Body goes to stdout by default, or to `<outfile>` if given.
+  All backends fail on HTTP 4xx/5xx (curl is invoked with `-f`);
+  use `./scripts/web-fetch.sh ... || :` at the call site if you
+  want to tolerate HTTP errors. Never call `curl`/`wget`
+  directly from a workspace script.
 
 See `docs/design/13-conventions.md §Shell scripts` for the POSIX-
-sh conventions the scripts follow and explicit deviations.
+sh conventions the scripts follow and explicit deviations, and
+§Script wrappers / §External tool wrappers for the rule that no
+raw `cargo` / `mktemp` / `curl` / `wget` calls are allowed in
+workspace scripts.
 
 ### Recommended Git configuration
 

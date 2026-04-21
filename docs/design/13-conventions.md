@@ -554,6 +554,29 @@ scripts"). Validate with `./scripts/test-scripts.sh`. Then use
 the new wrapper — don't fall back to raw cargo because the
 wrapper doesn't exist yet.
 
+## External tool wrappers
+
+**Rule: never call `mktemp`, `curl`, or `wget` directly from a
+workspace script. Use the wrappers.** The rationale is
+portability: these tools vary across the minimal environments we
+need to support — Alpine/busybox, FreeBSD, OpenBSD, macOS, WSL —
+and their flag surfaces aren't consistent (busybox wget doesn't
+take `--show-progress`, busybox mktemp lacks some templates,
+OpenBSD ftp speaks HTTP but wants its own flag vocabulary). The
+wrappers encode the portable choice once so every script doesn't
+have to rediscover it.
+
+| Wrapper | Replaces | Notes |
+|---|---|---|
+| `./scripts/mktemp.sh [<slug>]` | `mktemp` | Delegates to `mktemp(1)` when present; falls back to a 10-char `[A-Za-z0-9]` suffix from `/dev/urandom` + `touch`. Fallback does **not** set 0600 perms (`chmod` after creation for confidential content). Caller **must** register cleanup: `trap 'rm -f "$tmp"' EXIT INT HUP TERM`. |
+| `./scripts/web-fetch.sh <URL> [<outfile>]` | `curl`, `wget` | Tries `curl` → `wget` → `fetch` (FreeBSD) → `ftp` (OpenBSD HTTP mode). UA override via `WEB_FETCH_UA`. All backends fail on HTTP 4xx/5xx (curl gets `-f`; the others default to failing). Callers that want to continue regardless of HTTP status use `./scripts/web-fetch.sh ... || :` at the call site — the idiom in `print-audit-info.sh`. |
+
+**When the wrapper's semantics don't match your need, extend it.**
+Don't reach around to raw `curl -fsSL` / `mktemp --suffix=...` /
+etc.
+
+Validate any changes with `./scripts/test-scripts.sh` as usual.
+
 ## Pre-landing checks
 
 **Mandatory before every commit that touches Rust code.** One

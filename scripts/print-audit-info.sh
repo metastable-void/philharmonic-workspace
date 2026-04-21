@@ -15,29 +15,29 @@ host=$(uname -n)
 v4=
 v6=
 
+# Resolve this script's directory once so we can invoke sibling
+# helpers without depending on CWD — print-audit-info.sh is
+# called from inside `commit-all.sh` where CWD is the workspace
+# root, and potentially from other callers later.
+_here=$(cd -- "$(dirname -- "$0")" && pwd)
+
 if [ "${1:-}" = "--anonymize" ] ; then
     v4=hidden/ZZ
     v6=hidden/ZZ
-elif command -v curl > /dev/null 2>&1 ; then
-    tmp_v4=$(mktemp /tmp/tmp_v4.XXXXXX)
-    tmp_v6=$(mktemp /tmp/tmp_v6.XXXXXX)
-    curl -s https://1.1.1.1/cdn-cgi/trace > "$tmp_v4" 2>/dev/null || :
-    curl -s https://[2606:4700:4700::1111]/cdn-cgi/trace > "$tmp_v6" 2>/dev/null || :
+else
+    # `web-fetch.sh` picks whichever of curl / wget / fetch /
+    # ftp is available; we don't need to branch here. `|| :`
+    # keeps the audit line produced even if the network is down
+    # or the workspace convention's fetch tool is missing — an
+    # empty `4=`/`6=` field is acceptable, a failed commit is not.
+    tmp_v4=$("$_here/mktemp.sh" tmp_v4)
+    tmp_v6=$("$_here/mktemp.sh" tmp_v6)
+    trap 'rm -f "$tmp_v4" "$tmp_v6"' EXIT INT HUP TERM
+    "$_here/web-fetch.sh" https://1.1.1.1/cdn-cgi/trace "$tmp_v4" || :
+    "$_here/web-fetch.sh" 'https://[2606:4700:4700::1111]/cdn-cgi/trace' "$tmp_v6" || :
 
     v4="$(awk -F= '/^ip=/{print $2}' < "$tmp_v4")/$(awk -F= '/^loc=/{print $2}' < "$tmp_v4")"
     v6="$(awk -F= '/^ip=/{print $2}' < "$tmp_v6")/$(awk -F= '/^loc=/{print $2}' < "$tmp_v6")"
-
-    rm -f "$tmp_v4" "$tmp_v6"
-elif command -v wget > /dev/null 2>&1 ; then
-    tmp_v4=$(mktemp /tmp/tmp_v4.XXXXXX)
-    tmp_v6=$(mktemp /tmp/tmp_v6.XXXXXX)
-    wget -q -O "$tmp_v4" https://1.1.1.1/cdn-cgi/trace >/dev/null 2>&1 || :
-    wget -q -O "$tmp_v6" https://[2606:4700:4700::1111]/cdn-cgi/trace >/dev/null 2>&1 || :
-
-    v4="$(awk -F= '/^ip=/{print $2}' < "$tmp_v4")/$(awk -F= '/^loc=/{print $2}' < "$tmp_v4")"
-    v6="$(awk -F= '/^ip=/{print $2}' < "$tmp_v6")/$(awk -F= '/^loc=/{print $2}' < "$tmp_v6")"
-
-    rm -f "$tmp_v4" "$tmp_v6"
 fi
 
 os=

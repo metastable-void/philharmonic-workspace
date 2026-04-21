@@ -61,6 +61,27 @@ Developer: Yuka MORI.
   `cargo --version`) — nothing wraps these and they're cheap.
   See docs/design/13-conventions.md §Script wrappers for the
   authoritative statement and rationale.
+- **Same rule for `mktemp`, `curl`, `wget`, and other external
+  non-Rust tools.** Never call `mktemp`, `curl`, or `wget`
+  directly from a workspace script. Use the wrappers:
+  - `./scripts/mktemp.sh [<slug>]` — creates a temp file under
+    `$TMPDIR` (or `/tmp`), falls back to a `/dev/urandom`-based
+    suffix when `mktemp(1)` isn't installed. **Pair with a
+    `trap 'rm -f "$tmp"' EXIT INT HUP TERM` in the caller** —
+    the wrapper doesn't clean up for you.
+  - `./scripts/web-fetch.sh <URL> [<outfile>]` — HTTP GET via
+    whichever of `curl`/`wget`/`fetch`/`ftp` is present. All
+    backends fail on HTTP 4xx/5xx (curl is invoked with `-f`).
+    User-Agent override via `WEB_FETCH_UA`. Use `... || :` at
+    the call site if you want to tolerate HTTP errors (see
+    `print-audit-info.sh` for the idiom).
+  The rule exists because these tools vary across minimal
+  environments (Alpine busybox, FreeBSD, OpenBSD, macOS, WSL).
+  The wrappers encode the portable choice once. New scripts
+  that need temp files or HTTP must call the wrapper; if the
+  wrapper doesn't do what you need, extend it — don't reach
+  around it. See docs/design/13-conventions.md §External tool
+  wrappers.
 - **Notes to humans.** When you tell Yuka anything significant
   (verification results with informative "why", platform
   caveats, audit findings, mid-implementation design calls,
