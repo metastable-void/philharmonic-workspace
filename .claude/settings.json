@@ -3,7 +3,9 @@
     "allow": [
       "Bash(node *)",
       "Bash(./scripts/test-scripts.sh)",
-      "Bash(./scripts/codex-status.sh)"
+      "Bash(./scripts/codex-status.sh)",
+      "Skill(codex:rescue)",
+      "Skill(codex:rescue:*)"
     ]
   },
   "enabledPlugins": {
