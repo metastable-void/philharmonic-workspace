@@ -9,5 +9,4 @@ this file, but never edit this file.
 
 ## Short-term TODOs
 
-- update ROADMAP.md.
-- release mechanics-config/mechanics-core.
+- update ROADMAP.md regularly.
