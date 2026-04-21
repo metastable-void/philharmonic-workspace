@@ -11,6 +11,10 @@ Developer: Yuka MORI.
   ROADMAP.md §5.
 - Submodule discipline: commit inside submodule first, push, then
   bump parent pointer. See ROADMAP.md §2.
+- ROADMAP.md is living. When a phase/task completes or plans
+  change, update ROADMAP.md in the same commit as the work — not
+  as a follow-up. A stale roadmap is worse than none. See
+  docs/design/13-conventions.md §ROADMAP maintenance.
 - Git workflow: all Git operations go through `scripts/*.sh`
   (`status.sh`, `pull-all.sh`, `commit-all.sh`, `push-all.sh`).
   If a script doesn't cover what you need, extend the script

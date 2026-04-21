@@ -179,6 +179,48 @@ that haven't been pushed to their own remotes. This prevents the
 single most common submodule error: pushing a workspace pointer
 that references a submodule commit nobody else can fetch.
 
+## AI-assisted development
+
+This project is developed primarily with AI pair-programming, and
+with a deliberate split between two agents:
+
+- **Claude Code** — designer, reviewer, and workspace caretaker.
+  Owns architecture, API shape, design docs, ROADMAP updates,
+  `Cargo.toml` plumbing, submodule wrangling, and review of
+  Codex's output. Git operations (commit, push) go through the
+  workspace helper scripts, driven by Claude.
+- **Codex CLI** — implementation partner. Claude spawns Codex
+  (via the Claude-Code `codex:` plugin) for substantive coding:
+  a crate's implementation, an algorithm, a connector, a
+  real-sized test suite. Claude writes the prompt; Codex writes
+  the code; Claude reviews.
+
+The rule of thumb: if the question is "what should this look
+like?", Claude answers. If the question is "now write the
+thing", Claude hands off to Codex, unless the work is plumbing or
+housekeeping that doesn't warrant the round-trip.
+
+The two agents read different instruction files:
+
+- `CLAUDE.md` at the repo root → Claude Code's conventions and
+  session bootstrap.
+- `AGENTS.md` at the repo root → Codex's conventions (auto-
+  loaded by Codex when it runs here).
+- `.codex/config.toml` → project-local Codex CLI settings,
+  activated by pointing `CODEX_HOME` at `.codex/`.
+
+Every Codex prompt Claude writes is archived under
+`docs/codex-prompts/YYYY-MM-DD-<slug>.md` and committed *before*
+Codex is spawned. That makes the design-to-implementation path
+reviewable after the fact, which is hard to reconstruct from
+chat history alone.
+
+Contributions from purely-human workflows are welcome — nothing
+in the code requires the AI workflow. But the project's docs,
+scripts, and prompt archive assume it, so mirroring the design-
+then-implement split (even manually) tends to produce cleaner
+history and easier review.
+
 ## Building and testing
 
 From the workspace root:

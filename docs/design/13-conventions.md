@@ -181,6 +181,28 @@ tracked here — add to the list when a new one is introduced:
   `codex-status.sh` already truncates to 80 chars downstream,
   so the lost data is never displayed anyway.
 
+## ROADMAP maintenance
+
+`ROADMAP.md` at the repo root is the linear plan: where the
+project is, what's next, what's blocked on what. Its audience is
+Claude Code working sessions (and anyone re-orienting to the
+project after a break). It's not a historical diary or a wish
+list — it's the document that tells you what to do next.
+
+- **Update in the same commit as the work.** A commit that
+  moves a phase forward should also mark the relevant tasks done
+  (or partially done) in ROADMAP.md. Splitting "do the work" and
+  "update ROADMAP" into separate commits lets the roadmap drift
+  out of sync with reality; coupling them keeps the plan honest.
+- **When plans change, update the plan.** If implementation
+  reveals the planned approach is wrong, update ROADMAP.md (and
+  the relevant design doc) with the new approach and a short
+  line explaining *why* — future readers need the "why" more
+  than the "what".
+- **Don't paper over an unclear roadmap with code.** If the next
+  step isn't clear from ROADMAP.md, stop and propose a roadmap
+  update first. Implementing against a guess creates churn.
+
 ## Codex prompt archive
 
 Claude hands substantive coding to Codex (see CLAUDE.md §Claude
