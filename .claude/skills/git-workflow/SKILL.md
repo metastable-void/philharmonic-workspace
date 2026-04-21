@@ -125,10 +125,14 @@ good, `U` = good+untrusted; anything else on a pushed commit is a
 problem). Canonical replacement for ad-hoc `git log -n 1` across
 repos — do not invoke raw `git log -n 1` for HEAD-state queries.
 
-### `scripts/check-api-breakage.sh [baseline-rev]`
-Runs `cargo-semver-checks --workspace --all-features` against a
-git baseline (defaults to `origin/main`); installs the tool on
-first use. Use before preparing a crate release.
+### `scripts/check-api-breakage.sh <crate> [<baseline-version>]`
+Runs `cargo semver-checks check-release -p <crate>` against a
+crates.io baseline (latest non-yanked by default, or the version
+you pass). Per-crate, not `--workspace`, because this workspace
+is a virtual-workspace parent + submodules and the
+git-clone-based baseline modes don't resolve submodule members.
+Installs `cargo-semver-checks` on first use. Use before preparing
+a crate release.
 
 ### `scripts/publish-crate.sh [--dry-run] <crate>`
 Publishes one crate to crates.io (via `cargo publish`) and tags

@@ -29,8 +29,14 @@ git fetch --tags --quiet
 git submodule update --remote --rebase --recursive
 
 # Submodule `update --remote` fetches branches but not arbitrary
-# tags. Pull tags explicitly so `cargo-semver-checks --baseline-rev
-# vX.Y.Z` and similar tag-based tooling see every release.
+# tags. Pull tags explicitly so release tags (`vX.Y.Z` produced
+# by `publish-crate.sh`) are available locally for `git log
+# --tags`, `git describe`, GitHub release-notes drafting, and any
+# tag-based tooling that may be added later. Note:
+# `./scripts/check-api-breakage.sh` uses crates.io as its
+# baseline (not a git tag), so it doesn't require these tags to
+# be present — this fetch is defensive, not load-bearing for the
+# semver-checks flow.
 git submodule foreach --quiet 'git fetch --tags --quiet origin'
 
 # Show resulting state. Parent may now be dirty due to bumped

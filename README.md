@@ -275,10 +275,15 @@ Invoke by path (`./scripts/foo.sh`), not via `bash`.
   pending toolchain updates. Called as step 0 by
   `pre-landing.sh` so each local run nudges against CI-vs-local
   drift.
-- `./scripts/check-api-breakage.sh [baseline-rev]` — run
-  `cargo-semver-checks --workspace --all-features` against a git
-  baseline (defaults to `origin/main`). Installs
-  `cargo-semver-checks` on first run.
+- `./scripts/check-api-breakage.sh <crate> [<baseline-version>]` —
+  run `cargo-semver-checks` for a single workspace crate against
+  a crates.io baseline. Without `<baseline-version>` the tool
+  picks the latest non-yanked version of `<crate>` on crates.io.
+  Per-crate, not `--workspace`, because the parent here is a
+  virtual-workspace submodule repo and the git-clone-based
+  baseline modes can't resolve submodule members — see
+  `docs/design/13-conventions.md §API breakage detection` for
+  the rationale. Installs `cargo-semver-checks` on first run.
 - `./scripts/publish-crate.sh [--dry-run] <crate>` — publish one
   crate to crates.io and tag the release inside the submodule.
   Tags are created only after `cargo publish` succeeds.
@@ -313,13 +318,19 @@ submodule + parent commit in that invocation — so each commit
 records the environment that created it without re-hitting the
 network per submodule.
 
-Shape of the line:
+Shape of the line (wrapped for readability; one physical line in
+the commit message):
 
 ```
 Audit-Info: t=<unix-ts> h=<hostname> u=<user>/<uid> g=<group>/<gid> \
             4=<ipv4>/<geo> 6=<ipv6>/<geo> k=<kernel>/<release> \
-            a=<arch> o=<os-id>_<version-id>
+            a=<arch> o=<os-id>_<version-id> r=<rustc-version>
 ```
+
+`r=` is the output of `rustc --version | awk '{print $2}'` (e.g.
+`1.95.0`). Empty if `rustc` isn't on `PATH` — rare, but possible
+for a docs-only commit on a machine without rustup; that case
+doesn't fail the commit.
 
 Query trailers across history with git's native tools:
 
@@ -526,12 +537,18 @@ after a successful `cargo publish`.
 4. Run the pre-release API-breakage check:
 
    ```bash
-   ./scripts/check-api-breakage.sh v<previous-version>
+   ./scripts/check-api-breakage.sh <crate>
+   # or, to pin the baseline explicitly:
+   ./scripts/check-api-breakage.sh <crate> <previous-version>
    ```
 
-   This runs `cargo-semver-checks --workspace --all-features`
-   against the previous release tag; installs the tool on first
-   use. Investigate any breakage before continuing.
+   This runs `cargo semver-checks check-release -p <crate>`
+   against a crates.io baseline (the newest non-yanked version by
+   default, or the version you pass). Installs
+   `cargo-semver-checks` on first use. Investigate any breakage
+   before continuing — a "requires new major version" result
+   typically means bumping your version higher, not overriding
+   the tool.
 5. Publish (dry-run first):
 
    ```bash

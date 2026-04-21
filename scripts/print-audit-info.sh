@@ -54,4 +54,12 @@ case "$kern" in
         ;;
 esac
 
-echo t="${t}" h="${host}" u="${user}/${uid}" g="${grp}/${gid}" 4="${v4}" 6="${v6}" k="${kern}/${krel}" a="${arch}" o="${os}"
+# Rust toolchain version from the committing environment. Empty
+# if rustc isn't on PATH — commits without Rust on the box (rare,
+# but possible for a docs-only machine) shouldn't fail here.
+rust=
+if command -v rustc > /dev/null 2>&1 ; then
+    rust=$(rustc --version 2>/dev/null | awk '{print $2}')
+fi
+
+echo t="${t}" h="${host}" u="${user}/${uid}" g="${grp}/${gid}" 4="${v4}" 6="${v6}" k="${kern}/${krel}" a="${arch}" o="${os}" r="${rust}"
