@@ -24,6 +24,14 @@ See the design documentation for the full architectural picture.
 Start with `docs/01-project-overview.md` (to be published alongside the
 crates; currently in the design repo).
 
+## Notes for humans
+Notes for humans live at HUMANS.md. Claude Code can and must
+commit human-made changes to it on every commit the agent makes.
+Normal `./scripts/commit-all.sh` invocations will do that.
+
+Coding agents (Claude Code and Codex) can freely read the contents
+of HUMANS.md, but they MUST NOT change the contents there.
+
 ## Repository structure
 
 ```
