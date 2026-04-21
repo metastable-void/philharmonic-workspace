@@ -687,13 +687,44 @@ Usage in practice: when authoring a new entity kind (e.g.
 result into the Rust source as a `const KIND: Uuid = uuid!("…")`,
 and commit. Never regenerate.
 
-## Naming and terminology (FSF-preferred framing)
+## Naming and terminology
 
 Documentation, comments, commit messages, and any other
-workspace-authored prose follow FSF-preferred terminology. This
-is a soft rule — readability trumps dogma — but avoid the
-specific anti-patterns below. If you're unsure, match the rest
-of the surrounding text.
+workspace-authored prose follow two overlapping conventions:
+inclusive/neutral/technically-accurate language, and
+FSF-preferred framing for free-software terminology. Both are
+soft rules — readability trumps dogma — but the anti-patterns
+below have specific reasons behind them and are worth avoiding.
+If you're unsure, match the rest of the surrounding text.
+
+README.md has a contributor-facing summary at §Terminology and
+language; this section is the authoritative statement.
+
+### Inclusive, neutral, technically accurate language
+
+- **No charged master/slave metaphors** for technical
+  relationships. Use what the parts actually do: `primary` /
+  `replica`, `leader` / `follower`, `parent` / `child`,
+  `controller` / `agent`, `main` / `workers`. This workspace's
+  default git branch is `main`, not `master`.
+- **No gendered defaults.** Prefer the singular "they" when the
+  referent's gender is unknown or irrelevant; avoid "he",
+  "he/she", "(s)he", "the user … his …". Avoid "guys" / "man"
+  as colloquial generics — write "folks", "everyone", "people",
+  or the role itself ("developers", "operators", "reviewers").
+- **Name what the thing does, not who's allowed to use it.**
+  Prefer `allowlist` / `denylist` (or "permitted" /
+  "disallowed") over `whitelist` / `blacklist`.
+- **"Dummy" / "sanity check" / "crazy"-adjacent wording** has
+  less charged technical equivalents — `stub`, `placeholder`,
+  `fake`, "smoke test", "quick check", "verify", "unusual",
+  "unexpected". Use them when they fit.
+- **Technical accuracy overrides aesthetic neutrality.** When a
+  protocol, library, or external project ships a term literally
+  (HTTP `Authorization` header; the `master` branch of an
+  external repo you're referencing; a DB `MASTER` command), use
+  the literal name. The rule targets prose we author in this
+  workspace, not identifiers other projects defined.
 
 ### Operating systems and kernels
 
@@ -745,11 +776,16 @@ of the surrounding text.
 
 ### Enforcement
 
-A best-effort manual scan found three standalone-"open-source"
-uses and zero `win*` abbreviations in workspace docs at the
-time this section was added; they were reworded to FLOSS /
-free-software framing in the same commit that introduced this
-section.
+Enforcement is by review, not tooling — the workspace has no
+linter for prose conventions. A best-effort manual scan at the
+time the FSF-framing subsection was added found three
+standalone-"open-source" uses and zero `win*` abbreviations;
+they were reworded in the same commit. Equivalent sweeps for
+`master`/`slave` metaphors, gendered defaults, and
+`whitelist`/`blacklist` can happen opportunistically when
+editing an affected file; a dedicated cleanup pass is
+unnecessary unless a pattern is repeated enough to be worth
+campaigning about.
 
 ## Pre-landing checks
 

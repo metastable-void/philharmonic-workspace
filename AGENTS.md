@@ -129,6 +129,38 @@ a branch and open a PR"), stop and surface that — don't guess.
   *why* is non-obvious (hidden constraint, subtle invariant,
   workaround for a specific bug). Don't narrate *what* — names do
   that.
+- **Terminology and language.** Prose you author — code
+  comments, rustdoc, error-message text, the final summary you
+  return to Claude (which may feed a commit message) — follows
+  the workspace terminology conventions at
+  `README.md §Terminology and language`. Short form:
+  - No `master`/`slave` for technical relationships (use
+    `primary`/`replica`, `leader`/`follower`, `parent`/`child`,
+    `controller`/`agent`, `main`/`workers`). Default git branch
+    here is `main`.
+  - No gendered defaults — prefer singular "they"; avoid
+    "he"/"he/she"/"(s)he" and "guys"/"man" as generics.
+  - Prefer `allowlist`/`denylist` over `whitelist`/`blacklist`;
+    `stub`/`placeholder`/`fake` over "dummy"; "smoke test" /
+    "verify" over "sanity check".
+  - **GNU/Linux** for the OS, **Linux kernel** for the kernel —
+    don't collapse the two in prose. Matching `uname -s`
+    against the literal string `Linux` is fine (that's the
+    kernel-interface identifier, not prose).
+  - **Microsoft Windows** or **Windows** in prose. No
+    `win*`-style freeform abbreviations; established
+    identifiers (`Win32` API, `x86_64-pc-windows-msvc`) ship
+    that way and are left alone.
+  - Prefer **"free software"** or **"FLOSS"** over standalone
+    **"open-source"**, except when quoting external conventions
+    (OSI proper noun, "open-source licenses" per OSI).
+  - Technical accuracy overrides aesthetic neutrality — use
+    literal external identifiers (HTTP `Authorization`, a DB
+    `MASTER` command, an external repo's `master` branch) as
+    they ship; the rule targets prose we author in this
+    workspace.
+  Full rule set with exceptions:
+  `docs/design/13-conventions.md §Naming and terminology`.
 
 ## Shell scripts
 

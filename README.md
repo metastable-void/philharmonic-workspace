@@ -682,6 +682,70 @@ implementation discovers that the docs got something wrong, update
 the docs first, then the code. Docs that describe reality are useful;
 docs describing an aspirational past are worse than nothing.
 
+## Terminology and language
+
+Prose authored in this workspace — documentation, code
+comments, commit messages and commit-message trailers,
+notes-to-humans entries, PR descriptions — follows two
+overlapping conventions. Both are soft rules (readability wins
+ties), but the anti-patterns below have specific reasons behind
+them and are worth avoiding.
+
+### Inclusive, neutral, technically accurate language
+
+- **No charged master/slave metaphors** for technical
+  relationships. Say what the parts actually do:
+  `primary`/`replica`, `leader`/`follower`, `parent`/`child`,
+  `controller`/`agent`, `main`/`workers`. This workspace's
+  default git branch is `main`, not `master`.
+- **No gendered defaults.** Prefer the singular "they" when the
+  referent's gender is unknown or irrelevant. Avoid "he",
+  "he/she", "(s)he", "the user … his …", and generic "guys" /
+  "man" — use "folks", "everyone", "people", or the role
+  itself ("developers", "operators", "reviewers").
+- **Name what the thing does**, not who's allowed to use it —
+  `allowlist` / `denylist` (or "permitted" / "disallowed") over
+  `whitelist` / `blacklist`.
+- **Prefer less charged technical words** where they fit —
+  `stub` / `placeholder` / `fake` over "dummy"; "smoke test" /
+  "quick check" / "verify" over "sanity check"; "unusual" /
+  "unexpected" over "crazy".
+- **Technical accuracy overrides aesthetic neutrality.** When a
+  protocol, library, or external project ships a term literally
+  (HTTP `Authorization` header, the `master` branch of an
+  external repo you're referencing, a DB `MASTER` command), use
+  the literal name. The rule targets prose we author in this
+  workspace, not identifiers other projects defined.
+
+### FSF-preferred framing
+
+- **GNU/Linux** for the GNU-userspace-plus-Linux-kernel OS;
+  **Linux kernel** (or "the kernel of Linux") when the kernel
+  is what you mean — don't collapse the two. Non-GNU
+  Linux-based systems get named explicitly (Alpine is
+  musl-based; Android is Linux-based but distinct from
+  GNU/Linux; BusyBox environments are their own thing);
+  "works on Linux" papers over a family that isn't uniform.
+  Matching `uname -s` against the literal string `Linux` is
+  fine — that's the kernel-interface identifier, not prose.
+- **Microsoft Windows** or **Windows** in prose. No `win*`-style
+  freeform abbreviations (`Win`, `win32`, `win64`, `WIN_`);
+  reads as Microsoft "winning" against competing systems.
+  Established technical identifiers that ship that way (the
+  `Win32` API, `x86_64-pc-windows-msvc`) are fine — don't fight
+  those, and don't invent new ones.
+- **"Free software"** (free as in freedom) or **"FLOSS"** over
+  standalone **"open-source"**. Use "open-source" only when
+  quoting external conventions: the Open Source Initiative is a
+  proper noun; OSI's list is "open-source licenses" by OSI's
+  own framing.
+
+Enforcement is by review; there's no prose linter. Fix
+violations opportunistically when editing an affected file. The
+authoritative statement, with the full anti-pattern list and
+the `uname -s` / `Win32` exceptions spelled out, is
+[`docs/design/13-conventions.md §Naming and terminology`](docs/design/13-conventions.md).
+
 ## Editions and MSRV
 
 - Edition 2024.

@@ -133,6 +133,26 @@ Developer: Yuka MORI.
   automatically sweeps in any pending human edits via
   `git add -A` — that's fine. See docs/instructions/README.md
   §HUMANS.md for the full rule.
+- **Terminology and language.** Prose you author — docs, code
+  comments, commit messages and commit-message trailers,
+  notes-to-humans entries, PR descriptions — follows the
+  inclusive-neutral + FSF-preferred rules at
+  [README.md §Terminology and language](README.md). Short form:
+  no `master`/`slave` for technical relationships (use
+  `primary`/`replica`, `leader`/`follower`, `parent`/`child`,
+  etc.); no gendered defaults (prefer singular "they", avoid
+  "guys"/"man" as generics); prefer `allowlist`/`denylist` over
+  whitelist/blacklist; prefer `stub`/`placeholder`/`fake` over
+  "dummy"; GNU/Linux (OS) vs. Linux kernel — don't collapse;
+  `Microsoft Windows`/`Windows` in prose, never `win*`
+  shorthand; prefer "free software" / "FLOSS" over standalone
+  "open-source" unless quoting external conventions. Technical
+  accuracy overrides aesthetic neutrality — use literal
+  external identifiers (HTTP `Authorization`, `Win32`,
+  `x86_64-pc-windows-msvc`, `uname -s`'s `Linux` string) as
+  they ship. Authoritative statement with full anti-pattern
+  list and exceptions: docs/design/13-conventions.md §Naming
+  and terminology.
 - Git workflow: all Git operations go through `scripts/*.sh`
   (`status.sh`, `pull-all.sh`, `commit-all.sh`, `push-all.sh`).
   If a script doesn't cover what you need, extend the script
