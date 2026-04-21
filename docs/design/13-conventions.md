@@ -312,6 +312,58 @@ Cross-crate design docs live in the meta-crate's repository
 
 Currently published at `metastable-void.github.io/philharmonic/`.
 
+## Release tagging
+
+Every crate release is tagged. The tag:
+
+- **Lives in the crate's own repo (the submodule), not the parent
+  workspace.** Each submodule is a single-crate repo, so the tag
+  `v<version>` is unambiguous there. No per-crate prefixing is
+  needed.
+- **Is created only by `./scripts/publish-crate.sh`.** Running
+  `git tag` by hand during a publish is the same class of
+  mistake as ad-hoc `git commit` — it drifts from the convention
+  and skips the pre-flight checks.
+- **Is annotated and cryptographically signed** (`git tag -s`).
+  Matches the workspace's "every commit is signed" rule.
+- **Is created after `cargo publish` succeeds, not before.** A
+  failed publish must not leave a dangling tag. If
+  `publish-crate.sh` fails between `cargo publish` and
+  `git tag`, the crate is on crates.io without a tag — recover
+  by running `git tag -s v<version>` manually in the submodule
+  and then `./scripts/push-all.sh`.
+- **Is pushed by `./scripts/push-all.sh`** via `--follow-tags`.
+  Only tags pointing at pushed commits go up, so stray local
+  tags never leak.
+
+Why: crates.io holds the published tarball, but the exact git
+state that was published is only trivially recoverable if a tag
+marks it. Tags also give `cargo-semver-checks` a clean baseline
+reference for release-to-release API-breakage checks.
+
+## API breakage detection
+
+`cargo-semver-checks` compares the public API surface of the
+workspace's current state against a git baseline revision, and
+flags semver-incompatible changes (removed items, tightened trait
+bounds, signature changes, etc.). Invoke via:
+
+```bash
+./scripts/check-api-breakage.sh [baseline-rev]
+```
+
+The baseline defaults to `origin/main`. Pass a release tag
+(`v0.2.2`) or any commit-ish to compare against a specific
+point — typically the previous release tag, when preparing a
+new one. The script installs `cargo-semver-checks` via
+`cargo install --locked` on first use.
+
+**When to run:** before preparing a crate release, as part of the
+pre-release review checklist. Not part of the default pre-landing
+trio (fmt/clippy/test) because it's slower, requires network on
+first run (install), and the signal is per-release rather than
+per-commit.
+
 ## Pre-landing checks
 
 **Mandatory before every commit that touches Rust code.** Run

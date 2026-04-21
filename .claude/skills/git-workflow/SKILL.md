@@ -88,12 +88,24 @@ includes the bumped pointers).
   — no escaping gymnastics needed.
 
 ### `scripts/push-all.sh`
-Pushes each submodule's current branch (`git push -u origin
-<branch>`), then pushes the parent. Submodule push failures abort
-before the parent is pushed, so origin never gets a parent pointer
-referencing an unpushed submodule commit. Detached-HEAD submodules
-are skipped with a warning (normal right after `git submodule
-update`).
+Pushes each submodule's current branch (`git push --follow-tags
+origin <branch>`), then pushes the parent. Submodule push failures
+abort before the parent is pushed, so origin never gets a parent
+pointer referencing an unpushed submodule commit. Detached-HEAD
+submodules are skipped with a warning (normal right after
+`git submodule update`). `--follow-tags` means release tags
+created by `publish-crate.sh` ship along with their branch commit.
+
+### `scripts/check-api-breakage.sh [baseline-rev]`
+Runs `cargo-semver-checks --workspace --all-features` against a
+git baseline (defaults to `origin/main`); installs the tool on
+first use. Use before preparing a crate release.
+
+### `scripts/publish-crate.sh [--dry-run] <crate>`
+Publishes one crate to crates.io (via `cargo publish`) and tags
+the release `v<version>` inside the submodule repo. Tag is
+signed, created only after a successful publish. The tag is then
+pushed by the next `push-all.sh` via `--follow-tags`.
 
 ## Decision tree
 

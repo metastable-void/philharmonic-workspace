@@ -200,6 +200,13 @@ Invoke by path (`./scripts/foo.sh`), not via `bash`.
   any submodule push fails.
 - `./scripts/codex-status.sh` — list Codex processes spawned by
   Claude Code and their descendants.
+- `./scripts/check-api-breakage.sh [baseline-rev]` — run
+  `cargo-semver-checks --workspace --all-features` against a git
+  baseline (defaults to `origin/main`). Installs
+  `cargo-semver-checks` on first run.
+- `./scripts/publish-crate.sh [--dry-run] <crate>` — publish one
+  crate to crates.io and tag the release inside the submodule.
+  Tags are created only after `cargo publish` succeeds.
 
 See `docs/design/13-conventions.md §Shell scripts` for the POSIX-
 sh conventions the scripts follow and explicit deviations.
@@ -332,38 +339,54 @@ constraints.
 
 ## Publishing
 
-Each crate is published to crates.io independently. Commits and
-pushes go through the workspace scripts; `cargo publish` and
-release tagging are unchanged.
+Each crate is published to crates.io independently. The release
+flow is scripted end-to-end; the per-crate tag is created only
+after a successful `cargo publish`.
 
 1. Edit `Cargo.toml` inside the crate's submodule directory to
-   bump the version. Leave the tree dirty — don't commit manually.
+   bump the version. Update the crate's `CHANGELOG.md`. Leave
+   the tree dirty — don't commit manually.
 2. From the workspace root, `./scripts/commit-all.sh "release
-   <crate> vX.Y.Z"`. This commits the submodule (with signoff)
-   and then commits the parent (bumping the pointer) in one pass.
+   <crate> vX.Y.Z"`. This commits the submodule (signed off,
+   signed) and the parent (bumping the pointer) in one pass.
 3. `./scripts/push-all.sh` — pushes the submodule first, then
-   the parent.
-4. Tag inside the submodule (no workspace script covers tags
-   yet, so raw git is the current exception):
+   the parent. (Tag push happens later, via the same script.)
+4. Run the pre-release API-breakage check:
 
    ```bash
-   cd <crate>
-   git tag -a vX.Y.Z -m 'release <crate> vX.Y.Z'
-   git push origin vX.Y.Z
+   ./scripts/check-api-breakage.sh v<previous-version>
    ```
 
-5. `cargo publish --dry-run` to verify, then `cargo publish`.
-6. After the crates.io index updates (a minute or two), bump the
+   This runs `cargo-semver-checks --workspace --all-features`
+   against the previous release tag; installs the tool on first
+   use. Investigate any breakage before continuing.
+5. Publish (dry-run first):
+
+   ```bash
+   ./scripts/publish-crate.sh --dry-run <crate>
+   ./scripts/publish-crate.sh           <crate>
+   ```
+
+   `publish-crate.sh` runs `cargo publish --dry-run` internally,
+   then `cargo publish` (unless `--dry-run` was passed), then
+   creates a signed annotated tag `vX.Y.Z` inside the submodule
+   repo. A failed publish does not leave a dangling tag.
+6. `./scripts/push-all.sh` — pushes the new tag (it uses
+   `git push --follow-tags`; the tag travels alongside the
+   branch).
+7. After the crates.io index updates (a minute or two), bump the
    workspace dependency's `version` in the parent's `Cargo.toml`
    to match. Commit and push with
    `./scripts/commit-all.sh --parent-only "bump <crate> dep to vX.Y.Z"`
    and `./scripts/push-all.sh`.
 
 Crates must be published in dependency order: cornerstone first
-(`philharmonic-types`), dependents after. For coordinated
-multi-crate releases, tooling like `cargo-workspaces` or
-`release-plz` can help — but for pre-1.0 infrequent releases, the
-manual process is fine.
+(`philharmonic-types`), dependents after. `cargo publish` will
+refuse if a dependency version isn't yet on crates.io, so the
+ordering error surfaces early. For coordinated multi-crate
+releases, tooling like `cargo-workspaces` or `release-plz` can
+help — but for pre-1.0 infrequent releases, `publish-crate.sh`
+run per crate is fine.
 
 ## Design documentation
 

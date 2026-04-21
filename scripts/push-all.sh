@@ -12,6 +12,10 @@
 #   is a normal state right after `git submodule update`; the
 #   real guardrail against pushing unresolvable pointers is
 #   `push.recurseSubmodules=check` on the parent (see ROADMAP §2).
+# - `--follow-tags` ships any annotated tags pointing at the
+#   pushed commits. scripts/publish-crate.sh creates signed
+#   annotated tags on release commits, so a single push-all
+#   carries them along with the branch update.
 #
 # POSIX sh only — see docs/design/13-conventions.md §Shell scripts.
 
@@ -26,11 +30,11 @@ if [ "$branch" = "HEAD" ]; then
     echo "    If you made local commits here, checkout a branch" >&2
     echo "    and re-run this script before the parent is pushed." >&2
 else
-    git push origin "$branch"
+    git push --follow-tags origin "$branch"
 fi
 '
 
 # Push parent. With push.recurseSubmodules=check configured,
 # Git refuses this if any referenced submodule commit is not on
-# origin.
-git push
+# origin. --follow-tags carries any parent-level release tags.
+git push --follow-tags

@@ -16,12 +16,22 @@ cd "$(git rev-parse --show-toplevel)"
 # dirty working tree rather than auto-merging.
 git pull --rebase
 
+# Fetch all tags on the parent. Default fetch only pulls tags that
+# point at commits we're receiving; release tags for inactive
+# releases wouldn't follow otherwise.
+git fetch --tags --quiet
+
 # Update each submodule's working tree to the tip of its tracked
 # remote branch (branch = ... in .gitmodules). --rebase replays
 # any local submodule commits on top of the remote branch instead
 # of detaching HEAD at the remote SHA, which the default checkout
 # mode would do when origin is ahead.
 git submodule update --remote --rebase --recursive
+
+# Submodule `update --remote` fetches branches but not arbitrary
+# tags. Pull tags explicitly so `cargo-semver-checks --baseline-rev
+# vX.Y.Z` and similar tag-based tooling see every release.
+git submodule foreach --quiet 'git fetch --tags --quiet origin'
 
 # Show resulting state. Parent may now be dirty due to bumped
 # submodule pointers; that's the signal to commit. We're already
