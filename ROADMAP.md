@@ -12,9 +12,11 @@ serving real tenants).
 - Phase 0 (workspace setup): **done**, with substantial added
   infrastructure beyond the original scope — see the Phase 0
   section below and §9.
-- Phase 1 (`mechanics-config` extraction): **implementation
-  complete in git** (`mechanics-config 0.1.0`, `mechanics-core
-  0.2.3`). Publish to crates.io: pending.
+- Phase 1 (`mechanics-config` extraction): **mechanics-config
+  0.1.0 published** (2026-04-21); **mechanics-core 0.2.3 publish
+  pending** a decision on 0.2.3 vs 0.3.0 surfaced by
+  `check-api-breakage.sh` (see
+  `docs/notes-to-humans/2026-04-21-0006-mechanics-core-semver-checks-finding.md`).
 - Phases 2–9: not started.
 
 Work through phases in order unless a phase is explicitly noted
@@ -351,8 +353,9 @@ file inventory):
 - Publishing conventions: per-release signed annotated tag
   `v<version>` inside the crate's submodule (created only on
   successful `cargo publish`, pushed by the next `push-all.sh`
-  via `--follow-tags`). `./scripts/check-api-breakage.sh`
-  against the previous tag before any new release.
+  via `--follow-tags`).
+  `./scripts/check-api-breakage.sh <crate> [<baseline-version>]`
+  against the previous crates.io release before any new release.
 
 **Acceptance criteria**:
 - `git submodule status` shows all 23 submodules at a clean
@@ -368,7 +371,9 @@ file inventory):
 
 ### Phase 1 — Extract `mechanics-config`
 
-**Status**: **Implementation complete in git; publish pending.**
+**Status**: **mechanics-config 0.1.0 published (2026-04-21);
+mechanics-core 0.2.3 publish pending a 0.2.3-vs-0.3.0 decision
+(see §Remaining work).**
 
 Landed work (see `docs/codex-prompts/2026-04-20-0001-phase-1-*`
 for the Codex prompts and the commits they produced):
@@ -401,23 +406,28 @@ extraction (settled)".
 
 **Remaining work**:
 
-1. `./scripts/check-api-breakage.sh v0.2.2` on `mechanics-core`
-   to confirm the extraction is non-breaking at the public
-   surface. (The public API re-exports the types at the old
-   paths, so this should pass; run it to confirm before
-   publishing.)
-2. `./scripts/publish-crate.sh --dry-run mechanics-config`
-   then the real publish.
-3. `./scripts/publish-crate.sh --dry-run mechanics-core` then
-   real publish. Must be in this order — `mechanics-core 0.2.3`
-   pins `mechanics-config = "0.1.0"`, so the dep has to be on
-   crates.io first.
-4. `./scripts/push-all.sh` to ship the `v0.1.0` and `v0.2.3`
-   tags alongside branch commits.
+1. Decide 0.2.3 vs 0.3.0 for `mechanics-core`.
+   `./scripts/check-api-breakage.sh mechanics-core 0.2.2` reports
+   2 major failures (8 re-exported types now live in
+   `mechanics-config` — same paths, different defining crate, so
+   type identity changed). Call-site usage is preserved; the tool
+   is flagging the wire-level identity change. See
+   `docs/notes-to-humans/2026-04-21-0006-mechanics-core-semver-checks-finding.md`
+   for the analysis and the recommendation (Path A: 0.3.0).
+2. If Path A: bump `mechanics-core/Cargo.toml` + CHANGELOG to
+   `0.3.0`; bump `mechanics/Cargo.toml`'s
+   `mechanics-core = "0.2.2"` pin to `"0.3.0"` in the same
+   session so downstream consumers opt in explicitly.
+3. `./scripts/publish-crate.sh --dry-run mechanics-core` then the
+   real publish. `mechanics-config 0.1.0` is already on crates.io
+   (done 2026-04-21), so the dep resolves.
+4. `./scripts/push-all.sh` to ship the resulting `v0.3.0` (or
+   `v0.2.3`) tag alongside branch commits.
 
 **Acceptance criteria** (remaining):
-- `mechanics-config 0.1.0` published on crates.io. _(pending)_
-- `mechanics-core 0.2.3` published on crates.io. _(pending)_
+- `mechanics-config 0.1.0` published on crates.io. ✓ _(2026-04-21)_
+- `mechanics-core` published on crates.io at the version chosen
+  in step 1. _(pending)_
 - `cargo tree -p mechanics-config | grep -iE 'boa|reqwest|tokio'`
   returns empty. ✓
 - Workspace `cargo test --workspace` passing
@@ -1239,8 +1249,9 @@ From the workspace root:
 Publishing a crate (from the workspace root):
 
 ```bash
-# API-breakage check against the previous release (or any baseline)
-./scripts/check-api-breakage.sh v0.1.0
+# API-breakage check against the latest crates.io release
+# (pass a specific version as the second argument to override)
+./scripts/check-api-breakage.sh <crate>
 
 # Dry-run publish; stops before real publish, no tag created
 ./scripts/publish-crate.sh --dry-run <crate>

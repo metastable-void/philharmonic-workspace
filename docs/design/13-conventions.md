@@ -484,20 +484,32 @@ reference for release-to-release API-breakage checks.
 
 ## API breakage detection
 
-`cargo-semver-checks` compares the public API surface of the
-workspace's current state against a git baseline revision, and
-flags semver-incompatible changes (removed items, tightened trait
-bounds, signature changes, etc.). Invoke via:
+`cargo-semver-checks` compares the public API surface of one
+workspace crate against a crates.io baseline (not a git baseline —
+see note below) and flags semver-incompatible changes (removed
+items, tightened trait bounds, signature changes, etc.). Invoke
+via:
 
 ```bash
-./scripts/check-api-breakage.sh [baseline-rev]
+./scripts/check-api-breakage.sh <crate> [<baseline-version>]
 ```
 
-The baseline defaults to `origin/main`. Pass a release tag
-(`v0.2.2`) or any commit-ish to compare against a specific
-point — typically the previous release tag, when preparing a
-new one. The script installs `cargo-semver-checks` via
-`cargo install --locked` on first use.
+Without `<baseline-version>`, cargo-semver-checks queries
+crates.io for the newest published version of `<crate>` and uses
+that as the baseline. Pass an explicit version (e.g. `0.2.2`) to
+compare against a specific earlier release. The script installs
+`cargo-semver-checks` via `cargo install --locked` on first use.
+
+**Per-crate, not workspace-wide.** An earlier version of the
+script used `--workspace --baseline-rev <rev>`. That does not
+work in this repo: the parent is a virtual workspace (no
+`[package]` table), and cargo-semver-checks resolves
+`--baseline-rev` by `git clone`ing the parent at that rev — which
+doesn't recurse into submodules, so workspace members can't be
+found at the baseline root. Per-crate mode against a crates.io
+baseline sidesteps the problem entirely. See
+`docs/notes-to-humans/2026-04-21-0006-mechanics-core-semver-checks-finding.md`
+for the full history.
 
 **When to run:** before preparing a crate release, as part of the
 pre-release review checklist. Not part of the default pre-landing

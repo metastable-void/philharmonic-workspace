@@ -5,6 +5,34 @@
 mechanics-core". This note records the pre-release audit so the
 actual release session can start from a known state rather than
 re-deriving the punch list.
+
+> **Status update (2026-04-21, later same day):**
+> - §1 ordering constraint **resolved**: `mechanics-config 0.1.0`
+>   is now published on crates.io
+>   (`./scripts/crates-io-versions.sh mechanics-config` returns
+>   `0.1.0`). The hard blocker for publishing `mechanics-core` is
+>   gone — the dep it pins (`mechanics-config = "0.1.0"`) now
+>   resolves.
+> - §2 missing LICENSE files **resolved**: every workspace crate
+>   (all 23) now ships `LICENSE-APACHE` + `LICENSE-MPL` at its
+>   repo root, copied from the canonical `mechanics-core` pair.
+> - §3 sparse `mechanics-config/README.md` **resolved**: expanded
+>   from 3 lines to a full README (API surface, design properties,
+>   basic usage, scope).
+> - §5 `cargo-semver-checks` **unblocked** (mechanics-config is
+>   now a resolvable dep), **and the check now runs and surfaces
+>   a real finding for mechanics-core**. See
+>   `2026-04-21-0006-mechanics-core-semver-checks-finding.md` for
+>   the finding and the 0.2.3-vs-0.3.0 decision it forces.
+> - `./scripts/check-api-breakage.sh` had a bug preventing it from
+>   running at all (tried `--workspace --baseline-rev` against a
+>   virtual workspace without submodule contents); rewritten to
+>   per-crate `--baseline-version` mode. Same note (0006) covers
+>   the fix.
+>
+> §4 (semver-bump judgment) has been **sharpened** by the §5
+> check's output — see note 0006 for why 0.2.3 is no longer a
+> defensible patch bump under strict cargo-semver-checks rules.
 **Audit inputs:**
 - `./scripts/status.sh` / `./scripts/heads.sh` (tree + signatures).
 - `./scripts/publish-crate.sh --dry-run <crate>` (both crates).
