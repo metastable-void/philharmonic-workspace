@@ -1,0 +1,60 @@
+# Project-local Codex CLI config for the philharmonic workspace.
+#
+# === Activation ===
+#
+# Codex reads config.toml from $CODEX_HOME (default ~/.codex), so
+# this file is NOT auto-loaded. To use it, point CODEX_HOME at
+# this directory before invoking Codex:
+#
+#     export CODEX_HOME="$(git rev-parse --show-toplevel)/.codex"
+#     codex ...
+#
+# Or pass it inline:
+#
+#     CODEX_HOME="$(git rev-parse --show-toplevel)/.codex" codex ...
+#
+# When CODEX_HOME points here, Codex will also write its session
+# state (rollouts, auth tokens, etc.) under this directory. Only
+# this config.toml is tracked in Git; session state is gitignored.
+#
+# === Intent ===
+#
+# Settings are baselines. The Codex plugin (invoked by Claude via
+# `codex:rescue`, etc.) may override per-invocation with --model,
+# --effort, --write/--read, --sandbox flags. Those take precedence.
+#
+# Coding/behavioral conventions live in AGENTS.md at the repo
+# root (auto-loaded by Codex).
+
+# --- Model ---
+# Left unset. The Codex plugin passes --model when Claude picks
+# one; otherwise inherit the CLI's default (latest GPT-5.x-codex).
+
+# --- Sandboxing ---
+# Codex writes within the workspace only. No writes outside the
+# repo tree without an explicit approval request.
+sandbox_mode = "workspace-write"
+
+[sandbox_workspace_write]
+# Cargo needs network for crate fetches (first build after dep
+# changes, `cargo update`, etc.). Leave enabled; tighten to false
+# for reviews of crypto-sensitive diffs where isolation matters.
+network_access = true
+# Keep /tmp writable — build scripts and test fixtures use it.
+exclude_tmpdir = false
+exclude_slash_tmp = false
+
+# --- Approvals ---
+# `on-request`: Codex proceeds with in-sandbox work unattended,
+# asks only when it wants to escape (shell outside workspace,
+# network when disabled, etc.). Balances "get work done" with
+# "don't silently do something surprising."
+approval_policy = "on-request"
+
+# --- Reasoning & verbosity ---
+# Medium effort is the right default for crate-sized tasks;
+# bump to high via --effort for genuinely hard algorithm work.
+model_reasoning_effort = "medium"
+# Concise output matches the workspace's terse review style;
+# Claude-side review prefers diffs over long narrations.
+model_verbosity = "concise"

@@ -21,6 +21,13 @@ Developer: Yuka MORI.
   bashisms; explicit deviations (e.g. `ps -o rss=`) are tracked in
   docs/design/13-conventions.md §Shell scripts. Validate with
   `dash -n scripts/*.sh` before landing.
+- Codex has its own instruction file: `AGENTS.md` at the repo
+  root. It's auto-loaded by Codex when it runs, and mirrors the
+  Claude-vs-Codex division (Claude designs/commits; Codex
+  implements; Codex doesn't run git). `.codex/config.toml` holds
+  project-local Codex CLI settings (activated via
+  `CODEX_HOME=.codex`). Don't edit AGENTS.md casually — it's the
+  contract Codex sees every run.
 - Fresh clone: run `scripts/setup.sh` once — it initializes all
   submodules recursively and warns if the Rust toolchain is
   missing.

@@ -2,6 +2,10 @@ target/
 **/*.rs.bk
 .DS_Store
 .vscode/settings.json
-.codex
 ._*
+
+# Project-local Codex state (when CODEX_HOME points at .codex/):
+# track only the committed config, not session/auth/cache state.
+.codex/*
+!.codex/config.toml
 
