@@ -166,6 +166,23 @@ rule below. Ad-hoc invocations drift from those defaults. If the
 script doesn't support what you need, extend the script (and
 document the change here) before proceeding.
 
+**`commit-all.sh` sweeps all dirty parent files into the parent
+commit.** Internally it runs `git add -A` before `git commit`, so
+pre-staging a subset with `git add` does not scope the commit —
+selective staging is meaningless against this script. When the
+parent has unrelated dirty files you want to keep out of the
+commit you're about to make, **clean them out of the tree first**:
+either move them to `/tmp` and restore after, or commit them
+separately in a prior `--parent-only` invocation (then run the
+real commit). The motivation for the unconditional sweep: the
+script's contract is "commit everything dirty, correctly, with
+every required invariant" — a selective path would need different
+tooling, and if you find yourself wanting it often, extend the
+script rather than working around it at call sites. The same
+behavior applies to `--parent-only` invocations — all
+parent-level dirty files land in that commit regardless of what
+you pass on the CLI.
+
 **Don't invoke `git log -n 1` to list HEAD state across the
 workspace** — use `./scripts/heads.sh`. Raw `git log` remains
 fine for history browsing (`git log <path>`, `git log --oneline`,

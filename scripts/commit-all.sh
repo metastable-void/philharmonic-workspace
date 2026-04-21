@@ -26,6 +26,15 @@
 #   be committed yet.
 # Message defaults to "updates".
 #
+# Scope: the parent commit uses `git add -A` before `git commit`,
+# so ALL dirty parent files get swept in. Pre-staging a subset
+# with `git add` does NOT scope the commit — selective staging is
+# meaningless here. To make a single-purpose commit when the parent
+# has unrelated dirty files, clean them out of the tree first
+# (move to /tmp, or commit them separately in a prior --parent-only
+# invocation), then run commit-all.sh. See
+# docs/design/13-conventions.md §Git workflow.
+#
 # POSIX sh only — see docs/design/13-conventions.md §Shell scripts.
 
 set -eu
