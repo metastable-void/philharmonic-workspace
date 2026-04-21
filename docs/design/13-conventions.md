@@ -92,12 +92,25 @@ scripts in `scripts/`:
   in-progress uncommitted work).
 - `push-all.sh` — push each submodule's current branch, then the
   parent.
+- `heads.sh` — show the current HEAD commit for the parent and
+  every submodule (short SHA, `%G?` signature indicator,
+  subject). The canonical way to verify signatures landed after
+  a commit/push. **Use this instead of `git log -n 1`** for
+  HEAD-state queries — the script walks all 24 repos in one
+  call with the canonical format; raw `git log -n 1` per-repo
+  is 24 invocations and drifts in format.
 
 **Don't invoke `git commit` or `git push` ad-hoc.** The scripts
 encode submodule ordering, default arguments, and the signoff
 rule below. Ad-hoc invocations drift from those defaults. If the
 script doesn't support what you need, extend the script (and
 document the change here) before proceeding.
+
+**Don't invoke `git log -n 1` to list HEAD state across the
+workspace** — use `./scripts/heads.sh`. Raw `git log` remains
+fine for history browsing (`git log <path>`, `git log --oneline`,
+etc.); the rule targets specifically the "show current HEAD
+commit on each repo" pattern.
 
 **Every commit is signed off *and* cryptographically signed.**
 The scripts pass both `-s` (DCO signoff, adds `Signed-off-by:`

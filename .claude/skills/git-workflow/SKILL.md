@@ -37,11 +37,16 @@ Authoritative sources (read these if anything below is unclear):
 4. **If a script doesn't cover your case, extend the script first**
    (and update `docs/design/13-conventions.md §Git workflow`) rather
    than reaching for raw git. This is the whole point of the rule.
-5. **Read-only inspection is fine** with raw git (`git log`,
-   `git diff`, `git show`, `git rev-parse`, `git branch`,
-   `git submodule status`). The prohibition is on state-changing
-   operations (`commit`, `push`, `add` outside what scripts do,
-   `reset`, `rebase`, etc.).
+5. **Read-only inspection is fine** with raw git for history
+   browsing (`git log`, `git diff`, `git show`, `git rev-parse`,
+   `git branch`, `git submodule status`). The prohibition is on
+   state-changing operations (`commit`, `push`, `add` outside
+   what scripts do, `reset`, `rebase`, etc.). **Exception:** do
+   *not* use raw `git log -n 1` to check current HEAD state
+   across the workspace — use `./scripts/heads.sh`. It walks all
+   24 repos (parent + submodules) in one call with the canonical
+   SHA-sig-subject format; raw `git log -n 1` would need 24
+   invocations to match and drifts in format between them.
 
 ## The scripts
 
@@ -95,6 +100,15 @@ pointer referencing an unpushed submodule commit. Detached-HEAD
 submodules are skipped with a warning (normal right after
 `git submodule update`). `--follow-tags` means release tags
 created by `publish-crate.sh` ship along with their branch commit.
+
+### `scripts/heads.sh`
+Shows the current HEAD commit for the parent and every submodule,
+with short SHA, `%G?` signature indicator, and subject. Use after
+`commit-all.sh` / `push-all.sh` to sanity-check what landed and
+to verify every commit carries a cryptographic signature (`G` =
+good, `U` = good+untrusted; anything else on a pushed commit is a
+problem). Canonical replacement for ad-hoc `git log -n 1` across
+repos — do not invoke raw `git log -n 1` for HEAD-state queries.
 
 ### `scripts/check-api-breakage.sh [baseline-rev]`
 Runs `cargo-semver-checks --workspace --all-features` against a

@@ -151,10 +151,14 @@ detached-HEAD guards that raw `git commit`/`git push` skip. They're
 the only supported path — not a convenience layer. This applies to
 every contributor (humans and AI agents alike).
 
-Read-only git (`git log`, `git diff`, `git show`, `git status`,
-`git blame`, `git rev-parse`) is fine. The prohibition is on
-state-changing operations (`commit`, `push`, `add` outside what
-the scripts do, `reset`, `rebase`, branch create/delete, etc.).
+Read-only git is fine for history browsing (`git log`,
+`git diff`, `git show`, `git status`, `git blame`,
+`git rev-parse`). The prohibition is on state-changing
+operations (`commit`, `push`, `add` outside what the scripts do,
+`reset`, `rebase`, branch create/delete, etc.) — and there's one
+read-only exception: use `./scripts/heads.sh`, not raw
+`git log -n 1`, to show the current HEAD commit across the
+workspace.
 If a script doesn't cover a case you need, extend the script
 rather than reaching for raw git — see
 `docs/design/13-conventions.md §Git workflow`.
@@ -200,6 +204,12 @@ Invoke by path (`./scripts/foo.sh`), not via `bash`.
   any submodule push fails.
 - `./scripts/codex-status.sh` — list Codex processes spawned by
   Claude Code and their descendants.
+- `./scripts/heads.sh` — show the current HEAD commit for the
+  parent and every submodule, with short SHA, signature
+  indicator, and subject. Use after `commit-all.sh` /
+  `push-all.sh` to verify every commit carries a cryptographic
+  signature. Canonical replacement for raw `git log -n 1` across
+  repos.
 - `./scripts/check-api-breakage.sh [baseline-rev]` — run
   `cargo-semver-checks --workspace --all-features` against a git
   baseline (defaults to `origin/main`). Installs
