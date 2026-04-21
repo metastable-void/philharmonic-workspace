@@ -414,14 +414,15 @@ workspace dev tooling written in Rust. Multi-bin layout: each
 `publish = false` — these are dev artifacts, never shipped to
 crates.io.
 
-**When to add a bin here vs. extend a shell script in
-`scripts/`:** prefer Rust for non-trivial tooling — parsing,
-validation, multi-step reasoning, anything that would become a
-fragile awk/sed/jq pipeline. Keep shell scripts for simple
-orchestration (git workflow, cargo wrappers, filesystem glue).
-The full rubric is in
+**When to add a bin here:** the rule is narrow — never invoke
+`python`, `perl`, `ruby`, `node`, or any non-baseline scripting
+language from workspace tooling. If you'd otherwise reach for
+one, write a Rust bin in `xtask/` instead. POSIX shell (with
+`awk`, `jq`, `sed`, `grep`, standard pipelines) remains fine
+and is not a target for extraction — the existing
+`scripts/*.sh` are good as-is. See
 [`docs/design/13-conventions.md`](docs/design/13-conventions.md)
-§In-tree workspace tooling.
+§In-tree workspace tooling for the decision table.
 
 Current bins:
 

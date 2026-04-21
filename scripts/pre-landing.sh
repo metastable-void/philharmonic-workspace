@@ -15,9 +15,12 @@
 # changed — the workspace-level run in step 2 skips them for
 # speed.
 #
-# Auto-detects modified crates as submodules with a dirty working
-# tree (unstaged changes, staged changes, or untracked files).
-# Pass crate names explicitly to override.
+# Auto-detects modified crates as workspace members with a dirty
+# working tree (unstaged changes, staged changes, or untracked
+# files). Submodule-backed and in-tree (non-submodule, e.g.
+# `xtask`) members are both covered uniformly via
+# `./scripts/show-dirty.sh`. Pass crate names explicitly to
+# override.
 #
 # Usage:
 #   ./scripts/pre-landing.sh                    # auto-detect modified crates
@@ -48,8 +51,9 @@ if [ $# -gt 0 ]; then
     crates=$*
     printf '=== pre-landing: explicit crates: %s ===\n' "$crates"
 else
-    # Submodules with unstaged, staged, or untracked changes count
-    # as modified. `show-dirty.sh` emits one name per line.
+    # Workspace members (submodule-backed or in-tree) with
+    # unstaged, staged, or untracked changes count as modified.
+    # `show-dirty.sh` emits one name per line.
     crates=$(./scripts/show-dirty.sh)
     if [ -n "$crates" ]; then
         # Collapse newlines to spaces for the header. $crates is

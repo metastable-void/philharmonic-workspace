@@ -48,6 +48,21 @@ fi
 
 crate=$1
 
+# Refuse to publish in-tree (non-submodule) workspace members.
+# They're dev tooling with `publish = false`, have no separate
+# git repo for release tags, and running this script against one
+# would (at best) fail at `cargo publish` and (worse) place a
+# `v<version>` tag in the parent repo instead of the submodule —
+# polluting the parent's tag namespace with a spurious release
+# marker. Submodules carry a `.git` file at their root; in-tree
+# members don't.
+if [ -d "$crate" ] && [ ! -f "$crate/.git" ]; then
+    printf '!!! %s: in-tree workspace member (not a submodule). publish-crate.sh\n' "$crate" >&2
+    printf '    only supports submodule-backed crates; in-tree tooling like\n' >&2
+    printf '    `xtask` is `publish = false` by design.\n' >&2
+    exit 1
+fi
+
 # `crate-version.sh` validates that $crate/Cargo.toml exists and
 # parses its version line; it exits non-zero with a clear error
 # if either step fails.

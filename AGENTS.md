@@ -147,14 +147,16 @@ workspace:
 - Explicit POSIX deviations (e.g. `ps -o rss=`) are tracked in
   `docs/design/13-conventions.md §Shell scripts`. Don't introduce
   new ones without a recorded reason.
-- **Prefer a Rust bin in `xtask/` over a shell script for
-  non-trivial tooling.** `xtask/` is the in-tree (non-submodule)
-  member crate at the workspace root, multi-bin
-  (`src/bin/<tool>.rs`), `publish = false`. Reach for a new bin
-  when the task has parsing, validation, or multi-step logic;
-  shell scripts remain the right home for simple orchestration
-  (git workflow, cargo wrappers, filesystem glue). When in
-  doubt, Rust.
+- **Never invoke `python`, `perl`, `ruby`, `node`, or other
+  non-baseline scripting languages from workspace tooling.** If
+  a task would lean on one, write a Rust bin in `xtask/` (the
+  in-tree, non-submodule, multi-bin crate at the workspace root,
+  `publish = false`). Existing POSIX shell scripts — `awk`,
+  `sed`, `grep`, `jq`, standard pipelines — remain fine as-is;
+  the rule is about ad-hoc `python3 -c "..."` creep, not the
+  well-written shell in `scripts/*.sh`. If you're tempted to
+  run python/perl from a script, prompt to a Rust bin extraction
+  in your final summary rather than introducing the dep.
 - **UUID generation for stable wire-format constants always goes
   through `cargo run -p xtask --bin gen-uuid -- --v4`.** Every
   `KIND: Uuid` constant, algorithm identifier, or any value that

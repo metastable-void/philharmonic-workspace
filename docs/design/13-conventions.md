@@ -579,15 +579,28 @@ Validate any changes with `./scripts/test-scripts.sh` as usual.
 
 ## In-tree workspace tooling (`xtask/`)
 
-**Rule: prefer a Rust bin in `xtask/` over a shell script for
-any non-trivial workspace tooling.** Non-trivial here means
-anything that involves real parsing (TOML, JSON, regex beyond
-trivial patterns), validation logic, multi-step reasoning, or
-anything that would turn into a fragile awk/sed/jq pipeline in
-shell. Shell remains the right home for simple orchestration:
-composing other commands, git workflow, filesystem glue,
-per-tool availability probing. When in doubt, Rust — it's
-typed, clippy-checked, testable, and more portable.
+**Rule: never invoke `python`, `perl`, `ruby`, `node`, or any
+other non-baseline scripting language from workspace tooling.
+If you're tempted, write a Rust bin in `xtask/` instead.**
+
+Well-written POSIX shell (with `awk`, `sed`, `grep`, `jq`, `cut`,
+standard text pipelines) stays where it is — shell is the right
+tool for orchestration, git workflow, cargo wrappers,
+filesystem glue, and simple data pipelines. The rule targets
+ad-hoc `python3 -c "..."` / `perl -e "..."` creep, not the
+existing `scripts/*.sh`. If an existing script works and is
+POSIX-clean, leave it.
+
+The categories in play:
+
+| Category | Example | Home |
+|---|---|---|
+| Ad-hoc one-off in a terminal session | "generate a UUID for this constant" | Rust bin (`cargo run -p xtask --bin gen-uuid -- --v4`) — **never** `python3 -c "import uuid"` |
+| Non-baseline language reach | "parse YAML, walk DOM, emit Rust" | Rust bin in `xtask/` |
+| POSIX shell orchestration | "commit across submodules then push" | `scripts/*.sh` |
+| POSIX shell with `awk` / `jq` / `sed` | "list non-yanked versions from crates.io sparse index" | `scripts/*.sh` (e.g. `crates-io-versions.sh`) |
+| Trivial cargo wrapper | "fmt + check + clippy + test" | `scripts/*.sh` |
+| Non-trivial parsing / cross-file validation / stateful check | "verify no two entity KINDs collide across the workspace" | Rust bin in `xtask/` |
 
 `xtask/` is an **in-tree (non-submodule) member crate** at the
 workspace root. It lives alongside the submodule-backed crates
@@ -611,17 +624,6 @@ Each bin is invoked as:
 ```bash
 cargo run -p xtask --bin <name> -- <args>
 ```
-
-### When to add a bin vs. extend a script
-
-| Task | Home |
-|---|---|
-| "Generate a UUID for a KIND constant" | Rust bin (`gen-uuid`) |
-| "List workspace members" | Shell (current; awk-based) — move to Rust bin if it becomes fragile |
-| "Run cargo fmt + check + clippy" | Shell (`rust-lint.sh`) — it's orchestration |
-| "Parse a submodule's CHANGELOG and emit release notes" | Rust bin (real parsing) |
-| "Push all submodules then parent" | Shell (`push-all.sh`) — orchestration with ordering |
-| "Validate a generated entity-kind UUID isn't already in use" | Rust bin (cross-file search + comparison) |
 
 ### Non-submodule member plumbing
 
