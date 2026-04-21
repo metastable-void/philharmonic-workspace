@@ -29,6 +29,13 @@ Developer: Yuka MORI.
   same session. Session-only output is not enough for
   substantial notes. See docs/design/13-conventions.md §Notes to
   humans and §Journal-like files (filename format).
+- **HUMANS.md is read-only for agents.** `HUMANS.md` at the repo
+  root is a human-authored note-to-self. You MAY read it freely
+  for context on what Yuka is thinking; you MUST NOT edit, append
+  to, or auto-generate content in it. `./scripts/commit-all.sh`
+  automatically sweeps in any pending human edits via
+  `git add -A` — that's fine. See docs/instructions/README.md
+  §HUMANS.md for the full rule.
 - Git workflow: all Git operations go through `scripts/*.sh`
   (`status.sh`, `pull-all.sh`, `commit-all.sh`, `push-all.sh`).
   If a script doesn't cover what you need, extend the script

@@ -107,6 +107,28 @@ workspace:
   `docs/design/13-conventions.md §Shell scripts`. Don't introduce
   new ones without a recorded reason.
 
+## HUMANS.md (do not touch)
+
+`HUMANS.md` at the repo root is a human-authored note-to-self.
+It's part of your context, not your output surface.
+
+- **You MAY read it** for context on Yuka's thinking, preferences,
+  and current focus. Reading it is encouraged when it might
+  inform the work you're doing.
+- **You MUST NOT modify it.** No edits, no appends, no "helpful"
+  reformatting, no auto-generated sections. No exceptions.
+- You don't commit in this workspace anyway (see §Git), so the
+  commit-side rules don't apply to you — just: read freely,
+  never modify.
+
+If something in `HUMANS.md` looks wrong, outdated, or contradicts
+the code you're touching, flag it in your final summary so
+Claude Code can bring it to Yuka's attention. Don't edit the
+file to "fix" it.
+
+For the full rule set, see `docs/instructions/README.md`
+§HUMANS.md.
+
 ## Crypto-sensitive paths
 
 The following areas require Yuka's personal review and must not
