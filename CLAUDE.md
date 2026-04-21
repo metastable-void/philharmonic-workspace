@@ -15,12 +15,52 @@ Developer: Yuka MORI.
   change, update ROADMAP.md in the same commit as the work — not
   as a follow-up. A stale roadmap is worse than none. See
   docs/design/13-conventions.md §ROADMAP maintenance.
-- Pre-landing checks: before committing Rust changes, run
-  `./scripts/pre-landing.sh` — one command that auto-detects
-  modified crates and runs the full flow (lint, workspace
-  test, plus `--ignored` per modified crate). Don't run raw
-  `cargo fmt/check/clippy/test` when the scripts cover the
-  case. See docs/design/13-conventions.md §Pre-landing checks.
+- **Write workspace-scoped conventions into the repo, not into
+  machine-local memory.** When you learn a rule that applies to
+  *this project* ("in this workspace, prefer X over Y", "every
+  crate must do Z"), its durable home is the repo — this file,
+  `AGENTS.md`, or `docs/design/13-conventions.md` — not your
+  per-agent-install memory store. Memory is per-machine and
+  doesn't travel with the repo to other clones, other
+  contributors, or fresh WSL boxes; the repo does. Reserve
+  machine-local memory for genuinely machine-local facts (e.g.
+  "on this box, rustup/gh were installed on <date>"). Recurrent
+  feedback that names the project or its conventions belongs in
+  the repo, full stop — otherwise the same lesson has to be
+  re-learned on every new machine.
+- **Prefer `scripts/*.sh` wrappers over raw `cargo`.** Same rule
+  as the git-workflow one below, for the same reason: the
+  wrappers encode flag choices, auto-install, workspace-cd, and
+  POSIX-compatibility guards that ad-hoc `cargo` invocations
+  skip. Contributor-vs-CI parity is only guaranteed *because*
+  the scripts are the single source of truth. Inventory (see
+  README.md §"The workspace scripts" for the full list with
+  flags):
+  - `./scripts/pre-landing.sh` — `fmt --check` + `check` +
+    `clippy -D warnings` + `test`, auto-detecting modified crates.
+    Run before every commit that touches Rust.
+  - `./scripts/rust-lint.sh [<crate>]` — fmt + check + clippy,
+    workspace or per-crate.
+  - `./scripts/rust-test.sh [--include-ignored|--ignored] [<crate>]`
+    — cargo test with ignored-test control.
+  - `./scripts/cargo-audit.sh` — RustSec advisories.
+  - `./scripts/check-api-breakage.sh <crate> [<baseline-version>]`
+    — cargo-semver-checks, per-crate, crates.io baseline.
+  - `./scripts/publish-crate.sh [--dry-run] <crate>` — publish +
+    signed tag.
+  - `./scripts/crate-version.sh <crate> | --all` — local version
+    from Cargo.toml.
+  - `./scripts/crates-io-versions.sh <crate>` — published
+    versions from crates.io sparse index.
+  - `./scripts/check-toolchain.sh [--update]` — rust toolchain
+    version + update probe.
+  If no wrapper covers your case, extend a script or write a new
+  one (see the "Extract routines into scripts" bullet below)
+  rather than reaching for raw `cargo`. **Exempt** category:
+  read-only cargo queries (`cargo tree`, `cargo metadata`,
+  `cargo --version`) — nothing wraps these and they're cheap.
+  See docs/design/13-conventions.md §Script wrappers for the
+  authoritative statement and rationale.
 - **Notes to humans.** When you tell Yuka anything significant
   (verification results with informative "why", platform
   caveats, audit findings, mid-implementation design calls,

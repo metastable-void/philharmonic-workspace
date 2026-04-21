@@ -53,6 +53,45 @@ a branch and open a PR"), stop and surface that — don't guess.
 
 ## Rust conventions
 
+- **Workspace conventions live in the repo, not in any local
+  memory you or your runtime may keep.** If you discover a rule
+  that applies to *this project* — naming, versioning, tooling
+  choices, anything a future contributor would need to honor —
+  its durable home is this file, `CLAUDE.md`, or
+  `docs/design/13-conventions.md`. Don't rely on
+  `$CODEX_HOME`-local state, cached project files, or your own
+  in-process memory to persist such rules across sessions or
+  machines; those are per-install and don't follow the repo.
+  Surface the rule to Claude in your final summary so it can be
+  committed to the repo properly.
+- **Use `scripts/*.sh` wrappers over raw `cargo` subcommands.**
+  The wrappers encode mandated flags (`-D warnings`,
+  `--all-targets`, per-crate scoping, auto-install of
+  cargo-audit / cargo-semver-checks on first use) so your local
+  runs behave identically to CI. Raw `cargo <subcommand>` drifts.
+  The wrapper inventory:
+  - `./scripts/pre-landing.sh` — canonical fmt+check+clippy+test
+    flow, auto-detects modified crates. Run before finishing any
+    Rust-touching task.
+  - `./scripts/rust-lint.sh [<crate>]`,
+    `./scripts/rust-test.sh [--include-ignored|--ignored] [<crate>]`
+    — individual phases if you need them standalone.
+  - `./scripts/cargo-audit.sh`,
+    `./scripts/check-api-breakage.sh <crate> [<version>]` —
+    pre-release checks.
+  - `./scripts/publish-crate.sh [--dry-run] <crate>` — publish +
+    signed release tag (Claude runs this, not you; it commits).
+  - `./scripts/crate-version.sh <crate>` / `--all` — local
+    version from Cargo.toml.
+  - `./scripts/crates-io-versions.sh <crate>` — published
+    versions from crates.io (requires `curl` + `jq`).
+  - `./scripts/check-toolchain.sh` — rust toolchain state.
+  If your task needs a cargo operation with no wrapper, surface
+  that in your final summary rather than silently running raw
+  cargo — the workspace convention is to extend a script first.
+  **Exempt**: read-only queries (`cargo tree`, `cargo metadata`,
+  `cargo --version`). See `docs/design/13-conventions.md §Script
+  wrappers`.
 - **Edition 2024, MSRV 1.88.** Every `Cargo.toml` already carries
   `edition = "2024"` and `rust-version = "1.88"` — match.
 - **License.** All crates are `Apache-2.0 OR MPL-2.0` with both

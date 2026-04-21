@@ -517,6 +517,43 @@ trio (fmt/clippy/test) because it's slower, requires network on
 first run (install), and the signal is per-release rather than
 per-commit.
 
+## Script wrappers
+
+**Rule: every `cargo` invocation with a `scripts/*.sh` wrapper
+goes through the wrapper, not raw `cargo`.** This is the same
+principle as the `scripts/*`-only git workflow: the wrappers are
+the single source of truth for flag choices, ordering, install
+of optional tools, and workspace-cd. Contributor-vs-CI parity is
+guaranteed only *because* the wrappers are authoritative.
+Ad-hoc `cargo <subcommand>` invocations drift quietly — a
+missing `-D warnings`, a forgotten `--all-targets`, a workspace
+that isn't at the expected CWD — and drift shows up as a CI
+failure that a local run missed.
+
+The inventory and what each wrapper covers:
+
+| Wrapper | Wraps | Notes |
+|---|---|---|
+| `./scripts/pre-landing.sh [<crate>...] [--no-ignored]` | `cargo fmt --check` + `cargo check` + `cargo clippy --all-targets -- -D warnings` + `cargo test --workspace` + `cargo test --ignored -p <crate>` per modified crate | The canonical pre-commit flow. Auto-detects modified crates via `show-dirty.sh`. CI runs the same script. See §Pre-landing checks. |
+| `./scripts/rust-lint.sh [<crate>]` | `cargo fmt --check` + `cargo check` + `cargo clippy --all-targets -- -D warnings` | Workspace-wide (no arg) or per-crate. |
+| `./scripts/rust-test.sh [--include-ignored\|--ignored] [<crate>]` | `cargo test` with ignored-test control | `--ignored` runs *only* `#[ignore]`-gated; `--include-ignored` runs everything. |
+| `./scripts/cargo-audit.sh [...]` | `cargo audit` | Auto-installs `cargo-audit` via `cargo install --locked` on first run. |
+| `./scripts/check-api-breakage.sh <crate> [<baseline-version>]` | `cargo semver-checks check-release -p <crate> --baseline-version <ver>` | Per-crate; crates.io baseline (default: newest published). See §API breakage detection. |
+| `./scripts/publish-crate.sh [--dry-run] <crate>` | `cargo publish -p <crate>` + signed release tag | Enforces clean tree, branch-HEAD, no-existing-tag invariants. Tag created only on publish success. |
+| `./scripts/crate-version.sh <crate> \| --all` | Parses `version = "..."` from `<crate>/Cargo.toml` | Single-crate for programmatic use (`publish-crate.sh` consumes it); `--all` prints every workspace member's version. |
+| `./scripts/crates-io-versions.sh <crate>` | crates.io sparse-index query | Lists non-yanked published versions. Requires `curl` + `jq` (fails fast if missing). |
+| `./scripts/check-toolchain.sh [--update]` | `rustup check` / `rustup update` + version print | Step 0 of `pre-landing.sh`; run standalone to probe local drift against CI's `@stable`. |
+
+**Exempt**: read-only cargo queries have no wrapper and don't
+need one — `cargo tree`, `cargo metadata`, `cargo --version`,
+`cargo search` are fine to run raw.
+
+**If no wrapper fits**: extend one, or add a new
+`scripts/*.sh` (see §Shell scripts §"Extract routines into
+scripts"). Validate with `./scripts/test-scripts.sh`. Then use
+the new wrapper — don't fall back to raw cargo because the
+wrapper doesn't exist yet.
+
 ## Pre-landing checks
 
 **Mandatory before every commit that touches Rust code.** One
