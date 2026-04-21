@@ -103,8 +103,11 @@ Each submodule is a standalone Git repository at
 files tracked directly in the parent repo):
 - `xtask` — multi-bin crate for dev tools written in Rust.
   Today's bins: `gen-uuid` (canonical source for every wire-
-  format UUID we mint). See [§xtask and KIND UUID
-  generation](#xtask-and-kind-uuid-generation) below.
+  format UUID we mint), `crates-io-versions` (sparse-index
+  query for published crate versions), and `web-fetch` (in-
+  process HTTP GET, no `curl`/`wget` dependency). See
+  [§xtask and KIND UUID generation](#xtask-and-kind-uuid-generation)
+  below.
 
 ## Status
 
@@ -115,7 +118,8 @@ through 2026.
 
 Already published with substantive content:
 `philharmonic-types`, `philharmonic-store`,
-`philharmonic-store-sqlx-mysql`, `mechanics-core`, `mechanics`.
+`philharmonic-store-sqlx-mysql`, `mechanics-config`,
+`mechanics-core`, `mechanics`.
 
 ## Prerequisites
 
@@ -475,6 +479,16 @@ Current bins:
   dependency on `jq` or `web-fetch.sh`, so it works on stripped
   GNU/Linux and macOS baselines where neither is installed.
   Replaces the former `scripts/crates-io-versions.sh`.
+- **`web-fetch`** — HTTP GET with `ureq` + `rustls`. Usage:
+  `./scripts/xtask.sh web-fetch -- <URL> [<outfile>]`.
+  In-process so there's no dependency on `curl` / `wget` /
+  `fetch` / `ftp` being on `PATH` — none of those are in every
+  stripped GNU/Linux or macOS baseline. UA overridable via
+  `WEB_FETCH_UA`; body goes to stdout by default, or to
+  `<outfile>` if given; fails on HTTP 4xx/5xx. `./scripts/web-fetch.sh`
+  remains as a thin shim for shell callers
+  (`print-audit-info.sh` uses it) — both end up in the same Rust
+  bin.
 
 ## AI-assisted development
 

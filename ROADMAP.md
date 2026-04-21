@@ -26,7 +26,16 @@ serving real tenants).
   0.3.0) so downstream consumers opt into the new `mechanics-core`
   type identity explicitly rather than silently under a caret
   upgrade.
-- Phases 2–9: not started.
+- Phase 2 Wave 1 (`philharmonic-policy` non-crypto foundation):
+  **done** (2026-04-21). Six entity kinds + permission evaluation
+  landed under submodule commit `790c23d`; parent pointer bumped
+  in `65fc3c4`. Crate still at `0.0.0` locally — no publish yet,
+  Wave 2 (crypto: SCK + `pht_` token utilities) is gated on Yuka's
+  Gate-2 code review and is the next dispatch.
+- Phase 2 Wave 2 (SCK crypto + `pht_` tokens): not started.
+  Gate-1 crypto approval is in place at
+  `docs/design/crypto-approvals/2026-04-21-phase-2-sck-and-pht.md`.
+- Phases 3–9: not started.
 
 Work through phases in order unless a phase is explicitly noted
 as parallel-safe. Consult the design documentation as the
@@ -333,9 +342,26 @@ file inventory):
   parse check), `rust-lint.sh`, `rust-test.sh`, `pre-landing.sh`
   (mandated pre-landing driver), `check-toolchain.sh`,
   `check-api-breakage.sh`, `publish-crate.sh`, `cargo-audit.sh`,
-  `crate-version.sh`, `codex-status.sh`, plus
-  `scripts/lib/workspace-cd.sh` shared helper. All POSIX sh,
-  validated by `test-scripts.sh` (and CI).
+  `crate-version.sh`, `codex-status.sh`, `print-audit-info.sh`
+  (audit-trailer generator invoked once by `commit-all.sh`),
+  `mktemp.sh` / `web-fetch.sh` (portability wrappers — never
+  call raw `mktemp` / `curl` / `wget` from workspace scripts),
+  `xtask.sh` (invocation wrapper for the in-tree `xtask/` crate;
+  see §"In-tree workspace tooling" below), plus
+  `scripts/lib/workspace-cd.sh` and `scripts/lib/workspace-members.sh`
+  shared helpers. All POSIX sh, validated by `test-scripts.sh`
+  (and CI).
+- `xtask/` — in-tree (non-submodule) member crate holding
+  workspace dev tooling written in Rust. Multi-bin layout
+  (`src/bin/*.rs`, `publish = false`). Current bins: `gen-uuid`
+  (canonical source for stable wire-format UUIDs),
+  `crates-io-versions` (sparse-index query, `ureq` +
+  `serde_json` — replaces the former `crates-io-versions.sh`
+  shell script that depended on `jq` + `web-fetch.sh`), and
+  `web-fetch` (`ureq` + `rustls`, replaces the old shell
+  curl/wget/fetch/ftp fallback chain). Invoked via
+  `./scripts/xtask.sh <tool> -- <args>`. See
+  `docs/design/13-conventions.md §In-tree workspace tooling`.
 - `.github/workflows/ci.yml` at the parent level — runs
   `setup.sh` + `pre-landing.sh` on push/PR (workspace-level; the
   `--ignored` phase runs contributor-side only).
@@ -449,8 +475,36 @@ extraction (settled)".
 
 ### Phase 2 — `philharmonic-policy`
 
-**Goal**: Implement the policy layer entity kinds and basic
-operations.
+**Status**: Wave 1 (non-crypto foundation) **done (2026-04-21)**.
+Wave 2 (SCK crypto + `pht_` token utilities) pending Gate-2 code
+review; it's the next dispatch. See
+`docs/notes-to-humans/2026-04-21-0008-phase-2-wave-1-landed.md`
+for the Wave 1 landing summary (Codex behavior, pre-landing
+results, scope drift captured in `e20ebb1`).
+
+Wave 1 delivered (submodule commit `790c23d`, parent bump
+`65fc3c4`):
+
+- Six entity kinds implemented with stable `KIND: Uuid`
+  constants (`Tenant`, `Principal`, `TenantEndpointConfig`,
+  `RoleDefinition`, `RoleMembership`, `MintingAuthority`,
+  `AuditEvent`) minus the crypto-requiring bits of
+  `TenantEndpointConfig` (encrypted_config slot present, SCK
+  encrypt/decrypt deferred to Wave 2).
+- Permission evaluation (`evaluate_permission`) walking
+  `RoleMembership` → `RoleDefinition` → permission atoms.
+- Three test tiers: 11 mock-backed unit tests
+  (`tests/common/mock.rs` + `tests/permission_mock.rs`), 10
+  `#[ignore]`-gated MySQL testcontainer tests
+  (`tests/permission_mysql.rs`), and 6 colocated unit tests in
+  the crate. Pre-landing green (fmt/check/clippy/test +
+  `--ignored` 10/10).
+
+Wave 2 (remaining) is the crypto foundation and the point at
+which Yuka reviews actual crypto code line-by-line. See §5
+"Crypto review protocol" — this is a two-gate path, Gate-1
+(approach approval, done 2026-04-21) and Gate-2 (code review,
+pending).
 
 **Reference**: `09-policy-and-tenancy.md` exhaustively;
 `05-storage-substrate.md` for storage traits.

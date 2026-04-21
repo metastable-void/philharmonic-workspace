@@ -630,7 +630,7 @@ have to rediscover it.
 | Wrapper | Replaces | Notes |
 |---|---|---|
 | `./scripts/mktemp.sh [<slug>]` | `mktemp` | Delegates to `mktemp(1)` when present; falls back to a 10-char `[A-Za-z0-9]` suffix from `/dev/urandom` + `touch`. Fallback does **not** set 0600 perms (`chmod` after creation for confidential content). Caller **must** register cleanup: `trap 'rm -f "$tmp"' EXIT INT HUP TERM`. |
-| `./scripts/web-fetch.sh <URL> [<outfile>]` | `curl`, `wget` | Tries `curl` → `wget` → `fetch` (FreeBSD) → `ftp` (OpenBSD HTTP mode). UA override via `WEB_FETCH_UA`. All backends fail on HTTP 4xx/5xx (curl gets `-f`; the others default to failing). Callers that want to continue regardless of HTTP status use `./scripts/web-fetch.sh ... || :` at the call site — the idiom in `print-audit-info.sh`. |
+| `./scripts/web-fetch.sh <URL> [<outfile>]` | `curl`, `wget` | Thin shim that `exec`s `./scripts/xtask.sh web-fetch -- "$@"`; the real implementation is `xtask/src/bin/web-fetch.rs` using `ureq` + `rustls`, so there's no dependency on `curl` / `wget` / `fetch` / `ftp` being on `PATH` (none of those ship on every stripped GNU/Linux or macOS baseline). UA override via `WEB_FETCH_UA` (default `philharmonic-dev-agent/1.0`). HTTP 4xx/5xx fails the fetch (exit 2). Callers that want to continue regardless of HTTP status use `./scripts/web-fetch.sh ... || :` at the call site — the idiom in `print-audit-info.sh`. The shim exists so shell callers keep working without learning about `xtask`; prefer `./scripts/xtask.sh web-fetch -- ...` at new call sites. |
 
 **When the wrapper's semantics don't match your need, extend it.**
 Don't reach around to raw `curl -fsSL` / `mktemp --suffix=...` /
@@ -684,11 +684,12 @@ Multi-bin layout:
 
 ```
 xtask/
-├── Cargo.toml           # publish = false, name = "xtask"
+├── Cargo.toml                    # publish = false, name = "xtask"
 └── src/
     └── bin/
-        ├── gen-uuid.rs  # one tool per file
-        └── <future>.rs
+        ├── gen-uuid.rs           # one tool per file
+        ├── crates-io-versions.rs # crates.io sparse-index query
+        └── web-fetch.rs          # in-process HTTP GET (ureq + rustls)
 ```
 
 Each bin is invoked via the `xtask.sh` wrapper:
