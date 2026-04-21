@@ -116,9 +116,12 @@ commit. The parent's Git config should have
 signoff rule. If a script doesn't do what you need, extend it
 first and update `docs/design/13-conventions.md §Git workflow`.
 
-**Every commit is signed off.** Commits in the parent and every
-submodule must carry a `Signed-off-by:` trailer (the scripts pass
-`-s`). Non-negotiable.
+**Every commit is signed off *and* signed.** Commits in the
+parent and every submodule must carry both a `Signed-off-by:`
+trailer (DCO, via `-s`) and a cryptographic signature (GPG or
+SSH, via `-S`). The scripts pass both flags and verify the
+signature after committing — an unsigned commit triggers a
+rollback. Non-negotiable.
 
 **Pre-landing checks (mandatory).** Before committing any
 change that touches Rust code, all three of the following must

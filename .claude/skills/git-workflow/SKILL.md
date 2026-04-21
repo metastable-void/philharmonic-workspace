@@ -8,8 +8,9 @@ description: Use whenever any Git operation is about to run against the philharm
 This workspace is a parent Git repo containing ~23 submodules, one per
 crate. Wrong ordering (parent pushed before submodule) produces a
 pointer origin can't resolve; missing `-s` signoff violates the DCO
-rule every repo in the family enforces. The `scripts/*.sh` helpers
-exist so neither mistake is possible. Use them.
+rule every repo in the family enforces; an unsigned commit breaks the
+GPG/SSH-signature requirement. The `scripts/*.sh` helpers exist so
+none of those mistakes are possible. Use them.
 
 Authoritative sources (read these if anything below is unclear):
 - `CLAUDE.md` → "Git workflow" bullet.
@@ -21,9 +22,14 @@ Authoritative sources (read these if anything below is unclear):
 
 1. **Never run raw `git commit` or `git push`** in this workspace —
    parent or submodule. The scripts encode submodule-first ordering,
-   signoff (`-s`), and detached-HEAD guards that ad-hoc commands skip.
-2. **Every commit is signed off** (`Signed-off-by:` trailer). The
-   scripts pass `-s`; don't bypass.
+   signoff (`-s`), signing (`-S`), and detached-HEAD guards that
+   ad-hoc commands skip.
+2. **Every commit is signed off *and* signed** (`Signed-off-by:`
+   trailer via `-s`, plus a GPG or SSH signature via `-S`). The
+   scripts pass both flags and verify the signature with
+   `git log --format=%G?` after each commit; an unsigned commit
+   is rolled back with `git reset --soft HEAD~1` and the script
+   aborts. Don't bypass.
 3. **Submodule commits land before the parent bumps their pointer.**
    `commit-all.sh` and `push-all.sh` walk submodules first on purpose.
    Reversing the order produces an unresolvable parent pointer on

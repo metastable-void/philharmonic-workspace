@@ -99,11 +99,23 @@ rule below. Ad-hoc invocations drift from those defaults. If the
 script doesn't support what you need, extend the script (and
 document the change here) before proceeding.
 
-**Every commit is signed off.** The scripts pass `-s` to
-`git commit`; a `Signed-off-by:` trailer is mandatory on every
-commit in every repo in this workspace (parent and submodules).
-This is a Developer Certificate of Origin-style assertion and is
-a hard requirement, not a preference.
+**Every commit is signed off *and* cryptographically signed.**
+The scripts pass both `-s` (DCO signoff, adds `Signed-off-by:`
+trailer to the commit message) and `-S` (GPG or SSH signature,
+attaches a cryptographic signature to the commit object) to
+`git commit`. Additionally, `commit-all.sh` verifies the
+resulting HEAD with `git log --format=%G?` after every commit it
+makes — if the commit somehow lacks a signature, it is rolled
+back with `git reset --soft HEAD~1` and the script aborts.
+
+Consequence: if your local Git doesn't have signing configured
+(no GPG key, or `gpg.format=ssh` without a `user.signingkey`),
+`commit-all.sh` will fail before producing an unsigned commit.
+Configure signing once — `git config --global user.signingkey
+<key>`, `git config --global commit.gpgsign true`, and optionally
+`git config --global gpg.format ssh` for SSH signing — and you
+won't have to think about it again. Both checks are hard
+requirements, not preferences.
 
 ## Shell scripts
 

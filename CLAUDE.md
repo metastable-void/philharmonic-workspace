@@ -24,7 +24,9 @@ Developer: Yuka MORI.
   (`status.sh`, `pull-all.sh`, `commit-all.sh`, `push-all.sh`).
   If a script doesn't cover what you need, extend the script
   first rather than running ad-hoc git commands. Every commit is
-  signed off (`-s`). See docs/design/13-conventions.md §Git
+  DCO-signed off (`-s`) and cryptographically signed (`-S`, GPG
+  or SSH); `commit-all.sh` enforces both and verifies the
+  signature post-commit. See docs/design/13-conventions.md §Git
   workflow.
 - Shell scripts are **POSIX sh** (`#!/bin/sh`), not bash. No
   bashisms; explicit deviations (e.g. `ps -o rss=`) are tracked in

@@ -4,8 +4,13 @@
 # Walks each submodule, commits any dirty tree there, then commits
 # the parent (which includes the bumped submodule pointers).
 #
-# Every commit is signed off (`-s`). This is the workspace
-# convention; see docs/design/13-conventions.md §Git workflow.
+# Every commit is signed off (`-s`, DCO trailer) *and*
+# cryptographically signed (`-S`, GPG or SSH). Signing is
+# enforced two ways: we pass `-S` to `git commit` (so a missing
+# signing key aborts the commit before it lands), and we verify
+# the resulting HEAD with `git log --format=%G?` — if the commit
+# somehow lacks a signature, we roll it back and fail. See
+# docs/design/13-conventions.md §Git workflow.
 #
 # Safety: refuses to commit in a submodule that's in detached HEAD
 # state if it has changes to commit — that commit would be an
@@ -55,7 +60,17 @@ if ! git diff --quiet || ! git diff --cached --quiet || [ -n "$(git ls-files --o
     fi
     echo "=== committing in $name (branch: $branch) ==="
     git add -A
-    git commit -s -F "$MSG_FILE"
+    # -S forces GPG/SSH signing; commit aborts here if no key.
+    git commit -s -S -F "$MSG_FILE"
+    # Defence in depth: verify the commit actually carries a
+    # signature. %G? returns "N" for unsigned commits.
+    sig=$(git log -n 1 --format=%G? HEAD)
+    if [ "$sig" = "N" ]; then
+        echo "!!! $name: HEAD $(git rev-parse --short HEAD) has no signature." >&2
+        echo "    Rolling back with git reset --soft HEAD~1." >&2
+        git reset --soft HEAD~1
+        exit 1
+    fi
 else
     echo "=== $name clean ==="
 fi
@@ -68,7 +83,15 @@ fi
 if ! git diff --quiet || ! git diff --cached --quiet || [ -n "$(git ls-files --others --exclude-standard)" ]; then
     echo "=== committing in parent ==="
     git add -A
-    git commit -s -F "$msgfile"
+    # -S forces GPG/SSH signing; commit aborts here if no key.
+    git commit -s -S -F "$msgfile"
+    sig=$(git log -n 1 --format=%G? HEAD)
+    if [ "$sig" = "N" ]; then
+        echo "!!! parent: HEAD $(git rev-parse --short HEAD) has no signature." >&2
+        echo "    Rolling back with git reset --soft HEAD~1." >&2
+        git reset --soft HEAD~1
+        exit 1
+    fi
 else
     echo "=== parent clean ==="
 fi
