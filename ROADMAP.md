@@ -13,10 +13,13 @@ serving real tenants).
   infrastructure beyond the original scope — see the Phase 0
   section below and §9.
 - Phase 1 (`mechanics-config` extraction): **mechanics-config
-  0.1.0 published** (2026-04-21); **mechanics-core 0.2.3 publish
-  pending** a decision on 0.2.3 vs 0.3.0 surfaced by
-  `check-api-breakage.sh` (see
-  `docs/notes-to-humans/2026-04-21-0006-mechanics-core-semver-checks-finding.md`).
+  0.1.0 published** (2026-04-21); **mechanics-core re-cut as
+  0.3.0**, publish pending. The version bump from 0.2.3 to 0.3.0
+  was decided after `check-api-breakage.sh` surfaced a
+  type-identity change flagged as a breaking change — see
+  `docs/notes-to-humans/2026-04-21-0006-mechanics-core-semver-checks-finding.md`.
+  `mechanics/Cargo.toml` bumped in lockstep to opt downstreams in
+  explicitly (`mechanics-core = "0.3.0"`).
 - Phases 2–9: not started.
 
 Work through phases in order unless a phase is explicitly noted
@@ -372,8 +375,11 @@ file inventory):
 ### Phase 1 — Extract `mechanics-config`
 
 **Status**: **mechanics-config 0.1.0 published (2026-04-21);
-mechanics-core 0.2.3 publish pending a 0.2.3-vs-0.3.0 decision
-(see §Remaining work).**
+mechanics-core re-cut as 0.3.0, publish pending.** The 0.2.3 →
+0.3.0 bump was made after `check-api-breakage.sh` surfaced a
+type-identity change that cargo-semver-checks correctly flagged
+as a breaking change under cargo's pre-1.0 rules. See
+`docs/notes-to-humans/2026-04-21-0006-mechanics-core-semver-checks-finding.md`.
 
 Landed work (see `docs/codex-prompts/2026-04-20-0001-phase-1-*`
 for the Codex prompts and the commits they produced):
@@ -381,14 +387,19 @@ for the Codex prompts and the commits they produced):
 - `mechanics-config 0.1.0` created with the Boa-free schema
   types and pure structural validation. `cargo tree -p
   mechanics-config | grep -iE 'boa|reqwest|tokio'` is empty.
-- `mechanics-core 0.2.3` depends on `mechanics-config = "0.1.0"`,
+- `mechanics-core 0.3.0` depends on `mechanics-config = "0.1.0"`,
   wraps the extracted types with Boa GC newtypes
   (`#[unsafe_ignore_trace]`), re-exports at
   `mechanics_core::endpoint::*` and
-  `mechanics_core::job::MechanicsConfig` for back-compat.
+  `mechanics_core::job::MechanicsConfig` so call-site paths keep
+  working. The minor-digit bump (0.2.x → 0.3.0) signals the
+  underlying type-identity change to cargo's resolver.
 - Behavior change: schema validation now fails at config-
   construction time instead of job-call time (noted in
-  `mechanics-core/CHANGELOG.md 0.2.3`).
+  `mechanics-core/CHANGELOG.md 0.3.0`).
+- `mechanics/Cargo.toml` bumped to `mechanics-core = "0.3.0"` in
+  lockstep so the http-server crate opts in explicitly rather
+  than being held back on the 0.2.x line.
 - Post-extraction cleanup: 5 orphan `.rs` files removed from
   `mechanics-core/src/internal/http/` that were no longer
   compiled but would still have shipped in the crates.io
@@ -406,28 +417,15 @@ extraction (settled)".
 
 **Remaining work**:
 
-1. Decide 0.2.3 vs 0.3.0 for `mechanics-core`.
-   `./scripts/check-api-breakage.sh mechanics-core 0.2.2` reports
-   2 major failures (8 re-exported types now live in
-   `mechanics-config` — same paths, different defining crate, so
-   type identity changed). Call-site usage is preserved; the tool
-   is flagging the wire-level identity change. See
-   `docs/notes-to-humans/2026-04-21-0006-mechanics-core-semver-checks-finding.md`
-   for the analysis and the recommendation (Path A: 0.3.0).
-2. If Path A: bump `mechanics-core/Cargo.toml` + CHANGELOG to
-   `0.3.0`; bump `mechanics/Cargo.toml`'s
-   `mechanics-core = "0.2.2"` pin to `"0.3.0"` in the same
-   session so downstream consumers opt in explicitly.
-3. `./scripts/publish-crate.sh --dry-run mechanics-core` then the
+1. `./scripts/publish-crate.sh --dry-run mechanics-core` then the
    real publish. `mechanics-config 0.1.0` is already on crates.io
    (done 2026-04-21), so the dep resolves.
-4. `./scripts/push-all.sh` to ship the resulting `v0.3.0` (or
-   `v0.2.3`) tag alongside branch commits.
+2. `./scripts/push-all.sh` to ship the resulting `v0.3.0` tag
+   alongside branch commits.
 
 **Acceptance criteria** (remaining):
 - `mechanics-config 0.1.0` published on crates.io. ✓ _(2026-04-21)_
-- `mechanics-core` published on crates.io at the version chosen
-  in step 1. _(pending)_
+- `mechanics-core 0.3.0` published on crates.io. _(pending)_
 - `cargo tree -p mechanics-config | grep -iE 'boa|reqwest|tokio'`
   returns empty. ✓
 - Workspace `cargo test --workspace` passing

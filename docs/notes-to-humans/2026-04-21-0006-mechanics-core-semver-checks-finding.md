@@ -4,8 +4,13 @@
 **Surfaced by:** the first working run of
 `./scripts/check-api-breakage.sh mechanics-core` after the script
 was rewritten (same session — see §"Script fix" below).
-**Status:** Open. Yuka decides whether to republish as `0.3.0` or
-ship as `0.2.3` and ignore the tool.
+**Status:** **Resolved (2026-04-21, same session): Path A chosen.**
+`mechanics-core/Cargo.toml` bumped to `0.3.0`, CHANGELOG's
+`[0.2.3]` heading re-cut as `[0.3.0]` with the reasoning recorded
+in the section preamble, and `mechanics/Cargo.toml` updated from
+`mechanics-core = "0.2.2"` to `"0.3.0"` in the same session so
+downstream consumers opt in explicitly. Publish still pending —
+next steps in `ROADMAP.md` §Phase 1 Remaining work.
 
 ## The finding
 
