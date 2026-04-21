@@ -21,7 +21,7 @@
 
 set -eu
 
-cd "$(git rev-parse --show-toplevel)"
+. "$(dirname -- "$0")/lib/workspace-cd.sh"
 
 git submodule foreach '
 branch=$(git rev-parse --abbrev-ref HEAD)

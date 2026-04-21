@@ -29,7 +29,7 @@
 
 set -eu
 
-cd "$(git rev-parse --show-toplevel)"
+. "$(dirname -- "$0")/lib/workspace-cd.sh"
 
 dry_run=0
 while [ $# -gt 0 ]; do
@@ -48,18 +48,10 @@ fi
 
 crate=$1
 
-if [ ! -f "$crate/Cargo.toml" ]; then
-    printf '!!! %s: not a workspace crate (no %s/Cargo.toml)\n' "$crate" "$crate" >&2
-    exit 1
-fi
-
-# Extract the first `version = "..."` line from the package manifest.
-# [package] comes before [dependencies] in every workspace crate.
-version=$(awk -F'"' '/^version *=/ { print $2; exit }' "$crate/Cargo.toml")
-if [ -z "$version" ]; then
-    printf '!!! %s: could not parse version from Cargo.toml\n' "$crate" >&2
-    exit 1
-fi
+# `crate-version.sh` validates that $crate/Cargo.toml exists and
+# parses its version line; it exits non-zero with a clear error
+# if either step fails.
+version=$(./scripts/crate-version.sh "$crate")
 
 tag="v$version"
 

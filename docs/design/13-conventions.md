@@ -173,12 +173,24 @@ the Alpine build supports.
 
 **Validate with `./scripts/test-scripts.sh`** (mandatory after
 any change under `scripts/`). It runs `dash -n` against every
-`.sh` under `scripts/`, falling back to `sh -n` if dash isn't
-installed. GitHub CI runs the same script, so drift between
-contributor and CI behavior is impossible. Actual execution
-under dash (the default `/bin/sh` on Debian/Ubuntu) is the
-other half of the check — worth doing manually for scripts that
-actually run state-changing logic.
+`.sh` under `scripts/` *and* `scripts/lib/` (sourced helpers),
+falling back to `sh -n` if dash isn't installed. GitHub CI
+runs the same script, so drift between contributor and CI
+behavior is impossible. Actual execution under dash (the
+default `/bin/sh` on Debian/Ubuntu) is the other half of the
+check — worth doing manually for scripts that run state-
+changing logic.
+
+**Workspace-root resolution is shared.** Scripts that need to
+operate at the workspace root (most of them) source
+`scripts/lib/workspace-cd.sh`, which resolves the root with a
+three-tier fallback — superproject of the current submodule,
+else git toplevel, else the script's own `$0`-relative path —
+and `cd`s there. Works whether the script is invoked from the
+workspace root, from inside a submodule, or from outside any
+git repo entirely (e.g. `/tmp`). New scripts needing this
+behavior should source the helper rather than reimplementing
+the resolution inline.
 
 **Extract routines into scripts, not ad-hoc commands.** When
 you find yourself running the same command or command sequence
@@ -495,15 +507,33 @@ per-commit.
 
 ## Pre-landing checks
 
-**Mandatory before every commit that touches Rust code.** Run
-all of the following at the workspace root; all must pass:
+**Mandatory before every commit that touches Rust code.** One
+command covers the full flow:
 
 ```bash
-./scripts/rust-lint.sh                      # fmt-check + check + clippy -D warnings
-./scripts/rust-test.sh                      # cargo test --workspace (skips #[ignore])
-# Plus, for every crate you modified in this commit:
-./scripts/rust-test.sh --ignored <crate>    # its #[ignore]-gated integration tests
+./scripts/pre-landing.sh
 ```
+
+It auto-detects modified crates (submodules with a dirty
+working tree) and runs, in order:
+
+1. `./scripts/rust-lint.sh` — fmt-check + check + clippy
+   (`-D warnings`).
+2. `./scripts/rust-test.sh` — `cargo test --workspace` (skips
+   `#[ignore]`-gated tests).
+3. `./scripts/rust-test.sh --ignored <crate>` for every modified
+   crate — exercises the integration tests for what you actually
+   changed.
+
+Pass crate names to `pre-landing.sh` to override the
+auto-detection; pass `--no-ignored` to skip step 3 entirely
+(rare, for fast iteration when you're certain the slow tests
+aren't affected).
+
+GitHub CI runs the same script on a clean checkout (no dirty
+submodules → step 3 naturally empty) so contributor and CI
+behavior don't drift. If you want to understand what each
+underlying step does, see the next subsection.
 
 **Why split the test run.** Integration tests that need real
 infrastructure (testcontainers, live DBs, external APIs) carry

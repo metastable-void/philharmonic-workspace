@@ -124,23 +124,23 @@ signature after committing — an unsigned commit triggers a
 rollback. Non-negotiable.
 
 **Pre-landing checks (mandatory).** Before committing any
-change that touches Rust code, all of the following must pass
-at the parent root:
+change that touches Rust code, run:
 
 ```bash
-./scripts/rust-lint.sh                      # fmt-check + check + clippy -D warnings
-./scripts/rust-test.sh                      # cargo test --workspace (skips #[ignore])
-# Plus, for every crate you modified in this commit:
-./scripts/rust-test.sh --ignored <crate>    # its #[ignore]-gated integration tests
+./scripts/pre-landing.sh
 ```
 
+It auto-detects modified crates (dirty submodules) and runs
+`rust-lint.sh`, `rust-test.sh`, and `rust-test.sh --ignored
+<crate>` for each modified crate — all three phases must pass.
+
 `#[ignore]` is the project convention for tests that need real
-infrastructure (testcontainers, live services); the workspace
-run skips them, and you run `--ignored` per-modified-crate to
-exercise them. Don't run raw `cargo fmt/check/clippy/test` when
-the scripts cover the case. Clippy runs with `-D warnings` — fix
-the root cause, don't silence at crate scope. See
-`docs/design/13-conventions.md §Pre-landing checks` for detail.
+infrastructure (testcontainers, live services); step 2 skips
+them for speed, step 3 exercises them per-modified-crate. Don't
+run raw `cargo fmt/check/clippy/test` when the scripts cover
+the case. Clippy runs with `-D warnings` — fix the root cause,
+don't silence at crate scope. See
+`docs/design/13-conventions.md §Pre-landing checks`.
 
 **Follow append-only discipline.** The substrate has no `UPDATE`
 or `DELETE` semantics. Entity state changes are new revisions;
@@ -1097,11 +1097,10 @@ From the workspace root:
 # Push pushed-pending commits across every submodule
 ./scripts/push-all.sh
 
-# Pre-landing checks (mandatory before committing Rust code)
-./scripts/rust-lint.sh                      # fmt-check + check + clippy -D warnings
-./scripts/rust-test.sh                      # cargo test --workspace (skips #[ignore])
-# Plus, for every crate modified in the commit:
-./scripts/rust-test.sh --ignored <crate>    # its #[ignore]-gated integration tests
+# Pre-landing checks (mandatory before committing Rust code).
+# Auto-detects modified crates and runs lint + workspace test +
+# --ignored per modified crate. One command, all phases.
+./scripts/pre-landing.sh
 ```
 
 Publishing a crate (from the workspace root):

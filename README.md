@@ -219,9 +219,30 @@ Invoke by path (`./scripts/foo.sh`), not via `bash`.
   `#[ignore]` control. Default skips `#[ignore]`'d tests;
   `--ignored` runs only them (use per modified crate to exercise
   its integration tests); `--include-ignored` runs everything.
+- `./scripts/pre-landing.sh [--no-ignored] [<crate>...]` —
+  canonical pre-landing driver. Auto-detects modified crates
+  from dirty submodules, then runs `rust-lint.sh`,
+  `rust-test.sh`, and `rust-test.sh --ignored <crate>` for each
+  modified crate. Use this instead of running the three
+  individually — one command captures the mandated flow.
 - `./scripts/test-scripts.sh` — POSIX-parse-checks every
   `scripts/*.sh` with `dash -n` (fallback `sh -n`). Mandatory
   after any script change; GitHub CI runs the same check.
+- `./scripts/check-detached.sh` — walks every submodule and
+  fails with a non-zero exit if any is in detached HEAD. Useful
+  pre-flight before a multi-commit operation.
+- `./scripts/cargo-audit.sh [...]` — runs `cargo audit` against
+  the workspace's `Cargo.lock` (RustSec advisory database).
+  Auto-installs `cargo-audit` via `cargo install --locked` on
+  first run; forwards extra arguments unchanged.
+- `./scripts/crate-version.sh <crate>` — prints the version
+  string of a workspace crate, parsed from its own `Cargo.toml`.
+  Intended for other scripts to consume (`publish-crate.sh` uses
+  it), usable standalone.
+- `./scripts/show-dirty.sh` — prints the names of dirty
+  submodules, one per line. Machine-readable (used internally by
+  `pre-landing.sh`); no decoration or status lines, empty output
+  when nothing is dirty.
 - `./scripts/check-api-breakage.sh [baseline-rev]` — run
   `cargo-semver-checks --workspace --all-features` against a git
   baseline (defaults to `origin/main`). Installs
@@ -309,16 +330,27 @@ cargo build --workspace          # build everything
 
 ### Pre-landing checks (mandatory)
 
-Every commit that touches Rust code must pass all of the
-following at the workspace root. This applies equally to humans
-and AI agents.
+Every commit that touches Rust code must pass the following.
+One command covers the flow:
 
 ```bash
-./scripts/rust-lint.sh                      # fmt-check + check + clippy -D warnings
-./scripts/rust-test.sh                      # workspace tests, skips #[ignore]
-# Plus, for every crate modified in the commit:
-./scripts/rust-test.sh --ignored <crate>    # its #[ignore]-gated integration tests
+./scripts/pre-landing.sh
 ```
+
+It auto-detects modified crates (submodules with a dirty tree)
+and runs:
+
+1. `./scripts/rust-lint.sh` — `cargo fmt --check`, `cargo check`,
+   `cargo clippy --all-targets -- -D warnings`.
+2. `./scripts/rust-test.sh` — `cargo test --workspace`, skipping
+   `#[ignore]`-gated tests.
+3. `./scripts/rust-test.sh --ignored <crate>` for each modified
+   crate.
+
+Pass explicit crate names to override detection, or
+`--no-ignored` to skip step 3. GitHub CI runs the same script;
+because CI's checkout is clean, step 3 is naturally empty. This
+applies equally to humans and AI agents.
 
 - `./scripts/rust-lint.sh` runs `cargo fmt --all --check`, then
   `cargo check --workspace`, then `cargo clippy --workspace

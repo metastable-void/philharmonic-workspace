@@ -152,35 +152,35 @@ and surface that rather than proceeding.
 ## Before you hand off
 
 Before concluding any task that touched a `.rs` file (including
-transitive effects — e.g. a `Cargo.toml` dep bump), run all of
-the following at the workspace root and confirm they pass:
+transitive effects — e.g. a `Cargo.toml` dep bump), run:
 
 ```bash
-./scripts/rust-lint.sh                      # fmt + check + clippy -D warnings
-./scripts/rust-test.sh                      # cargo test --workspace, skips #[ignore]
-# Plus, for every crate you modified:
-./scripts/rust-test.sh --ignored <crate>    # its #[ignore]-gated tests
+./scripts/pre-landing.sh
 ```
+
+It auto-detects modified crates and runs the full flow:
+`rust-lint.sh` (fmt + check + clippy `-D warnings`), then
+`rust-test.sh` (`cargo test --workspace`, skips `#[ignore]`),
+then `rust-test.sh --ignored <crate>` for each modified crate
+(exercises the `#[ignore]`-gated integration tests). If any
+step fails and you can't get it green within the task, say so
+in your final summary. Don't hand off red code.
 
 - **Use the scripts**, not raw `cargo fmt/check/clippy/test`.
   The scripts encode the mandated flags (`-D warnings`,
   `--all-targets`, etc.) so you don't have to remember them.
-  Bespoke `cargo test <pattern>` for focused debugging is still
+  Bespoke `cargo test <pattern>` for focused debugging remains
   fine; the rule targets the canonical pre-landing flow.
 - Clippy runs with `-D warnings` — warnings are errors. Fix the
   root cause. Only add `#[allow(clippy::<lint>)]` at the
   *narrowest* scope, with a one-line comment explaining why,
   when a lint is genuinely wrong for a specific call site.
-- If `rust-lint.sh`'s fmt-check step fails, run `cargo fmt --all`
-  (or `cargo fmt -p <crate>`) to apply and re-run.
-- Why two test phases: `#[ignore]`-gated tests need real
-  infrastructure (testcontainers, live services) and are slow;
-  the workspace run skips them; the per-touched-crate `--ignored`
-  run exercises them for crates you actually changed. Running
-  `--ignored` against untouched crates is waste.
-
-If any step fails and you can't get it green within the task,
-say so in your final summary. Don't hand off red code.
+- If the fmt-check step fails, run `cargo fmt --all` (or
+  `cargo fmt -p <crate>`) to apply and re-run `pre-landing.sh`.
+- `#[ignore]` is the project convention for tests that need real
+  infrastructure (testcontainers, live services) and are slow.
+  The workspace-level run skips them; the per-modified-crate
+  `--ignored` phase exercises them for crates you touched.
 
 Doc-only / config-only / script-only changes can skip these (no
 `.rs` file touched).

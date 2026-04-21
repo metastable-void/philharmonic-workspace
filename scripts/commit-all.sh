@@ -30,7 +30,7 @@
 
 set -eu
 
-cd "$(git rev-parse --show-toplevel)"
+. "$(dirname -- "$0")/lib/workspace-cd.sh"
 
 parent_only=0
 if [ "${1:-}" = "--parent-only" ]; then

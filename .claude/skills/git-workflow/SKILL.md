@@ -106,6 +106,16 @@ POSIX-parse-checks every `scripts/*.sh` with `dash -n` (fallback
 `sh -n`). **Mandatory after any change under `scripts/`** before
 committing. GitHub CI runs the same check.
 
+### `scripts/check-detached.sh`
+Fails with a non-zero exit if any submodule is in detached HEAD,
+listing the offenders. Useful pre-flight before `commit-all.sh`,
+`publish-crate.sh`, or any multi-commit operation.
+
+### `scripts/show-dirty.sh`
+Prints dirty-submodule names, one per line; empty output when
+nothing's dirty. Machine-readable counterpart to `status.sh`;
+used internally by `pre-landing.sh`.
+
 ### `scripts/heads.sh`
 Shows the current HEAD commit for the parent and every submodule,
 with short SHA, `%G?` signature indicator, and subject. Use after
@@ -125,6 +135,16 @@ Publishes one crate to crates.io (via `cargo publish`) and tags
 the release `v<version>` inside the submodule repo. Tag is
 signed, created only after a successful publish. The tag is then
 pushed by the next `push-all.sh` via `--follow-tags`.
+
+### `scripts/cargo-audit.sh [...]`
+Runs `cargo audit` against the workspace `Cargo.lock`;
+auto-installs `cargo-audit` via `cargo install --locked` on
+first use. Run alongside `check-api-breakage.sh` when preparing
+a release.
+
+### `scripts/crate-version.sh <crate>`
+Prints a crate's version string parsed from its own `Cargo.toml`.
+Internal helper; used by `publish-crate.sh`.
 
 ## Decision tree
 

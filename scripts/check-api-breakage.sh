@@ -20,7 +20,7 @@
 
 set -eu
 
-cd "$(git rev-parse --show-toplevel)"
+. "$(dirname -- "$0")/lib/workspace-cd.sh"
 
 baseline=${1:-origin/main}
 

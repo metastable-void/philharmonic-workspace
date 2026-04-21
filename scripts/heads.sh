@@ -26,15 +26,24 @@
 
 set -eu
 
-cd "$(git rev-parse --show-toplevel)"
+. "$(dirname -- "$0")/lib/workspace-cd.sh"
 
 # Width of the longest submodule name
 # (philharmonic-connector-impl-llm-openai-compat = 45), plus a
 # little padding. Keeps columns aligned without needing `column`.
 fmt='%-48s %s\n'
 
-printf "$fmt" 'parent' "$(git log -n 1 --format='%h %G? %s' HEAD)"
-
-git submodule foreach --quiet '
-printf "%-48s %s\n" "$name" "$(git log -n 1 --format="%h %G? %s" HEAD)"
-'
+# Buffer all rows via `$()` and emit in one go at the end. If the
+# script's stdout is piped to a truncating consumer (e.g.
+# `./scripts/heads.sh | head -3`), SIGPIPE on closure affects only
+# the final `printf` below — not the submodule walk. Otherwise
+# `git submodule foreach` would abort mid-walk with a confusing
+# "fatal: run_command returned non-zero status for <name>" as soon
+# as the first row hits a closed pipe.
+output=$(
+    printf "$fmt" 'parent' "$(git log -n 1 --format='%h %G? %s' HEAD)"
+    git submodule foreach --quiet '
+    printf "%-48s %s\n" "$name" "$(git log -n 1 --format="%h %G? %s" HEAD)"
+    '
+)
+printf '%s\n' "$output"

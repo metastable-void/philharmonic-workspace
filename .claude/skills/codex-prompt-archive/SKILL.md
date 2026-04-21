@@ -155,12 +155,11 @@ shape:
   `scripts/commit-all.sh` only, no `push-all.sh`, no
   `cargo publish`. Codex will run raw git otherwise.
 - **Always** list the verification commands Codex must run before
-  finalizing: `./scripts/rust-lint.sh` (fmt + check + clippy -D
-  warnings), `./scripts/rust-test.sh` (workspace tests, skips
-  `#[ignore]`), and `./scripts/rust-test.sh --ignored <crate>`
-  for every crate Codex modified. Plus any task-specific
-  `cargo tree` greps. Tell Codex not to run raw
-  `cargo fmt/check/clippy/test` when the scripts cover it.
+  finalizing: `./scripts/pre-landing.sh` (auto-detects touched
+  crates; runs lint + workspace test + `--ignored` per modified
+  crate). Plus any task-specific `cargo tree` greps. Tell Codex
+  not to run raw `cargo fmt/check/clippy/test` when the scripts
+  cover it.
 
 ## Do not
 

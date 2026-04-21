@@ -16,13 +16,11 @@ Developer: Yuka MORI.
   as a follow-up. A stale roadmap is worse than none. See
   docs/design/13-conventions.md §ROADMAP maintenance.
 - Pre-landing checks: before committing Rust changes, run
-  `./scripts/rust-lint.sh` (fmt + check + clippy -D warnings)
-  and `./scripts/rust-test.sh` (workspace tests, skip
-  `#[ignore]`). Plus, for **every** crate modified in the
-  commit, run `./scripts/rust-test.sh --ignored <crate>` to
-  exercise its integration tests. Don't run raw `cargo
-  fmt/check/clippy/test` when the scripts cover the case. See
-  docs/design/13-conventions.md §Pre-landing checks.
+  `./scripts/pre-landing.sh` — one command that auto-detects
+  modified crates and runs the full flow (lint, workspace
+  test, plus `--ignored` per modified crate). Don't run raw
+  `cargo fmt/check/clippy/test` when the scripts cover the
+  case. See docs/design/13-conventions.md §Pre-landing checks.
 - **Notes to humans.** When you tell Yuka anything significant
   (verification results with informative "why", platform
   caveats, audit findings, mid-implementation design calls,

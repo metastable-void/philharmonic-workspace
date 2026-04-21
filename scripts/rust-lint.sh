@@ -27,7 +27,7 @@
 # POSIX sh only — see docs/design/13-conventions.md §Shell scripts.
 
 set -eu
-cd "$(git rev-parse --show-toplevel)"
+. "$(dirname -- "$0")/lib/workspace-cd.sh"
 
 if [ $# -gt 1 ]; then
     echo "Usage: $0 [<crate-name>]" >&2

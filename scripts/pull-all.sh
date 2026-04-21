@@ -8,7 +8,7 @@
 
 set -eu
 
-cd "$(git rev-parse --show-toplevel)"
+. "$(dirname -- "$0")/lib/workspace-cd.sh"
 
 # Integrate remote changes into the parent. Rebase keeps history
 # linear — local parent commits (usually submodule-pointer bumps)

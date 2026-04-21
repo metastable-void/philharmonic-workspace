@@ -42,8 +42,9 @@ jobs:
       - name: Workspace setup
         run: ./scripts/setup.sh
 
-      - name: Lint (fmt-check + check + clippy -D warnings)
-        run: ./scripts/rust-lint.sh
-
-      - name: Test (workspace, skip #[ignore])
-        run: ./scripts/rust-test.sh
+      # Single driver for the full pre-landing flow. CI has a clean
+      # checkout (no dirty submodules) so pre-landing.sh skips the
+      # per-crate --ignored phase — contributor behavior matches
+      # exactly, ensuring no CI/local drift.
+      - name: Pre-landing checks (lint + workspace test)
+        run: ./scripts/pre-landing.sh

@@ -11,7 +11,7 @@
 # POSIX sh only — see docs/design/13-conventions.md §Shell scripts.
 
 set -eu
-cd "$(git rev-parse --show-toplevel)"
+. "$(dirname -- "$0")/lib/workspace-cd.sh"
 
 if command -v dash >/dev/null 2>&1; then
     checker=dash
@@ -24,10 +24,15 @@ else
     exit 1
 fi
 
-printf '=== parse-checking scripts/*.sh with %s ===\n' "$checker"
+printf '=== parse-checking scripts/*.sh + scripts/lib/*.sh with %s ===\n' "$checker"
 
 fail=0
-for f in scripts/*.sh; do
+# POSIX sh has no recursive glob; enumerate the subdirectories we
+# care about explicitly. `scripts/lib/*.sh` covers sourced helpers
+# like workspace-cd.sh; a parse error there breaks every script
+# that sources them.
+for f in scripts/*.sh scripts/lib/*.sh; do
+    [ -f "$f" ] || continue  # glob expands literally if no match
     if "$checker" -n "$f" 2>/dev/null; then
         printf 'ok   %s\n' "$f"
     else

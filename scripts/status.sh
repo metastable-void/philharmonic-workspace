@@ -7,7 +7,7 @@
 
 set -eu
 
-cd "$(git rev-parse --show-toplevel)"
+. "$(dirname -- "$0")/lib/workspace-cd.sh"
 
 # The "# branch.ab +A -B" line (porcelain v2) carries ahead/behind
 # counts when an upstream is set. Parse with `cut`; the submodule
