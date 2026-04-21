@@ -139,6 +139,13 @@ procps-style utilities aren't guaranteed. Sticking to POSIX sh +
 POSIX utilities means every script runs on every platform Yuka
 reasonably touches, without a "this one needs bash" asterisk.
 
+**Busybox caveat.** Alpine-class busybox installations are
+supported. *Extremely stripped* busybox builds (e.g. Ubuntu's
+`/usr/bin/busybox` from `busybox-static`, which lacks `etime`,
+`time`, `-p`) are out of scope — rescue/initramfs images aren't
+a real target. When picking a `ps` field or flag, prefer ones
+the Alpine build supports.
+
 **Validate with dash.** `dash -n scripts/*.sh` catches most
 bashisms at parse time. Actual execution under dash (the default
 `/bin/sh` on Debian/Ubuntu) is the other half of the check.
@@ -155,13 +162,24 @@ tracked here — add to the list when a new one is introduced:
 
 - **`ps -o rss=`** (`scripts/codex-status.sh`). POSIX mandates
   `vsz` but not `rss`. `rss` is supported identically on Linux
-  procps, FreeBSD base ps, and macOS BSD ps, and matches what the
-  user expects to see for process-memory summaries. Keeping it
-  for output fidelity.
-- **`ps -ww`** (`scripts/codex-status.sh`). `-w` is not strictly
-  POSIX but is supported across Linux/FreeBSD/macOS; it disables
-  `args` truncation, which is how the existing command-line
-  display works.
+  procps, FreeBSD base ps, macOS BSD ps, and Alpine busybox, and
+  matches what the user expects to see for process-memory
+  summaries. Kept for output fidelity.
+
+**Noteworthy field choices (within POSIX but worth recording).**
+
+- **`ps -o time=`, not `pcpu=`** (`scripts/codex-status.sh`).
+  `time` (cumulative CPU time) is POSIX-mandated and present
+  everywhere, including Alpine busybox. `pcpu` / `%CPU` is not
+  in busybox ps, so using it would block the portability goal.
+  The trade-off is that we show "how much CPU has this process
+  burned" rather than the instantaneous rate — acceptable for a
+  Codex-status summary; for live "is it stuck?" readings use
+  `top`/`htop`.
+- **No `-w`/`-ww`.** Busybox ps rejects `-w`. macOS/BSD ps may
+  truncate `args` to terminal width without it, but
+  `codex-status.sh` already truncates to 80 chars downstream,
+  so the lost data is never displayed anyway.
 
 ## Codex prompt archive
 
