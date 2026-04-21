@@ -258,10 +258,17 @@ The two agents read different instruction files:
   activated by pointing `CODEX_HOME` at `.codex/`.
 
 Every Codex prompt Claude writes is archived under
-`docs/codex-prompts/YYYY-MM-DD-<slug>.md` and committed *before*
-Codex is spawned. That makes the design-to-implementation path
-reviewable after the fact, which is hard to reconstruct from
-chat history alone.
+`docs/codex-prompts/YYYY-MM-DD-NNNN-<slug>[-NN].md` and committed
+*before* Codex is spawned. That makes the design-to-
+implementation path reviewable after the fact, which is hard to
+reconstruct from chat history alone.
+
+Significant observations Claude makes during a session — audit
+results, platform caveats, mid-implementation design calls — go
+to `docs/notes-to-humans/YYYY-MM-DD-NNNN-<slug>[-NN].md`, committed
+in the same session. Session scrollback is disposable; the notes
+directory is a durable journal of what was surprising or
+important to flag.
 
 Contributions from purely-human workflows are welcome — nothing
 in the code requires the AI workflow. But the project's docs,

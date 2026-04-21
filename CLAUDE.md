@@ -20,6 +20,15 @@ Developer: Yuka MORI.
   --all-targets -- -D warnings`, and `cargo test --workspace`.
   All three must pass. No exceptions for "small" changes. See
   docs/design/13-conventions.md §Pre-landing checks.
+- **Notes to humans.** When you tell Yuka anything significant
+  (verification results with informative "why", platform
+  caveats, audit findings, mid-implementation design calls,
+  non-obvious failure modes, anything flagged as "note this"),
+  also write it to `docs/notes-to-humans/YYYY-MM-DD-NNNN-<slug>[-NN].md`
+  and commit via `./scripts/commit-all.sh --parent-only` in the
+  same session. Session-only output is not enough for
+  substantial notes. See docs/design/13-conventions.md §Notes to
+  humans and §Journal-like files (filename format).
 - Git workflow: all Git operations go through `scripts/*.sh`
   (`status.sh`, `pull-all.sh`, `commit-all.sh`, `push-all.sh`).
   If a script doesn't cover what you need, extend the script
@@ -73,7 +82,8 @@ hands off to Codex unless it's plumbing/housekeeping that
 doesn't warrant the round-trip.
 
 **Archive every Codex prompt.** Before spawning Codex, write the
-prompt to `docs/codex-prompts/YYYY-MM-DD-<slug>.md` and commit
-it (via `scripts/commit-all.sh`). No Codex invocation is
+prompt to `docs/codex-prompts/YYYY-MM-DD-NNNN-<slug>[-NN].md` and
+commit it (via `scripts/commit-all.sh`). No Codex invocation is
 ephemeral — the prompt is part of the project record. See
-docs/design/13-conventions.md §Codex prompt archive.
+docs/design/13-conventions.md §Codex prompt archive (and
+§Journal-like files for the filename format).

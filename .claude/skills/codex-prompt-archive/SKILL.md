@@ -1,6 +1,6 @@
 ---
 name: codex-prompt-archive
-description: Use BEFORE spawning Codex via the codex:* plugin (codex-rescue, codex-run, etc.) for any substantive coding task in this workspace. Every Codex prompt must be archived to docs/codex-prompts/YYYY-MM-DD-<slug>[-NN].md and committed via scripts/commit-all.sh *before* Codex is spawned — there are no ephemeral Codex invocations. Also consult to decide whether a task should even go to Codex vs. stay with Claude.
+description: Use BEFORE spawning Codex via the codex:* plugin (codex-rescue, codex-run, etc.) for any substantive coding task in this workspace. Every Codex prompt must be archived to docs/codex-prompts/YYYY-MM-DD-NNNN-<slug>[-NN].md and committed via scripts/commit-all.sh *before* Codex is spawned — there are no ephemeral Codex invocations. Also consult to decide whether a task should even go to Codex vs. stay with Claude.
 ---
 
 # Codex prompt archive
@@ -18,8 +18,8 @@ Authoritative sources:
 - `docs/design/13-conventions.md` §"Codex prompt archive" —
   location, contents, commit cadence, rationale.
 - Existing prompts under `docs/codex-prompts/` (e.g.
-  `2026-04-20-phase-1-mechanics-config-extraction-{01,02}.md`) as
-  working templates.
+  `2026-04-20-0001-phase-1-mechanics-config-extraction-{01,02}.md`)
+  as working templates.
 
 ## When to hand off to Codex
 
@@ -49,15 +49,25 @@ partway through, the archive is still complete.
 
 ### Location
 
-`docs/codex-prompts/YYYY-MM-DD-<slug>.md`
+`docs/codex-prompts/YYYY-MM-DD-NNNN-<slug>[-NN].md`
 
-- `YYYY-MM-DD` is today's date.
-- `<slug>` names the task concisely: `auth-middleware-rewrite`,
-  `sqlx-mysql-store-skeleton`, `phase-1-mechanics-config-extraction`.
-- One file per prompt.
-- Multi-round tasks (Codex hit a limit and you're resuming, or a
-  task naturally splits) get a numeric suffix: `-01`, `-02`, ...
-  Never overwrite a prior round's file.
+Follows the workspace-wide journal filename format (see
+`docs/design/13-conventions.md` §Journal-like files).
+
+- `YYYY-MM-DD`: today's date.
+- `NNNN` (required): four-digit daily sequence, counted
+  per-directory in `docs/codex-prompts/`. The first prompt on a
+  day is `0001`, second is `0002`, etc.
+- `<slug>`: short kebab-case task name
+  (`auth-middleware-rewrite`, `sqlx-mysql-store-skeleton`,
+  `phase-1-mechanics-config-extraction`).
+- `[-NN]` (optional): two-digit round suffix for multi-part work
+  on one logical entry (Codex hit a limit mid-task; you're
+  resuming). Share the same daily-sequence `NNNN` across rounds
+  of one entry; increment the trailing `-NN`. Never overwrite a
+  prior round's file.
+
+One file per prompt.
 
 ### Required contents
 

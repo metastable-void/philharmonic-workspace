@@ -215,6 +215,85 @@ list — it's the document that tells you what to do next.
   step isn't clear from ROADMAP.md, stop and propose a roadmap
   update first. Implementing against a guess creates churn.
 
+## Journal-like files
+
+Every journal-like file Claude generates under this workspace
+follows one filename shape:
+
+```
+YYYY-MM-DD-NNNN-<slug>[-NN].md
+```
+
+- **`YYYY-MM-DD`** — the date the file was created.
+- **`NNNN`** (required) — four-digit daily sequence, zero-padded,
+  counted **per-directory**. The first file written in a given
+  journal directory on a given day is `0001`, the second `0002`,
+  etc. `docs/codex-prompts/` and `docs/notes-to-humans/` each
+  count independently. Four digits (not two) because 99-per-day
+  is realistically tight for notes-to-humans in a busy session;
+  `9999` gives comfortable headroom.
+- **`<slug>`** — short kebab-case task name. Example:
+  `phase-1-mechanics-config-extraction`,
+  `journal-conventions-established`. Keep it <= ~60 characters.
+- **`[-NN]`** (optional) — two-digit round suffix for multi-part
+  work on one logical entry. Use when a Codex session hit a
+  limit mid-task and you're resuming, or a notes-to-humans entry
+  genuinely needs a follow-up round. Omit when the entry stands
+  alone. Two digits is enough here because rounds rarely exceed
+  a handful.
+
+Journal directories currently governed by this format:
+
+- `docs/codex-prompts/` — see §Codex prompt archive.
+- `docs/notes-to-humans/` — see §Notes to humans.
+
+Any future journal directory adopts the same format by default.
+Don't invent a variant.
+
+## Notes to humans
+
+`docs/notes-to-humans/` is where Claude writes significant
+findings, observations, and decisions that would otherwise live
+only in session scrollback. **When Claude tells Yuka anything
+substantial, the note must also be written to a file here and
+committed.** Session-only output is not enough.
+
+**What counts as "significant" (write a note):**
+
+- Verification results where the *why* is informative ("your
+  version bump is defensible for these reasons; CHANGELOG missed
+  the behavior change").
+- Platform-specific caveats surfaced during investigation
+  ("Alpine busybox ps has no `pcpu`; we switched to `time`").
+- Audit results: what's been touched, what hasn't, what's load-
+  bearing, what's dead.
+- Design calls made mid-implementation that the prompt didn't
+  spell out.
+- Non-obvious failure modes surfaced during testing.
+- Anything Yuka says to "note", "remember", or "flag".
+
+**What does not (session-only is fine):**
+
+- Routine acknowledgments ("done", "committed", "pushed").
+- Echoes of commands run.
+- Plan summaries before acting.
+- Trivially-obvious diffs.
+
+**Contents.** Prose-focused, one logical observation per file.
+Give enough context that a future reader can act without
+re-running the investigation: file paths, commit SHAs, the why
+behind the finding. If two unrelated observations are worth
+saving, write two files (different daily sequences).
+
+**Commit.** Through `./scripts/commit-all.sh --parent-only` in
+the same session — the note is parent-level regardless of
+whether the underlying work was in a submodule.
+
+**Don't write to humans like a self-reminder.** The audience is
+Yuka (and future collaborators reading the repo), not
+Claude-next-session. Complete sentences, concrete references, no
+in-jokes.
+
 ## Codex prompt archive
 
 Claude hands substantive coding to Codex (see CLAUDE.md §Claude
@@ -222,11 +301,13 @@ vs. Codex division of labor). Every prompt Claude writes for
 Codex is archived and committed — there are no ephemeral Codex
 invocations.
 
-**Location.** `docs/codex-prompts/YYYY-MM-DD-<slug>.md`, where
-`<slug>` names the task (`auth-middleware-rewrite`,
-`sqlx-mysql-store-skeleton`). One file per prompt. If a task
-needs multiple rounds of Codex work, use a numeric suffix
-(`-01`, `-02`) rather than overwriting.
+**Location.** `docs/codex-prompts/YYYY-MM-DD-NNNN-<slug>[-NN].md`
+(see §Journal-like files for format detail). `<slug>` names the
+task (`auth-middleware-rewrite`, `sqlx-mysql-store-skeleton`).
+One file per prompt. If a task needs multiple rounds of Codex
+work, use the trailing round suffix (`-01`, `-02`) — share the
+daily-sequence `NNNN` across rounds of the same logical entry,
+and never overwrite a prior round's file.
 
 **Contents.** The full prompt text Claude sent to Codex,
 verbatim, plus a short preamble with:
