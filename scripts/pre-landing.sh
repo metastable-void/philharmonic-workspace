@@ -2,6 +2,10 @@
 # scripts/pre-landing.sh — the canonical pre-landing-check driver.
 #
 # Runs the mandated flow in order:
+#   0. ./scripts/check-toolchain.sh             (prints rust/cargo versions;
+#                                                if rustup is installed, runs
+#                                                `rustup check` to surface
+#                                                pending toolchain updates)
 #   1. ./scripts/rust-lint.sh                   (fmt + check + clippy -D warnings)
 #   2. ./scripts/rust-test.sh                   (cargo test --workspace, skips #[ignore])
 #   3. ./scripts/rust-test.sh --ignored <X>     for each modified crate X
@@ -58,6 +62,7 @@ else
     fi
 fi
 
+./scripts/check-toolchain.sh
 ./scripts/rust-lint.sh
 ./scripts/rust-test.sh
 

@@ -243,6 +243,12 @@ Invoke by path (`./scripts/foo.sh`), not via `bash`.
   submodules, one per line. Machine-readable (used internally by
   `pre-landing.sh`); no decoration or status lines, empty output
   when nothing is dirty.
+- `./scripts/check-toolchain.sh [--update]` — prints local
+  `rustc`/`cargo` versions and, if rustup is installed, runs
+  `rustup check` (or `rustup update` with `--update`) to surface
+  pending toolchain updates. Called as step 0 by
+  `pre-landing.sh` so each local run nudges against CI-vs-local
+  drift.
 - `./scripts/check-api-breakage.sh [baseline-rev]` — run
   `cargo-semver-checks --workspace --all-features` against a git
   baseline (defaults to `origin/main`). Installs
