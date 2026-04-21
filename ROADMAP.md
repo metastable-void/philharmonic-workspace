@@ -12,14 +12,20 @@ serving real tenants).
 - Phase 0 (workspace setup): **done**, with substantial added
   infrastructure beyond the original scope — see the Phase 0
   section below and §9.
-- Phase 1 (`mechanics-config` extraction): **mechanics-config
-  0.1.0 published** (2026-04-21); **mechanics-core re-cut as
-  0.3.0**, publish pending. The version bump from 0.2.3 to 0.3.0
-  was decided after `check-api-breakage.sh` surfaced a
-  type-identity change flagged as a breaking change — see
+- Phase 1 (`mechanics-config` extraction): **done** (2026-04-21).
+  `mechanics-config 0.1.0`, `mechanics-core 0.3.0`, and
+  `mechanics 0.3.0` are all published to crates.io with signed
+  `v<version>` release tags inside their submodules. The
+  mechanics-core bump from originally-drafted 0.2.3 to 0.3.0 was
+  made after `check-api-breakage.sh` surfaced the type-identity
+  change (schema types moved to `mechanics-config`, re-exported
+  at the same paths) as a breaking change under cargo's pre-1.0
+  semver rules — see
   `docs/notes-to-humans/2026-04-21-0006-mechanics-core-semver-checks-finding.md`.
-  `mechanics/Cargo.toml` bumped in lockstep to opt downstreams in
-  explicitly (`mechanics-core = "0.3.0"`).
+  `mechanics` bumped in lockstep (0.2.0/0.2.1-unpublished →
+  0.3.0) so downstream consumers opt into the new `mechanics-core`
+  type identity explicitly rather than silently under a caret
+  upgrade.
 - Phases 2–9: not started.
 
 Work through phases in order unless a phase is explicitly noted
@@ -374,12 +380,17 @@ file inventory):
 
 ### Phase 1 — Extract `mechanics-config`
 
-**Status**: **mechanics-config 0.1.0 published (2026-04-21);
-mechanics-core re-cut as 0.3.0, publish pending.** The 0.2.3 →
-0.3.0 bump was made after `check-api-breakage.sh` surfaced a
-type-identity change that cargo-semver-checks correctly flagged
-as a breaking change under cargo's pre-1.0 rules. See
+**Status**: **done (2026-04-21).** All three crates published
+to crates.io with signed `v<version>` tags in their submodules:
+`mechanics-config 0.1.0`, `mechanics-core 0.3.0`,
+`mechanics 0.3.0`. The mechanics-core bump from originally-
+drafted 0.2.3 to 0.3.0 was made after `check-api-breakage.sh`
+surfaced a type-identity change that cargo-semver-checks
+correctly flagged as a breaking change under cargo's pre-1.0
+rules — see
 `docs/notes-to-humans/2026-04-21-0006-mechanics-core-semver-checks-finding.md`.
+`mechanics` was published in the same session, co-moved to 0.3.0
+so downstream consumers opt in explicitly.
 
 Landed work (see `docs/codex-prompts/2026-04-20-0001-phase-1-*`
 for the Codex prompts and the commits they produced):
@@ -417,24 +428,22 @@ Boa.
 **Reference**: `06-execution-substrate.md`, section "Schema
 extraction (settled)".
 
-**Remaining work**:
+**Remaining work**: none. Phase 1 complete.
 
-1. `./scripts/publish-crate.sh --dry-run mechanics-core` then the
-   real publish. `mechanics-config 0.1.0` is already on crates.io
-   (done 2026-04-21), so the dep resolves.
-2. `./scripts/push-all.sh` to ship the resulting `v0.3.0` tag
-   alongside branch commits.
-
-**Acceptance criteria** (remaining):
+**Acceptance criteria**:
 - `mechanics-config 0.1.0` published on crates.io. ✓ _(2026-04-21)_
-- `mechanics-core 0.3.0` published on crates.io. _(pending)_
+- `mechanics-core 0.3.0` published on crates.io. ✓ _(2026-04-21)_
+- `mechanics 0.3.0` published on crates.io. ✓ _(2026-04-21)_
+- Signed `v0.1.0` / `v0.3.0` / `v0.3.0` release tags inside the
+  respective submodule repos, pushed via `./scripts/push-all.sh`
+  with `--follow-tags`. ✓
 - `cargo tree -p mechanics-config | grep -iE 'boa|reqwest|tokio'`
   returns empty. ✓
 - Workspace `cargo test --workspace` passing
   (`./scripts/rust-test.sh`). ✓
-- Mechanics-core integration tests passing
-  (`./scripts/rust-test.sh --ignored mechanics-core`).
-  _(run locally before publish)_
+- `./scripts/check-api-breakage.sh mechanics-core` clean at the
+  major bump (`v0.2.2 → v0.3.0 (major change)`,
+  `no semver update required`). ✓
 
 ---
 
