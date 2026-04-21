@@ -541,7 +541,8 @@ The inventory and what each wrapper covers:
 | `./scripts/check-api-breakage.sh <crate> [<baseline-version>]` | `cargo semver-checks check-release -p <crate> --baseline-version <ver>` | Per-crate; crates.io baseline (default: newest published). See §API breakage detection. |
 | `./scripts/publish-crate.sh [--dry-run] <crate>` | `cargo publish -p <crate>` + signed release tag | Enforces clean tree, branch-HEAD, no-existing-tag invariants. Tag created only on publish success. |
 | `./scripts/crate-version.sh <crate> \| --all` | Parses `version = "..."` from `<crate>/Cargo.toml` | Single-crate for programmatic use (`publish-crate.sh` consumes it); `--all` prints every workspace member's version. |
-| `./scripts/crates-io-versions.sh <crate>` | crates.io sparse-index query | Lists non-yanked published versions. Requires `curl` + `jq` (fails fast if missing). |
+| `./scripts/xtask.sh crates-io-versions -- <crate>` | crates.io sparse-index query | Lists non-yanked published versions. Rust bin in `xtask/` (using `ureq` + `serde_json`); replaces the former shell script, which depended on `jq` + `web-fetch.sh` — neither is part of stripped GNU/Linux or macOS baselines. |
+| `./scripts/xtask.sh <tool> -- <args>` | wrapper for in-tree Rust bins | Canonical invocation for any `xtask/` bin; supports `--list` and `--help`; mandatory `--` separates wrapper-level flags from bin args. Prefer over `cargo run -p xtask --bin <tool> --` direct calls. |
 | `./scripts/check-toolchain.sh [--update]` | `rustup check` / `rustup update` + version print | Step 0 of `pre-landing.sh`; run standalone to probe local drift against CI's `@stable`. |
 
 **Exempt**: read-only cargo queries have no wrapper and don't
@@ -595,10 +596,11 @@ The categories in play:
 
 | Category | Example | Home |
 |---|---|---|
-| Ad-hoc one-off in a terminal session | "generate a UUID for this constant" | Rust bin (`cargo run -p xtask --bin gen-uuid -- --v4`) — **never** `python3 -c "import uuid"` |
+| Ad-hoc one-off in a terminal session | "generate a UUID for this constant" | Rust bin (`./scripts/xtask.sh gen-uuid -- --v4`) — **never** `python3 -c "import uuid"` |
 | Non-baseline language reach | "parse YAML, walk DOM, emit Rust" | Rust bin in `xtask/` |
 | POSIX shell orchestration | "commit across submodules then push" | `scripts/*.sh` |
-| POSIX shell with `awk` / `jq` / `sed` | "list non-yanked versions from crates.io sparse index" | `scripts/*.sh` (e.g. `crates-io-versions.sh`) |
+| POSIX shell with `awk` / `sed` (baseline-present) | "enumerate workspace members from Cargo.toml" | `scripts/*.sh` (e.g. `lib/workspace-members.sh`) |
+| Depends on a marginal tool (`jq`, `curl`, `wget`) | "list non-yanked versions from crates.io" | Rust bin in `xtask/` — `jq` / curl / wget aren't on every stripped baseline; Rust has `serde_json` and `ureq` in-tree |
 | Trivial cargo wrapper | "fmt + check + clippy + test" | `scripts/*.sh` |
 | Non-trivial parsing / cross-file validation / stateful check | "verify no two entity KINDs collide across the workspace" | Rust bin in `xtask/` |
 
@@ -619,11 +621,21 @@ xtask/
         └── <future>.rs
 ```
 
-Each bin is invoked as:
+Each bin is invoked via the `xtask.sh` wrapper:
 
 ```bash
-cargo run -p xtask --bin <name> -- <args>
+./scripts/xtask.sh --list                   # list available tools
+./scripts/xtask.sh --help                   # wrapper help
+./scripts/xtask.sh <tool>                   # run with no args
+./scripts/xtask.sh <tool> -- <args>         # run with args (note the `--`)
 ```
+
+The mandatory `--` separator between the bin name and its
+arguments exists so future wrapper-level flags (e.g. a
+`--release` toggle) can't collide with a bin's own flag of the
+same name. Don't call `cargo run -p xtask --bin <name> --`
+directly at call sites — `xtask.sh` is the single invocation
+surface.
 
 ### Non-submodule member plumbing
 
@@ -644,7 +656,7 @@ algorithm identifiers, key IDs, any value that once committed
 must never change — is generated via:**
 
 ```bash
-cargo run -p xtask --bin gen-uuid -- --v4
+./scripts/xtask.sh gen-uuid -- --v4
 ```
 
 Not `python3 -c "import uuid"`, not `uuidgen`, not online
@@ -664,6 +676,70 @@ Usage in practice: when authoring a new entity kind (e.g.
 `TenantEndpointConfig`), run `gen-uuid --v4` once, paste the
 result into the Rust source as a `const KIND: Uuid = uuid!("…")`,
 and commit. Never regenerate.
+
+## Naming and terminology (FSF-preferred framing)
+
+Documentation, comments, commit messages, and any other
+workspace-authored prose follow FSF-preferred terminology. This
+is a soft rule — readability trumps dogma — but avoid the
+specific anti-patterns below. If you're unsure, match the rest
+of the surrounding text.
+
+### Operating systems and kernels
+
+- **GNU/Linux** for the GNU-userspace-plus-Linux-kernel
+  operating system, not just "Linux." Calling the whole system
+  "Linux" credits the kernel alone for userspace that's
+  largely GNU (libc, coreutils, binutils, bash, …).
+- **Linux kernel** (or "the kernel of Linux") when referring
+  specifically to the kernel. Don't use "Linux" as a shorthand
+  for the kernel when the kernel is what you mean.
+- **Non-GNU Linux-based systems** are named explicitly, not
+  collapsed into "Linux." Alpine is musl-based; Android is
+  Linux-based but distinct from GNU/Linux; BusyBox environments
+  are their own thing. Saying "works on Linux" papers over a
+  distribution family that really isn't uniform.
+- **`uname -s` string matches** are a pragmatic exception. When
+  shell code matches the literal kernel-identifier string
+  `Linux` (as in `case "$(uname -s)" in Linux) ... esac`),
+  writing `Linux` is accurate — that IS what the kernel returns
+  via `uname`. The rule targets human-facing prose, not
+  kernel-interface string literals.
+
+### Microsoft Windows
+
+- Write the full name — "Microsoft Windows" or just "Windows" —
+  in neutral prose. Don't abbreviate to `Win`, `win32`, `win64`,
+  or `WIN_` as a freeform shorthand; the abbreviation reads as
+  Microsoft "winning" against competing systems. The exception
+  is established technical identifiers that ship that way (the
+  Windows API is literally the `Win32` API; package identifiers
+  like `x86_64-pc-windows-msvc` have `windows` in them). Don't
+  fight those; don't invent new `win*`-prefixed abbreviations.
+
+### Free software vs. "open-source"
+
+- **"Free software"** (free as in freedom) when framing a
+  software-freedom position or classifying a license.
+- **"FLOSS"** (Free/Libre/Open-Source Software) as an inclusive
+  umbrella when both the free-software and open-source
+  communities are equally in scope — e.g. describing the broad
+  ecosystem of publicly-licensed code.
+- Avoid **"open-source"** as a standalone phrase when the intent
+  is user freedom. "Open-source" is the marketing framing that
+  intentionally sets the freedom argument aside. Use it when
+  quoting or referencing external conventions (the "Open Source
+  Initiative" is a proper noun; an "open-source license" is how
+  the OSI describes licenses on their approved list), not as the
+  default neutral term.
+
+### Enforcement
+
+A best-effort manual scan found three standalone-"open-source"
+uses and zero `win*` abbreviations in workspace docs at the
+time this section was added; they were reworded to FLOSS /
+free-software framing in the same commit that introduced this
+section.
 
 ## Pre-landing checks
 

@@ -83,8 +83,9 @@ a branch and open a PR"), stop and surface that — don't guess.
     signed release tag (Claude runs this, not you; it commits).
   - `./scripts/crate-version.sh <crate>` / `--all` — local
     version from Cargo.toml.
-  - `./scripts/crates-io-versions.sh <crate>` — published
-    versions from crates.io (requires `curl` + `jq`).
+  - `./scripts/xtask.sh crates-io-versions -- <crate>` —
+    published versions from crates.io (Rust bin; no external
+    `jq` / curl dep).
   - `./scripts/check-toolchain.sh` — rust toolchain state.
   If your task needs a cargo operation with no wrapper, surface
   that in your final summary rather than silently running raw
@@ -158,12 +159,13 @@ workspace:
   run python/perl from a script, prompt to a Rust bin extraction
   in your final summary rather than introducing the dep.
 - **UUID generation for stable wire-format constants always goes
-  through `cargo run -p xtask --bin gen-uuid -- --v4`.** Every
+  through `./scripts/xtask.sh gen-uuid -- --v4`.** Every
   `KIND: Uuid` constant, algorithm identifier, or any value that
   once committed must never change is minted through this tool.
-  Never `python3 -c "import uuid"`, `uuidgen`, or online
-  generators — the canonical source keeps randomness uniform
-  across sessions and machines.
+  Never `python3 -c "import uuid"`, `uuidgen`, online generators,
+  or direct `cargo run` — the canonical invocation path
+  (`xtask.sh` wrapper) keeps randomness uniform across sessions
+  and machines and leaves room to add pre-build caching later.
 - **Use the wrapper scripts for `mktemp` / `curl` / `wget`, not
   the raw tools.** These tools vary across minimal environments
   (Alpine busybox, FreeBSD, OpenBSD, macOS, WSL); the wrappers

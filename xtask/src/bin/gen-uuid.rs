@@ -10,7 +10,7 @@
 //! §KIND UUID generation` for the rule.
 //!
 //! Usage:
-//!   cargo run -p xtask --bin gen-uuid -- --v4
+//!   ./scripts/xtask.sh gen-uuid -- --v4
 //!
 //! `--v4` is mandatory on purpose. Every KIND we mint in this
 //! workspace is a v4 random UUID; requiring the version-flag

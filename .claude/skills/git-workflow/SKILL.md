@@ -152,12 +152,15 @@ Internal helper; used by `publish-crate.sh`. Pass `--all` instead
 of a crate name to list every submodule's name and version in one
 aligned pass — handy when preparing a multi-crate release.
 
-### `scripts/crates-io-versions.sh <crate>`
-Lists the published (non-yanked) versions of a crate on crates.io
-by querying the sparse index directly. Complements
+### `scripts/xtask.sh crates-io-versions -- <crate>`
+Lists the published (non-yanked) versions of a crate on
+crates.io by querying the sparse index directly. Complements
 `crate-version.sh`: local vs. already-published state.
-**Requires `curl` and `jq`** — not part of the workspace baseline;
-the script bails with a clear message if either is missing.
+Implemented as a Rust bin in `xtask/` (uses `ureq` +
+`serde_json` internally — no dependency on `jq` or
+`web-fetch.sh`, both of which are out of baseline on stripped
+GNU/Linux and macOS installs). Replaces the former
+`crates-io-versions.sh`.
 
 ## Decision tree
 

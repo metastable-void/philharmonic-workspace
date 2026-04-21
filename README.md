@@ -263,15 +263,18 @@ Invoke by path (`./scripts/foo.sh`), not via `bash`.
   to list every workspace submodule's name and version in one
   pass — handy for a quick at-a-glance view when preparing a
   multi-crate release.
-- `./scripts/crates-io-versions.sh <crate>` — lists the
-  published, non-yanked versions of a crate on crates.io (one
-  per line, oldest first) by querying the sparse index
+- `./scripts/xtask.sh crates-io-versions -- <crate>` — lists
+  the published, non-yanked versions of a crate on crates.io
+  (one per line, oldest first) by querying the sparse index
   directly. Complements `crate-version.sh`: local version vs.
   what's already on crates.io. Useful for release prep ("is
   this version free?", "was an earlier release yanked?").
-  Requires `curl` AND `jq` on PATH — these aren't part of the
-  workspace baseline, so the script fails fast with a clear
-  message if either is missing.
+  Implemented as a Rust bin in `xtask/` (not a shell script —
+  the old `crates-io-versions.sh` depended on `jq` and
+  `web-fetch.sh`, which are out of baseline on stripped
+  GNU/Linux and macOS installs). See [§`xtask` and KIND UUID
+  generation](#xtask-and-kind-uuid-generation) below for how the
+  wrapper works.
 - `./scripts/show-dirty.sh` — prints the names of dirty
   submodules, one per line. Machine-readable (used internally by
   `pre-landing.sh`); no decoration or status lines, empty output
@@ -302,12 +305,21 @@ Invoke by path (`./scripts/foo.sh`), not via `bash`.
   via `trap 'rm -f "$tmp"' EXIT INT HUP TERM` — the wrapper
   doesn't clean up for you. Never call `mktemp` directly from a
   workspace script.
+- `./scripts/xtask.sh` — canonical wrapper for bins in the
+  in-tree `xtask/` dev-tooling crate. `--list` enumerates
+  available bins; `--help` shows usage. Bin args go after `--`:
+  `./scripts/xtask.sh <tool> -- <args>`. Prefer this over
+  `cargo run -p xtask --bin <tool> --` directly so the
+  invocation surface stays consistent. See
+  [§`xtask` and KIND UUID generation](#xtask-and-kind-uuid-generation)
+  for the current bins.
 - `./scripts/web-fetch.sh <URL> [<outfile>]` — workspace-
-  canonical HTTP(S) GET. Tries `curl` → `wget` → `fetch` (FreeBSD)
-  → `ftp` (OpenBSD HTTP mode); UA overridable via `WEB_FETCH_UA`.
-  Body goes to stdout by default, or to `<outfile>` if given.
-  All backends fail on HTTP 4xx/5xx (curl is invoked with `-f`);
-  use `./scripts/web-fetch.sh ... || :` at the call site if you
+  canonical HTTP(S) GET for shell callers. Tries `curl` →
+  `wget` → `fetch` (FreeBSD) → `ftp` (OpenBSD HTTP mode); UA
+  overridable via `WEB_FETCH_UA`. Body goes to stdout by
+  default, or to `<outfile>` if given. All backends fail on
+  HTTP 4xx/5xx (curl is invoked with `-f`); use
+  `./scripts/web-fetch.sh ... || :` at the call site if you
   want to tolerate HTTP errors. Never call `curl`/`wget`
   directly from a workspace script.
 
@@ -424,12 +436,23 @@ and is not a target for extraction — the existing
 [`docs/design/13-conventions.md`](docs/design/13-conventions.md)
 §In-tree workspace tooling for the decision table.
 
+Invoke tools via the **`./scripts/xtask.sh`** wrapper — don't
+call `cargo run -p xtask --bin <tool>` directly at call sites.
+The wrapper gives a consistent surface (`--list`, `--help`,
+mandatory `--` separator before bin args) and is the single
+place to add pre-build caching or release-mode toggles later.
+
+```bash
+./scripts/xtask.sh --list                   # list available tools
+./scripts/xtask.sh <tool> -- <args...>      # run <tool> with args
+```
+
 Current bins:
 
 - **`gen-uuid`** — generate a UUID and print it to stdout.
-  Usage: `cargo run -p xtask --bin gen-uuid -- --v4`.
-  `--v4` is mandatory so the version choice is always explicit
-  at the call site.
+  Usage: `./scripts/xtask.sh gen-uuid -- --v4`. `--v4` is
+  mandatory so the version choice is always explicit at the
+  call site.
 
   **Every stable wire-format UUID in this workspace is generated
   via this tool** — entity `KIND` constants, algorithm
@@ -439,6 +462,13 @@ Current bins:
   uniform across sessions and machines. See
   [`docs/design/13-conventions.md`](docs/design/13-conventions.md)
   §KIND UUID generation for the rule.
+- **`crates-io-versions`** — list published, non-yanked versions
+  of a crate on crates.io, one per line. Usage:
+  `./scripts/xtask.sh crates-io-versions -- <crate>`. Queries
+  the sparse index directly via `ureq` + `serde_json` — no
+  dependency on `jq` or `web-fetch.sh`, so it works on stripped
+  GNU/Linux and macOS baselines where neither is installed.
+  Replaces the former `scripts/crates-io-versions.sh`.
 
 ## AI-assisted development
 
@@ -658,13 +688,16 @@ Declared in workspace policy and mirrored in each crate manifest.
 All crates are dual-licensed under `Apache-2.0 OR MPL-2.0` at the
 consumer's choice:
 
-- **Apache-2.0**: standard permissive open-source license with patent
-  grants.
-- **MPL-2.0**: file-level copyleft, FSF-compatible, GPL-2.0+
-  compatible via the secondary license clause.
+- **Apache-2.0**: standard permissive free software license with
+  patent grants. Classified as FLOSS by OSI and FSF.
+- **MPL-2.0**: file-level copyleft, FSF-compatible (listed as a
+  free software license), GPL-2.0+ compatible via the secondary
+  license clause.
 
 This dual-license combination covers more deployment scenarios than
-the common `Apache-2.0 OR MIT` while staying clearly open-source.
+the common `Apache-2.0 OR MIT` while keeping every crate squarely
+in the free software / FLOSS category (both chosen licenses are on
+the FSF's approved list).
 
 Individual crates carry their own `LICENSE` files under each
 submodule. The workspace repository itself carries copies for

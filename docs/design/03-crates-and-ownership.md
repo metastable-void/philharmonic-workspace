@@ -204,10 +204,12 @@ implies JS-executor concerns these crates don't have.
 All crates: `Apache-2.0 OR MPL-2.0`.
 
 The dual license gives consumers choice: Apache-2.0 (standard
-permissive with patent grants) or MPL-2.0 (file-level copyleft,
-FSF-compatible, GPL-2.0+ compatible via secondary license clause).
-This combination covers more deployment scenarios than the common
-`Apache-2.0 OR MIT` while staying clearly open source.
+permissive free software license with patent grants) or MPL-2.0
+(file-level copyleft, FSF-compatible, GPL-2.0+ compatible via
+the secondary license clause). This combination covers more
+deployment scenarios than the common `Apache-2.0 OR MIT` while
+keeping every crate firmly in the free software / FLOSS category
+(both licenses on the FSF's approved list).
 
 ## Repository structure
 
