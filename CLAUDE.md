@@ -144,6 +144,17 @@ Developer: Yuka MORI.
   cannot. See docs/design/13-conventions.md §Panics and
   undefined behavior for the full rule with examples and the
   list of relevant future-Clippy lints.
+- **Library crates take bytes, not file paths.** A library's
+  public API accepts data (byte slices, pre-parsed structs,
+  `Zeroizing<[u8; N]>` for private-key material) — never a
+  `&Path`, filename, environment-variable name, or config-file
+  path. File I/O, file-permission checks, environment lookup,
+  and config-file parsing belong in the bin crate that holds
+  the library's runtime context. The rule applies across the
+  workspace and is a Gate-1 smell for crypto-adjacent APIs in
+  particular. See docs/design/13-conventions.md §Library crate
+  boundaries for the rule, rationale, and concrete examples
+  (secret keys, trust stores, TLS certs, config structs).
 - **Never recall a Rust crate's published version from memory
   — always look it up via
   `./scripts/xtask.sh crates-io-versions -- <crate>`.**

@@ -1,14 +1,32 @@
 # Gate-1 proposal — Phase 5 Wave A: COSE_Sign1 connector authorization tokens
 
 **Date:** 2026-04-22
-**Revision:** 2 (revised 2026-04-22 after Codex's security review)
+**Revision:** 3 (revised 2026-04-22 after Yuka's Gate-1 sign-off)
 **Phase:** 5 (connector triangle), Wave A (signing-only half)
 **Author:** Claude Code (on Yuka's review queue)
-**Status:** Awaiting Gate-1 sign-off — no implementation yet
+**Status:** **Gate-1 approved 2026-04-22** — implementation unblocked
+**Approval record:** `docs/design/crypto-approvals/2026-04-22-phase-5-wave-a-cose-sign1-tokens.md`
 **Wave split decision:** ROADMAP §Phase 5 (commit `e292918`)
 **Security review:** `docs/codex-reports/2026-04-22-0003-phase-5-wave-a-cose-sign1-tokens-security-review.md`.
-Resolutions are summarized in §"Codex security review resolutions"
-at the end of this document; the body has been updated inline.
+Resolutions are summarized in §"Codex security review resolutions";
+the body is updated inline.
+
+## Revisions
+
+- **r1** (2026-04-22): first draft.
+- **r2** (2026-04-22): applied six of seven findings from Codex's
+  independent design-level security review; documented the
+  stateless-replay threat-model decision.
+- **r3** (2026-04-22): Gate-1 approved by Yuka with a workspace-
+  level caveat — library crates take bytes, not file paths.
+  Refactored the minting-side and registry sections accordingly
+  (the `philharmonic-connector-client` and
+  `philharmonic-connector-service` lib APIs accept bytes; file I/O
+  and permission checks live in the respective bin crates). Open
+  Questions resolved: Q1 → option (a), Q2 → pycose 2.x approved.
+  The workspace rule itself landed in
+  `docs/design/13-conventions.md` §Library crate boundaries and
+  a short bullet in `CLAUDE.md`.
 
 ## Scope
 
@@ -296,64 +314,81 @@ narrowed, already-verified interface.
 
 ### Minting side (lowerer)
 
-Each lowerer binary loads its Ed25519 keypair at boot:
+Per workspace convention §Library crate boundaries, file I/O and
+permission checks live in the lowerer **bin** crate. The
+`philharmonic-connector-client` **library** accepts the seed
+bytes and nothing filesystem-shaped.
 
-- Source: a file path in the lowerer's configuration
-  (`signing_key_path`). 32-byte seed; PEM or raw binary —
-  decide at implementation time, default to raw binary for
-  simplicity.
-- **File-permission check before the read.** On Unix
-  (`cfg(unix)`), `stat(2)` the file and fail closed unless:
+**Library API** (`philharmonic-connector-client`):
+
+```rust
+pub struct LowererSigningKey {
+    seed: Zeroizing<[u8; 32]>,
+    kid: String,
+}
+
+impl LowererSigningKey {
+    /// Construct from a 32-byte Ed25519 seed. The seed is owned
+    /// by the `Zeroizing` wrapper and zeroed on drop.
+    pub fn from_seed(seed: Zeroizing<[u8; 32]>, kid: String) -> Self;
+
+    pub fn kid(&self) -> &str;
+
+    pub fn mint_token(
+        &self,
+        claims: &ConnectorTokenClaims,
+    ) -> Result<ConnectorSignedToken, MintError>;
+}
+```
+
+Per the resolution of Open Question #1 (option a, approved
+2026-04-22), the library holds the raw 32-byte seed in
+`Zeroizing<[u8; 32]>` and reconstructs a transient
+`ed25519_dalek::SigningKey` via `SigningKey::from_bytes` on
+every `mint_token` call. Ed25519 key schedule is cheap; at
+lowerer throughput (one sign per connector call) the overhead
+is negligible and zeroization is guaranteed by
+`Zeroizing::drop`.
+
+**Binary responsibilities** (lowerer bin crate — wherever the
+lowerer's `main` lives):
+
+- Read the configured seed source (typically a file path from
+  the lowerer's config; could equally be an env var, a KMS
+  fetch, or stdin in a test harness).
+- If the source is a filesystem path, perform a
+  **file-permission check** before the read. On `cfg(unix)`,
+  `stat(2)` the file and fail closed unless:
   - the owning uid matches the current process's uid (i.e. the
     key file isn't owned by someone else), AND
-  - the mode's group and other bits are both zero (i.e.
-    `mode & 0o077 == 0`, matching the 0600 / 0400 class).
-  Non-compliant permissions → the lowerer refuses to start with
-  `SigningKeyFilePermissions` error, naming the file and the
-  observed mode. On Windows (not a supported production host;
-  see conventions), skip the check with a warning. This catches
-  world- or group-readable key files, which on multi-user or
-  misconfigured hosts are the most common secret-exfiltration
-  path. (The check is analogous to OpenSSH's client
-  `StrictHostKeyChecking`-adjacent file-mode refusals.)
-- Read bytes into `Zeroizing<[u8; 32]>` immediately after the
-  file read; `std::fs::read` returns `Vec<u8>` which lives
-  long enough for a `copy_from_slice` into the zeroized
-  buffer, then drop the `Vec`.
-- Construct `ed25519_dalek::SigningKey::from_bytes(&buf)`. The
-  `SigningKey` type itself does not zeroize on drop (as of
-  2.2.0); wrap it in a local `Zeroizing`-aware newtype at the
-  lowerer's public surface:
+  - `mode & 0o077 == 0` (no group or other bits — matching the
+    0600 / 0400 class).
+  Non-compliant permissions → the bin refuses to start,
+  surfacing the file path and the observed mode in an operator-
+  readable error. Analogous to OpenSSH's client file-mode
+  refusals. On Microsoft Windows (not a supported production
+  host; see conventions), the bin may skip the check with a
+  warning.
+- Read bytes into `Zeroizing<[u8; 32]>` (the bin can use a
+  scratch `Vec<u8>`, `copy_from_slice` into the zeroized
+  buffer, and drop the `Vec` — or go straight into the fixed
+  buffer if the reader allows).
+- Hand the `Zeroizing<[u8; 32]>` to
+  `LowererSigningKey::from_seed`, which now owns the zeroizing
+  buffer for the remainder of the process lifetime.
 
-  ```rust
-  pub struct LowererSigningKey {
-      inner: SigningKey,   // ed25519_dalek type
-      kid: String,
-  }
-
-  impl Drop for LowererSigningKey {
-      fn drop(&mut self) {
-          // SigningKey::to_bytes returns a [u8; 32] snapshot we
-          // can zero; but the internal field is private, so we
-          // zero a copy and rely on the Drop-on-move semantics
-          // of the inner SigningKey itself. Flag for Yuka: is
-          // the implicit zero-before-drop in SigningKey sufficient,
-          // or do we need to patch ed25519-dalek for explicit
-          // zeroization? See Open Questions §1 below.
-      }
-  }
-  ```
-
-  **This is Open Question #1 below.** Pending Yuka's guidance,
-  the default plan is to use `secrecy::SecretBox<[u8; 32]>`
-  holding the seed and regenerating the `SigningKey` on each
-  sign call — slower but guaranteed zeroization. Benchmarks
-  TBD.
+This split keeps `philharmonic-connector-client` unit-testable
+with in-memory seeds (the RFC 8032 test vector seed for Wave A's
+known-answer tests), free of filesystem-portability concerns,
+and composable with non-file secret sources.
 
 ### Verifying side (service)
 
-The `philharmonic-connector-service` holds a
-`MintingKeyRegistry`:
+Same split: file I/O and config parsing live in the service
+**bin**; the `philharmonic-connector-service` **library**
+exposes a programmatic registry.
+
+**Library API** (`philharmonic-connector-service`):
 
 ```rust
 pub struct MintingKeyEntry {
@@ -367,23 +402,31 @@ pub struct MintingKeyRegistry {
 }
 
 impl MintingKeyRegistry {
-    pub fn lookup(&self, kid: &str) -> Option<&MintingKeyEntry>;
+    pub fn new() -> Self;
     pub fn insert(&mut self, kid: String, entry: MintingKeyEntry);
+    pub fn lookup(&self, kid: &str) -> Option<&MintingKeyEntry>;
 }
 ```
 
 Public keys are **not** sensitive and don't need zeroization.
 
-Registered at boot from a config file (one entry per minting
-authority, each with `kid`, `public_key_hex`, `not_before`,
-`not_after`). Rotation is additive: a new kid gets a new
-`MintingKeyEntry` inserted; old kids stay registered until
-all in-flight tokens issued under them have expired.
-`not_before` / `not_after` are **enforced** at verification
-time (see verify step 4 above) — they are not advisory. This
-means a future-dated key cannot be used early, and an operator
-can retire a kid cleanly by setting `not_after` in the past
-without needing to synchronously remove the entry.
+The library ships no `load_from_file`, `load_from_toml`, or
+similar. The service **bin** is responsible for whatever
+configuration format it chooses (TOML, JSON, env-derived, KMS-
+backed) — it parses that format, constructs `MintingKeyEntry`
+values, and calls `insert` per minting authority at boot. This
+keeps the library independent of any particular config
+serialization choice, and keeps Wave A's unit tests free of
+fixture files.
+
+Rotation is additive: a new kid gets a new `MintingKeyEntry`
+inserted; old kids stay registered until all in-flight tokens
+issued under them have expired. `not_before` / `not_after` are
+**enforced** at verification time (see verify step 4 above) —
+they are not advisory. A future-dated key cannot be used early,
+and an operator can retire a kid cleanly by setting
+`not_after` in the past without synchronously removing the
+entry.
 
 ### `kid` encoding
 
@@ -396,14 +439,23 @@ wire format — the registry uses exact-string equality.
 
 **Private keys only** (public keys need no zeroization):
 
-- `Zeroizing<[u8; 32]>` on the seed buffer between file read
-  and `SigningKey::from_bytes` call.
-- `LowererSigningKey` wrapper (see Open Questions §1 for the
-  SigningKey-specific zeroization story).
+- `Zeroizing<[u8; 32]>` owns the 32-byte Ed25519 seed. The
+  lowerer bin allocates and populates it (see §"Minting side")
+  and hands ownership to `LowererSigningKey::from_seed`. The
+  library holds the `Zeroizing` wrapper for its lifetime; when
+  the `LowererSigningKey` drops, the seed is zeroed.
+- Every `mint_token` call reconstructs a transient
+  `ed25519_dalek::SigningKey` via
+  `SigningKey::from_bytes(seed.as_ref())` and drops it at end-
+  of-call. This is the approved pattern per Open Question #1
+  (option a, resolved 2026-04-22): `ed25519_dalek::SigningKey`
+  does not itself zeroize on drop in 2.x, so we never keep one
+  around — the authoritative copy of key material lives only
+  in our `Zeroizing` wrapper.
 - Signing-time intermediates (the `r` nonce in Ed25519) are
   derived inside `ed25519-dalek` and aren't exposed to our
-  code, so there's nothing for us to zero. This is fine —
-  the library is the trusted boundary.
+  code, so there's nothing for us to zero. The library is the
+  trusted boundary here.
 
 ## Test-vector plan
 
@@ -515,10 +567,13 @@ reject path.
    `unsafe` internally (via its RustCrypto dependency chain);
    we don't add any of our own.
 
-3. **Key handling that can't be zeroized.** See Open Question
-   §1 — `ed25519_dalek::SigningKey` doesn't itself implement
-   `Zeroize`. Two fallback approaches proposed; awaiting
-   Yuka's preference.
+3. **Key handling that can't be zeroized.** None in the
+   landed design. `ed25519_dalek::SigningKey` (2.x) doesn't
+   itself implement `Zeroize`, so we never hold one longer
+   than a single `mint_token` call — the authoritative copy of
+   key material lives in our `Zeroizing<[u8; 32]>` wrapper,
+   and the transient `SigningKey` is reconstructed per sign.
+   See §"Resolved open questions" #1.
 
 4. **Signatures over untrusted input.** The sign side takes
    trusted input (engine-assembled claim values), so
@@ -529,62 +584,66 @@ reject path.
    signature check passes, which is standard COSE /
    JWT-equivalent discipline.
 
-## Open questions
+## Resolved open questions
 
-1. **Ed25519 private-key zeroization.** `ed25519_dalek::SigningKey`
-   (version 2.x) does not implement `Zeroize` or zero its
-   internal secret on drop. Options:
+All three Open Questions from r1/r2 are resolved. Retained here
+for archaeology.
 
-   - (a) Hold the raw 32-byte seed in a `Zeroizing<[u8; 32]>`
-     and reconstruct the `SigningKey` via `from_bytes` on
-     every sign call. Costs a key schedule per sign; at
-     lowerer throughput (one sign per connector call) this is
-     negligible.
-   - (b) Cache the `SigningKey` and manually zero its
-     internal state at drop via a custom wrapper. Requires
-     access to `ed25519-dalek` internals we don't control;
-     fragile.
-   - (c) Accept that the `SigningKey` lives in RAM for the
-     process lifetime and trust Linux's process-isolation
-     boundary. Simplest, weakest.
+1. **Ed25519 private-key zeroization → option (a).** Resolved
+   2026-04-22 by Yuka at Gate-1. Hold the raw 32-byte seed in
+   `Zeroizing<[u8; 32]>`; reconstruct the transient
+   `ed25519_dalek::SigningKey` via `from_bytes` on every sign
+   call. One key schedule per sign; at Wave A lowerer
+   throughput (one sign per connector call) the overhead is
+   negligible, and zeroization is guaranteed by
+   `Zeroizing::drop`. Rejected alternatives: caching a
+   `SigningKey` with a custom drop-zero wrapper (fragile —
+   requires access to `ed25519-dalek` internals we don't
+   control), and accepting process-lifetime residency
+   (weakest).
 
-   **My lean: (a).** The cost is trivial, the zeroization is
-   guaranteed, the wrapper is a few lines. Want Yuka's call
-   before implementation.
+2. **`pycose` 2.x as cross-check reference → approved.**
+   Resolved 2026-04-22 by Yuka at Gate-1. Vector generation
+   and cross-implementation cross-check will run Python
+   `pycose` 2.x against the Rust implementation for the final
+   COSE_Sign1 bytes.
 
-2. **`pycose` cross-check for the COSE_Sign1 vector.** The
-   vector plan assumes we have a non-Rust reference
-   implementation to cross-check against for the canonical
-   CBOR / COSE_Sign1 bytes. `pycose` 2.x (Python) is the
-   obvious candidate. Flagging because it's the one external
-   tool in the plan — if Yuka wants a different reference
-   (e.g. `go-cose`), say so and I'll adjust.
-
-3. ~~**`subtle` crate for constant-time `payload_hash`
-   compare.**~~ **Decided (r2):** use `subtle = "2"` for the
-   `payload_hash` equality in verify step 10. Already in the
-   dep tree transitively via `ed25519-dalek`, so no new runtime
-   surface. Closing.
+3. **`subtle` crate for constant-time `payload_hash`
+   compare → approved.** Resolved in r2. Use `subtle = "2"`
+   for the `payload_hash` equality in verify step 10. Already
+   in the dep tree transitively via `ed25519-dalek`, so no new
+   runtime surface.
 
 ## What lands (Wave A)
 
-Source files (no code written yet):
+Library source files (no code written yet):
 
-- `philharmonic-connector-client/src/signing.rs` — `LowererSigningKey`
-  + `mint_token`.
+- `philharmonic-connector-client/src/signing.rs` —
+  `LowererSigningKey` (`from_seed(Zeroizing<[u8;32]>, kid)`)
+  and `mint_token`. No file I/O.
 - `philharmonic-connector-service/src/verify.rs` —
-  `MintingKeyRegistry` + `verify_token`.
+  `MintingKeyRegistry` (`new` / `insert` / `lookup`) and the
+  `verify_token` function. No file I/O, no config-file
+  parsing.
 - `philharmonic-connector-service/src/context.rs` — the
   verified `ConnectorCallContext` construction from claim
   fields.
 - Tests: `philharmonic-connector-client/tests/signing_vectors.rs`,
   `philharmonic-connector-service/tests/verify_vectors.rs`,
-  `tests/vectors/*.hex` / `*.json` committed alongside.
+  `tests/vectors/*.hex` / `*.json` committed alongside. All
+  tests feed bytes in directly — no fixture files on disk at
+  the library boundary.
 
-What does not ship in Wave A:
+What does **not** land in Wave A:
 
-- No `ConfigLowerer` impl (that's Wave B, which needs
-  encryption to produce the payload bytes).
+- File-reading / permission-checking code for the lowerer seed
+  file. That's a lowerer-bin concern and lands with the
+  lowerer binary (not yet scoped in this workspace —
+  `philharmonic-lowerer` is a later phase).
+- Config-file parsing for the service's `MintingKeyRegistry`.
+  Same reason: service-bin concern.
+- No `ConfigLowerer` connector impl (that's Wave B, which
+  needs encryption to produce the payload bytes).
 - No publish — crates stay at `0.0.0` until Wave B's
   end-to-end tests pass.
 
@@ -602,7 +661,7 @@ finding:
 | 2 | `not_before` / `not_after` on registry entries defined but not checked at verify | HIGH | **Fixed.** Enforced at verify step 4 (`KeyOutOfWindow`). Registry now carries an explicit `MintingKeyEntry` with the window. |
 | 3 | No audience binding; optional `realm` check; weak issuer-key binding | HIGH | **Partially fixed.** Realm check is now mandatory at verify step 11 (`RealmMismatch`). No `aud` claim added — `realm` acts as audience in this architecture. Issuer-bound registry entries not adopted for v1 (small benefit, adds operator config; revisit if a concrete issuer-confusion scenario surfaces). |
 | 4 | `alg` not explicitly pinned on verify | MEDIUM | **Fixed.** Explicit `alg == -8` (EdDSA) check at verify step 2 (`AlgorithmNotAllowed`). |
-| 5 | Signing-key file handling omits permission checks | MEDIUM | **Fixed.** 0600-class permission + matching-uid check before the file read on `cfg(unix)`. `SigningKeyFilePermissions` error on mismatch. |
+| 5 | Signing-key file handling omits permission checks | MEDIUM | **Fixed.** 0600-class permission + matching-uid check before the file read on `cfg(unix)`. In r3 this check lives in the **lowerer bin**, not `philharmonic-connector-client` — the library now accepts a seed byte buffer and does no file I/O (see §"Minting side" and conventions §Library crate boundaries). |
 | 6 | Unbounded payload hashing (DoS pressure) | MEDIUM | **Fixed.** Hard `MAX_PAYLOAD_BYTES` ceiling (default 1 MiB) enforced at verify step 5 before the SHA-256 work (`PayloadTooLarge`). |
 | 7 | Duplicated `kid` in protected header and claims without equality check | LOW | **Fixed.** Equality check at verify step 8 (`KidInconsistent`). Keeping both locations because `ConnectorTokenClaims` ships in `philharmonic-connector-common 0.1.0` with `kid` already in the claim set; removing it would be an API break we don't want mid-v1. |
 
@@ -613,20 +672,39 @@ decision documented in §"Replay threat model". The report's
 `alg`/`kid`, explicit negative vector planning) all carried
 through into r2.
 
-## Requesting Gate-1 approval
+## Gate-1 outcome
 
-For this proposal to unblock dispatch:
+Approved by Yuka on 2026-04-22. See
+`docs/design/crypto-approvals/2026-04-22-phase-5-wave-a-cose-sign1-tokens.md`
+for the approval record.
 
-- Confirm or adjust the two remaining Open Questions (#1
-  zeroization approach, #2 cross-check reference). #3 is
-  decided.
-- Confirm the replay threat-model decision in §"Replay threat
-  model" — stateless, exp-bound, impl-layer idempotency.
-- Confirm the revised 11-step verification order and, in
-  particular, the post-review additions (alg pin, key window,
-  payload size ceiling, kid equality, mandatory realm).
-- Flag any field of the claim set you want CBOR-encoded
-  differently than the defaults (e.g. `Uuid` as text vs.
-  bytes).
-- Say "Gate-1 approved" and I'll archive the Codex prompt +
-  dispatch. No code before that.
+Approval included one workspace-level caveat — library crates
+take bytes, not file paths. The r3 minting-side and registry
+sections reflect that split; the general rule landed in
+`docs/design/13-conventions.md` §Library crate boundaries and
+as a bullet in `CLAUDE.md`.
+
+Open Questions:
+
+- **#1 zeroization approach** → option (a): seed in
+  `Zeroizing<[u8; 32]>`, `SigningKey` reconstructed per sign.
+- **#2 cross-check reference** → pycose 2.x approved.
+- **#3 `subtle` for `payload_hash` compare** → approved in r2.
+
+Replay threat-model (§"Replay threat model") and the 11-step
+verification order (§"Service-side verification order") were
+approved as proposed in r2.
+
+## Next steps
+
+1. Archive the Codex implementation prompt for Wave A at
+   `docs/codex-prompts/YYYY-MM-DD-NNNN-phase-5-wave-a-...md`
+   per the codex-prompt-archive skill. The prompt must link
+   this proposal and the approval record, spell out the 10
+   negative vectors, and carry the test-vector seed + claim
+   set as committed hex (so Codex is not generating the
+   reference values it's being verified against).
+2. Dispatch Codex via the `codex:codex-rescue` plugin.
+3. Gate-2 review on the returned code before any
+   `cargo publish`. The crates stay at `0.0.0` through Wave A;
+   publish happens when Wave B lands and end-to-end tests pass.

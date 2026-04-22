@@ -1128,6 +1128,59 @@ Reasoning:
 Example: `philharmonic-store` (traits) + `philharmonic-store-sqlx-
 mysql` (SQL impl); not `philharmonic-store` with `mysql` feature.
 
+## Library crate boundaries
+
+Library crates expose data-taking APIs, not path-taking APIs.
+When a secret or a config input is needed, the library accepts
+the **bytes** (or a pre-parsed struct) — not a `&Path`, not a
+filename, not an environment-variable name, not a config-file
+path. File I/O, file-permission checks, environment lookup,
+config-file parsing, and CLI-argument handling belong in the
+bin crate that holds the library's runtime context.
+
+Reasoning:
+
+- **Testability.** A lib that takes bytes is unit-tested with
+  fixture bytes — no tempfile, no filesystem permissions, no
+  racing tests for a shared file.
+- **Portability.** File-permission semantics differ across
+  Unix, Microsoft Windows, and WASI. A lib that reads files
+  carries that portability burden; a lib that takes bytes
+  doesn't.
+- **Composability.** Consumers that fetch secrets from a key
+  manager, a KMS, or an environment variable can use the lib
+  without pretending the bytes came from a file.
+- **Config-surface discipline.** Config files are an
+  application concern — serialization format, schema versioning,
+  backward-compat story. A library that reads config files
+  ships opinions the downstream binary may not share.
+
+Concretely:
+
+- **Secret keys.** Libraries take a pre-read byte slice (or
+  `Zeroizing<[u8; N]>` for private-key material). The bin
+  crate does the file read and any file-permission check.
+- **Public-key registries, trust stores.** Libraries expose
+  programmatic insertion (`insert(kid, entry)`) rather than
+  `load_from_config_file(path)`. The bin parses whatever
+  config format it chose (TOML, JSON, env-derived, KMS-backed)
+  and calls insert.
+- **TLS certs, CA bundles.** Same pattern — libraries accept
+  bytes or pre-parsed types, not paths.
+- **Runtime config structs.** Libraries accept a populated
+  `Config { ... }` value. The bin decides whether that value
+  came from a TOML file, command-line flags, or the
+  environment.
+
+Exception: bin crates may (and should) layer a thin
+configuration surface over a library. The rule is about which
+crate owns file I/O, not about banning config files in the
+workspace. It also does **not** apply to `dev-dependencies` or
+in-`tests/` helpers — a test may freely read a fixture file.
+
+The crypto-review skill's Gate-1 checks treat any file-path-
+taking crypto library API as a smell to flag explicitly.
+
 ## Re-export discipline
 
 Crates re-export types from their direct dependencies that appear in
