@@ -95,4 +95,4 @@ if [ ! -f "$bins_dir/$tool.rs" ]; then
     exit 1
 fi
 
-exec cargo run --quiet -p xtask --bin "$tool" -- "$@"
+exec cargo xtask "$tool" -- "$@"

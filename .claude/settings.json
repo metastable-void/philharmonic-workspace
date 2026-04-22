@@ -13,7 +13,8 @@
       "Read(//tmp/**)",
       "Bash(./scripts/rust-test.sh --ignored philharmonic-policy)",
       "Bash(cargo fmt *)",
-      "Bash(./scripts/pre-landing.sh --no-ignored philharmonic-types)"
+      "Bash(./scripts/pre-landing.sh --no-ignored philharmonic-types)",
+      "Bash(./scripts/xtask.sh gen-uuid *)"
     ],
     "additionalDirectories": [
       "/tmp"
