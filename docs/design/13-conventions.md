@@ -67,7 +67,7 @@ Peer crates within the workspace pin loosely to each other
 
 **Pinning to a patch version.** When a crate relies on a feature
 or fix introduced in a specific patch, pin to that exact patch
-(`philharmonic-types = "0.3.3"`) so `cargo` refuses to resolve
+(`philharmonic-types = "0.3.4"`) so `cargo` refuses to resolve
 against an older patch that lacks the required feature. This is
 the *only* reason to tighten beyond a minor pin; don't pin to a
 patch for hygiene or habit. When the dependency publishes a

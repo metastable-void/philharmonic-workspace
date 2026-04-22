@@ -352,11 +352,15 @@ file inventory):
   enforced `-s` signoff and `-S` GPG/SSH signing; rollback on
   unsigned commits), `push-all.sh` (`--follow-tags`), `heads.sh`,
   `check-detached.sh`, `show-dirty.sh`, `test-scripts.sh` (POSIX
-  parse check), `rust-lint.sh`, `rust-test.sh`, `pre-landing.sh`
-  (mandated pre-landing driver), `check-toolchain.sh`,
-  `check-api-breakage.sh`, `publish-crate.sh`, `cargo-audit.sh`,
-  `crate-version.sh`, `codex-status.sh`, `print-audit-info.sh`
-  (audit-trailer generator invoked once by `commit-all.sh`),
+  parse check), `rust-lint.sh`, `rust-test.sh`, `miri-test.sh`
+  (routine `cargo +nightly miri test` for UB checks,
+  `<crate> [<test>...]` shape), `pre-landing.sh` (mandated
+  pre-landing driver), `check-toolchain.sh`,
+  `check-api-breakage.sh`, `publish-crate.sh`, `verify-tag.sh`
+  (three-way post-release check: local + signed + pushed to
+  origin at same SHA), `cargo-audit.sh`, `crate-version.sh`,
+  `codex-status.sh`, `print-audit-info.sh` (audit-trailer
+  generator invoked once by `commit-all.sh`),
   `mktemp.sh` / `web-fetch.sh` (portability wrappers — never
   call raw `mktemp` / `curl` / `wget` from workspace scripts),
   `xtask.sh` (invocation wrapper for the in-tree `xtask/` crate;

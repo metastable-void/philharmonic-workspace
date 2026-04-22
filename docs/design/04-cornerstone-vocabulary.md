@@ -1,7 +1,7 @@
 # Cornerstone Vocabulary (`philharmonic-types`)
 
 The workspace's shared vocabulary crate. Stable, narrow, depended on
-by everything else. Currently at v0.3.3.
+by everything else. Currently at v0.3.4.
 
 ## What's in it
 

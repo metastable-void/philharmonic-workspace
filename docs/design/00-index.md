@@ -89,13 +89,14 @@ Published and stable:
 - `philharmonic-types` (cornerstone)
 - `philharmonic-store` (substrate traits)
 - `philharmonic-store-sqlx-mysql` (SQL backend)
+- `mechanics-config` (Boa-free schema types)
 - `mechanics-core` (JS executor library)
 - `mechanics` (JS executor HTTP service)
+- `philharmonic-policy` (tenants, principals, SCK at-rest
+  encryption, `pht_` tokens)
 
 Designed, not yet implemented:
 
-- `mechanics-config` (extraction pending)
-- `philharmonic-policy`
 - `philharmonic-workflow`
 - `philharmonic-connector-common`
 - `philharmonic-connector-client`

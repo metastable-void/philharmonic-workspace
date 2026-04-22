@@ -85,6 +85,9 @@ a branch and open a PR"), stop and surface that — don't guess.
     pre-release checks.
   - `./scripts/publish-crate.sh [--dry-run] <crate>` — publish +
     signed release tag (Claude runs this, not you; it commits).
+  - `./scripts/verify-tag.sh <crate> [<tag>]` — verify a release
+    tag is locally present, signed, and pushed to origin at the
+    same commit. Claude runs this post-publish.
   - `./scripts/crate-version.sh <crate>` / `--all` — local
     version from Cargo.toml.
   - `./scripts/xtask.sh crates-io-versions -- <crate>` —
@@ -157,7 +160,7 @@ a branch and open a PR"), stop and surface that — don't guess.
 - **Version pinning.** Peer workspace crates pin loosely to each
   other (`philharmonic-store = "0.1"`). The cornerstone
   (`philharmonic-types`) is pinned to minor. Pin to a specific
-  patch (`"0.3.3"`) only when relying on a feature introduced in
+  patch (`"0.3.4"`) only when relying on a feature introduced in
   that patch — not out of habit.
 - **Testing.** Unit tests colocated (`#[cfg(test)] mod tests`).
   Integration tests in `tests/`. Tests that need real

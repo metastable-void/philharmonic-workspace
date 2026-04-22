@@ -56,6 +56,9 @@ Developer: Yuka MORI.
     — cargo-semver-checks, per-crate, crates.io baseline.
   - `./scripts/publish-crate.sh [--dry-run] <crate>` — publish +
     signed tag.
+  - `./scripts/verify-tag.sh <crate> [<tag>]` — three-way check
+    that a release tag is locally present, signed, and pushed to
+    origin at the same commit. Run after publish + push.
   - `./scripts/crate-version.sh <crate> | --all` — local version
     from Cargo.toml.
   - `./scripts/xtask.sh crates-io-versions -- <crate>` —

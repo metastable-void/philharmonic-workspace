@@ -2,28 +2,24 @@
 
 ## Currently published with substantive content
 
-- **`philharmonic-types`** (v0.3.3) — cornerstone vocabulary.
+- **`philharmonic-types`** (v0.3.4) — cornerstone vocabulary.
 - **`philharmonic-store`** (v0.1.0) — storage substrate traits.
 - **`philharmonic-store-sqlx-mysql`** (v0.1.0) — SQL backend.
-- **`mechanics-core`** (v0.2.2) — JS executor library (Boa-backed).
-- **`mechanics`** — HTTP service wrapping `mechanics-core`.
+- **`mechanics-config`** (v0.1.0) — Boa-free schema types
+  (`MechanicsConfig`, `HttpEndpoint`, supporting types) extracted
+  from `mechanics-core` so the lowerer can consume schema without
+  pulling in Boa / reqwest / tokio.
+- **`mechanics-core`** (v0.3.0) — JS executor library (Boa-backed).
+- **`mechanics`** (v0.3.0) — HTTP service wrapping `mechanics-core`.
+- **`philharmonic-policy`** (v0.1.0) — tenants, principals,
+  per-tenant endpoint configs (`TenantEndpointConfig`) with SCK
+  AES-256-GCM at-rest encryption, roles, role memberships,
+  minting authorities, audit events; `pht_` long-lived API
+  token format.
 
 ## Published as 0.0.0 placeholders
 
 - **`philharmonic`** — meta-crate placeholder.
-
-## To be published as 0.0.0 placeholders (not yet claimed)
-
-These names should be claimed on crates.io before implementations
-are far along, to prevent name squatting.
-
-- **`mechanics-config`** — schema types extracted from
-  `mechanics-core` (`MechanicsConfig`, `HttpEndpoint`, supporting
-  types). Boa-free; depended on by both the connector client
-  (produces configs) and `mechanics-core` (consumes them).
-- **`philharmonic-policy`** — tenants, principals, per-tenant
-  endpoint configs (`TenantEndpointConfig`), roles, role
-  memberships, minting authorities, audit events.
 - **`philharmonic-workflow`** — orchestration layer.
 - **`philharmonic-connector-common`** — shared vocabulary for the
   connector layer: COSE token and payload types, realm model,
