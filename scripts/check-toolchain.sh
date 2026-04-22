@@ -67,7 +67,12 @@ if [ "$do_update" -eq 1 ]; then
     rustup update
 else
     echo '=== rustup check ==='
-    rustup check
+    # rustup check exits 100 when any toolchain has an update available.
+    # This script's purpose is to print update status, not fail on it —
+    # `|| :` swallows the non-zero so downstream pre-landing steps still
+    # run. Without this, `set -e` in the caller aborts the moment a new
+    # nightly ships.
+    rustup check || :
 fi
 
 # Nightly + miri presence probe (scripts/miri-test.sh needs both).
