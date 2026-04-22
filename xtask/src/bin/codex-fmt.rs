@@ -175,11 +175,7 @@ fn main() -> ExitCode {
             Ok(0) => break,
             Ok(_) => {}
             Err(e) => {
-                let _ = writeln!(
-                    &mut out,
-                    "{}codex-fmt: read error: {}{}",
-                    p.red, e, p.reset
-                );
+                let _ = writeln!(&mut out, "{}codex-fmt: read error: {}{}", p.red, e, p.reset);
                 return ExitCode::from(1);
             }
         }
@@ -242,13 +238,7 @@ fn render(out: &mut impl Write, v: &Value, p: &Palette) {
             let _ = writeln!(
                 out,
                 "{}[{} / {}]{} {}{}{}",
-                p.dim,
-                rtype,
-                ptype,
-                p.reset,
-                p.gray,
-                ts_short,
-                p.reset,
+                p.dim, rtype, ptype, p.reset, p.gray, ts_short, p.reset,
             );
         }
     }
@@ -256,7 +246,10 @@ fn render(out: &mut impl Write, v: &Value, p: &Palette) {
 
 fn render_session_meta(out: &mut impl Write, payload: &Value, p: &Palette) {
     let id = payload.get("id").and_then(Value::as_str).unwrap_or("?");
-    let ts = payload.get("timestamp").and_then(Value::as_str).unwrap_or("?");
+    let ts = payload
+        .get("timestamp")
+        .and_then(Value::as_str)
+        .unwrap_or("?");
     let cwd = payload.get("cwd").and_then(Value::as_str).unwrap_or("?");
     let originator = payload
         .get("originator")
@@ -285,11 +278,7 @@ fn render_session_meta(out: &mut impl Write, payload: &Value, p: &Palette) {
         .and_then(Value::as_str)
         .unwrap_or("?");
 
-    let _ = writeln!(
-        out,
-        "{}{}=== SESSION START ==={}",
-        p.bold, p.cyan, p.reset
-    );
+    let _ = writeln!(out, "{}{}=== SESSION START ==={}", p.bold, p.cyan, p.reset);
     let _ = writeln!(out, "  id:         {}", id);
     let _ = writeln!(out, "  started:    {}", ts);
     let _ = writeln!(out, "  originator: {} ({})", originator, source);
@@ -488,10 +477,7 @@ fn render_message(out: &mut impl Write, payload: &Value, ts_short: &str, p: &Pal
     let content = payload.get("content").and_then(Value::as_array);
     if let Some(items) = content {
         for item in items {
-            let text = item
-                .get("text")
-                .and_then(Value::as_str)
-                .unwrap_or("");
+            let text = item.get("text").and_then(Value::as_str).unwrap_or("");
             if text.is_empty() {
                 continue;
             }
@@ -544,20 +530,12 @@ fn render_function_call(out: &mut impl Write, payload: &Value, ts_short: &str, p
     }
 }
 
-fn render_function_call_output(
-    out: &mut impl Write,
-    payload: &Value,
-    ts_short: &str,
-    p: &Palette,
-) {
+fn render_function_call_output(out: &mut impl Write, payload: &Value, ts_short: &str, p: &Palette) {
     let call_id = payload
         .get("call_id")
         .and_then(Value::as_str)
         .unwrap_or("?");
-    let output = payload
-        .get("output")
-        .and_then(Value::as_str)
-        .unwrap_or("");
+    let output = payload.get("output").and_then(Value::as_str).unwrap_or("");
     let line_count = output.lines().count();
 
     let _ = writeln!(
@@ -622,10 +600,7 @@ fn render_custom_tool_call_output(
         .get("call_id")
         .and_then(Value::as_str)
         .unwrap_or("?");
-    let output = payload
-        .get("output")
-        .and_then(Value::as_str)
-        .unwrap_or("");
+    let output = payload.get("output").and_then(Value::as_str).unwrap_or("");
     let line_count = output.lines().count();
 
     let _ = writeln!(
