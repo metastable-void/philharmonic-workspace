@@ -382,6 +382,7 @@ YYYY-MM-DD-NNNN-<slug>[-NN].md
 Journal directories currently governed by this format:
 
 - `docs/codex-prompts/` — see §Codex prompt archive.
+- `docs/codex-reports/` — see §Codex reports.
 - `docs/notes-to-humans/` — see §Notes to humans.
 
 Any future journal directory adopts the same format by default.
@@ -465,6 +466,71 @@ artifact for reconstructing why a chunk of code looks the way
 it does, and they're where Claude/Codex collaboration mistakes
 become visible in review. Losing them to chat history defeats
 the reviewability of the workflow.
+
+## Codex reports
+
+Parallel to `docs/codex-prompts/` (Claude → Codex) and
+`docs/notes-to-humans/` (Claude → Yuka), `docs/codex-reports/`
+is **Codex → the repo**: Codex-authored reports that capture
+findings, design rationale, or implementation details worth
+preserving past the session-summary text Codex writes back to
+Claude.
+
+**Location.** `docs/codex-reports/YYYY-MM-DD-NNNN-<slug>[-NN].md`
+(see §Journal-like files for format detail). `<slug>` usually
+mirrors the prompt's slug so the two files pair by name. `NNNN`
+is counted per-directory — Codex picks the next free number for
+today's date by listing `docs/codex-reports/` and incrementing
+past the highest existing sequence for today.
+
+**When Codex writes a report:**
+
+- The prompt explicitly asks for one.
+- The work involved a non-obvious design call that the prompt
+  didn't spell out, and future sessions would have to re-derive
+  it from code alone without the written rationale.
+- Substantial findings surfaced during implementation that
+  don't fit in the session-summary (test-matrix results beyond
+  the acceptance list, blocker-then-resolution sequences,
+  cross-dependency version notes).
+- Items flagged per a flag-vs-fix policy (crypto-review,
+  zeroization gaps, `unsafe` in neighboring code) that Codex
+  observed but didn't fix. The session-summary will mention
+  these; the report is where they're documented in enough
+  detail that Yuka can act on them later without re-running
+  the investigation.
+
+**When session-summary alone is fine:**
+
+- Routine implementation of a well-specified prompt with no
+  surprises.
+- Acknowledgement-style updates ("done, tests green,
+  acceptance criteria met").
+- Diffs that are self-explanatory from the code alone.
+
+**Contents.** Prose-focused, one logical report per file.
+Audience is future-Claude (for session continuity) and Yuka
+(for human review). Complete sentences, concrete file paths,
+no session-specific in-jokes. Cross-reference the prompt file
+with a short header:
+
+```markdown
+# <title>
+
+**Date:** YYYY-MM-DD
+**Prompt:** docs/codex-prompts/YYYY-MM-DD-NNNN-<slug>.md
+```
+
+**Commit cadence.** Claude drives Git via `scripts/*.sh` (see
+§Git workflow). Codex leaves the report file in the working
+tree; Claude reviews and commits it alongside the
+implementation diff. Typically report + impl land in one
+commit. When the impl lands across multiple commits, the
+report lands with the last one so it reflects the final state.
+
+**Codex does not commit.** Same rule as everything else Codex
+writes — leave the working tree dirty. Mention the report path
+in the final summary so Claude picks it up on review.
 
 ## Edition and MSRV
 

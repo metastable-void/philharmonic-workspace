@@ -333,6 +333,76 @@ in your final summary. Don't hand off red code.
 Doc-only / config-only / script-only changes can skip these (no
 `.rs` file touched).
 
+## Reports (`docs/codex-reports/`)
+
+You — Codex — have a dedicated journal at
+`docs/codex-reports/` for writing your own findings back to the
+repo. Parallel to `docs/codex-prompts/` (Claude → you) and
+`docs/notes-to-humans/` (Claude → Yuka), this directory is
+**you → the repo**: observations that outlive the session-
+summary you return to Claude.
+
+**Filename format** (same as the other journal directories):
+
+```
+docs/codex-reports/YYYY-MM-DD-NNNN-<slug>[-NN].md
+```
+
+- `YYYY-MM-DD` — today's date.
+- `NNNN` — four-digit daily sequence *within this directory*.
+  List `docs/codex-reports/`, find the highest `NNNN` for
+  today, add one. If the directory has nothing for today yet,
+  start at `0001`. Independent from the sequences in
+  `docs/codex-prompts/` and `docs/notes-to-humans/`.
+- `<slug>` — short kebab-case. Usually mirrors the prompt's
+  slug so the two files pair by name.
+- `[-NN]` — optional two-digit round suffix for multi-round
+  follow-ups. Omit for standalone entries.
+
+**Write a report when:**
+
+- The prompt explicitly asks for one.
+- You made a non-obvious design call the prompt didn't spell
+  out, and future sessions would have to re-derive it from the
+  code alone without the written rationale.
+- Substantial findings surfaced during implementation that
+  don't fit in the session-summary (test-matrix results beyond
+  the acceptance list, blocker-then-resolution sequences,
+  cross-dependency version notes).
+- You flagged something per a flag-vs-fix policy (crypto-review,
+  zeroization gaps, `unsafe` in neighboring code) that you
+  saw but didn't fix. The session-summary mentions these; the
+  report documents them in enough detail for Yuka to act later
+  without re-running your investigation.
+
+**Skip the report when** the work was routine, well-specified,
+and produced no surprises. Don't write a report for the sake
+of writing one — session-summary is sufficient for
+"done, tests green, acceptance criteria met".
+
+**Start each report with a header that cross-references the
+prompt**:
+
+```markdown
+# <title>
+
+**Date:** 2026-04-22
+**Prompt:** docs/codex-prompts/2026-04-22-0001-<slug>.md
+```
+
+Then prose. Audience is future-Claude sessions (so they can
+pick up context without re-running the task) and Yuka (for
+human review). Complete sentences, concrete file paths, no
+session-specific in-jokes.
+
+**Don't commit.** Same rule as every other file you write:
+leave it dirty in the working tree. Mention the report's path
+in your final summary so Claude picks it up on review and
+commits it alongside the implementation.
+
+See `docs/design/13-conventions.md §Codex reports` for the
+authoritative rule.
+
 ## Documentation
 
 When a change warrants a doc update (new trait, new error
