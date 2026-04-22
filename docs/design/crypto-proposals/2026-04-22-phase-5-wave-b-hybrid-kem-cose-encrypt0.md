@@ -1,7 +1,7 @@
 # Gate-1 proposal — Phase 5 Wave B: hybrid KEM + COSE_Encrypt0 payload encryption
 
 **Date:** 2026-04-22
-**Revision:** 1 (first draft, written same day as Wave A Gate-2 approval)
+**Revision:** 2 (revised after Codex's design-level security review)
 **Phase:** 5 (connector triangle), Wave B (encryption half)
 **Author:** Claude Code (on Yuka's review queue)
 **Status:** **Awaiting Gate-1 sign-off** — no implementation yet
@@ -10,12 +10,23 @@
   approved
   `docs/design/crypto-approvals/2026-04-22-phase-5-wave-a-cose-sign1-tokens-01.md`).
 **Wave split decision:** ROADMAP §Phase 5 (commit `e292918`).
+**Security review:**
+  `docs/codex-reports/2026-04-22-0005-phase-5-wave-b-hybrid-kem-cose-encrypt0-security-review.md`.
+  Resolutions are summarized in §"Codex security review resolutions"
+  at the end of this document; the body has been updated inline.
 
 ## Revisions
 
 - **r1** (2026-04-22): first draft. Writing before bed — expect
   Yuka to flag things. Open Questions are called out explicitly
   at the bottom and are load-bearing.
+- **r2** (2026-04-22): applied Codex's independent security
+  review. Three HIGH and three MEDIUM findings triaged:
+  four fixes landed inline, two concerns (replay CPU-amplification
+  and error-variant oracle) resolved via service-bin-layer
+  requirements + library-internal-vs-external-surface
+  documentation rather than library-API changes.
+  Summary table at §"Codex security review resolutions".
 
 ## Scope
 
@@ -141,6 +152,24 @@ New threats introduced by encryption:
 4. **KEM-only or ECDH-only downgrade.** The HKDF combines both
    shared secrets; there's no single-primitive fallback. Any
    middlebox attempt to strip one half fails AEAD decryption.
+5. **Replay-driven CPU exhaustion.** Wave B's decrypt path is
+   significantly more expensive per call than Wave A's signature
+   check: each accepted token + ciphertext pair triggers an
+   ML-KEM-768 decapsulation, an X25519 DH, an HKDF, and an
+   AES-256-GCM decrypt. A captured valid `(token, payload)`
+   pair can be replayed within `exp` to force that work
+   repeatedly. Codex's security review (finding #4) flagged
+   this as a material uplift from Wave A's replay acceptance.
+   The library does not add a replay cache (stays stateless
+   per Wave A); the mitigation is on the **service bin**:
+   a) per-tenant and per-instance rate limits on decrypt
+   attempts, b) per-source-IP rate limits at the router, and
+   c) an early `404` / `429` before the decrypt pipeline for
+   requests over a budget. These requirements are normative
+   for the bin-layer implementation and will be echoed in the
+   service bin's module docs and in
+   `docs/design/08-connector-architecture.md`'s router
+   section when that content lands.
 
 Out of Wave B's threat-mitigation scope (explicit):
 
@@ -277,14 +306,33 @@ operation returns.
 
 ### AEAD associated data
 
-AAD binds the ciphertext to the specific call context. On both
-sides, AAD is computed from claim fields **available at
-encrypt-time** (i.e. NOT `payload_hash`, which would be
+Per RFC 9052 §5.3, the AEAD's associated-data input for
+COSE_Encrypt0 is the canonical CBOR of `Enc_structure`:
+
+```
+Enc_structure = [
+    context: "Encrypt0",
+    protected: bstr  (serialized protected-header bucket),
+    external_aad: bstr,
+]
+```
+
+We use the standard structure exactly. That covers the
+protected header (alg, kid, IV, kem_ct, ecdh_eph_pk) under
+the AEAD tag automatically — an attacker flipping a byte in
+any header field causes tag verification to fail.
+
+`external_aad` carries the **call-context binding digest**:
+the value binds the ciphertext to the Wave-A-verified claim
+fields so that valid ciphertexts can't be rehomed to tokens
+for a different `(realm, tenant, inst, step, config_uuid, kid)`
+tuple. Per-call context comes from claim fields available
+**at encrypt-time** (i.e. NOT `payload_hash`, which would be
 circular, and NOT `iss`/`exp`/`iat` which are not per-call
 identifiers):
 
 ```
-AAD = SHA-256( CBOR_canonical({
+external_aad = SHA-256( CBOR_canonical({
     "realm":       claims.realm,
     "tenant":      claims.tenant,     (16-byte bstr)
     "inst":        claims.inst,       (16-byte bstr)
@@ -295,20 +343,28 @@ AAD = SHA-256( CBOR_canonical({
 ```
 
 - 32 bytes (one SHA-256 digest).
-- **Lowerer side** computes it before encryption, using the
-  values it's about to place in the token claims.
-- **Service side** computes it after Wave A token verification
-  succeeds (so claim fields are verified-trusted), using the
-  same canonical encoding. Passes the 32 bytes into
-  `aes_gcm::Aes256Gcm::decrypt(&nonce, Payload { msg:
-  ciphertext, aad: &aad_bytes })`. Decryption fails if the
-  AAD doesn't match → `PayloadAadMismatch`.
+- **Lowerer side** computes `external_aad` before encryption,
+  using the values it's about to place in the token claims.
+  `coset::CoseEncrypt0Builder::create_ciphertext(aad_buf,
+  plaintext, ...)` takes `external_aad` and handles the
+  `Enc_structure` serialization internally.
+- **Service side** computes the same `external_aad` after
+  Wave A token verification succeeds (so claim fields are
+  verified-trusted). `coset::CoseEncrypt0::decrypt(aad_buf,
+  ...)` rebuilds the `Enc_structure` and passes the full
+  canonical CBOR as AEAD associated-data.
 
-**Open Question #4 below — AAD field set and encoding.** I've
-proposed SHA-256 of a canonical CBOR map to get a fixed-width
-AAD with unambiguous field inclusion. Alternatives: raw
-concatenation of fields (length-prefixed), or using the COSE
-`Enc_structure` `external_aad` with raw bytes. Yuka's call.
+The "AAD binding to the token" phrasing in
+`docs/design/11-security-and-cryptography.md` is satisfied by
+this `external_aad` — the digest bridges the COSE_Encrypt0
+to the COSE_Sign1's claim set.
+
+**Open Question #4 below — `external_aad` field set and
+encoding.** I've proposed SHA-256 of a canonical CBOR map to
+get a fixed-width digest with unambiguous field inclusion.
+Alternatives: raw concatenation of fields (length-prefixed),
+or passing the claim-map canonical CBOR directly (variable
+width; fine for AEAD). Yuka's call.
 
 ### COSE_Encrypt0 envelope
 
@@ -377,7 +433,7 @@ minimum lifetime needed.
 
 ### Service-side pipeline (verify + decrypt)
 
-Extends Wave A's 11-step order with two more steps. All 11
+Extends Wave A's 11-step order with five more steps. All 11
 Wave A steps run unchanged and short-circuit first; Wave B
 only runs if the token is fully valid.
 
@@ -385,12 +441,63 @@ only runs if the token is fully valid.
 |------|--------|-------------|
 | 1–11 | Wave A token verify | (Wave A variants) |
 | 12 | Parse `COSE_Encrypt0(payload_bytes)` | `EncryptedPayloadMalformed` |
-| 13 | Read protected-header kid; look up realm private keys in `RealmPrivateKeyRegistry`; window-check | `UnknownRealmKid` / `RealmKeyOutOfWindow` |
-| 14 | Hybrid-KEM decapsulate; HKDF; compute expected AAD from Wave-A-verified claims; AES-256-GCM decrypt | `DecryptionFailed` |
+| 12a | Protected-header strict validation (see below) | `EncryptedPayloadMalformed` |
+| 13 | Read protected-header kid; look up in `RealmPrivateKeyRegistry`; window-check; check entry's `realm == service_realm` | `UnknownRealmKid` / `RealmKeyOutOfWindow` / `RealmKeyRealmMismatch` |
+| 14 | Hybrid-KEM decapsulate; HKDF; compute `external_aad` from Wave-A-verified claims; AES-256-GCM decrypt (AEAD AAD = `Enc_structure` per RFC 9052) | `DecryptionFailed` |
 | 15 | Parse decrypted plaintext; assert inner `realm` field equals `claims.realm` | `InnerRealmMismatch` |
 
 Only after step 15 passes is the decrypted plaintext handed to
 `impl` dispatch.
+
+**Step 12a: strict protected-header validation.** Explicitly
+required before any expensive crypto. Each condition rejects
+with `EncryptedPayloadMalformed`:
+
+- `alg == 3` exactly (A256GCM). No other value — not even other
+  AEADs we might later support, without a version bump.
+- `unprotected` map is empty. Any entry is rejected.
+- Required labels present exactly once: `1` (alg), `4` (kid),
+  `5` (IV), `"kem_ct"`, `"ecdh_eph_pk"`.
+- Duplicate labels across the map are rejected (including
+  duplicate integer labels and duplicate text labels).
+- Unknown labels are rejected. No forward-compat tolerance at
+  this layer; forward compat is handled by protocol version
+  bumps.
+- Exact byte-length bounds:
+  - `kid`: 1 ≤ length ≤ 255 (sanity bound; real kids are
+    ~40 chars).
+  - `IV`: exactly 12 bytes.
+  - `kem_ct`: exactly 1088 bytes (FIPS 203 ML-KEM-768
+    ciphertext size).
+  - `ecdh_eph_pk`: exactly 32 bytes.
+- Ciphertext body: bounded by Wave A's `MAX_PAYLOAD_BYTES`
+  (1 MiB default, enforced at Wave A step 5 — which checks
+  the outer COSE_Encrypt0 byte length). No separate
+  Wave-B-only ciphertext limit.
+
+**Step 13: realm-kid lookup with realm check.** Per Codex's
+review, the registry entry carries a `realm: RealmId` field
+so that even if the wrong realm's key entries end up in a
+service's registry (operator misconfig / key-distribution
+mistake), the service refuses to decrypt:
+
+```rust
+let entry = registry.lookup(protected_kid)
+    .ok_or(TokenVerifyError::UnknownRealmKid { kid })?;
+
+if now < entry.not_before || now >= entry.not_after {
+    return Err(TokenVerifyError::RealmKeyOutOfWindow { ... });
+}
+if entry.realm.as_str() != service_realm {
+    return Err(TokenVerifyError::RealmKeyRealmMismatch { ... });
+}
+```
+
+In v1 each service instance is for exactly one realm, so the
+registry is homogeneous and this check is belt-and-suspenders.
+For a hypothetical multi-realm service in the future, this
+check is a prerequisite — it keeps realm-kid ownership
+auditable at the library layer.
 
 **Step 14 is the only cryptographic failure point in Wave B's
 decrypt path.** The AEAD check, the tag verification, and the
@@ -401,6 +508,35 @@ debugging rather than security. I'm not proposing sub-variants
 for "which part of decryption failed." **Open Question #8 —
 whether the AEAD / AAD mismatch should be distinguishable for
 operator troubleshooting, or lumped.**
+
+### Internal vs external error surface
+
+The library returns fine-grained `TokenVerifyError` variants
+for every rejection path because tests and operator logs need
+to tell them apart. The **service bin** (which consumes the
+library and surfaces HTTP) SHOULD collapse all steps-12-to-15
+failures into a **single generic HTTP error** (e.g.
+`400 Bad Request` with `{ "error": "decryption_failed" }`) plus
+a best-effort uniform response latency. This prevents an
+attacker from using API-surface error variants to probe the
+realm-kid namespace or key-window state.
+
+This requirement is for the service bin, not the Wave B
+library. The library exposes what happened so the bin can log
+it; the bin decides what the external response looks like.
+Documented here (and in the service bin's README / module
+docs at implementation time) because otherwise the two crates'
+behavior can diverge under independent development. See
+§"Codex security review resolutions" finding #2.
+
+The two kids are separate by design. In the claim set,
+`claims.kid` identifies the **lowerer signing key** used to
+mint the token (Wave A). In the COSE_Encrypt0 protected
+header, `kid` identifies the **realm KEM + X25519 keypair**
+used to encrypt the payload (Wave B). The two refer to
+different key materials on different sides of the triangle;
+they are expected to differ, and no `protected_kid ==
+claims.kid` check is meaningful.
 
 ### Key management
 
@@ -422,6 +558,7 @@ Wave A's `MintingKeyRegistry`.
 pub struct RealmPrivateKeyEntry {
     pub kem_sk: Zeroizing<[u8; 2400]>,   // ML-KEM-768 sk size per FIPS 203
     pub ecdh_sk: x25519_dalek::StaticSecret,
+    pub realm: RealmId,                   // belt-and-suspenders per Codex r2 review
     pub not_before: UnixMillis,
     pub not_after: UnixMillis,
 }
@@ -443,6 +580,18 @@ wrapped by a type that zeroizes on drop (X25519's
 `x25519-dalek 2.x`). The service bin reads private keys from
 deployment secret storage, populates the registry, drops the
 buffers.
+
+**Why `realm` on the entry.** v1 deploys each service for one
+realm, so `registry.lookup(kid)` uniqueness by `kid` alone is
+sufficient in the common case. The per-entry `realm` field is
+there for two reasons: (1) defensive against operator
+misconfig where the wrong realm's key distribution lands in a
+service's secret-store path, and (2) forward-looking toward
+multi-realm deployments (not scoped for v1) where a single
+registry would need `(realm, kid)` disambiguation. Step 13's
+`entry.realm == service_realm` check is cheap and makes the
+ownership explicit. See §"Codex security review resolutions"
+finding #3.
 
 ### Zeroization points
 
@@ -524,14 +673,44 @@ drops at the earliest possible scope.
 
 One vector per Wave B rejection path:
 
+**Parse + header validation (step 12 / 12a):**
+
 - `wave_b_encrypted_payload_malformed.hex` — truncated
-  COSE_Encrypt0. Step 12, `EncryptedPayloadMalformed`.
+  COSE_Encrypt0 bytes (CBOR parse fails). Step 12,
+  `EncryptedPayloadMalformed`.
+- `wave_b_alg_not_a256gcm.hex` — valid COSE_Encrypt0 with
+  `alg = 1` (A128GCM, registered but disallowed here).
+  Step 12a, `EncryptedPayloadMalformed`.
+- `wave_b_unprotected_nonempty.hex` — valid envelope but
+  `unprotected` map carries a single entry. Step 12a,
+  `EncryptedPayloadMalformed`.
+- `wave_b_kem_ct_wrong_length.hex` — `kem_ct` is 1087 bytes
+  (one byte short of FIPS 203). Step 12a,
+  `EncryptedPayloadMalformed`.
+- `wave_b_ecdh_pk_wrong_length.hex` — `ecdh_eph_pk` is 31
+  bytes. Step 12a, `EncryptedPayloadMalformed`.
+- `wave_b_iv_wrong_length.hex` — nonce is 11 bytes. Step 12a,
+  `EncryptedPayloadMalformed`.
+- `wave_b_unknown_protected_label.hex` — an extra unknown
+  text-keyed header is present. Step 12a,
+  `EncryptedPayloadMalformed`.
+
+**Registry + key lookup (step 13):**
+
 - `wave_b_unknown_realm_kid.hex` — valid COSE_Encrypt0 with
   `kid` not in the service's realm registry. Step 13,
   `UnknownRealmKid`.
 - `wave_b_realm_key_out_of_window.hex` — service's realm-key
   entry has `not_after` in the past. Step 13,
   `RealmKeyOutOfWindow`.
+- `wave_b_realm_key_realm_mismatch.hex` — registry entry for
+  the kid exists and is in-window but its `realm` field does
+  not equal `service_realm` (simulates operator
+  key-distribution misconfig). Step 13,
+  `RealmKeyRealmMismatch`.
+
+**Decryption (step 14):**
+
 - `wave_b_decrypt_tag_tamper.hex` — valid envelope but last
   byte of the GCM tag is flipped. Step 14, `DecryptionFailed`.
 - `wave_b_decrypt_kem_ct_tamper.hex` — one byte of `kem_ct`
@@ -541,18 +720,23 @@ One vector per Wave B rejection path:
   `ecdh_eph_pk` flipped → wrong ECDH shared secret → wrong
   AEAD key. Step 14, `DecryptionFailed`.
 - `wave_b_decrypt_aad_tamper.hex` — valid ciphertext, but
-  `claims.realm` claim differs from what the ciphertext was
-  encrypted under (forcibly swap one claim field post-
-  signing without regenerating AAD). Step 14,
-  `DecryptionFailed` — AAD mismatch indistinguishable from
-  tag tamper, by design.
+  one claim field differs between what was bound as
+  `external_aad` and what the service recomputes (simulates
+  a token with matching signature but a different
+  `config_uuid`). Step 14, `DecryptionFailed` — AAD mismatch
+  indistinguishable from tag tamper, by design.
+
+**Inner-realm check (step 15):**
+
 - `wave_b_inner_realm_mismatch.hex` — valid decryption, but
   the decrypted plaintext's inner `realm` field differs from
   `claims.realm`. Step 15, `InnerRealmMismatch`.
 
-Eight Wave B negative vectors. Combined with Wave A's 10, the
-service-side test file asserts each of 18 reject paths hits
-its specific error variant.
+Fifteen Wave B negative vectors. Combined with Wave A's 10,
+the service-side test file asserts each of 25 reject paths
+hits its specific library-level error variant — independent of
+whatever generic response the service bin may surface
+externally (see §"Internal vs external error surface").
 
 ## `philharmonic-connector-common 0.2.0`
 
@@ -581,9 +765,14 @@ surface tight.
    ECDH concatenation for the HKDF IKM (ML-KEM first). Empty
    salt. `info = "philharmonic/wave-b/hybrid-kem/v1/aead-key"`.
    HKDF-Extract then HKDF-Expand yields a 32-byte AES-256-GCM
-   key. AEAD associated-data is SHA-256 of a canonical CBOR
-   map of `(realm, tenant, inst, step, config_uuid, kid)`.
-   Confirm Q#1 (IKM order), Q#4 (AAD content + encoding).
+   key. AEAD associated-data is the canonical CBOR of COSE's
+   `Enc_structure = ["Encrypt0", protected, external_aad]`
+   (RFC 9052 §5.3), where `external_aad` is SHA-256 of a
+   canonical CBOR map of `(realm, tenant, inst, step,
+   config_uuid, kid)`. Using the full `Enc_structure` covers
+   the protected header under the AEAD tag automatically.
+   Confirm Q#1 (IKM order), Q#4 (external_aad content +
+   encoding).
 
 2. **`unsafe` usage.** None planned in our code. Upstream
    `ml-kem`, `x25519-dalek`, `aes-gcm`, `hkdf`, `sha2` all use
@@ -721,6 +910,32 @@ first time Wave A's code actually makes it to crates.io —
 Wave A landed in-tree but deferred publish specifically for
 this moment.
 
+## Codex security review resolutions
+
+Codex ran an independent design-level security review of r1 of
+this proposal. The full report is at
+`docs/codex-reports/2026-04-22-0005-phase-5-wave-b-hybrid-kem-cose-encrypt0-security-review.md`.
+Six findings (three HIGH, three MEDIUM); Claude's evaluation
+and the r2 resolution per finding:
+
+| # | Finding | Severity | r2 resolution |
+|---|---------|----------|---------------|
+| 1 | COSE `Enc_structure` not specified; AEAD AAD is raw `external_aad` digest only, so protected headers aren't AEAD-authenticated | HIGH | **Fixed.** §"AEAD associated data" now specifies RFC 9052 `Enc_structure = ["Encrypt0", protected, external_aad]` as the AEAD AAD, with `external_aad` carrying the call-context digest. Covers the protected header under the AEAD tag, matches standards-compliant COSE implementations, removes the ordering dependency on Wave A step 10. |
+| 2 | Step-13 distinct error variants (`UnknownRealmKid` vs `RealmKeyOutOfWindow`) leak realm-kid-namespace state to the external attacker surface | HIGH | **Partially fixed (library) + documented (bin).** Claude's threat-model analysis: the kid in the COSE_Encrypt0 protected header is signature-covered via `payload_hash`, so an attacker with a valid token cannot freely probe realm kids — Wave A step 10 catches any substitution. The observable attack surface only arises if distinct HTTP responses surface distinct library variants. The library keeps typed variants for tests/logs (critical for operator forensics); new §"Internal vs external error surface" mandates that the service bin collapse all steps-12-to-15 failures into a single generic HTTP response with uniform latency. Library API unchanged; normative requirement on the bin layer. |
+| 3 | No claims↔decryption-key binding; registry shape keyed only by `kid`, no `protected_kid == claims.kid` check, no `registry_entry.realm == claims.realm` check | HIGH | **Partially fixed.** The "`protected_kid == claims.kid`" part of the finding doesn't apply — Wave A's `claims.kid` identifies the **lowerer signing key**, while COSE_Encrypt0's protected-header `kid` identifies the **realm KEM keypair**; they are different-purpose kids by design (documented in §"Internal vs external error surface"). The realm-binding half of the finding is fixed: `RealmPrivateKeyEntry` now carries a `realm: RealmId` field, and step 13 additionally checks `entry.realm == service_realm` (`RealmKeyRealmMismatch` variant). Registry keying stays `by_kid`; single-realm-per-service makes `(realm, kid)` keying unnecessary for v1 and keying by `kid` keeps the common-case lookup cheap. The `realm` field already gives us multi-realm future-compat. |
+| 4 | Replay remains accepted from Wave A and now amplifies CPU-exhaustion risk: each replay drives ML-KEM decap + X25519 + HKDF + AEAD decrypt | MEDIUM | **Documented.** Wave A's stateless-replay decision stands; adding a replay cache would violate "stateless where feasible" and add an HA cache runtime dep for marginal benefit over TLS + tight `exp` + bin-layer rate limiting. Threat-model §"Replay-driven CPU exhaustion" (new in r2) names the amplification explicitly and makes per-tenant / per-instance rate limits a normative requirement at the service bin layer (not at the library). The bin's module docs will restate this requirement at implementation time. |
+| 5 | Payload-size and structure bounds underspecified | MEDIUM | **Fixed.** New step 12a specifies hard byte-length bounds for every field (`kid` ≤ 255, `IV == 12`, `kem_ct == 1088`, `ecdh_eph_pk == 32`, ciphertext bounded by Wave A's 1 MiB outer limit). |
+| 6 | Mandatory algorithm / parameter validation not explicit in decrypt sequence | MEDIUM | **Fixed.** New step 12a is an explicit strict-validation pass: `alg == 3` exactly, `unprotected` map empty, every required label present exactly once at exact type/length, duplicate labels rejected, unknown labels rejected. Runs before any crypto. |
+
+Four of six findings are normative design fixes landed inline
+above; two (replay amplification and error-variant
+observability) are resolved by layering requirements between
+the library and the service bin — the library exposes typed
+behavior; the bin assembles the external surface. The report's
+positive notes (token↔ciphertext commitment, documented
+secret lifecycle, negative-vector planning) carried through
+into r2.
+
 ## Requesting Gate-1 approval
 
 For this proposal to unblock dispatch:
@@ -743,8 +958,17 @@ For this proposal to unblock dispatch:
     flag if it fractures.
   - Q#8 DecryptionFailed not sub-varianted.
 
-- Confirm the replay threat-model decision stays Wave A's.
-- Confirm the 15-step verify+decrypt order.
+- Confirm the replay threat-model decision stays Wave A's,
+  with the r2-added CPU-amplification acknowledgement and
+  normative bin-layer rate-limit requirement.
+- Confirm the revised verify+decrypt order: Wave A's 11 steps,
+  then 12 (parse), 12a (strict header validation per r2), 13
+  (kid lookup + window + `entry.realm == service_realm` per
+  r2), 14 (crypto, using `Enc_structure` AAD per r2), 15
+  (inner-realm check).
+- Confirm the internal-vs-external error-surface split:
+  typed library variants, generic HTTP response from the bin
+  (per r2 / finding #2).
 - Confirm the `connector-common 0.2.0` bump scope is
   appropriate for Wave B (adding `iat`, nothing else).
 - Confirm Wave A vectors regeneration is in scope of Wave B
