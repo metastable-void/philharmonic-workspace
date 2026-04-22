@@ -16,15 +16,20 @@
   AES-256-GCM at-rest encryption, roles, role memberships,
   minting authorities, audit events; `pht_` long-lived API
   token format.
+- **`philharmonic-connector-common`** (v0.1.0) — shared
+  vocabulary for the connector layer: COSE token and payload
+  types (`ConnectorTokenClaims`, `ConnectorSignedToken`,
+  `ConnectorEncryptedPayload`), realm model (`RealmId`,
+  `RealmPublicKey`, `RealmRegistry`), `ConnectorCallContext`
+  (verified claims delivered to implementations), and the
+  shared `ImplementationError` taxonomy. Types-only; crypto
+  construction lives in `philharmonic-connector-client` and
+  `philharmonic-connector-service`.
 
 ## Published as 0.0.0 placeholders
 
 - **`philharmonic`** — meta-crate placeholder.
 - **`philharmonic-workflow`** — orchestration layer.
-- **`philharmonic-connector-common`** — shared vocabulary for the
-  connector layer: COSE token and payload types, realm model,
-  `ConnectorCallContext` (verified claims delivered to
-  implementations), shared error types.
 - **`philharmonic-connector-client`** — the lowerer. Produces
   concrete `MechanicsConfig` values by fetching
   `TenantEndpointConfig` entities via policy, decrypting each

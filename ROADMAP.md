@@ -617,7 +617,15 @@ Final test discipline (as shipped at `0.1.0`):
 
 ---
 
-### Phase 3 — `philharmonic-connector-common`
+### Phase 3 — `philharmonic-connector-common` ✓ _(done 2026-04-22)_
+
+**Status**: Landed in a single Codex dispatch (see
+`docs/codex-prompts/2026-04-22-0002-phase-3-connector-common.md`).
+Pre-landing + miri both green (10 tests). Gate-2 review
+completed by Yuka in-session; dedicated approval doc deferred
+because Phase 3 carries no crypto construction (types-only).
+Published as `philharmonic-connector-common 0.1.0` on
+crates.io; tag `v0.1.0` signed and pushed.
 
 **Goal**: Shared wire-format types for the connector layer.
 
@@ -686,10 +694,13 @@ Final test discipline (as shipped at `0.1.0`):
 
 **Acceptance criteria**:
 - `philharmonic-connector-common` compiles with minimal deps
-  (`philharmonic-types`, `mechanics-config`, `coset`, `serde`).
+  (`philharmonic-types`, `coset`, `serde`, `thiserror`). ✓
+  _(`mechanics-config` ended up unused in Phase 3 scope; may
+  return in Phase 5.)_
 - Unit tests for token claim serde round-trip and realm
-  registry lookup by kid.
-- `philharmonic-connector-common` publishes as `0.1.0`.
+  registry lookup by kid. ✓ _(10 tests total.)_
+- `philharmonic-connector-common` publishes as `0.1.0`. ✓
+  _(2026-04-22)_
 
 ---
 

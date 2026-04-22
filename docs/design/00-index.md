@@ -94,11 +94,13 @@ Published and stable:
 - `mechanics` (JS executor HTTP service)
 - `philharmonic-policy` (tenants, principals, SCK at-rest
   encryption, `pht_` tokens)
+- `philharmonic-connector-common` (shared connector-layer
+  vocabulary: COSE token / payload types, realm model,
+  `ConnectorCallContext`, shared `ImplementationError`)
 
 Designed, not yet implemented:
 
 - `philharmonic-workflow`
-- `philharmonic-connector-common`
 - `philharmonic-connector-client`
 - `philharmonic-connector-router`
 - `philharmonic-connector-service`

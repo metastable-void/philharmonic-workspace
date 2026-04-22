@@ -23,13 +23,18 @@ What a first shipping release includes, and what's deferred.
   encryption, `pht_` long-lived API token format. Yuka's
   two-gate crypto review protocol (Gate-1 approach approval
   + Gate-2 code review) satisfied.
+- `philharmonic-connector-common` — published `0.1.0`
+  (2026-04-22). Shared connector-layer vocabulary:
+  `ConnectorTokenClaims`, `ConnectorCallContext`, realm model
+  (`RealmId`, `RealmPublicKey`, `RealmRegistry`), thin COSE
+  wrapper types (`ConnectorSignedToken`,
+  `ConnectorEncryptedPayload`), `ImplementationError`. Types-
+  only; crypto construction lives in Phase 5.
 
 ### Needs implementation work
 
 - `philharmonic-workflow` — design complete, code not started.
   Depends on `philharmonic-policy` for `Tenant` entity marker.
-- `philharmonic-connector-common` — shared vocabulary (COSE
-  formats, realm model, `ConnectorCallContext`).
 - `philharmonic-connector-client` — the lowerer; implements
   `ConfigLowerer`.
 - `philharmonic-connector-router` — pure HTTP dispatcher
