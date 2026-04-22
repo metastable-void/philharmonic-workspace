@@ -30,11 +30,20 @@ else
     # keeps the audit line produced even if the network is down
     # or the workspace convention's fetch tool is missing — an
     # empty `4=`/`6=` field is acceptable, a failed commit is not.
+    #
+    # We use icanhazip.com's family-specific subdomains (both
+    # Cloudflare-operated, same cdn-cgi/trace endpoint as 1.1.1.1
+    # serves): `ipv4.icanhazip.com` has only A records,
+    # `ipv6.icanhazip.com` has only AAAA, so DNS forces the socket
+    # family without us having to use a bracketed IPv6 literal in
+    # the URL. That matters because ureq 3.x + rustls reject
+    # bracketed IPv6 literals as SNI names; using a DNS name
+    # dodges the issue while still guaranteeing per-family paths.
     tmp_v4=$("$_here/mktemp.sh" tmp_v4)
     tmp_v6=$("$_here/mktemp.sh" tmp_v6)
     trap 'rm -f "$tmp_v4" "$tmp_v6"' EXIT INT HUP TERM
-    "$_here/web-fetch.sh" https://1.1.1.1/cdn-cgi/trace "$tmp_v4" || :
-    "$_here/web-fetch.sh" 'https://[2606:4700:4700::1111]/cdn-cgi/trace' "$tmp_v6" || :
+    "$_here/web-fetch.sh" https://ipv4.icanhazip.com/cdn-cgi/trace "$tmp_v4" || :
+    "$_here/web-fetch.sh" https://ipv6.icanhazip.com/cdn-cgi/trace "$tmp_v6" || :
 
     v4="$(awk -F= '/^ip=/{print $2}' < "$tmp_v4")/$(awk -F= '/^loc=/{print $2}' < "$tmp_v4")"
     v6="$(awk -F= '/^ip=/{print $2}' < "$tmp_v6")/$(awk -F= '/^loc=/{print $2}' < "$tmp_v6")"
