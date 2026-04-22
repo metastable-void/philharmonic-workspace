@@ -89,14 +89,23 @@ Stable i64 values:
 ## Status transitions
 
 ```
-Pending → Running   (first step starts)
+Pending → Running   (first step starts and succeeds)
 Pending → Completed (caller marks complete before any step)
 Pending → Cancelled (cancel before any step)
+Pending → Failed    (first step errors, including malformed output)
 Running → Running   (step succeeds, no completion signal)
 Running → Completed (script signals done=true, or caller completes)
 Running → Failed    (step errors, including malformed output)
 Running → Cancelled (cancel during execution)
 ```
+
+The engine writes one instance revision per step execution, so a
+first-step failure has to transition directly from `Pending`
+(revision 0) to `Failed` — there is no intermediate Running
+revision. Earlier drafts of this doc omitted `Pending → Failed`;
+the transition was added when Phase 4's Codex-authored
+implementation flagged the inconsistency between this diagram
+and §Execution sequence step 8.
 
 Terminal states have no outgoing transitions. The engine refuses
 operations on terminal instances with `InstanceTerminal` error.
