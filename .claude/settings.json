@@ -7,7 +7,11 @@
       "Skill(codex:rescue)",
       "Skill(codex:rescue:*)",
       "Bash(./scripts/miri-test.sh philharmonic-policy *)",
-      "Bash(./scripts/miri-test.sh philharmonic-types *)"
+      "Bash(./scripts/miri-test.sh philharmonic-types *)",
+      "Bash(./scripts/pre-landing.sh --no-ignored philharmonic-policy)",
+      "Bash(echo \"EXIT $?\")",
+      "Read(//tmp/**)",
+      "Bash(./scripts/rust-test.sh --ignored philharmonic-policy)"
     ]
   },
   "enabledPlugins": {
