@@ -1,7 +1,7 @@
 # Gate-1 proposal — Phase 5 Wave A: COSE_Sign1 connector authorization tokens
 
 **Date:** 2026-04-22
-**Revision:** 3 (revised 2026-04-22 after Yuka's Gate-1 sign-off)
+**Revision:** 4 (aligned with `philharmonic-types 0.3.5`)
 **Phase:** 5 (connector triangle), Wave A (signing-only half)
 **Author:** Claude Code (on Yuka's review queue)
 **Status:** **Gate-1 approved 2026-04-22** — implementation unblocked
@@ -27,6 +27,17 @@ the body is updated inline.
   The workspace rule itself landed in
   `docs/design/13-conventions.md` §Library crate boundaries and
   a short bullet in `CLAUDE.md`.
+- **r4** (2026-04-22): upstream alignment, no Wave A design
+  change. Caught while drafting the pycose reference-vector
+  generator: `philharmonic-types 0.3.4`'s `Sha256` serde
+  emitted a hex text string unconditionally, but the proposal
+  pinned `payload_hash` as a 32-byte CBOR byte string.
+  `philharmonic-types 0.3.5` fixes the serde to be
+  human-readable-aware (JSON unchanged, CBOR now emits a 32-byte
+  bstr). This proposal's encoding claim is now true. Blocker
+  note: `docs/notes-to-humans/2026-04-22-0009-...md`; decision
+  record: `...-0010-...md`. Minimum dep: `philharmonic-types >=
+  0.3.5`.
 
 ## Scope
 
@@ -183,9 +194,14 @@ as the wire form:
   `serde_cbor` / `ciborium` handle `uuid::Uuid` by default when
   the `serde` feature is on; we'll test this explicitly in
   vector tests.
-- `UnixMillis` serializes as an unsigned 64-bit integer
-  (millis since epoch).
+- `UnixMillis` is an `i64` with `#[serde(transparent)]`; a
+  positive value serializes as a CBOR unsigned integer
+  (major type 0). Philharmonic timestamps are always positive
+  post-epoch millis, so the wire form is effectively a CBOR
+  uint.
 - `Sha256` serializes as a 32-byte byte string (major type 2).
+  **Requires `philharmonic-types >= 0.3.5`** — earlier versions
+  emitted a hex text string unconditionally (r4 revision note).
 
 The CBOR encoding is canonical per RFC 8949 §4.2 deterministic
 encoding — `ciborium` produces deterministic output by default
