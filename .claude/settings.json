@@ -16,7 +16,8 @@
       "Bash(./scripts/pre-landing.sh --no-ignored philharmonic-types)",
       "Bash(./scripts/xtask.sh gen-uuid *)",
       "Bash(./scripts/xtask.sh crates-io-versions *)",
-      "Bash(./scripts/pre-landing.sh philharmonic-connector-common *)"
+      "Bash(./scripts/pre-landing.sh philharmonic-connector-common *)",
+      "Bash(./scripts/pre-landing.sh philharmonic-types *)"
     ],
     "additionalDirectories": [
       "/tmp"
