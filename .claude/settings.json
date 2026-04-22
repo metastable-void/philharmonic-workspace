@@ -19,7 +19,12 @@
       "Bash(./scripts/pre-landing.sh philharmonic-connector-common *)",
       "Bash(./scripts/pre-landing.sh philharmonic-types *)",
       "Bash(./scripts/rust-lint.sh xtask *)",
-      "Bash(./scripts/xtask.sh web-fetch *)"
+      "Bash(./scripts/xtask.sh web-fetch *)",
+      "Bash(./scripts/pre-landing.sh philharmonic-connector-client *)",
+      "Bash(./scripts/pre-landing.sh philharmonic-connector-service *)",
+      "Bash(./scripts/rust-test.sh philharmonic-connector-service *)",
+      "Bash(./scripts/rust-test.sh philharmonic-connector-client *)",
+      "Bash(./scripts/rust-test.sh philharmonic-connector-common *)"
     ],
     "additionalDirectories": [
       "/tmp"

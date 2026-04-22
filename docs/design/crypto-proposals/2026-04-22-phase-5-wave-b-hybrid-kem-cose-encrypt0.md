@@ -1,10 +1,11 @@
 # Gate-1 proposal — Phase 5 Wave B: hybrid KEM + COSE_Encrypt0 payload encryption
 
 **Date:** 2026-04-22
-**Revision:** 2 (revised after Codex's design-level security review)
+**Revision:** 3 (Gate-1 approved; Q answers folded in)
 **Phase:** 5 (connector triangle), Wave B (encryption half)
 **Author:** Claude Code (on Yuka's review queue)
-**Status:** **Awaiting Gate-1 sign-off** — no implementation yet
+**Status:** **Gate-1 approved 2026-04-22** — implementation unblocked
+**Approval record:** `docs/design/crypto-approvals/2026-04-22-phase-5-wave-b-hybrid-kem-cose-encrypt0.md`
 **Prereq (landed):** Wave A COSE_Sign1
   (`docs/design/crypto-proposals/2026-04-22-phase-5-wave-a-cose-sign1-tokens.md`,
   approved
@@ -27,6 +28,21 @@
   requirements + library-internal-vs-external-surface
   documentation rather than library-API changes.
   Summary table at §"Codex security review resolutions".
+- **r3** (2026-04-22): **Gate-1 approved by Yuka**
+  (`docs/design/crypto-approvals/2026-04-22-phase-5-wave-b-hybrid-kem-cose-encrypt0.md`).
+  All eight Open Questions answered; each answer confirmed
+  Claude's proposed lean. Specifically:
+  - Q#1 HKDF IKM order → `kem_ss || ecdh_ss` (ML-KEM first).
+  - Q#2 ML-KEM sk zeroization → `Zeroizing<[u8; 2400]>` + per-decrypt reconstruction.
+  - Q#3 X25519 ephemeral source → `OsRng` in public API + test-only override.
+  - Q#4 AAD content → SHA-256 of canonical CBOR map of `(realm, tenant, inst, step, config_uuid, kid)`.
+  - Q#5 AEAD nonce → random 12 bytes from `OsRng`.
+  - Q#6 `rand_core` version pin → acknowledged; defer to implementation time, flag if it fractures.
+  - Q#7 COSE alg id → `alg = 3` (A256GCM) + custom text-keyed headers for `kem_ct` / `ecdh_eph_pk`.
+  - Q#8 distinguish AEAD / AAD / kem-ct failures → document-only, all lumped to `DecryptionFailed`.
+  The body of this document already captured all eight leans
+  at r2; r3 is a status / provenance bump rather than a design
+  change. No further revisions expected before Codex dispatch.
 
 ## Scope
 

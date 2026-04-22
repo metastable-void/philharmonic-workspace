@@ -57,6 +57,7 @@ PUBLIC_KEY_HEX = "d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f70751
 CLAIM_ORDER = [
     "iss",
     "exp",
+    "iat",
     "kid",
     "realm",
     "tenant",
@@ -68,6 +69,7 @@ CLAIM_ORDER = [
 
 ISS = "lowerer.main"
 EXP_MILLIS = 1924992000000  # 2031-01-01T00:00:00Z
+IAT_MILLIS = 1924991880000  # exp minus 120 seconds (default Wave A validity window)
 KID = "lowerer.main-2026-04-22-3c8a91d0"
 REALM = "llm"
 TENANT_UUID = "11111111-2222-4333-8444-555555555555"
@@ -102,6 +104,7 @@ def build_claim_pairs() -> list[tuple[str, object]]:
     return [
         ("iss", ISS),
         ("exp", EXP_MILLIS),
+        ("iat", IAT_MILLIS),
         ("kid", KID),
         ("realm", REALM),
         ("tenant", uuid_bytes(TENANT_UUID)),

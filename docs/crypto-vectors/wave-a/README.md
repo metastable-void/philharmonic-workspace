@@ -50,11 +50,18 @@ verified against.
 | `wave_a_public.hex` | 32-byte Ed25519 public key | RFC 8032 §7.1 TEST 1 |
 | `wave_a_payload_plaintext.hex` | 27-byte plaintext `"phase-5-wave-a-test-payload"` | fixed |
 | `wave_a_payload_hash.hex` | SHA-256 of the plaintext | computed |
-| `wave_a_claims.cbor.hex` | Canonical CBOR of the claim payload (207 bytes) | computed |
+| `wave_a_claims.cbor.hex` | Canonical CBOR of the claim payload (220 bytes) | computed |
 | `wave_a_protected.hex` | COSE_Sign1 protected header bytes (38 bytes) | computed |
-| `wave_a_sig_structure1.hex` | RFC 9052 §4.4 `Sig_structure1` (262 bytes) | computed |
+| `wave_a_sig_structure1.hex` | RFC 9052 §4.4 `Sig_structure1` (275 bytes) | computed |
 | `wave_a_signature.hex` | Ed25519 signature over `Sig_structure1` (64 bytes) | computed |
-| `wave_a_cose_sign1.hex` | Final COSE_Sign1 structure (317 bytes) | computed |
+| `wave_a_cose_sign1.hex` | Final COSE_Sign1 structure (330 bytes) | computed |
+
+**Byte sizes updated 2026-04-22** after the
+`philharmonic-connector-common 0.2.0` bump added an `iat` claim
+(9 → 10 claim-map entries; all downstream byte sizes grew).
+Prior-`0.1.0`-shaped vectors (claims 207, Sig_structure1 262,
+COSE_Sign1 317 bytes) are no longer valid; re-run the generator
+to match the current shape.
 
 ## Claim-set constants
 
@@ -67,6 +74,7 @@ declaration order.
 |-------|-------|
 | `iss` | `"lowerer.main"` |
 | `exp` | `1924992000000` (2031-01-01T00:00:00Z) |
+| `iat` | `1924991880000` (exp − 120 000 ms, the Wave A default validity window) |
 | `kid` | `"lowerer.main-2026-04-22-3c8a91d0"` |
 | `realm` | `"llm"` |
 | `tenant` | `11111111-2222-4333-8444-555555555555` |
@@ -77,6 +85,9 @@ declaration order.
 
 ## Dependencies
 
+- `philharmonic-connector-common >= 0.2.0` for the `iat` claim.
+  Earlier `0.1.x` versions don't have `iat` and will NOT match
+  `wave_a_claims.cbor.hex`.
 - `philharmonic-types >= 0.3.5` for the CBOR-bstr-shaped `Sha256`
   serde impl. Earlier versions emit a hex text string instead
   and will NOT match `wave_a_claims.cbor.hex`.
