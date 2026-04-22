@@ -5,7 +5,9 @@
       "Bash(./scripts/test-scripts.sh)",
       "Bash(./scripts/codex-status.sh)",
       "Skill(codex:rescue)",
-      "Skill(codex:rescue:*)"
+      "Skill(codex:rescue:*)",
+      "Bash(./scripts/miri-test.sh philharmonic-policy *)",
+      "Bash(./scripts/miri-test.sh philharmonic-types *)"
     ]
   },
   "enabledPlugins": {

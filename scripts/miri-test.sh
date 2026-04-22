@@ -13,8 +13,17 @@
 #
 # Usage:
 #   ./scripts/miri-test.sh --workspace                 # cargo miri test --workspace
-#   ./scripts/miri-test.sh <crate> [<crate>...]        # per-crate, one or more
+#   ./scripts/miri-test.sh <crate> [<test>...]         # per-crate, optionally
+#                                                      # filtered to specific
+#                                                      # test names (libtest
+#                                                      # substring match)
 #   ./scripts/miri-test.sh                             # usage error
+#
+# Single-crate + test-filter is the canonical form. Miri is slow
+# (10–50× cargo test), so the realistic use pattern is "one crate,
+# specific tests". The `--workspace` form is a rare escape hatch —
+# it almost always fails because most workspace crates use FFI
+# (testcontainers, sqlx, networking) that miri can't execute.
 #
 # Env:
 #   MIRIFLAGS — forwarded to miri. Common flags:
@@ -46,12 +55,16 @@ set -eu
 
 if [ $# -eq 0 ]; then
     cat <<EOF >&2
-Usage: $0 --workspace | <crate> [<crate>...]
+Usage: $0 --workspace | <crate> [<test>...]
 
 Examples:
-  $0 philharmonic-policy              # single crate
-  $0 philharmonic-types mechanics-config
-  $0 --workspace                      # entire workspace (may fail on FFI crates)
+  $0 philharmonic-policy                               # all non-ignored tests in the crate
+  $0 philharmonic-policy sck_decrypt                   # tests matching "sck_decrypt"
+  $0 philharmonic-policy sck_ pht_                     # tests matching either substring
+  $0 --workspace                                       # entire workspace (usually fails on FFI crates)
+
+Test-name args are libtest substring filters, forwarded to
+\`cargo test\` after \`--\`. Miri is slow; narrow the scope.
 
 Env: MIRIFLAGS forwarded (e.g. -Zmiri-disable-isolation).
 EOF
@@ -87,11 +100,20 @@ echo '=== cargo +nightly miri setup (idempotent) ==='
 cargo +nightly miri setup >/dev/null
 
 if [ "$1" = "--workspace" ]; then
+    if [ $# -gt 1 ]; then
+        echo "!!! --workspace takes no further args (got: $*)" >&2
+        exit 2
+    fi
     echo "=== cargo +nightly miri test --workspace ==="
     cargo +nightly miri test --workspace
 else
-    for crate in "$@"; do
-        echo "=== cargo +nightly miri test -p $crate ==="
+    crate="$1"
+    shift
+    if [ $# -eq 0 ]; then
+        printf '=== cargo +nightly miri test -p %s ===\n' "$crate"
         cargo +nightly miri test -p "$crate"
-    done
+    else
+        printf '=== cargo +nightly miri test -p %s -- %s ===\n' "$crate" "$*"
+        cargo +nightly miri test -p "$crate" -- "$@"
+    fi
 fi
