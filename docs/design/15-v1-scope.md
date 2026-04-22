@@ -24,7 +24,10 @@ What a first shipping release includes, and what's deferred.
   two-gate crypto review protocol (Gate-1 approach approval
   + Gate-2 code review) satisfied.
 - `philharmonic-connector-common` — published `0.1.0`
-  (2026-04-22). Shared connector-layer vocabulary:
+  (2026-04-22); `0.2.0` prepared in-tree (adds `iat` claim to
+  `ConnectorTokenClaims` per Wave A Gate-2 follow-up), publishes
+  with the rest of the connector triangle after Wave B end-to-
+  end. Shared connector-layer vocabulary:
   `ConnectorTokenClaims`, `ConnectorCallContext`, realm model
   (`RealmId`, `RealmPublicKey`, `RealmRegistry`), thin COSE
   wrapper types (`ConnectorSignedToken`,

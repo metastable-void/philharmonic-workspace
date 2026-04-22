@@ -16,15 +16,18 @@
   AES-256-GCM at-rest encryption, roles, role memberships,
   minting authorities, audit events; `pht_` long-lived API
   token format.
-- **`philharmonic-connector-common`** (v0.1.0) — shared
-  vocabulary for the connector layer: COSE token and payload
-  types (`ConnectorTokenClaims`, `ConnectorSignedToken`,
-  `ConnectorEncryptedPayload`), realm model (`RealmId`,
-  `RealmPublicKey`, `RealmRegistry`), `ConnectorCallContext`
-  (verified claims delivered to implementations), and the
-  shared `ImplementationError` taxonomy. Types-only; crypto
-  construction lives in `philharmonic-connector-client` and
-  `philharmonic-connector-service`.
+- **`philharmonic-connector-common`** (v0.1.0 on crates.io;
+  v0.2.0 pending in-tree) — shared vocabulary for the connector
+  layer: COSE token and payload types (`ConnectorTokenClaims`,
+  `ConnectorSignedToken`, `ConnectorEncryptedPayload`), realm
+  model (`RealmId`, `RealmPublicKey`, `RealmRegistry`),
+  `ConnectorCallContext` (verified claims delivered to
+  implementations), and the shared `ImplementationError`
+  taxonomy. Types-only; crypto construction lives in
+  `philharmonic-connector-client` and
+  `philharmonic-connector-service`. 0.2.0 adds an `iat` claim
+  to `ConnectorTokenClaims` (Wave A Gate-2 follow-up) and
+  publishes with the rest of the connector triangle after Wave B.
 - **`philharmonic-workflow`** (v0.1.0) — orchestration engine.
   Three entity kinds (`WorkflowTemplate`, `WorkflowInstance`,
   `StepRecord`) with append-only revision-based state evolution.
@@ -48,13 +51,18 @@
   byte-identical plaintext to the destination realm's KEM
   public key, and minting signed authorization tokens binding
   the payload hash to the step context. Implements
-  `ConfigLowerer` from `philharmonic-workflow`.
+  `ConfigLowerer` from `philharmonic-workflow`. Wave A mint
+  path (COSE_Sign1) landed in-tree 2026-04-22; Wave B encrypt
+  path pending. Publish held until Wave B end-to-end tests pass.
 - **`philharmonic-connector-router`** — pure HTTP dispatcher
-  binary library. Routes requests by realm.
+  binary library. Routes requests by realm. Implementation
+  lands with Wave B.
 - **`philharmonic-connector-service`** — service framework for
   per-realm connector service binaries. Hosts the
   `Implementation` trait, token verification, payload
-  decryption, dispatch.
+  decryption, dispatch. Wave A verify path landed in-tree
+  2026-04-22; Wave B decrypt path pending. Publish held until
+  Wave B end-to-end tests pass.
 - **`philharmonic-api`** — public HTTP API.
 - Per-implementation crates (one per connector implementation —
   e.g. `philharmonic-connector-impl-http-forward`,

@@ -130,6 +130,8 @@ connector call against one `TenantEndpointConfig`.
 - **Claims**:
   - `iss` — issuer (the lowerer / deployment).
   - `exp` — expiry.
+  - `iat` — issued-at (Unix milliseconds); authoritative mint
+    time, surfaced as `ConnectorCallContext.issued_at`.
   - `kid` — signing key ID.
   - `realm` — destination realm name.
   - `tenant` — tenant UUID.
