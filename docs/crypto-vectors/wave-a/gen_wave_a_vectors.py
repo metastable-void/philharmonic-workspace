@@ -100,7 +100,9 @@ def encode_cbor_map_in_order(pairs: list[tuple[str, object]]) -> bytes:
     return cbor2.dumps(dict(pairs))
 
 
-def build_claim_pairs() -> list[tuple[str, object]]:
+def build_claim_pairs(
+    payload_hash_override: bytes | None = None,
+) -> list[tuple[str, object]]:
     return [
         ("iss", ISS),
         ("exp", EXP_MILLIS),
@@ -113,7 +115,9 @@ def build_claim_pairs() -> list[tuple[str, object]]:
         ("config_uuid", uuid_bytes(CONFIG_UUID)),
         (
             "payload_hash",
-            hashlib.sha256(PAYLOAD_PLAINTEXT).digest(),
+            payload_hash_override
+            if payload_hash_override is not None
+            else hashlib.sha256(PAYLOAD_PLAINTEXT).digest(),
         ),
     ]
 
@@ -166,6 +170,29 @@ def build_cose_sign1(protected_bytes: bytes, payload_bytes: bytes,
 # Main.
 
 
+def sign_claims(
+    private_key: Ed25519PrivateKey,
+    payload_hash: bytes | None,
+) -> tuple[bytes, bytes, bytes, bytes, bytes]:
+    """Build claims + sign. Returns (claim_bytes, protected_bytes,
+    sig_structure1_bytes, signature, cose_sign1_bytes)."""
+    claim_pairs = build_claim_pairs(payload_hash_override=payload_hash)
+    payload_bytes = encode_cbor_map_in_order(claim_pairs)
+    protected_bytes = build_protected_header()
+    to_be_signed = sig_structure1(protected_bytes, payload_bytes)
+    signature = private_key.sign(to_be_signed)
+    cose_sign1_bytes = build_cose_sign1(
+        protected_bytes, payload_bytes, signature
+    )
+    return (
+        payload_bytes,
+        protected_bytes,
+        to_be_signed,
+        signature,
+        cose_sign1_bytes,
+    )
+
+
 def main(outdir: Path) -> None:
     seed = bytes.fromhex(SEED_HEX)
     private_key = Ed25519PrivateKey.from_private_bytes(seed)
@@ -182,21 +209,12 @@ def main(outdir: Path) -> None:
             f" RFC 8032 TEST 1 expected {PUBLIC_KEY_HEX}"
         )
 
-    # Build and serialize the claim payload.
-    claim_pairs = build_claim_pairs()
-    payload_bytes = encode_cbor_map_in_order(claim_pairs)
-
-    # Build the protected header.
-    protected_bytes = build_protected_header()
-
-    # Build Sig_structure1 and sign.
-    to_be_signed = sig_structure1(protected_bytes, payload_bytes)
-    signature = private_key.sign(to_be_signed)
-
-    # Build the final COSE_Sign1.
-    cose_sign1_bytes = build_cose_sign1(
-        protected_bytes, payload_bytes, signature
-    )
+    # --- Self-contained Wave A vector: payload_hash = SHA-256 of the
+    # fixed 27-byte PAYLOAD_PLAINTEXT. Used by the Wave A unit tests
+    # in philharmonic-connector-client/service to exercise the
+    # signing / verification paths without any Wave B dependency. ---
+    (payload_bytes, protected_bytes, to_be_signed, signature,
+     cose_sign1_bytes) = sign_claims(private_key, payload_hash=None)
 
     # Write artifacts.
     outdir.mkdir(parents=True, exist_ok=True)
@@ -214,6 +232,50 @@ def main(outdir: Path) -> None:
     }
     for name, hx in artifacts.items():
         (outdir / name).write_text(hx + "\n")
+
+    # --- Wave A × Wave B composition vectors: same claim set as
+    # above, but payload_hash points at the real Wave B-encrypted
+    # payload (read from the sibling crypto-vectors/wave-b directory
+    # if present). Used by the end-to-end Wave B integration tests
+    # where the lowerer mints a token over a real COSE_Encrypt0. ---
+    wave_b_hash_path = outdir.parent / "wave-b" / "wave_b_payload_hash.hex"
+    if wave_b_hash_path.is_file():
+        wave_b_payload_hash = bytes.fromhex(
+            wave_b_hash_path.read_text().strip()
+        )
+        assert len(wave_b_payload_hash) == 32
+
+        (comp_payload_bytes, comp_protected_bytes, comp_to_be_signed,
+         comp_signature, comp_cose_sign1_bytes) = sign_claims(
+            private_key, payload_hash=wave_b_payload_hash
+        )
+        composition = {
+            "wave_a_composition_payload_hash.hex":
+                wave_b_payload_hash.hex(),
+            "wave_a_composition_claims.cbor.hex":
+                comp_payload_bytes.hex(),
+            "wave_a_composition_sig_structure1.hex":
+                comp_to_be_signed.hex(),
+            "wave_a_composition_signature.hex":
+                comp_signature.hex(),
+            "wave_a_composition_cose_sign1.hex":
+                comp_cose_sign1_bytes.hex(),
+        }
+        for name, hx in composition.items():
+            (outdir / name).write_text(hx + "\n")
+        print()
+        print("# Wave A × Wave B composition vectors")
+        print(f"payload hash (from Wave B) = {wave_b_payload_hash.hex()}")
+        print(f"claims CBOR ({len(comp_payload_bytes):>3d} B) = "
+              f"{comp_payload_bytes.hex()[:60]}…")
+        print(f"signature ({len(comp_signature):>3d} B) = "
+              f"{comp_signature.hex()}")
+        print(f"COSE_Sign1 ({len(comp_cose_sign1_bytes):>3d} B) = "
+              f"{comp_cose_sign1_bytes.hex()[:60]}…")
+    else:
+        print()
+        print("# Wave A × Wave B composition vectors: NOT generated")
+        print(f"  (expected {wave_b_hash_path} but no file found)")
 
     # Print a human summary to stdout so rerunning the script in a
     # terminal shows the values without opening the files.

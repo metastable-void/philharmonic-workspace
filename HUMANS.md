@@ -9,7 +9,7 @@ this file, but never edit this file.
 
 ## Short-term TODOs
 
-- update ROADMAP.md regularly.
+- tell Claude Code to update the docs.
 - talk with Claude Code about what to do next;
   we have a clear deadline (before the Japanese
   Golden Week holidays).
