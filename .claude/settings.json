@@ -11,7 +11,12 @@
       "Bash(./scripts/pre-landing.sh --no-ignored philharmonic-policy)",
       "Bash(echo \"EXIT $?\")",
       "Read(//tmp/**)",
-      "Bash(./scripts/rust-test.sh --ignored philharmonic-policy)"
+      "Bash(./scripts/rust-test.sh --ignored philharmonic-policy)",
+      "Bash(cargo fmt *)",
+      "Bash(./scripts/pre-landing.sh --no-ignored philharmonic-types)"
+    ],
+    "additionalDirectories": [
+      "/tmp"
     ]
   },
   "enabledPlugins": {
