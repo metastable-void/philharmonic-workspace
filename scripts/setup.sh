@@ -66,8 +66,30 @@ else
     warn "(Setup itself succeeded; this is only a heads-up.)"
 fi
 
+# Install stable toolchain + nightly with miri. Stable is the primary
+# build target; nightly+miri is used by scripts/miri-test.sh for routine
+# UB checks (see docs/design/13-conventions.md §Testing — miri). Both
+# rustup invocations are idempotent: `toolchain install` does nothing
+# if the toolchain is present; `component add` does nothing if the
+# component is already installed.
+if command -v rustup >/dev/null 2>&1; then
+    echo
+    ok "Ensuring stable toolchain is installed"
+    rustup toolchain install stable --profile minimal
+    ok "Ensuring nightly toolchain is installed (for miri)"
+    rustup toolchain install nightly --profile minimal
+    ok "Ensuring miri is installed on nightly"
+    rustup component add miri --toolchain nightly
+else
+    echo
+    warn "rustup not on PATH — skipping toolchain install."
+    warn "Install rustup from https://rustup.rs/; then rerun this"
+    warn "script to pick up the stable + nightly + miri toolchains."
+fi
+
 echo
 printf '%sSetup complete.%s Next steps:\n' "$BOLD" "$RESET"
 printf '  scripts/status.sh     — see working-tree state\n'
 printf '  scripts/pull-all.sh   — update submodules to tracked branches\n'
 printf '  cargo check --workspace (once Rust is installed)\n'
+printf '  scripts/miri-test.sh <crate> (requires nightly + miri)\n'

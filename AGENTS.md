@@ -76,6 +76,10 @@ a branch and open a PR"), stop and surface that — don't guess.
   - `./scripts/rust-lint.sh [<crate>]`,
     `./scripts/rust-test.sh [--include-ignored|--ignored] [<crate>]`
     — individual phases if you need them standalone.
+  - `./scripts/miri-test.sh --workspace | <crate>...` —
+    `cargo +nightly miri test` for routine UB checks. Not in
+    pre-landing (too slow); used pre-publish and periodically.
+    Requires nightly + miri, installed via `setup.sh`.
   - `./scripts/cargo-audit.sh`,
     `./scripts/check-api-breakage.sh <crate> [<version>]` —
     pre-release checks.

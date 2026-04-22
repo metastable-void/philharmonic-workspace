@@ -69,3 +69,24 @@ else
     echo '=== rustup check ==='
     rustup check
 fi
+
+# Nightly + miri presence probe (scripts/miri-test.sh needs both).
+# We don't auto-install here — that's setup.sh's job. Just warn if
+# missing so contributors notice the drift.
+echo
+echo '=== nightly + miri (for scripts/miri-test.sh) ==='
+if rustup toolchain list 2>/dev/null | grep -q '^nightly'; then
+    nightly_version="$(rustup run nightly rustc --version 2>/dev/null || echo 'unknown')"
+    printf '  nightly: %s\n' "$nightly_version"
+    if rustup component list --toolchain nightly --installed 2>/dev/null | grep -q '^miri'; then
+        printf '  miri: installed\n'
+    else
+        echo '!!! miri not installed on nightly.' >&2
+        echo '    Fix: rustup +nightly component add miri' >&2
+        echo '    Or:  scripts/setup.sh (installs idempotently)' >&2
+    fi
+else
+    echo '!!! nightly toolchain not installed.' >&2
+    echo '    Fix: rustup toolchain install nightly' >&2
+    echo '    Or:  scripts/setup.sh (installs idempotently)' >&2
+fi

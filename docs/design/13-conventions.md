@@ -1149,6 +1149,57 @@ Test helpers factored into a shared module within the tests
 directory; no separate testing crates unless the helpers are
 genuinely shared across crates.
 
+### Miri
+
+Run `cargo +nightly miri test` routinely, via
+`./scripts/miri-test.sh`. Miri is an interpreter for Rust's
+mid-level IR that catches UB classes regular `cargo test`
+doesn't: uninitialized-memory reads, out-of-bounds pointer
+arithmetic, invalid `mem::transmute` / `mem::uninitialized`,
+data races, type-layout confusion, and stacked-borrows
+violations in `unsafe` code paths (including in dependencies).
+
+This workspace bans `unsafe` in library code (see §Panics and
+undefined behavior above), but miri is cheap insurance against
+UB smuggled in through:
+- Dependency updates that quietly add or widen `unsafe` blocks.
+- Test harnesses that bypass the library rules.
+- `std` / core behavior that's UB-adjacent on specific targets.
+
+Invocation:
+```bash
+./scripts/miri-test.sh <crate> [<crate>...]   # per-crate
+./scripts/miri-test.sh --workspace            # whole workspace
+MIRIFLAGS="-Zmiri-disable-isolation" ./scripts/miri-test.sh <crate>
+```
+
+Setup (one-time, handled by `scripts/setup.sh`):
+- `rustup toolchain install nightly --profile minimal`
+- `rustup component add miri --toolchain nightly`
+
+`scripts/check-toolchain.sh` probes for both and prints a
+warning if either is missing — so periodic pre-landing runs
+surface drift.
+
+Scope caveats:
+- Miri cannot exercise FFI, inline assembly, or most syscalls.
+  Crates that depend on real sockets, DB drivers (sqlx),
+  testcontainers, or other I/O won't run under miri — scope
+  invocations to in-memory crates (`philharmonic-types`,
+  `mechanics-config`, `philharmonic-policy`'s crypto paths)
+  rather than `--workspace` blindly. Use `MIRIFLAGS=
+  -Zmiri-disable-isolation` if you need filesystem / env
+  access.
+- Miri is slow (10–50× cargo-test). Don't put it in
+  `pre-landing.sh`; run manually before publishing a crate and
+  on a periodic schedule (weekly / pre-milestone).
+
+Crypto paths (`philharmonic-policy` SCK / `pht_`) are the
+highest-value miri targets in this workspace — AES / SHA-2
+implementations in the `aes-gcm` / `sha2` crates use `unsafe`
+for SIMD intrinsics, and miri exercises the slow no-SIMD
+reference paths, giving a cross-check against the default ones.
+
 ## Workspace inspirations
 
 Conventions draw from:

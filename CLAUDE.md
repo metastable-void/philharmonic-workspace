@@ -45,6 +45,12 @@ Developer: Yuka MORI.
     workspace or per-crate.
   - `./scripts/rust-test.sh [--include-ignored|--ignored] [<crate>]`
     — cargo test with ignored-test control.
+  - `./scripts/miri-test.sh --workspace | <crate>...` — routine
+    `cargo +nightly miri test` for UB checks (uninitialized
+    memory, OOB pointer arithmetic, data races, stacked borrows).
+    Requires nightly + miri (installed by `setup.sh`, probed by
+    `check-toolchain.sh`). Slow — not in `pre-landing.sh`; run
+    manually pre-publish and on a schedule.
   - `./scripts/cargo-audit.sh` — RustSec advisories.
   - `./scripts/check-api-breakage.sh <crate> [<baseline-version>]`
     — cargo-semver-checks, per-crate, crates.io baseline.

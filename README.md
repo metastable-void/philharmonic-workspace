@@ -244,6 +244,17 @@ Invoke by path (`./scripts/foo.sh`), not via `bash`.
   `#[ignore]` control. Default skips `#[ignore]`'d tests;
   `--ignored` runs only them (use per modified crate to exercise
   its integration tests); `--include-ignored` runs everything.
+- `./scripts/miri-test.sh --workspace | <crate>...` — run
+  `cargo +nightly miri test` for routine undefined-behavior
+  checks (uninitialized memory, OOB pointer arithmetic, data
+  races, stacked-borrows violations). Requires nightly + miri
+  (installed by `setup.sh`, probed by `check-toolchain.sh`).
+  Miri is slow (10–50× cargo test) and cannot exercise FFI /
+  real I/O, so scope per-crate to in-memory crates rather than
+  `--workspace` blindly. `MIRIFLAGS` is forwarded
+  (e.g. `-Zmiri-disable-isolation`). Not in `pre-landing.sh` —
+  run manually before publishing and on a periodic schedule.
+  See [`docs/design/13-conventions.md` §Testing — Miri](docs/design/13-conventions.md).
 - `./scripts/pre-landing.sh [--no-ignored] [<crate>...]` —
   canonical pre-landing driver. Auto-detects modified crates
   from dirty submodules, then runs `rust-lint.sh`,
