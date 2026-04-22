@@ -898,7 +898,8 @@ independently of the KEM work.
 - **No publish at Wave A end.** The crates stay at `0.0.0`
   until Wave B finishes.
 
-**Wave A status — landed 2026-04-22.**
+**Wave A status — landed 2026-04-22, Gate-2 approved
+2026-04-22.**
 - Gate-1: approved (proposal r4,
   `docs/design/crypto-approvals/2026-04-22-phase-5-wave-a-cose-sign1-tokens.md`).
   Triggered a `philharmonic-types 0.3.5` upstream fix
@@ -917,10 +918,20 @@ independently of the KEM work.
   `docs/notes-to-humans/2026-04-22-0011-phase-5-wave-a-claude-review.md`.
   One flagged follow-up (`ConnectorCallContext.issued_at` has
   no source claim; Codex set it to `now` at verify time —
-  semantically "time verified" not "time issued") deferred to
-  a later connector-common 0.2.0 bump or Wave B.
-- Crates remain at `0.0.0`; publish waits for Wave B's
-  end-to-end tests.
+  semantically "time verified" not "time issued").
+- Yuka Gate-2 approval:
+  `docs/design/crypto-approvals/2026-04-22-phase-5-wave-a-cose-sign1-tokens-01.md`.
+  `issued_at` follow-up decided **(C) for now, (A) later** —
+  accept `= now` through Wave A; add an `iat` claim to
+  `ConnectorTokenClaims` with the `philharmonic-connector-common
+  0.2.0` bump that Wave B forces.
+- Codex accuracy-checked the Claude Gate-2 note —
+  `docs/codex-reports/2026-04-22-0004-phase-5-wave-a-claude-review-accuracy-check.md`.
+  Two precision nits recorded under the note's §Corrigenda;
+  neither changes the Gate-2 conclusion.
+- **Crates remain at `0.0.0`; publish waits for Wave B's
+  end-to-end tests.** Gate-2 approval is for "code as landed in
+  working tree," not for crates-io release.
 
 ---
 

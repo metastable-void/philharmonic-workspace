@@ -1,7 +1,12 @@
 # Phase 5 Wave A — Claude Gate-2 review
 
 **Date:** 2026-04-22
-**Status:** Gate-2 PASS
+**Status:** Gate-2 PASS — **approved by Yuka 2026-04-22**
+**Approval record:** `docs/design/crypto-approvals/2026-04-22-phase-5-wave-a-cose-sign1-tokens-01.md`
+**Accuracy check:** `docs/codex-reports/2026-04-22-0004-phase-5-wave-a-claude-review-accuracy-check.md`
+  (Codex audited this note for factual accuracy — verdict
+  "materially accurate" with two precision nits recorded under
+  §Corrigenda below).
 **Subject:** Codex's COSE_Sign1 mint + verify implementation for
 `philharmonic-connector-client` and `philharmonic-connector-service`.
 
@@ -182,12 +187,44 @@ Awaiting your call; no change needed to land the Wave A code.
 - **Wave B**: hybrid KEM (ML-KEM-768 + X25519 + HKDF-SHA256 +
   AES-256-GCM) + COSE_Encrypt0 + end-to-end integration test.
   Per ROADMAP, blocked on Wave A (done now) and post-Golden-Week
-  timing.
+  timing. **No crates-io publish for the connector crates until
+  Wave B lands and end-to-end tests pass** — Wave A-approved
+  code stays at `0.0.0` in the meantime, per the Gate-1 proposal
+  and Yuka's Gate-2 approval.
 - **Codex prompt for Wave B**: to be drafted after Yuka's own
   Gate-1 for Wave B's hybrid construction (separate proposal
   doc, not this one).
-- **connector-common 0.2.0 decision** (A / B / C / D above): can
-  wait until Wave B forces the bump.
+- **connector-common 0.2.0 decision** (A / B / C / D above):
+  Yuka confirmed **(C) for now, (A) later** in the Gate-2
+  approval. `issued_at = now` stays for Wave A; an `iat` claim
+  gets added to `ConnectorTokenClaims` when Wave B forces the
+  `philharmonic-connector-common 0.2.0` bump.
 
 No immediate action needed from Yuka to land Wave A; the code is
 committed and pushed.
+
+## Corrigenda (after Codex accuracy check)
+
+Codex audited this note against the actual code in both
+submodules and flagged two precision-level issues
+(`docs/codex-reports/2026-04-22-0004-phase-5-wave-a-claude-review-accuracy-check.md`).
+Neither changes the Gate-2 conclusion; recording here for the
+record.
+
+1. **Step 3 can also return `Malformed`.** The error-variant
+   table lists step 3 (kid lookup) as mapping only to
+   `UnknownKid { kid }`. In fact `verify.rs:52-53` also returns
+   `TokenVerifyError::Malformed` if the protected-header `kid`
+   bytes fail to decode as UTF-8. The proposal's 11-step order
+   fires `Malformed` here rather than `UnknownKid` because a
+   non-UTF-8 kid can't even be compared; the behavior is
+   correct, just not what the table suggested.
+
+2. **`philharmonic-types = "0.3.5"` is still caret syntax.** The
+   note called the pin "explicit, not caret." In Cargo's version
+   grammar `"0.3.5"` is equivalent to `^0.3.5` — it floors at
+   `>= 0.3.5` within the `0.3.x` series but still accepts
+   `0.3.6`, `0.3.7`, etc. as compatible. A truly non-caret pin
+   would be `"=0.3.5"`. The intent (floor at 0.3.5 so the
+   CBOR-bstr `Sha256` serde is guaranteed) is correct; the
+   label was wrong.
