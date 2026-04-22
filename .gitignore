@@ -9,3 +9,12 @@ target/
 .codex/*
 !.codex/config.toml
 
+# Claude Code session-state files. Anything under .claude/ that
+# represents ephemeral per-session state (lock files, caches) is
+# ignored; committed tooling (settings.json, skills/, any local
+# settings like settings.local.json) stays tracked via the
+# negated entries below.
+.claude/*.lock
+.claude/.cache/
+.claude/scheduled_tasks.lock
+
