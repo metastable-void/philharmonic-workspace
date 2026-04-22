@@ -1015,6 +1015,119 @@ Don't use `anyhow` in library crates — callers can't match on
 specific failure modes. Use `anyhow` in application binaries where
 appropriate.
 
+## Panics and undefined behavior
+
+Philharmonic is systems-programming infrastructure: long-running
+services, request-handling paths, cryptography, storage. A
+panicking thread ends the task it was running and, depending on
+the runtime, can destabilize neighboring tasks on the same
+worker; an unchecked integer overflow / underflow changes
+behavior silently between debug and release; an out-of-bounds
+index read is an invariant violation the compiler cannot catch.
+None of those failure modes are acceptable surface behavior for
+a crate that's meant to be trusted in production.
+
+**Principle: library code surfaces failures as typed `Result`s,
+not panics.** Bugs and genuine unrecoverable conditions are
+narrow exceptions, not the common case.
+
+**Banned in library code** (`src/**/*.rs`, excluding `#[cfg(test)]`
+modules):
+
+- **`.unwrap()` and `.expect()` on `Result` / `Option`** — use
+  `?` with a typed error variant, or `.ok_or_else(...)` /
+  `.map_err(...)` to convert.
+- **`panic!`, `unreachable!`, `todo!`, `unimplemented!` on
+  reachable paths** — model unreachability at the type level
+  (newtype, `NonZero<T>`, sealed enums, typestates) so the
+  compiler proves the invariant instead of `unreachable!()`
+  asserting it at runtime.
+- **Unbounded indexing** — `slice[i]`, `slice[a..b]`, and
+  `HashMap[&k]` all panic on absent or OOB access. Use
+  `.get(i)` / `.get(a..b)` / `.get(&k)` and propagate the
+  `Option`. Iterator-based access (`.iter().nth(i)`,
+  `.windows(n)`, `.chunks(n)`) is also fine — none of those
+  panic.
+- **Unchecked integer arithmetic** — `a + b`, `a - b`, `a * b`,
+  `a / b`, `a % b`, and the `+=` / `-=` / etc. assign forms all
+  panic on overflow in debug builds and silently wrap or trap in
+  release builds (release behavior depends on `overflow-checks`).
+  Use `checked_*`, `saturating_*`, or `wrapping_*` to declare
+  intent at the call site:
+  - `checked_add(n)` → `Option<T>` when the caller can handle
+    overflow as an error;
+  - `saturating_sub(n)` when clamping to `T::MIN` / `T::MAX` is
+    the desired behavior (common for `usize` subtraction
+    producing "zero or more remaining");
+  - `wrapping_add(n)` when modular arithmetic is the actual
+    intent (counters, hash mixing).
+  Plain `+` / `-` is still fine for constants or for cases the
+  compiler can prove — e.g. `usize_len + 1` where `usize_len`
+  comes from `.len()` of a `Vec<T>` of bounded size. When the
+  inputs are untrusted (external data, user input, other
+  crates' values), use checked arithmetic.
+- **Lossy `as` casts when the input can exceed the target
+  type's range** — `n as u32` silently truncates when `n: u64 >
+  u32::MAX`. Use `u32::try_from(n)` and propagate the resulting
+  `TryFromIntError` (or convert to a typed crate error). For
+  casts that are provably lossless (e.g. `u16 as u32`), plain
+  `as` is fine.
+- **`debug_assert!` / `assert!` on data from outside the
+  crate.** `debug_assert!` is compiled out in release, so a
+  production failure ships silently; `assert!` panics. For
+  internal consistency checks the crate controls end-to-end,
+  `debug_assert!` is acceptable; for inputs from a caller or
+  the outside world, validate with a `Result`-returning helper.
+- **`unsafe` blocks** — separately banned workspace-wide (see
+  `ROADMAP.md §5` and `docs/design/11-security-and-cryptography.md`).
+  No library crate here takes `unsafe` dependencies on invariants
+  the type system can't express.
+
+**Narrow exceptions — allowed with an inline justification:**
+
+- **Unrecoverable OS / hardware failure.** `SysRng.try_fill_bytes(...)
+  .expect("OS RNG failure — system entropy unavailable")` is
+  the one pattern already approved (see
+  `philharmonic-policy/src/sck.rs`). Rationale: on a system that
+  can't produce entropy, no cryptographic work is possible; no
+  caller can recover. This matches what `ring`, RustCrypto, and
+  `rand`'s `ThreadRng` do internally. Comment the reason at the
+  call site.
+- **Build-time-validated constants.** `uuid!("literal")` is
+  compile-time validated and has no runtime panic path. Same for
+  string literals parsed via `const fn`.
+- **Type-witness unreachability.** If you've exhausted a sealed
+  enum or matched on a newtype whose constructor rules out a
+  variant, `unreachable!()` is still wrong — change the match
+  or change the type. If the compiler is the only one that
+  can't see unreachability (e.g. slice-pattern exhaustion that
+  `match` can't express), prefer `expect` with a message naming
+  the type-level reason.
+
+**Where panics are fine**:
+
+- `#[cfg(test)]` modules, `tests/*.rs` integration tests,
+  `dev-dependencies`. Panicking is the mechanism of signaling
+  test failure; readability wins over ceremony.
+- `xtask/` bins: these are dev tooling, run from the contributor's
+  shell. A panic prints a stack trace to the contributor. Use
+  typed errors for user-surface failures (bad CLI args,
+  network failures) but `.unwrap()` / `.expect()` on invariants
+  is fine.
+- Reasonable `.expect()` at binary startup (e.g. parsing config
+  file at `main()`) — there's no caller to return a `Result` to.
+  In-service panic sources (request handlers, connection pools,
+  task loops) still follow the library rules.
+
+**Enforcement.** There is no automated lint yet. Reviewers audit
+at PR time, and the crypto-review protocol
+(`.claude/skills/crypto-review-protocol/`) includes an explicit
+panic-site pass over any crypto-sensitive diff. When Clippy adds
+reliable lints for the patterns above (`clippy::indexing_slicing`,
+`clippy::arithmetic_side_effects`, `clippy::unwrap_used`,
+`clippy::expect_used`, `clippy::integer_arithmetic`), adopt them
+per-crate with deny-level.
+
 ## Async runtime
 
 `tokio` is the workspace default. Avoid `async-std` or other

@@ -96,6 +96,27 @@ Developer: Yuka MORI.
   canonical source — `xtask.sh` — so nobody accidentally
   commits a value they generated ad-hoc and meant to throw
   away.
+- **No panics in library code.** This is systems-programming
+  infrastructure — request handlers, long-lived services, crypto,
+  storage — and a panicking task is user-visible failure with
+  hard-to-diagnose blast radius. `src/**` in every published
+  crate treats panics as bugs: no `.unwrap()` / `.expect()` on
+  `Result`/`Option`, no `panic!` / `unreachable!` / `todo!` /
+  `unimplemented!` on reachable paths, no unbounded indexing
+  (`slice[i]`, `slice[a..b]`, `map[&k]` — use `.get(...)` →
+  `Option` and propagate), no unchecked integer arithmetic
+  (use `checked_*` / `saturating_*` / `wrapping_*` to declare
+  intent), no lossy `as` casts on untrusted widths (use
+  `TryFrom`). Narrow exceptions require an inline justification
+  (unrecoverable OS failure like `OsRng` entropy exhaustion —
+  the one approved pattern at
+  `philharmonic-policy/src/sck.rs`; compile-time-validated
+  literals like `uuid!(...)`; type-witness unreachability that
+  the compiler can't express). Tests / `dev-dependencies` /
+  `xtask/` bins can `.unwrap()` freely; production crate `src/`
+  cannot. See docs/design/13-conventions.md §Panics and
+  undefined behavior for the full rule with examples and the
+  list of relevant future-Clippy lints.
 - **Never recall a Rust crate's published version from memory
   — always look it up via
   `./scripts/xtask.sh crates-io-versions -- <crate>`.**

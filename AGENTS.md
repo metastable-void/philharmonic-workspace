@@ -104,6 +104,40 @@ a branch and open a PR"), stop and surface that — don't guess.
   `is_retryable()` where useful. **Do not use `anyhow` in library
   crates** — callers can't match on specific failure modes. Binary
   crates may use `anyhow`.
+- **No panics in library code.** This is systems-programming
+  infrastructure (request handlers, long-lived services, crypto,
+  storage); a panicking task is user-visible failure. In any
+  `src/**/*.rs` outside `#[cfg(test)]`:
+  - No `.unwrap()` / `.expect()` on `Result` / `Option` — use
+    `?` with a typed error variant, or `.ok_or_else(...)` /
+    `.map_err(...)`.
+  - No `panic!` / `unreachable!` / `todo!` / `unimplemented!` on
+    reachable paths — model unreachability at the type level
+    (newtypes, sealed enums, `NonZero<T>`, typestates).
+  - **No unbounded indexing** — `slice[i]`, `slice[a..b]`,
+    `map[&k]` all panic on absent/OOB access. Use
+    `.get(...)` → `Option`, propagate.
+  - **No unchecked integer arithmetic** — `+`, `-`, `*`, `/`, `%`
+    (and `+=` / `-=` / etc.) panic on overflow in debug and
+    either trap or wrap silently in release. Use `checked_*` →
+    `Option` when the caller should handle overflow as an
+    error, `saturating_*` when clamping is the intent (common
+    for `usize` subtraction), `wrapping_*` when modular arith
+    is the actual semantic (counters, hash mixing). Plain `+` /
+    `-` is fine for constants and compiler-provable cases.
+  - No lossy `as` casts when the input width can exceed the
+    target's range — use `TryFrom::try_from` and propagate the
+    `TryFromIntError`. Provably-lossless casts (`u16 as u32`)
+    are fine.
+  Narrow, justified exceptions (inline comment required at the
+  call site): unrecoverable OS / hardware failure (the
+  `OsRng.try_fill_bytes(...).expect("OS RNG failure ...")`
+  pattern); build-time-validated constants (`uuid!("literal")`);
+  type-witness unreachability the compiler can't express. Tests
+  / dev-deps / `xtask/` bins can `.unwrap()` freely — panics in
+  tests are the failure-signal mechanism. See
+  `docs/design/13-conventions.md §Panics and undefined behavior`
+  for the full rule and rationale.
 - **Async.** `tokio` is the workspace default. Use `tokio::sync`
   primitives. Use `async-trait` on traits that need to be
   dyn-compatible.
