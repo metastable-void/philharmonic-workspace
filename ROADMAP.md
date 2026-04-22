@@ -824,7 +824,13 @@ wave pattern and it kept round-trips manageable.
   Zeroization discipline for intermediate key material. Larger
   surface; more novel (PQC). Builds on Wave A's token so that
   encrypted payloads can be hash-bound at mint time. Gate-1
-  proposal scheduled after Wave A lands.
+  proposal (r1) draft at
+  `docs/design/crypto-proposals/2026-04-22-phase-5-wave-b-hybrid-kem-cose-encrypt0.md` —
+  awaiting Yuka's review. Eight open questions, five require
+  decisions before dispatch. Wave B also lands the
+  `philharmonic-connector-common 0.2.0` bump (adds `iat` claim
+  per Wave A Gate-2 decision (A) later), which forces a Wave A
+  reference-vector regeneration.
 
 Neither wave publishes on its own — the triangle's crates
 publish as `0.1.0` only after Wave B's end-to-end tests pass.
