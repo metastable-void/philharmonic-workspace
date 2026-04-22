@@ -31,6 +31,84 @@ Out of scope for Wave A (deferred to Wave B):
 - Router.
 - End-to-end cross-crate integration (comes after Wave B).
 
+## Replay threat model
+
+The Wave A verification path is deliberately stateless — no
+`jti`, no server-side replay cache. This is a considered choice,
+not an oversight. Codex's security review flagged the absence as
+a HIGH finding; the finding is factually correct, and we accept
+the narrow threat in exchange for statelessness.
+
+### Threats considered
+
+1. **External wire-level replay / MITM.** Mitigated by TLS. The
+   `philharmonic-connector-router` terminates TLS at
+   `<realm>.connector.<domain>` and forwards to service
+   instances on the internal network. An external attacker can't
+   intercept a valid `(token, payload)` pair in the first place.
+
+2. **Log-based replay.** If an attacker obtains historical
+   `(token, payload)` pairs from logs, audit trails, or a
+   breached observability stack, they can replay them while
+   `exp` is still in the future. Mitigated by a tight `exp`
+   window — default 120 seconds from mint. The attack window
+   closes within seconds of natural token expiry.
+
+3. **Internal compromise** (rogue operator with wire access, a
+   compromised service replica). Anyone who has the capability
+   to replay at this level already has the capability to mint
+   new tokens or bypass the connector layer entirely. Replay
+   detection buys nothing against this threat.
+
+4. **Accidental double-fire** (network retry, lost ack, client
+   reconnect). This is the one realistic case where the same
+   `(token, payload)` hits the service twice. It's a
+   **correctness** concern (re-executed side effects), not a
+   security concern. Addressed at the implementation layer via
+   protocol-native idempotency: `http_forward` can thread
+   `instance_id` / `step_seq` as idempotency headers; `email_send`
+   uses RFC 5322 `Message-Id`; payment connectors use
+   vendor-specific idempotency keys; `sql_query` is the caller's
+   problem (SQL has transactions). The framework exposes
+   `instance_id`, `step_seq`, `config_uuid` in
+   `ConnectorCallContext` specifically so each impl can derive
+   a natural idempotency key.
+
+### Why not a server-side jti cache
+
+A `jti` claim plus a server-side replay cache would close the
+log-based replay window before `exp`. Costs:
+
+- Breaks the **"stateless where feasible"** workspace principle.
+- Requires a distributed cache across service replicas (Redis
+  or equivalent) for HA; adds a hard runtime dep.
+- Cache memory and TTL management become operational concerns
+  (eviction policy, memory ceilings, cross-region consistency).
+- Marginal benefit over tight `exp` + TLS + protocol-layer
+  idempotency.
+
+The tradeoff goes the other way. Stateless stays.
+
+### Properties this decision commits to
+
+- **`exp` is mandatory and defaults to 120 s** from mint time.
+  Lowerers that want a shorter window can configure it; longer
+  windows require explicit justification and operator sign-off.
+- **TLS is mandatory** on all legs: lowerer → router, router →
+  service. Plaintext HTTP between any two legs is out of scope
+  for v1 and SHOULD be rejected at config-load time in
+  production deployments.
+- **Per-impl idempotency is documented** in the
+  `philharmonic-connector-impl-*` crate READMEs. An impl that
+  performs non-idempotent side effects without an
+  idempotency-key mechanism is considered to have a bug — the
+  framework is not responsible for the duplicate behavior.
+
+This section exists so the threat-model decision is explicit
+and re-reviewable later. If the deployment model changes (e.g.
+we add a third-party hosted router, or weaken TLS assumptions),
+the replay model should be revisited.
+
 ## Primitives and library versions
 
 All RustCrypto. Versions verified against crates.io on
@@ -135,32 +213,78 @@ matches the RFC 9052 recommended pattern for JWT-like tokens.
 
 ### Service-side verification order
 
-The service-side `verify_token` runs checks in this order,
-stopping at the first failure:
+The service-side `verify_token(cose_bytes, payload_bytes,
+service_realm)` runs checks in this order, stopping at the
+first failure. Ordering is deliberate: algorithm and key-level
+checks fail before expensive crypto, signature verification
+fails before any untrusted payload content is trusted, and all
+content-level checks run over verified claim bytes.
 
-1. Parse the COSE_Sign1 bytes via `coset::CoseSign1::from_slice`.
-2. Extract `kid` from protected header; look up the verifier
-   key in the `MintingKeyRegistry`. Unknown kid → reject.
-3. Verify the Ed25519 signature using
-   `coset::CoseSign1::verify_signature`. Bad signature →
-   reject. **This must come before any payload-content check**
-   so that malformed payloads can't leak timing side channels.
-4. Decode the claim payload from CBOR.
-5. Check `exp > now_millis()` where `now_millis()` uses
-   `UnixMillis::now()` (monotonic enough for expiry checks;
-   we're not making real-time-accuracy claims). Expired →
-   reject.
-6. Compute `SHA-256(payload_bytes)` where `payload_bytes` is
-   the caller-supplied opaque payload. Compare with
-   `claims.payload_hash` in constant time via
-   `subtle::ConstantTimeEq` (pull `subtle = "2"` as a small new
-   dep, or use `ed25519-dalek`'s transitive `subtle`
-   re-export — TBD at implementation time, no construction
-   impact).
-7. If the caller passed an `expected_realm`, check
-   `claims.realm == expected_realm`. Mismatch → reject.
+1. **Parse** the COSE_Sign1 bytes via
+   `coset::CoseSign1::from_slice`. Malformed → reject
+   (`TokenVerifyError::Malformed`).
 
-Only after all seven pass is a verified `ConnectorCallContext`
+2. **Pin algorithm.** Read `alg` from the protected header;
+   require `alg == -8` (EdDSA per RFC 9053 §2.2). Any other
+   value rejects as `TokenVerifyError::AlgorithmNotAllowed`.
+   This is defense-in-depth against COSE / JWT-style
+   algorithm-confusion regressions if a dependency changes
+   behavior.
+
+3. **Kid lookup.** Extract `kid` from the protected header;
+   look up the verifier key in the `MintingKeyRegistry`.
+   Unknown kid → `TokenVerifyError::UnknownKid`.
+
+4. **Key validity window.** The registry entry carries
+   `not_before` / `not_after` (`UnixMillis`). Reject if `now <
+   not_before` or `now >= not_after`
+   (`TokenVerifyError::KeyOutOfWindow`). Operators that want a
+   kid immediately inactive can retire it by removing the
+   entry; the window check catches future-dated keys accepted
+   early and retired keys that weren't removed.
+
+5. **Payload size ceiling.** Before hashing, enforce
+   `payload_bytes.len() <= MAX_PAYLOAD_BYTES`. Default is
+   `1_048_576` (1 MiB), configurable per service. Oversize →
+   `TokenVerifyError::PayloadTooLarge { limit, actual }`.
+   Keeps the SHA-256 work attacker-bounded.
+
+6. **Signature verification.** Use
+   `coset::CoseSign1::verify_signature` with the Ed25519
+   verifying key from step 3. Bad signature →
+   `TokenVerifyError::BadSignature`. **No claim content is
+   trusted before this step passes.**
+
+7. **Claim payload decode.** Decode the claim payload from
+   CBOR into `ConnectorTokenClaims`. Malformed → treat as
+   `TokenVerifyError::Malformed` (the signature was valid over
+   something that still didn't match our schema, which means
+   either a version skew or a subtle encoding drift — reject
+   either way).
+
+8. **Kid consistency.** Require `claims.kid ==
+   protected.kid` (both are signature-covered, but duplication
+   invites drift). Mismatch →
+   `TokenVerifyError::KidInconsistent`. Cheap; catches schema
+   bugs and forensic-log confusion before they propagate.
+
+9. **Expiry.** Check `claims.exp > UnixMillis::now()`. Expired
+   → `TokenVerifyError::Expired`.
+
+10. **Payload-hash binding.** Compute
+    `SHA-256(payload_bytes)`. Compare in constant time with
+    `claims.payload_hash` via `subtle::ConstantTimeEq`
+    (Open Question #3 resolution: we pull `subtle = "2"`).
+    Mismatch → `TokenVerifyError::PayloadHashMismatch`.
+
+11. **Realm binding (mandatory).** Check `claims.realm ==
+    service_realm`. Mismatch →
+    `TokenVerifyError::RealmMismatch`. The service knows its
+    own realm at boot; it is never a caller-optional check.
+    This closes the cross-realm / audience-confusion vector
+    that Codex's review flagged as a HIGH issue.
+
+Only after all eleven pass is a verified `ConnectorCallContext`
 returned. The context is built from the claim fields that the
 service needs to dispatch (`tenant`, `inst`, `step`,
 `config_uuid`, `iss`-as-issuer, `exp`). The service does **not**
@@ -178,6 +302,20 @@ Each lowerer binary loads its Ed25519 keypair at boot:
   (`signing_key_path`). 32-byte seed; PEM or raw binary —
   decide at implementation time, default to raw binary for
   simplicity.
+- **File-permission check before the read.** On Unix
+  (`cfg(unix)`), `stat(2)` the file and fail closed unless:
+  - the owning uid matches the current process's uid (i.e. the
+    key file isn't owned by someone else), AND
+  - the mode's group and other bits are both zero (i.e.
+    `mode & 0o077 == 0`, matching the 0600 / 0400 class).
+  Non-compliant permissions → the lowerer refuses to start with
+  `SigningKeyFilePermissions` error, naming the file and the
+  observed mode. On Windows (not a supported production host;
+  see conventions), skip the check with a warning. This catches
+  world- or group-readable key files, which on multi-user or
+  misconfigured hosts are the most common secret-exfiltration
+  path. (The check is analogous to OpenSSH's client
+  `StrictHostKeyChecking`-adjacent file-mode refusals.)
 - Read bytes into `Zeroizing<[u8; 32]>` immediately after the
   file read; `std::fs::read` returns `Vec<u8>` which lives
   long enough for a `copy_from_slice` into the zeroized
@@ -218,13 +356,19 @@ The `philharmonic-connector-service` holds a
 `MintingKeyRegistry`:
 
 ```rust
+pub struct MintingKeyEntry {
+    pub vk: ed25519_dalek::VerifyingKey,
+    pub not_before: UnixMillis,
+    pub not_after: UnixMillis,
+}
+
 pub struct MintingKeyRegistry {
-    by_kid: HashMap<String, ed25519_dalek::VerifyingKey>,
+    by_kid: HashMap<String, MintingKeyEntry>,
 }
 
 impl MintingKeyRegistry {
-    pub fn lookup(&self, kid: &str) -> Option<&VerifyingKey>;
-    pub fn insert(&mut self, kid: String, vk: VerifyingKey);
+    pub fn lookup(&self, kid: &str) -> Option<&MintingKeyEntry>;
+    pub fn insert(&mut self, kid: String, entry: MintingKeyEntry);
 }
 ```
 
@@ -233,11 +377,13 @@ Public keys are **not** sensitive and don't need zeroization.
 Registered at boot from a config file (one entry per minting
 authority, each with `kid`, `public_key_hex`, `not_before`,
 `not_after`). Rotation is additive: a new kid gets a new
-`VerifyingKey` inserted; the old kid stays registered until
-all in-flight tokens issued under it have expired (`exp` past
-`now`). Validity windows (`not_before` / `not_after` on the
-service-side registry entry) let operators retire a kid
-cleanly.
+`MintingKeyEntry` inserted; old kids stay registered until
+all in-flight tokens issued under them have expired.
+`not_before` / `not_after` are **enforced** at verification
+time (see verify step 4 above) — they are not advisory. This
+means a future-dated key cannot be used early, and an operator
+can retire a kid cleanly by setting `not_after` in the past
+without needing to synchronously remove the entry.
 
 ### `kid` encoding
 
@@ -318,22 +464,41 @@ Committed as `tests/vectors/wave_a_cose_sign1.hex`.
 
 ### Negative-path vectors
 
+One vector per rejection reason in the verification order. Each
+must fail with the specific `TokenVerifyError` variant named.
+
+- `wave_a_bad_alg.hex` — same claims + key, but protected
+  header re-encoded with `alg = -7` (ES256). Must fail at
+  step 2 with `AlgorithmNotAllowed`.
+- `wave_a_unknown_kid.hex` — `kid` in the protected header
+  replaced with a kid not in the registry. Step 3,
+  `UnknownKid`.
+- `wave_a_key_out_of_window.hex` — valid token but the
+  registry entry for that kid has `not_after` in the past.
+  Step 4, `KeyOutOfWindow`.
+- `wave_a_payload_too_large.hex` — payload_bytes of size
+  `MAX_PAYLOAD_BYTES + 1`. Step 5, `PayloadTooLarge`.
 - `wave_a_tampered_sig.hex` — last byte of the signature
-  flipped; must fail verification.
+  flipped. Step 6, `BadSignature`.
 - `wave_a_tampered_payload.hex` — one byte of the claim
-  payload flipped; must fail verification.
-- `wave_a_tampered_kid.hex` — `kid` in the protected header
-  replaced with a kid not in the registry; must fail at the
-  registry lookup step.
-- `wave_a_expired.hex` — same construction but `exp` set to 1
-  (long in the past); must pass signature verification but
-  fail the expiry check.
+  payload flipped. Step 6, `BadSignature` (the signature no
+  longer covers the modified payload).
+- `wave_a_kid_inconsistent.hex` — protected header `kid` and
+  `claims.kid` differ. Step 8, `KidInconsistent`. (Synthesized
+  by signing a CBOR-encoded claim with `claims.kid = "A"` but
+  placing `"B"` in the protected header — signature valid but
+  the two kids mismatch.)
+- `wave_a_expired.hex` — `exp` set to 1 (long in the past).
+  Step 9, `Expired`.
 - `wave_a_payload_hash_mismatch.hex` — valid signature over
   one claim's `payload_hash`, but service verifies with
-  different payload bytes; must fail the hash-mismatch check.
+  different payload bytes of the same length. Step 10,
+  `PayloadHashMismatch`.
+- `wave_a_realm_mismatch.hex` — `claims.realm = "llm"` but
+  service_realm is `"sql"`. Step 11, `RealmMismatch`.
 
-Five negative vectors covering each rejection reason in the
-verification order.
+Ten negative vectors, one per verification step that has a
+reject path.
 
 ## Explicit confirmations (per crypto-review skill)
 
@@ -395,15 +560,11 @@ verification order.
    tool in the plan — if Yuka wants a different reference
    (e.g. `go-cose`), say so and I'll adjust.
 
-3. **`subtle` crate for constant-time `payload_hash` compare.**
-   SHA-256 digest comparisons that *feed* a signature check
-   are already covered by the signature's integrity — but
-   the payload-hash check on the service side is a separate
-   equality. Using `ConstantTimeEq` is cheap insurance
-   against speculative side channels. Small new dep (`subtle
-   = "2"`), already in the dependency tree transitively via
-   `ed25519-dalek`. Flagging as a decision, not a question —
-   will use unless Yuka objects.
+3. ~~**`subtle` crate for constant-time `payload_hash`
+   compare.**~~ **Decided (r2):** use `subtle = "2"` for the
+   `payload_hash` equality in verify step 10. Already in the
+   dep tree transitively via `ed25519-dalek`, so no new runtime
+   surface. Closing.
 
 ## What lands (Wave A)
 
@@ -427,15 +588,45 @@ What does not ship in Wave A:
 - No publish — crates stay at `0.0.0` until Wave B's
   end-to-end tests pass.
 
+## Codex security review resolutions
+
+Codex ran an independent design-level security review of r1 of
+this proposal. The full report is at
+`docs/codex-reports/2026-04-22-0003-phase-5-wave-a-cose-sign1-tokens-security-review.md`.
+Seven findings; Claude's evaluation and the r2 resolution per
+finding:
+
+| # | Finding | Severity | r2 resolution |
+|---|---------|----------|---------------|
+| 1 | Replay resistance not specified (no `jti`, no server-side cache) | HIGH | **Accept the risk, document explicitly.** Threat is narrow given TLS on every leg, tight 120 s `exp`, and protocol-layer idempotency as the impl's responsibility. Server-side `jti` cache breaks "stateless where feasible" and adds an HA cache dep for marginal benefit. See §"Replay threat model". |
+| 2 | `not_before` / `not_after` on registry entries defined but not checked at verify | HIGH | **Fixed.** Enforced at verify step 4 (`KeyOutOfWindow`). Registry now carries an explicit `MintingKeyEntry` with the window. |
+| 3 | No audience binding; optional `realm` check; weak issuer-key binding | HIGH | **Partially fixed.** Realm check is now mandatory at verify step 11 (`RealmMismatch`). No `aud` claim added — `realm` acts as audience in this architecture. Issuer-bound registry entries not adopted for v1 (small benefit, adds operator config; revisit if a concrete issuer-confusion scenario surfaces). |
+| 4 | `alg` not explicitly pinned on verify | MEDIUM | **Fixed.** Explicit `alg == -8` (EdDSA) check at verify step 2 (`AlgorithmNotAllowed`). |
+| 5 | Signing-key file handling omits permission checks | MEDIUM | **Fixed.** 0600-class permission + matching-uid check before the file read on `cfg(unix)`. `SigningKeyFilePermissions` error on mismatch. |
+| 6 | Unbounded payload hashing (DoS pressure) | MEDIUM | **Fixed.** Hard `MAX_PAYLOAD_BYTES` ceiling (default 1 MiB) enforced at verify step 5 before the SHA-256 work (`PayloadTooLarge`). |
+| 7 | Duplicated `kid` in protected header and claims without equality check | LOW | **Fixed.** Equality check at verify step 8 (`KidInconsistent`). Keeping both locations because `ConnectorTokenClaims` ships in `philharmonic-connector-common 0.1.0` with `kid` already in the claim set; removing it would be an API break we don't want mid-v1. |
+
+Six of seven findings are code / design fixes landed inline
+above. The seventh (replay) is a deliberate threat-model
+decision documented in §"Replay threat model". The report's
+"positive notes" (signature-first ordering, protected-header
+`alg`/`kid`, explicit negative vector planning) all carried
+through into r2.
+
 ## Requesting Gate-1 approval
 
 For this proposal to unblock dispatch:
 
-- Confirm or adjust each of the three Open Questions.
+- Confirm or adjust the two remaining Open Questions (#1
+  zeroization approach, #2 cross-check reference). #3 is
+  decided.
+- Confirm the replay threat-model decision in §"Replay threat
+  model" — stateless, exp-bound, impl-layer idempotency.
+- Confirm the revised 11-step verification order and, in
+  particular, the post-review additions (alg pin, key window,
+  payload size ceiling, kid equality, mandatory realm).
 - Flag any field of the claim set you want CBOR-encoded
   differently than the defaults (e.g. `Uuid` as text vs.
   bytes).
-- Confirm the verification order is correct, especially the
-  signature-first-before-any-payload-content-check ordering.
 - Say "Gate-1 approved" and I'll archive the Codex prompt +
   dispatch. No code before that.
