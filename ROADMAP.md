@@ -801,14 +801,114 @@ code personally.** Do not publish these without her sign-off.
 **Reference**: `08-connector-architecture.md`,
 `11-security-and-cryptography.md` exhaustively.
 
+#### Wave split
+
+Phase 5 is split into two waves, each with its own Gate-1
+crypto proposal and Gate-2 code review. Decided 2026-04-22 to
+keep each review surface tractable — Phase 2 used the same
+wave pattern and it kept round-trips manageable.
+
+- **Wave A — COSE_Sign1 authorization tokens.** Ed25519
+  signing, COSE_Sign1 construction and verification, kid-based
+  public-key registry, token expiry + payload-hash claim
+  binding. No encryption. Touches `connector-client` (mint)
+  and `connector-service` (verify). `connector-router` stays
+  no-crypto. Smaller, well-understood primitives (RustCrypto
+  `ed25519-dalek` + `coset`). Gate-1 proposal at
+  `docs/design/crypto-proposals/2026-04-22-phase-5-wave-a-cose-sign1-tokens.md`.
+
+- **Wave B — Hybrid KEM + AEAD payload encryption.** ML-KEM-768
+  + X25519 hybrid KEM, HKDF-SHA256 key derivation, AES-256-GCM
+  with AAD binding to the COSE_Sign1 token. COSE_Encrypt0
+  construction and verification. Realm public-key distribution.
+  Zeroization discipline for intermediate key material. Larger
+  surface; more novel (PQC). Builds on Wave A's token so that
+  encrypted payloads can be hash-bound at mint time. Gate-1
+  proposal scheduled after Wave A lands.
+
+Neither wave publishes on its own — the triangle's crates
+publish as `0.1.0` only after Wave B's end-to-end tests pass.
+Waves are internal review milestones; crates-io consumers see
+only the completed surface.
+
 **Crates touched**: `philharmonic-connector-client`,
 `philharmonic-connector-router`, `philharmonic-connector-service`.
 
+---
+
+#### Wave A — COSE_Sign1 authorization tokens
+
+**Scope**: signing and verification only. Tokens authenticate
+the lowerer and bind to a `payload_hash` claim; Wave A tests
+with arbitrary payload bytes so the token format lands
+independently of the KEM work.
+
 **Tasks**:
 
-1. **`philharmonic-connector-client`** (the lowerer):
-   - Implement `ConfigLowerer` trait from `philharmonic-workflow`.
-   - On each `lower()` call:
+1. **Lowerer-side mint (in `philharmonic-connector-client`)**:
+   - Ed25519 key pair lifecycle — key loading from the
+     lowerer's configured private-key source, kid tagging,
+     `Zeroizing` wrapper for the private bytes, signing.
+   - COSE_Sign1 construction over a CBOR-encoded
+     `ConnectorTokenClaims` payload (type already shipping in
+     `philharmonic-connector-common 0.1.0`). Protected header
+     declares the algorithm (`EdDSA` / COSE alg -8) and the
+     `kid`.
+   - `mint_token(claims) -> ConnectorSignedToken` public API.
+
+2. **Service-side verify (in `philharmonic-connector-service`)**:
+   - Kid-indexed `MintingKeyRegistry` of Ed25519 public keys,
+     registered at service boot from config.
+   - COSE_Sign1 signature verification.
+   - Claim checks: `exp` in the future (monotonic wall-clock
+     `UnixMillis`); `payload_hash` equals the SHA-256 of the
+     caller-supplied encrypted-payload bytes (the bytes are
+     opaque in Wave A — any SHA-256 agreement passes);
+     optional `realm` equality against the service's own realm.
+   - `verify_token(token, payload_bytes, expected_realm) ->
+      Result<ConnectorCallContext, TokenVerifyError>` public
+     API.
+   - Typed error enum distinguishing: signature mismatch,
+     expired, unknown kid, payload-hash mismatch, realm
+     mismatch, malformed COSE.
+
+3. **Crypto test vectors (known-answer tests)**:
+   - Fixed Ed25519 keypair (seed committed in `tests/vectors/`).
+   - Fixed claim set with every field populated.
+   - Fixed CBOR encoding of the claim payload (byte-identical).
+   - Fixed COSE_Sign1 output bytes (byte-identical).
+   - Tampered-signature rejection (flip one signature bit).
+   - Expired-token rejection.
+   - Wrong-kid rejection.
+   - Payload-hash-mismatch rejection.
+
+4. **Router: no-op.** `philharmonic-connector-router` stays
+   unimplemented in Wave A; no crypto needed for a pure
+   HTTP dispatcher.
+
+**Acceptance criteria (Wave A)**:
+- Gate-1 proposal approved by Yuka.
+- Known-answer test vectors pass byte-for-byte.
+- Round-trip test: mint → verify succeeds end to end.
+- Tamper / expiry / kid / hash rejection paths each have a
+  dedicated test.
+- No panics in `src/`; Ed25519 private bytes wrapped in
+  `Zeroizing`; no `unsafe`.
+- Gate-2 code review by Yuka.
+- **No publish at Wave A end.** The crates stay at `0.0.0`
+  until Wave B finishes.
+
+---
+
+#### Wave B — Hybrid KEM + AEAD payload encryption
+
+**Scope**: the encryption half of the triangle, composed with
+Wave A's token so that `payload_hash` binds real ciphertext.
+
+**Tasks**:
+
+1. **Lowerer-side encrypt (in `philharmonic-connector-client`)**:
+   - Complete the `ConfigLowerer` pipeline stubbed in Wave A:
      a. For each entry in the template's abstract config, fetch
         the `TenantEndpointConfig` by UUID from
         `philharmonic-policy`.
@@ -820,62 +920,63 @@ code personally.** Do not publish these without her sign-off.
         the realm's KEM public key via COSE_Encrypt0 with the
         ML-KEM-768 + X25519 hybrid construction.
      g. Hash the encrypted payload (SHA-256).
-     h. Mint a COSE_Sign1 token with claims `iss, exp, kid, realm,
-        tenant, inst, step, config_uuid, payload_hash`. Sign
-        with the lowerer's Ed25519 key.
+     h. Mint the Wave-A COSE_Sign1 token over claims
+        `{iss, exp, kid, realm, tenant, inst, step, config_uuid,
+        payload_hash}`.
      i. Assemble the `MechanicsConfig` entry: POST to
         `<realm>.connector.our-domain.tld`, `Authorization:
         Bearer <COSE_Sign1 bytes, base64url>`,
         `X-Encrypted-Payload: <COSE_Encrypt0 bytes, base64url>`.
 
-2. **`philharmonic-connector-router`** (pure dispatcher):
-   - Minimal HTTP server that terminates TLS for
-     `<realm>.connector.our-domain.tld` and forwards to connector
-     service instances in the realm.
-   - No token verification, no decryption, no rate limiting.
-   - Round-robin or least-connections load balancing is fine;
-     pick whatever's simple.
-
-3. **`philharmonic-connector-service`** (service framework):
-   - HTTP listener accepting POST requests.
-   - Verify COSE_Sign1 signature by `kid` against the registered
-     lowerer public key.
-   - Check token `exp` not passed.
-   - Compute SHA-256 of encrypted payload; verify against
-     `payload_hash` claim.
-   - Check token `realm` claim matches this binary's realm.
-   - Decrypt COSE_Encrypt0 with realm private key by `kid`.
+2. **Service-side decrypt (in `philharmonic-connector-service`)**:
+   - Build on Wave A's token-verify: after the token is valid,
+     decrypt COSE_Encrypt0 with the realm private key selected
+     by `kid`.
    - Parse decrypted JSON; verify inner `realm` field matches
      token `realm` (belt-and-suspenders).
-   - Look up `impl` field in the implementation registry; reject
-     if unknown.
+   - Look up `impl` field in the implementation registry;
+     reject if unknown.
    - Dispatch: call `handler.execute(config_subobject, request,
      ctx)` where `ctx` is built from the verified token claims.
    - Wrap result in HTTP response; map `ImplementationError`
      variants to appropriate HTTP status codes.
 
-4. **Crypto test vectors.** Generate before implementation is
-   finalized:
-   - Fixed ML-KEM-768 keypair, fixed X25519 keypair, fixed
-     Ed25519 keypair.
-   - Fixed plaintext payload.
-   - Expected COSE_Encrypt0 bytes.
-   - Expected COSE_Sign1 bytes.
+3. **`philharmonic-connector-router` (pure dispatcher)**:
+   - Minimal HTTP server that terminates TLS for
+     `<realm>.connector.our-domain.tld` and forwards to
+     connector service instances in the realm.
+   - No token verification, no decryption, no rate limiting.
+   - Round-robin or least-connections load balancing is fine;
+     pick whatever's simple.
 
-   Test that encrypt-then-decrypt and sign-then-verify round-trip
-   through the exact expected ciphertext/signature. This catches
-   nonce-reuse, HKDF-input-ordering, and AEAD-additional-data
-   bugs that round-trip-only tests miss.
+4. **Crypto test vectors (known-answer tests)**:
+   - Fixed ML-KEM-768 keypair, fixed X25519 keypair (seeds
+     committed).
+   - Fixed plaintext payload, fixed KEM randomness.
+   - Expected COSE_Encrypt0 bytes (byte-identical).
+   - Combined with Wave A's Ed25519 keypair: expected
+     COSE_Sign1 over `payload_hash = SHA-256(COSE_Encrypt0 bytes)`.
 
-**Acceptance criteria**:
-- Crypto test vectors pass in isolation (known inputs → known
-  outputs, not just round-trip).
-- Cross-crate integration test: `connector-client` encrypts,
-  `connector-service` decrypts, content matches exactly.
-- Yuka has reviewed the crypto code paths and signed off.
+   Known-answer tests catch nonce-reuse, HKDF-input-ordering,
+   and AEAD-additional-data bugs that round-trip-only tests
+   miss. Required to pass byte-for-byte.
+
+**Acceptance criteria (Wave B)**:
+- Gate-1 proposal approved by Yuka (separate doc from Wave A).
+- Known-answer test vectors pass byte-for-byte for both the
+  hybrid KEM and COSE_Encrypt0 layers.
+- End-to-end integration test: `connector-client` encrypts +
+  signs, `connector-service` verifies + decrypts, plaintext
+  matches exactly.
+- Zeroization discipline verified: HKDF output, shared secret,
+  AEAD key all `Zeroizing`-wrapped; audit by grepping for
+  the wrapper on every key-material variable.
+- Yuka has reviewed the crypto code paths (Gate-2) and signed
+  off.
 - No `unsafe` blocks in crypto code.
 - No custom crypto primitives — only `ml-kem`, `x25519-dalek`,
   `aes-gcm`, `ed25519-dalek`, `hkdf`, `sha2` from RustCrypto.
+- All three triangle crates publish as `0.1.0`.
 
 ---
 
