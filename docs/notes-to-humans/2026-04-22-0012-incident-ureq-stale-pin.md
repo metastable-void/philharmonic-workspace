@@ -86,6 +86,51 @@ as a required pre-commit step on any Cargo.toml change. The
 wrapper is one command; the cost of skipping it is commits like
 this one.
 
+## Known fallout of the 2 → 3 bump (accepted)
+
+The IPv6 leg of `print-audit-info.sh`'s IP-geolocation probe
+degraded from "returns the box's v6 address" to "empty." The
+cause is specific to ureq 3.x + rustls + IPv6 literals in URLs:
+
+- `print-audit-info.sh` fetches `https://1.1.1.1/cdn-cgi/trace`
+  (for v4) and `https://[2606:4700:4700::1111]/cdn-cgi/trace`
+  (for v6, to force the socket family).
+- In ureq 3.x, the TLS layer calls
+  `rustls_pki_types::ServerName::try_from(uri.authority().host())`
+  for SNI. With `http 1.x`'s `.host()` returning the IPv6
+  literal *with brackets* (`"[2606:...]"`), that string is
+  neither a valid DNS name nor a parseable `IpAddr`, so the
+  conversion fails with `"Rustls invalid dns name error"` and
+  the v6 probe comes back empty.
+- ureq 2.x did not hit this (its `.host()` handling or rustls
+  wiring avoided the bracketed form).
+
+Concrete effect: commit `100605d`'s `Audit-Info` trailer reads
+`6=/` whereas prior commits read e.g.
+`6=240b:10:9fc3:6e00:…/JP`. v4 is unaffected.
+
+I decided to accept the degradation rather than chase a fix.
+The probe is best-effort by design — `print-audit-info.sh` uses
+`|| :` on both calls and `6=/` is an expected "no answer"
+representation. The workarounds I considered and rejected:
+
+- **Use a hostname with an AAAA record** (e.g.
+  `one.one.one.one`): defeats the point of the v6 probe —
+  happy-eyeballs picks either family and we can't tell which,
+  so the result collapses to duplicating the v4 probe.
+- **Try to strip brackets before the SNI lookup**: would need
+  a custom ureq `Transport` / TLS connector, which is an
+  internal-API rabbit hole.
+- **Disable TLS verification for the v6 probe only**: a
+  `disable_verification(true)` setting exists in ureq's
+  `TlsConfig`, but it doesn't bypass the `ServerName::try_from`
+  step that's actually failing here.
+- **Fetch the v6 probe over plain HTTP**: Cloudflare serves
+  `/cdn-cgi/trace` over HTTP to some paths but redirects
+  others; adds fragility with no clear upside.
+
+If the v6 audit line becomes load-bearing later, revisit.
+
 ## Why file this as an incident at all
 
 The scope here is genuinely narrow — xtask tooling, not a
