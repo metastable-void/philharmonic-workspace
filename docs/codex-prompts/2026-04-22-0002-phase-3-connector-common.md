@@ -200,15 +200,18 @@ Add to `philharmonic-connector-common/Cargo.toml`:
   common dep; include if `ImplementationError` / other types
   need it. Skip if nothing in Phase 3 scope uses it; flag the
   choice.
-- `coset = "0.3"` — COSE structures. Look up the current version
-  via `./scripts/xtask.sh crates-io-versions -- coset` and pin
-  to the latest-minor.
+- `coset = "0.4"` — COSE structures. Claude verified 2026-04-22
+  via `./scripts/xtask.sh crates-io-versions -- coset` (latest
+  published: `0.4.2`). Pin to `"0.4"` for latest-minor
+  auto-updates. If the workspace already has a newer major in
+  use elsewhere, follow that; otherwise use `"0.4"`.
 - `serde = { version = "1", features = ["derive"] }` — serde
-  derives for the claim types.
+  derives for the claim types. (Latest published 2026-04-22:
+  `1.0.228`. Minor pin `"1"` is fine.)
 - `serde_json = "1"` — if tests need JSON round-trips; optional
-  otherwise.
-- `thiserror = "2"` — error derives. Look up latest via
-  `./scripts/xtask.sh crates-io-versions -- thiserror`.
+  otherwise. (Latest: `1.0.149`.)
+- `thiserror = "2"` — error derives. (Latest published 2026-04-22:
+  `2.0.18`. Minor pin `"2"` is fine.)
 
 **Crate version lookup rule:** never recall a crate's published
 version from memory. Always probe via

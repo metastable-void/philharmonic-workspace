@@ -17,3 +17,9 @@ this file, but never edit this file.
   the best practices for AI coding brewed inside this
   workspace repo into a reusable template/Rust crate/etc.
   this can happen after the MVP work is done.
+- Note: Normal person-hour calculations show that MVP
+  isn't possible to land before the Golden Week holidays;
+  Japanese working-hour traditions can possibly make it
+  possible: just make sure we don't hit karoshi - if I
+  die, no one capable of significant coding would be left
+  at this project.
