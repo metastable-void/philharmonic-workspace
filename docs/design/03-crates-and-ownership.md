@@ -25,11 +25,22 @@
   shared `ImplementationError` taxonomy. Types-only; crypto
   construction lives in `philharmonic-connector-client` and
   `philharmonic-connector-service`.
+- **`philharmonic-workflow`** (v0.1.0) — orchestration engine.
+  Three entity kinds (`WorkflowTemplate`, `WorkflowInstance`,
+  `StepRecord`) with append-only revision-based state evolution.
+  `SubjectContext` / `SubjectKind` for caller attribution,
+  reusing `philharmonic-policy`'s `Tenant` and
+  `MintingAuthority` markers. Async trait boundaries
+  (`StepExecutor`, `ConfigLowerer`) keep the engine transport-
+  and lowerer-naive. `WorkflowEngine<S, E, L>` implements the
+  nine-step execution sequence, five-state lifecycle with
+  terminal-state immutability, and architecturally-enforced
+  step-record audit discipline (persisted subject drops
+  `claims` and `tenant_id` by type construction).
 
 ## Published as 0.0.0 placeholders
 
 - **`philharmonic`** — meta-crate placeholder.
-- **`philharmonic-workflow`** — orchestration layer.
 - **`philharmonic-connector-client`** — the lowerer. Produces
   concrete `MechanicsConfig` values by fetching
   `TenantEndpointConfig` entities via policy, decrypting each

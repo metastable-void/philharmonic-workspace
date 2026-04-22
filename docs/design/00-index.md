@@ -97,10 +97,15 @@ Published and stable:
 - `philharmonic-connector-common` (shared connector-layer
   vocabulary: COSE token / payload types, realm model,
   `ConnectorCallContext`, shared `ImplementationError`)
+- `philharmonic-workflow` (orchestration engine: three entity
+  kinds, `SubjectContext`, `StepExecutor` / `ConfigLowerer`
+  trait surfaces, `WorkflowEngine<S, E, L>`, five-state
+  lifecycle with terminal-state immutability, nine-step
+  execution sequence, architecturally-enforced step-record
+  audit discipline)
 
 Designed, not yet implemented:
 
-- `philharmonic-workflow`
 - `philharmonic-connector-client`
 - `philharmonic-connector-router`
 - `philharmonic-connector-service`

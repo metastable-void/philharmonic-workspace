@@ -704,7 +704,23 @@ crates.io; tag `v0.1.0` signed and pushed.
 
 ---
 
-### Phase 4 — `philharmonic-workflow`
+### Phase 4 — `philharmonic-workflow` ✓ _(done 2026-04-22)_
+
+**Status**: Landed via one Codex dispatch (see
+`docs/codex-prompts/2026-04-22-0003-phase-4-workflow.md` and
+Codex's notes at
+`docs/codex-reports/2026-04-22-0002-phase-4-workflow.md`).
+Claude's review is at
+`docs/notes-to-humans/2026-04-22-0008-phase-4-claude-review.md`.
+Pre-landing + `cargo +nightly miri test` + tier-2 MySQL
+testcontainers all green. Gate-2 review completed in-session
+(not a crypto-construction trigger). One design-doc fix applied
+alongside: `07-workflow-orchestration.md §Status transitions`
+now lists `Pending → Failed` explicitly (the engine writes one
+instance revision per step, so a first-step failure transitions
+directly from Pending without an intermediate Running
+revision). Published as `philharmonic-workflow 0.1.0`; tag
+`v0.1.0` signed and pushed.
 
 **Goal**: Implement the workflow orchestration engine.
 
@@ -764,9 +780,15 @@ crates.io; tag `v0.1.0` signed and pushed.
 
 **Acceptance criteria**:
 - All engine methods work with `testcontainers`-based substrate
-  integration tests.
-- Full status-transition state machine coverage.
-- `philharmonic-workflow` publishes as `0.1.0`.
+  integration tests. ✓ _(3 MySQL testcontainer tests pass.)_
+- Full status-transition state machine coverage. ✓
+  _(Exhaustive matrix test in `src/status.rs`; 8 tier-1
+  behavioral tests in `tests/engine_mock.rs` covering the
+  execution sequence, terminal-state immutability, transport vs.
+  script errors, malformed-result handling, subject propagation,
+  and the audit-discipline invariant.)_
+- `philharmonic-workflow` publishes as `0.1.0`. ✓
+  _(2026-04-22)_
 
 ---
 

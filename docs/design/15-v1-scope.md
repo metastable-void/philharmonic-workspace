@@ -30,11 +30,19 @@ What a first shipping release includes, and what's deferred.
   wrapper types (`ConnectorSignedToken`,
   `ConnectorEncryptedPayload`), `ImplementationError`. Types-
   only; crypto construction lives in Phase 5.
+- `philharmonic-workflow` — published `0.1.0` (2026-04-22).
+  Orchestration engine with three entity kinds
+  (`WorkflowTemplate`, `WorkflowInstance`, `StepRecord`),
+  `SubjectContext` threading, `StepExecutor` / `ConfigLowerer`
+  async trait boundaries, `WorkflowEngine<S, E, L>` with
+  nine-step execution sequence and terminal-state-immutable
+  five-state lifecycle. Step-record subject content is
+  architecturally confined to `kind` + `id` + `authority_id`
+  (no `claims`, no `tenant_id`) via a separate
+  `StepRecordSubject` persistence type.
 
 ### Needs implementation work
 
-- `philharmonic-workflow` — design complete, code not started.
-  Depends on `philharmonic-policy` for `Tenant` entity marker.
 - `philharmonic-connector-client` — the lowerer; implements
   `ConfigLowerer`.
 - `philharmonic-connector-router` — pure HTTP dispatcher
