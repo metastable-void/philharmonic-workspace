@@ -104,8 +104,10 @@ files tracked directly in the parent repo):
 - `xtask` — multi-bin crate for dev tools written in Rust.
   Today's bins: `gen-uuid` (canonical source for every wire-
   format UUID we mint), `crates-io-versions` (sparse-index
-  query for published crate versions), and `web-fetch` (in-
-  process HTTP GET, no `curl`/`wget` dependency). See
+  query for published crate versions), `web-fetch` (in-
+  process HTTP GET, no `curl`/`wget` dependency), and
+  `codex-fmt` (renders Codex rollout JSONL into a color-
+  highlighted timeline; used by `scripts/codex-logs.sh`). See
   [§xtask and KIND UUID generation](#xtask-and-kind-uuid-generation)
   below.
 
@@ -279,6 +281,18 @@ Invoke by path (`./scripts/foo.sh`), not via `bash`.
   any submodule push fails.
 - `./scripts/codex-status.sh` — list Codex processes spawned by
   Claude Code and their descendants.
+- `./scripts/codex-logs.sh [-f|--follow] [--raw] [-n|--no-color]` —
+  print the latest Codex session spawned from Claude Code
+  (filters on the `session_meta` record's
+  `"originator":"Claude Code"` field under
+  `$CODEX_HOME/sessions/YYYY/MM/DD/rollout-*.jsonl`, default
+  `~/.codex`). By default the stream is piped through
+  `./scripts/xtask.sh codex-fmt --` so the reader gets a
+  color-highlighted human-readable timeline; pass `--raw` for
+  pure JSONL. `-f` behaves like `tail -f` (prints whole file,
+  then streams appends). `-n`/`--no-color` forwards the flag
+  to `codex-fmt`. Header path goes to stderr so stdout stays
+  clean for piping.
 - `./scripts/heads.sh` — show the current HEAD commit for the
   parent and every submodule, with short SHA, signature
   indicator, and subject. Use after `commit-all.sh` /
@@ -558,6 +572,18 @@ Current bins:
   remains as a thin shim for shell callers
   (`print-audit-info.sh` uses it) — both end up in the same Rust
   bin.
+- **`codex-fmt`** — render a Codex rollout JSONL transcript
+  (files under `$CODEX_HOME/sessions/YYYY/MM/DD/rollout-*.jsonl`)
+  into a color-highlighted human-readable timeline. Usage:
+  `./scripts/xtask.sh codex-fmt -- [<path>]`. With no path (or
+  `-`), reads from stdin — used by `scripts/codex-logs.sh` to
+  pipe `tail -f` through the formatter for live streaming of
+  an agent-spawned Codex session. Encrypted reasoning blobs
+  are replaced by a length-only placeholder; messages are
+  colored per role (`user` / `developer` / `assistant`); tool
+  calls surface as `>>>` / `<<<` with call IDs. `--no-color`
+  forces ANSI off; auto-disabled when stdout isn't a TTY so
+  piping to `less` or a file stays clean.
 
 ## AI-assisted development
 
