@@ -1,10 +1,14 @@
 # Gate-1 proposal — Phase 5 Wave A: COSE_Sign1 connector authorization tokens
 
 **Date:** 2026-04-22
+**Revision:** 2 (revised 2026-04-22 after Codex's security review)
 **Phase:** 5 (connector triangle), Wave A (signing-only half)
 **Author:** Claude Code (on Yuka's review queue)
 **Status:** Awaiting Gate-1 sign-off — no implementation yet
 **Wave split decision:** ROADMAP §Phase 5 (commit `e292918`)
+**Security review:** `docs/codex-reports/2026-04-22-0003-phase-5-wave-a-cose-sign1-tokens-security-review.md`.
+Resolutions are summarized in §"Codex security review resolutions"
+at the end of this document; the body has been updated inline.
 
 ## Scope
 
