@@ -14,7 +14,10 @@
 #
 # Safety: refuses to commit in a submodule that's in detached HEAD
 # state if it has changes to commit — that commit would be an
-# orphan the next time the submodule is checked out.
+# orphan the next time the submodule is checked out. Also refuses
+# the parent commit if .claude/settings.json contains any
+# reference to `scripts/commit-all.sh` — a permission entry for
+# this script would let agents commit without human approval.
 #
 # Usage:
 #   scripts/commit-all.sh [--anonymize] [--parent-only] [message]
@@ -103,6 +106,23 @@ fi
 '
 else
     echo "=== --parent-only: skipping submodules ==="
+fi
+
+# Safety: refuse the parent commit if .claude/settings.json
+# contains any reference to `scripts/commit-all.sh`. A permission
+# entry for this script (e.g. `Bash(./scripts/commit-all.sh *)`)
+# would let an agent commit without human approval, defeating the
+# human-in-the-loop gate this workflow relies on. The check is a
+# verbatim fixed-string match so any form of the allow entry is
+# caught. To restore the ability to commit, remove the offending
+# entry from .claude/settings.json.
+settings_file=".claude/settings.json"
+if [ -f "$settings_file" ] && grep -F -q "scripts/commit-all.sh" "$settings_file"; then
+    echo "!!! $settings_file references scripts/commit-all.sh." >&2
+    echo "    Refusing to commit the parent — a permission entry for this" >&2
+    echo "    script would let agents commit without human approval." >&2
+    echo "    Remove the entry from $settings_file and re-run." >&2
+    exit 1
 fi
 
 # Commit parent's changes (including bumped submodule pointers).
