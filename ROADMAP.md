@@ -898,6 +898,30 @@ independently of the KEM work.
 - **No publish at Wave A end.** The crates stay at `0.0.0`
   until Wave B finishes.
 
+**Wave A status — landed 2026-04-22.**
+- Gate-1: approved (proposal r4,
+  `docs/design/crypto-approvals/2026-04-22-phase-5-wave-a-cose-sign1-tokens.md`).
+  Triggered a `philharmonic-types 0.3.5` upstream fix
+  (CBOR-bstr `Sha256` serde) and a new workspace rule at
+  `docs/design/13-conventions.md` §Library crate boundaries.
+- Reference vectors: generated with cbor2 + cryptography at
+  `docs/crypto-vectors/wave-a/` before Codex dispatch; matched
+  byte-for-byte by the Rust implementation.
+- Implementation: Codex, commits `9634f68` + `bcf8ea6` + parent
+  pointer `ac02232`. Codex prompt archive:
+  `docs/codex-prompts/2026-04-22-0004-phase-5-wave-a-cose-sign1-tokens.md`.
+- Verification: positive KAT + 10 negative vectors green;
+  `pre-landing.sh` + `miri-test.sh` pass on both crates; no
+  panics, no `unsafe`, no file I/O in library code.
+- Claude Gate-2 review: PASS —
+  `docs/notes-to-humans/2026-04-22-0011-phase-5-wave-a-claude-review.md`.
+  One flagged follow-up (`ConnectorCallContext.issued_at` has
+  no source claim; Codex set it to `now` at verify time —
+  semantically "time verified" not "time issued") deferred to
+  a later connector-common 0.2.0 bump or Wave B.
+- Crates remain at `0.0.0`; publish waits for Wave B's
+  end-to-end tests.
+
 ---
 
 #### Wave B — Hybrid KEM + AEAD payload encryption

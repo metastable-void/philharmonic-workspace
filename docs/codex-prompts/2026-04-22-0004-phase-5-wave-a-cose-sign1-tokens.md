@@ -573,7 +573,61 @@ report — do not edit.
 
 ## Outcome
 
-Pending — will be updated after the Codex run completes. Expected
-content: summary of what landed, file counts, pre-landing + miri
-verdicts, any flagged divergence from the committed vectors,
-residual risks.
+**Completed 2026-04-22** — Codex delivered in one round. Commits
+`9634f68` (client) + `bcf8ea6` (service) + parent pointer bump
+`ac02232`.
+
+Files landed:
+- `philharmonic-connector-client/` — `src/signing.rs` (new, ~73),
+  `src/error.rs` (new, ~15), `src/lib.rs` updated, `Cargo.toml`,
+  `README.md`, `CHANGELOG.md`, `tests/signing_vectors.rs` (new,
+  ~124). 7 files, 284 insertions.
+- `philharmonic-connector-service/` — `src/verify.rs` (new,
+  ~129), `src/registry.rs` (new, ~42), `src/context.rs` (new,
+  ~16), `src/error.rs` (new, ~49), `src/lib.rs` updated,
+  `Cargo.toml`, `README.md`, `CHANGELOG.md`,
+  `tests/verify_vectors.rs` (new, ~337). 9 files, 658 insertions.
+
+Verification (Codex-reported + Claude Gate-2 confirmed):
+- `mint_token` output matches `wave_a_cose_sign1.hex`
+  byte-for-byte, plus every intermediate vector
+  (`wave_a_claims.cbor.hex`, `wave_a_protected.hex`,
+  `wave_a_sig_structure1.hex`, `wave_a_signature.hex`).
+- All 10 negative vectors reject with the exact error variant
+  specified in the proposal.
+- `./scripts/pre-landing.sh` passed on both crates.
+- `./scripts/miri-test.sh` passed on both crates.
+
+Claude Gate-2 review: PASS.
+- 11-step verify sequence: exact order, one distinct error
+  variant per rejection path.
+- `subtle::ConstantTimeEq` correctly used for the `payload_hash`
+  compare at step 10.
+- Zeroization: seed in `Zeroizing<[u8; 32]>` for
+  `LowererSigningKey`'s lifetime; transient
+  `ed25519_dalek::SigningKey` reconstructed per `mint_token`
+  call (option (a) from the proposal).
+- No `.unwrap()` / `.expect()` / `panic!` / `unreachable!` /
+  `todo!` / `unimplemented!` on any reachable path in `src/` of
+  either crate.
+- No `unsafe`.
+- No file I/O in either library (workspace convention §Library
+  crate boundaries).
+- Re-exports + rustdoc: complete.
+- Versions verified against crates.io 2026-04-22.
+
+Flagged follow-up (not a Gate-2 blocker):
+- `ConnectorCallContext.issued_at` has no corresponding claim
+  in `ConnectorTokenClaims`. Codex set it to `now` at verify
+  time; this is semantically "time verified" not "time issued."
+  Deferred to Wave B or `philharmonic-connector-common 0.2.0`
+  (would require adding an `iat` claim — breaking). See
+  `docs/notes-to-humans/2026-04-22-0011-phase-5-wave-a-claude-review.md`.
+
+Minor observations (not blockers):
+- `MintingKeyRegistry::insert` silently replaces on duplicate kid
+  (standard HashMap behavior). `RealmRegistry` in connector-common
+  rejects duplicates. Either policy is defensible; the service bin
+  can add a wrapper if strict semantics are wanted.
+- Crates remain at `0.0.0` per the proposal; publish is deferred
+  until Wave B lands and end-to-end tests pass.
