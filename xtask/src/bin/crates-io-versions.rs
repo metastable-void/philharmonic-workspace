@@ -84,20 +84,19 @@ fn main() -> ExitCode {
     let url = format!("https://index.crates.io/{}", sparse_index_path(&name));
     let response = match ureq::get(&url).call() {
         Ok(r) => r,
-        Err(ureq::Error::Status(404, _)) => {
+        // ureq 3.x flattens HTTP error responses into `StatusCode(code)` —
+        // the `Response` body is not attached on the error path, so we
+        // print just the code. 4xx/5xx → Err by default
+        // (`http_status_as_error = true`).
+        Err(ureq::Error::StatusCode(404)) => {
             eprintln!(
                 "!!! crates-io-versions: crate `{}` not found on crates.io (HTTP 404)",
                 name
             );
             return ExitCode::from(2);
         }
-        Err(ureq::Error::Status(code, resp)) => {
-            eprintln!(
-                "!!! crates-io-versions: HTTP {} {} for `{}`",
-                code,
-                resp.status_text(),
-                name
-            );
+        Err(ureq::Error::StatusCode(code)) => {
+            eprintln!("!!! crates-io-versions: HTTP {} for `{}`", code, name);
             return ExitCode::from(2);
         }
         Err(e) => {
@@ -105,7 +104,7 @@ fn main() -> ExitCode {
             return ExitCode::from(2);
         }
     };
-    let body = match response.into_string() {
+    let body = match response.into_body().read_to_string() {
         Ok(b) => b,
         Err(e) => {
             eprintln!("!!! crates-io-versions: read body failed: {}", e);

@@ -61,15 +61,14 @@ fn main() -> ExitCode {
 
     let ua = std::env::var("WEB_FETCH_UA").unwrap_or_else(|_| DEFAULT_UA.to_string());
 
-    let response = match ureq::get(&args.url).set("User-Agent", &ua).call() {
+    let response = match ureq::get(&args.url).header("User-Agent", &ua).call() {
         Ok(r) => r,
-        Err(ureq::Error::Status(code, resp)) => {
-            eprintln!(
-                "!!! web-fetch: HTTP {} {} for {}",
-                code,
-                resp.status_text(),
-                args.url
-            );
+        // ureq 3.x flattens HTTP error responses into `StatusCode(code)` —
+        // the response body is not attached on the error path, so we
+        // print just the code. 4xx/5xx → Err by default
+        // (`http_status_as_error = true`).
+        Err(ureq::Error::StatusCode(code)) => {
+            eprintln!("!!! web-fetch: HTTP {} for {}", code, args.url);
             return ExitCode::from(2);
         }
         Err(e) => {
@@ -78,7 +77,7 @@ fn main() -> ExitCode {
         }
     };
 
-    let mut reader = response.into_reader();
+    let mut reader = response.into_body().into_reader();
 
     match args.outfile {
         Some(path) => {

@@ -17,7 +17,9 @@
       "Bash(./scripts/xtask.sh gen-uuid *)",
       "Bash(./scripts/xtask.sh crates-io-versions *)",
       "Bash(./scripts/pre-landing.sh philharmonic-connector-common *)",
-      "Bash(./scripts/pre-landing.sh philharmonic-types *)"
+      "Bash(./scripts/pre-landing.sh philharmonic-types *)",
+      "Bash(./scripts/rust-lint.sh xtask *)",
+      "Bash(./scripts/xtask.sh web-fetch *)"
     ],
     "additionalDirectories": [
       "/tmp"
