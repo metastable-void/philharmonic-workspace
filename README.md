@@ -119,7 +119,7 @@ through 2026.
 Already published with substantive content:
 `philharmonic-types`, `philharmonic-store`,
 `philharmonic-store-sqlx-mysql`, `mechanics-config`,
-`mechanics-core`, `mechanics`.
+`mechanics-core`, `mechanics`, `philharmonic-policy`.
 
 ## Prerequisites
 

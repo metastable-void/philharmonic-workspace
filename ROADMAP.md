@@ -26,15 +26,28 @@ serving real tenants).
   0.3.0) so downstream consumers opt into the new `mechanics-core`
   type identity explicitly rather than silently under a caret
   upgrade.
-- Phase 2 Wave 1 (`philharmonic-policy` non-crypto foundation):
-  **done** (2026-04-21). Six entity kinds + permission evaluation
-  landed under submodule commit `790c23d`; parent pointer bumped
-  in `65fc3c4`. Crate still at `0.0.0` locally — no publish yet,
-  Wave 2 (crypto: SCK + `pht_` token utilities) is gated on Yuka's
-  Gate-2 code review and is the next dispatch.
-- Phase 2 Wave 2 (SCK crypto + `pht_` tokens): not started.
-  Gate-1 crypto approval is in place at
-  `docs/design/crypto-approvals/2026-04-21-phase-2-sck-and-pht.md`.
+- Phase 2 (`philharmonic-policy`): **done** (2026-04-22).
+  Published as `philharmonic-policy 0.1.0` with signed `v0.1.0`
+  tag. Shipped: seven entity kinds
+  (`Tenant`/`TenantEndpointConfig`/`Principal`/`RoleDefinition`/
+  `RoleMembership`/`MintingAuthority`/`AuditEvent`) plus
+  `TenantStatus` + `PrincipalKind` discriminants; three-way
+  tenant-binding permission evaluation
+  (`evaluate_permission`); `PermissionDocument` with parse-time
+  atom validation against the 22-atom `ALL_ATOMS` list; SCK
+  AES-256-GCM primitives (`Sck`, `sck_encrypt`, `sck_decrypt`)
+  with wire format v1 and AAD binding over
+  `tenant_id || config_uuid || key_version`; `pht_` API token
+  format with Zeroize discipline. Delivered across two waves
+  (non-crypto foundation at 2026-04-21 submodule commit
+  `790c23d`; crypto foundation at `0085819`) plus auth-
+  boundary hardening from an independent Codex security review
+  (`1cde0e1` — cross-tenant role-confusion fix + atom
+  validation) and zeroization hardening from Claude's Gate-2
+  re-review pass (`7ca357e` — H1 + H2). Gate-1 approval at
+  `docs/design/crypto-approvals/2026-04-21-phase-2-sck-and-pht.md`
+  (amended 2026-04-22 for the `rand 0.10` swap), Gate-2
+  approval at `-01.md` alongside.
 - Phases 3–9: not started.
 
 Work through phases in order unless a phase is explicitly noted
@@ -475,36 +488,64 @@ extraction (settled)".
 
 ### Phase 2 — `philharmonic-policy`
 
-**Status**: Wave 1 (non-crypto foundation) **done (2026-04-21)**.
-Wave 2 (SCK crypto + `pht_` token utilities) pending Gate-2 code
-review; it's the next dispatch. See
-`docs/notes-to-humans/2026-04-21-0008-phase-2-wave-1-landed.md`
-for the Wave 1 landing summary (Codex behavior, pre-landing
-results, scope drift captured in `e20ebb1`).
+**Status**: **done (2026-04-22).** Published as
+`philharmonic-policy 0.1.0` on crates.io with signed `v0.1.0`
+release tag in the submodule.
 
-Wave 1 delivered (submodule commit `790c23d`, parent bump
-`65fc3c4`):
+Landed across three dispatches plus a review pass:
 
-- Six entity kinds implemented with stable `KIND: Uuid`
-  constants (`Tenant`, `Principal`, `TenantEndpointConfig`,
-  `RoleDefinition`, `RoleMembership`, `MintingAuthority`,
-  `AuditEvent`) minus the crypto-requiring bits of
-  `TenantEndpointConfig` (encrypted_config slot present, SCK
-  encrypt/decrypt deferred to Wave 2).
-- Permission evaluation (`evaluate_permission`) walking
-  `RoleMembership` → `RoleDefinition` → permission atoms.
-- Three test tiers: 11 mock-backed unit tests
-  (`tests/common/mock.rs` + `tests/permission_mock.rs`), 10
-  `#[ignore]`-gated MySQL testcontainer tests
-  (`tests/permission_mysql.rs`), and 6 colocated unit tests in
-  the crate. Pre-landing green (fmt/check/clippy/test +
-  `--ignored` 10/10).
+- **Wave 1 — non-crypto foundation** (submodule commit
+  `790c23d`, parent bump `65fc3c4`, 2026-04-21). Six entity
+  kinds with stable `KIND: Uuid` constants (all of §"Tasks"
+  below minus crypto), permission evaluation walking
+  `RoleMembership` → `RoleDefinition` → permission atoms,
+  three test tiers. Full landing summary in
+  `docs/notes-to-humans/2026-04-21-0008-phase-2-wave-1-landed.md`.
+- **Wave 2 — crypto foundation** (submodule commit
+  `0085819`, parent bump `2c98467`, 2026-04-22). SCK
+  AES-256-GCM primitives with wire format v1 and AAD binding
+  over `tenant_id || config_uuid || key_version`, `pht_` API
+  token format with Zeroize discipline. Gate-1 approval at
+  `docs/design/crypto-approvals/2026-04-21-phase-2-sck-and-pht.md`
+  (amended 2026-04-22 to swap `rand_core + getrandom` for
+  `rand 0.10`); Gate-2 approval at
+  `docs/design/crypto-approvals/2026-04-21-phase-2-sck-and-pht-01.md`.
+  Detail in
+  `docs/notes-to-humans/2026-04-22-0001-phase-2-wave-2-landed-pending-gate2.md`.
+- **Auth-boundary hardening** (submodule commit `1cde0e1`,
+  parent `89dd590`, 2026-04-22) — closes two findings
+  surfaced by an independent Codex security review at
+  `docs/codex-reports/2026-04-22-0001-philharmonic-policy-security-review.md`.
+  Finding #1: cross-tenant role confusion in
+  `evaluate_permission` (role's tenant wasn't checked). Fix:
+  three-way tenant binding (principal / membership / role).
+  Finding #2: `PermissionDocument` accepted arbitrary
+  strings. Fix: parse-time validation against the canonical
+  22-atom `ALL_ATOMS` list.
+- **Gate-2 re-review + zeroization hardening** (submodule
+  commit `7ca357e`, parent `59f860a`, 2026-04-22). Claude-
+  driven Gate-2 review pass per Yuka's condition in the
+  approval doc; two stack-copy zeroization gaps (H1 in
+  `token.rs`, H2 in `sck.rs::from_file`) tightened via
+  `Zeroizing<[u8; 32]>` wrapping at declaration and
+  pass-by-reference. Detail in
+  `docs/notes-to-humans/2026-04-22-0005-gate-2-claude-review-outcome.md`
+  and `0006-crypto-zeroization-hardening-applied.md`.
 
-Wave 2 (remaining) is the crypto foundation and the point at
-which Yuka reviews actual crypto code line-by-line. See §5
-"Crypto review protocol" — this is a two-gate path, Gate-1
-(approach approval, done 2026-04-21) and Gate-2 (code review,
-pending).
+Final test discipline (as shipped at `0.1.0`):
+
+- 10 unit tests (`src/lib.rs`), 15 crypto-vector tests
+  (`tests/crypto_vectors.rs`), 14 mock-backed tests
+  (`tests/permission_mock.rs`), 12 MySQL-testcontainer tests
+  (`tests/permission_mysql.rs`, `#[ignore]`-gated).
+- Python reference generators (`tests/crypto_vectors/gen_sck.py`,
+  `gen_pht.py`) committed for audit-reproducibility; the
+  committed Rust hex constants match pyca `cryptography 41.0.7`
+  byte-for-byte across all 3 SCK + 3 `pht_` vectors.
+- Miri clean across the full non-ignored test suite (`cargo
+  +nightly miri test -p philharmonic-policy`).
+
+**Remaining work**: none. Phase 2 complete.
 
 **Reference**: `09-policy-and-tenancy.md` exhaustively;
 `05-storage-substrate.md` for storage traits.
@@ -556,13 +597,19 @@ pending).
    - Permission evaluation with nested role memberships.
 
 **Acceptance criteria**:
-- All seven entity kinds compile and pass their validation.
+- All seven entity kinds compile and pass their validation. ✓
 - SCK crypto tests include at least three test vectors (keys,
-  plaintexts, expected ciphertexts) that are hand-verifiable.
+  plaintexts, expected ciphertexts) that are hand-verifiable. ✓
+  _(3 vectors cross-checked byte-for-byte against pyca
+  `cryptography 41.0.7`; Python generators committed.)_
 - Permission evaluation tests cover: permission granted,
   permission denied, retired role, retired membership, retired
-  principal, suspended tenant.
-- `philharmonic-policy` publishes as `0.1.0`.
+  principal, suspended tenant. ✓ _(Tenant-status check at eval
+  time is deferred — flagged in the Gate-2 review note 0005 as
+  Wave 1 code intended to be enforced at the API layer in
+  Phase 8; not a Phase 2 regression. All other coverage
+  present in mock + MySQL tiers.)_
+- `philharmonic-policy` publishes as `0.1.0`. ✓ _(2026-04-22)_
 
 ---
 

@@ -10,18 +10,22 @@ What a first shipping release includes, and what's deferred.
 - `philharmonic-store` — published, stable.
 - `philharmonic-store-sqlx-mysql` — published, 28 passing
   integration tests.
+- `mechanics-config` — published `0.1.0` (2026-04-21). Schema
+  types (`MechanicsConfig`, `HttpEndpoint`, etc.) extracted
+  from `mechanics-core` so the lowerer stays Boa-free.
 - `mechanics-core` — published, substantial implementation.
 - `mechanics` HTTP service — published.
+- `philharmonic-policy` — published `0.1.0` (2026-04-22). All
+  seven entity kinds (`Tenant`, `Principal`,
+  `TenantEndpointConfig`, `RoleDefinition`, `RoleMembership`,
+  `MintingAuthority`, `AuditEvent`), permission evaluation
+  with three-way tenant binding, SCK AES-256-GCM at-rest
+  encryption, `pht_` long-lived API token format. Yuka's
+  two-gate crypto review protocol (Gate-1 approach approval
+  + Gate-2 code review) satisfied.
 
 ### Needs implementation work
 
-- `mechanics-config` — new crate extracting schema types
-  (`MechanicsConfig`, `HttpEndpoint`) from `mechanics-core`.
-  Keeps the lowerer Boa-free.
-- `philharmonic-policy` — design settled, code not started.
-  Contains `Tenant`, `Principal`, `TenantEndpointConfig`,
-  `RoleDefinition`, `RoleMembership`, `MintingAuthority`,
-  `AuditEvent` entity kinds.
 - `philharmonic-workflow` — design complete, code not started.
   Depends on `philharmonic-policy` for `Tenant` entity marker.
 - `philharmonic-connector-common` — shared vocabulary (COSE
