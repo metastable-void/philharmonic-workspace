@@ -11,6 +11,24 @@ Developer: Yuka MORI.
 - Design docs: see docs/design/ (authoritative for architecture)
 - Crypto-sensitive paths require Yuka's personal review; see
   ROADMAP.md §5.
+- **POSIX-ish host required.** This workspace assumes a
+  POSIX-ish development host: GNU/Linux (incl. WSL2 on
+  Windows), macOS (Darwin), BSDs (FreeBSD/OpenBSD/NetBSD/
+  DragonFly), illumos/Solaris, and musl distros (Alpine).
+  Before running any script, spawning Codex, or attempting a
+  Git state change, check the environment block's `Platform:`
+  field. If it reports `Platform: linux` / `darwin` /
+  `freebsd` / `openbsd` / `netbsd` / etc., proceed. If it
+  reports `Platform: win32` (raw Microsoft Windows), **STOP
+  IMMEDIATELY** — surface the mismatch in your first message
+  and instruct the human to switch to WSL2. Do not run
+  scripts, do not commit, do not spawn Codex. There's no
+  runtime gate inside the scripts because raw Windows can't
+  execute `#!/bin/sh` in the first place; the gate lives here,
+  in the docs, for the agent's benefit. On Git Bash / MSYS /
+  Cygwin (POSIX-compat layers): proceed with caution; flag any
+  submodule / signing / permission anomaly before continuing.
+  See docs/design/13-conventions.md §Development environment.
 - Submodule discipline: commit inside submodule first, push, then
   bump parent pointer. See ROADMAP.md §2.
 - ROADMAP.md is living. When a phase/task completes or plans

@@ -3,6 +3,69 @@
 Workspace-wide practices. Not design decisions about what the system
 does, but decisions every crate honors for consistency.
 
+## Development environment
+
+This workspace targets **POSIX-ish hosts** for development. The
+`scripts/*.sh` dispatcher is POSIX sh (`#!/bin/sh`), depends on
+SUSv4-baseline utilities (`awk`, `sed`, `grep`, `cut`, `tr`), and
+assumes POSIX file permissions, signal semantics, and process
+semantics. Individual rules (shell-script portability,
+`mktemp` / `web-fetch` wrappers, the `xtask` Rust-bin escape
+hatch for `jq` / `curl`) are downstream consequences of this
+single baseline assumption.
+
+### Supported dev platforms
+
+- **GNU/Linux**, any distribution, any arch (x86_64, aarch64,
+  etc.) — the primary development target.
+- **WSL2 on Microsoft Windows** — `uname -s` reports `Linux`;
+  behaves as GNU/Linux from the workspace's perspective. The
+  supported way to develop on Windows hardware.
+- **macOS (Darwin)** — POSIX-certified; the scripts work. HTTP
+  fetching and sparse-index querying moved to `xtask/` Rust bins
+  so stripped macOS installs (which lack `curl` / `jq` by
+  default) need no extra tooling.
+- **BSD family** — FreeBSD, OpenBSD, NetBSD, DragonFlyBSD.
+  Covered by the POSIX-sh discipline; explicit deviations are
+  tracked in §Shell scripts.
+- **illumos / Solaris** — POSIX-ish; should work, less
+  exercised.
+- **Alpine and other musl-based distros** — supported
+  (busybox `ps` / `sh` variants handled by §Shell scripts).
+
+### Unsupported dev platforms
+
+- **Raw (non-WSL) Microsoft Windows.** No cmd.exe, no
+  PowerShell. The scripts won't even execute — `#!/bin/sh` isn't
+  honored there — and even if POSIX sh were bootstrapped in,
+  submodule permission handling and the signing / audit-trailer
+  tooling assume a POSIX host.
+- **Git Bash / MSYS2 / Cygwin.** Read-only browsing may work;
+  state-changing operations (submodule ordering,
+  `commit-all.sh`, `push-all.sh`) are fragile. Use WSL2 instead.
+
+### Agent rule (Claude Code, Codex)
+
+**The docs are the gate.** The scripts aren't — raw Windows
+can't run `#!/bin/sh`, so a runtime detection inside a script
+never fires on the platforms it would gate. AI agents doing
+development in this repo MUST verify the host is POSIX-ish
+**before** running scripts, spawning sub-agents, or attempting
+Git state changes. The check is trivial: the environment block
+surfaced at session start reports `Platform: linux` / `darwin`
+/ `freebsd` / etc. on supported hosts, and `Platform: win32`
+(or similar) on raw Windows.
+
+- On a supported POSIX-ish host: proceed normally.
+- On **raw Windows** (`Platform: win32` or equivalent): stop
+  immediately. Surface the mismatch in the first message to the
+  human: "This workspace is POSIX-sh-based; raw Windows is not
+  supported. Use WSL2 to develop in this repo." Do not attempt
+  Git operations, do not run the scripts, do not spawn Codex.
+- On Git Bash / MSYS / Cygwin (POSIX-compat layers over
+  Windows): proceed with caution; flag any submodule, signing,
+  or file-permission anomaly and escalate before proceeding.
+
 ## Licensing
 
 All crates: `Apache-2.0 OR MPL-2.0`.

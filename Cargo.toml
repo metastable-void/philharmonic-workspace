@@ -61,3 +61,15 @@ opt-level = 3
 lto = true
 strip = true
 codegen-units = 1
+
+# Abort on panic instead of unwinding. Smaller binary, faster, and removes
+# an entire class of attack surface (unwind-based exploits). Only downside:
+# you lose `catch_unwind`, which most code shouldn't be using anyway.
+panic = "abort"
+
+# Keep integer-overflow checks on in release. The workspace no-panic rule
+# treats unchecked arithmetic as a bug (use `checked_*` / `saturating_*` /
+# `wrapping_*` to declare intent); silent wrap in release would mask
+# violations. Combined with `panic = "abort"`, unchecked overflow → abort
+# rather than silent data corruption.
+overflow-checks = true

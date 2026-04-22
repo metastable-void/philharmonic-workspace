@@ -129,6 +129,55 @@ Already published with substantive content:
   running storage backend tests. Containerized setups via Docker
   or Podman work well.
 
+## Supported development environments
+
+The workspace assumes a **POSIX-ish** host for development. Every
+script is POSIX sh (`#!/bin/sh`) and exercises POSIX utilities
+(`awk`, `sed`, `grep`, `cut`, `tr`); file-permission handling,
+signal semantics, and submodule-ordering rules all assume a
+POSIX host. In practice this means:
+
+**Supported and tested:**
+
+- **GNU/Linux** — any distribution, any arch (x86_64, aarch64,
+  etc.). This is the primary development target.
+- **WSL2 on Microsoft Windows** — works exactly like GNU/Linux
+  from the workspace's perspective; `uname -s` reports `Linux`.
+  This is the supported way to develop on Windows.
+- **macOS (Darwin)** — second-class-supported. POSIX-certified;
+  the scripts work. `scripts/web-fetch.sh` and
+  `scripts/xtask.sh crates-io-versions` are Rust bins precisely
+  so macOS (which ships neither `jq` nor `curl` by default in
+  minimal images) doesn't need extra tooling.
+- **BSD family** — FreeBSD, OpenBSD, NetBSD, DragonFlyBSD —
+  covered by the POSIX-sh discipline; deviations are tracked in
+  `docs/design/13-conventions.md §Shell scripts`.
+- **illumos / Solaris** — POSIX-ish; should work, less
+  exercised in practice.
+- **Alpine / musl-based distros** — supported (including
+  Alpine's busybox `ps` / `sh` variants).
+
+**Unsupported:**
+
+- **Raw (non-WSL) Microsoft Windows** — no cmd.exe, no
+  PowerShell. `#!/bin/sh` isn't honored, so the workspace
+  scripts can't even execute; submodule permission handling,
+  signing flows, and the audit-trailer tooling all assume a
+  POSIX host anyway. Use **WSL2** instead — it's a supported
+  path.
+- **Git Bash / MSYS / Cygwin** — POSIX-compat layers over
+  Windows. Read-only browsing may work; state-changing
+  operations are fragile. Not recommended.
+
+There is no runtime gate inside the scripts for this (raw
+Windows can't run `#!/bin/sh`, so there's no point). The gate
+lives in the docs, for the benefit of AI agents: Claude Code
+and Codex MUST verify they're on a POSIX-ish host before doing
+development work in this repo, and MUST stop and surface the
+problem if they're running under raw Windows. See
+[`CLAUDE.md`](CLAUDE.md), [`AGENTS.md`](AGENTS.md), and
+[`docs/design/13-conventions.md §Development environment`](docs/design/13-conventions.md).
+
 ## Cloning
 
 Fresh clone, including submodules:

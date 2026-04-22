@@ -1,2 +1,27 @@
 [alias]
 xtask = "run --quiet -p xtask --bin"
+
+
+# Linker-level hardening for all GNU/Linux builds, any arch. The link
+# args are binutils-level and work identically on x86_64, aarch64, and
+# other Linux arches — no reason to leave ARM64 cloud hosts unhardened.
+# `relocation-model=pic` is rustc's default for Linux executables but
+# stated explicitly as documentation.
+[target.'cfg(target_os = "linux")']
+rustflags = [
+    "-C", "relocation-model=pic",
+    # Control Flow Integrity — requires LLVM CFI support in the toolchain.
+    # "-Z", "sanitizer=cfi",  # nightly only, skip unless you're committed
+    "-C", "link-arg=-Wl,-z,relro,-z,now",  # RELRO full
+    "-C", "link-arg=-Wl,-z,noexecstack",
+]
+
+[registries.crates-io]
+protocol = "sparse"
+
+[net]
+retry = 3          # default 2; 3 is friendlier on flaky connections
+git-fetch-with-cli = true
+
+[profile.dev.package."*"]
+opt-level = 3

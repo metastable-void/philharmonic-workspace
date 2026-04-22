@@ -19,6 +19,30 @@ Authoritative detail for every rule summarized here lives in
 `docs/design/13-conventions.md`. Read it when a summary isn't
 enough.
 
+## Development host must be POSIX-ish
+
+This workspace assumes a POSIX-ish development host: GNU/Linux
+(incl. WSL2 on Windows), macOS (Darwin), BSDs
+(FreeBSD/OpenBSD/NetBSD/DragonFly), illumos/Solaris, or musl
+distros (Alpine). Every script is POSIX sh (`#!/bin/sh`); file-
+permission, signal, and submodule-ordering semantics assume a
+POSIX host.
+
+**Before running any script or touching files, check your
+environment.** If `uname -s` returns `Linux` / `Darwin` /
+`FreeBSD` / `OpenBSD` / `NetBSD` / `DragonFly` / `SunOS`,
+proceed. If it returns something indicating raw Microsoft
+Windows (unlikely — `#!/bin/sh` wouldn't get you this far), or
+if your runtime reports you're on native Windows, **STOP
+IMMEDIATELY** and surface the mismatch in your final message.
+Do not attempt the task. There's no runtime gate inside the
+scripts themselves (raw Windows can't execute `#!/bin/sh`, so
+it'd never fire); the gate lives here, in this document. On
+Git Bash / MSYS / Cygwin (POSIX-compat layers over Windows),
+proceed with caution and flag any submodule / signing /
+permission anomaly before continuing. See
+`docs/design/13-conventions.md §Development environment`.
+
 ## Your role in this workspace
 
 - **Implement what the prompt asks.** Don't redesign scope, don't
