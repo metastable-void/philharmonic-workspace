@@ -37,6 +37,7 @@
 #   ./scripts/codex-logs.sh --raw               # raw JSONL snapshot
 #   ./scripts/codex-logs.sh --raw -f            # raw JSONL tail -f
 #   ./scripts/codex-logs.sh -n | --no-color     # forward --no-color to codex-fmt
+#   ./scripts/codex-logs.sh --no-tool-output    # strip tool-output bodies
 #   ./scripts/codex-logs.sh -h | --help         # usage
 #
 # POSIX sh only — see docs/design/13-conventions.md §Shell scripts.
@@ -48,14 +49,16 @@ script_dir="$(cd -- "$(dirname -- "$0")" && pwd)"
 follow=0
 raw=0
 no_color=0
+no_tool_output=0
 while [ $# -gt 0 ]; do
     case "$1" in
-        -f|--follow)   follow=1;   shift ;;
-        --raw)         raw=1;      shift ;;
-        -n|--no-color) no_color=1; shift ;;
+        -f|--follow)     follow=1;         shift ;;
+        --raw)           raw=1;            shift ;;
+        -n|--no-color)   no_color=1;       shift ;;
+        --no-tool-output) no_tool_output=1; shift ;;
         -h|--help)
             cat <<EOF
-Usage: $0 [-f|--follow] [--raw] [-n|--no-color]
+Usage: $0 [-f|--follow] [--raw] [-n|--no-color] [--no-tool-output]
 
 Print the latest Codex session spawned from Claude Code. By
 default the rollout is piped through \`./scripts/xtask.sh
@@ -64,9 +67,14 @@ behaves like \`tail -f\` (prints the whole file first, then
 streams appends as Codex writes more).
 
 Flags:
-  -f, --follow    Stream appends in tail -f style.
-  --raw           Emit pure JSONL; skip the codex-fmt rendering.
-  -n, --no-color  Forward --no-color to codex-fmt (ignored with --raw).
+  -f, --follow       Stream appends in tail -f style.
+  --raw              Emit pure JSONL; skip the codex-fmt rendering.
+  -n, --no-color     Forward --no-color to codex-fmt (ignored with --raw).
+  --no-tool-output   Forward --no-tool-output to codex-fmt: drop
+                     tool-output bodies and keep only the one-line
+                     summary (\`<<< [call <id>, N lines]\`). Useful for
+                     eyeballing a long run's call pattern without
+                     drowning in output. Ignored with --raw.
 
 Sessions live under \$CODEX_HOME/sessions/YYYY/MM/DD/rollout-*.jsonl
 (default CODEX_HOME is ~/.codex).
@@ -124,7 +132,10 @@ printf '=== codex rollout: %s ===\n' "$latest" >&2
 
 fmt_flags=
 if [ "$no_color" -eq 1 ]; then
-    fmt_flags='--no-color'
+    fmt_flags="$fmt_flags --no-color"
+fi
+if [ "$no_tool_output" -eq 1 ]; then
+    fmt_flags="$fmt_flags --no-tool-output"
 fi
 
 # Producer is either a one-shot `cat` or a streaming `tail -f`.

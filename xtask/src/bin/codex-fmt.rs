@@ -4,6 +4,7 @@
 //! Usage:
 //!   ./scripts/xtask.sh codex-fmt -- [<path>]
 //!   ./scripts/xtask.sh codex-fmt -- --no-color [<path>]
+//!   ./scripts/xtask.sh codex-fmt -- --no-tool-output [<path>]
 //!   <producer> | ./scripts/xtask.sh codex-fmt --
 //!
 //! `<path>` is a Codex rollout file (one JSON object per line)
@@ -62,6 +63,17 @@
 //! without `-R`, or to another program switches them off. The
 //! `--no-color` flag forces them off even on a TTY.
 //!
+//! ## Suppressing tool output bodies
+//!
+//! Codex's `function_call_output` / `custom_tool_call_output`
+//! records carry the full stdout / apply_patch result / search
+//! hit list that the tool returned — often the bulk of the
+//! transcript. `--no-tool-output` drops those bodies and keeps
+//! only the one-line summary (`<<< [call <id>, N lines]`) plus
+//! the request side (`>>> tool(args)`), giving a compact
+//! what-was-called view without the results. Useful for
+//! eyeballing a long-running Codex dispatch's call pattern.
+//!
 //! ## Why an xtask bin rather than shell + jq
 //!
 //! `jq` is not POSIX and not shipped on every baseline (macOS
@@ -97,6 +109,19 @@ struct Args {
     /// Force ANSI color off even on a TTY.
     #[arg(long)]
     no_color: bool,
+
+    /// Drop tool-output bodies; keep only the call-side request and
+    /// the one-line output summary. Leaves messages and reasoning
+    /// untouched.
+    #[arg(long)]
+    no_tool_output: bool,
+}
+
+/// Render options derived from CLI flags. Kept separate from
+/// `Palette` (styling) so future per-record-type toggles can grow
+/// without touching color handling.
+struct RenderOpts {
+    no_tool_output: bool,
 }
 
 /// ANSI escape codes grouped so switching to no-color mode is a
@@ -150,6 +175,9 @@ fn main() -> ExitCode {
 
     let use_color = !args.no_color && io::stdout().is_terminal();
     let p: &Palette = if use_color { &COLOR } else { &NO_COLOR };
+    let opts = RenderOpts {
+        no_tool_output: args.no_tool_output,
+    };
 
     let reader: Box<dyn BufRead> = match args.path.as_deref() {
         None | Some("-") => Box::new(BufReader::new(io::stdin().lock())),
@@ -184,7 +212,7 @@ fn main() -> ExitCode {
             continue;
         }
         match serde_json::from_str::<Value>(line) {
-            Ok(v) => render(&mut out, &v, p),
+            Ok(v) => render(&mut out, &v, p, &opts),
             Err(e) => {
                 let _ = writeln!(
                     &mut out,
@@ -202,7 +230,7 @@ fn main() -> ExitCode {
     ExitCode::SUCCESS
 }
 
-fn render(out: &mut impl Write, v: &Value, p: &Palette) {
+fn render(out: &mut impl Write, v: &Value, p: &Palette, opts: &RenderOpts) {
     let ts = v.get("timestamp").and_then(Value::as_str).unwrap_or("");
     // Pull HH:MM:SS out of the ISO-8601 "YYYY-MM-DDTHH:MM:SS.sssZ"
     // via index math; never panic on short / non-ASCII strings.
@@ -227,11 +255,11 @@ fn render(out: &mut impl Write, v: &Value, p: &Palette) {
         ("response_item", "message") => render_message(out, payload, ts_short, p),
         ("response_item", "function_call") => render_function_call(out, payload, ts_short, p),
         ("response_item", "function_call_output") => {
-            render_function_call_output(out, payload, ts_short, p)
+            render_function_call_output(out, payload, ts_short, p, opts)
         }
         ("response_item", "custom_tool_call") => render_custom_tool_call(out, payload, ts_short, p),
         ("response_item", "custom_tool_call_output") => {
-            render_custom_tool_call_output(out, payload, ts_short, p)
+            render_custom_tool_call_output(out, payload, ts_short, p, opts)
         }
 
         _ => {
@@ -530,7 +558,13 @@ fn render_function_call(out: &mut impl Write, payload: &Value, ts_short: &str, p
     }
 }
 
-fn render_function_call_output(out: &mut impl Write, payload: &Value, ts_short: &str, p: &Palette) {
+fn render_function_call_output(
+    out: &mut impl Write,
+    payload: &Value,
+    ts_short: &str,
+    p: &Palette,
+    opts: &RenderOpts,
+) {
     let call_id = payload
         .get("call_id")
         .and_then(Value::as_str)
@@ -551,10 +585,12 @@ fn render_function_call_output(out: &mut impl Write, payload: &Value, ts_short: 
         if line_count == 1 { "" } else { "s" },
         p.reset,
     );
-    for line in output.lines() {
-        let _ = writeln!(out, "  {}{}{}", p.gray, line, p.reset);
+    if !opts.no_tool_output {
+        for line in output.lines() {
+            let _ = writeln!(out, "  {}{}{}", p.gray, line, p.reset);
+        }
+        let _ = writeln!(out);
     }
-    let _ = writeln!(out);
 }
 
 fn render_custom_tool_call(out: &mut impl Write, payload: &Value, ts_short: &str, p: &Palette) {
@@ -595,6 +631,7 @@ fn render_custom_tool_call_output(
     payload: &Value,
     ts_short: &str,
     p: &Palette,
+    opts: &RenderOpts,
 ) {
     let call_id = payload
         .get("call_id")
@@ -616,10 +653,12 @@ fn render_custom_tool_call_output(
         if line_count == 1 { "" } else { "s" },
         p.reset,
     );
-    for line in output.lines() {
-        let _ = writeln!(out, "  {}{}{}", p.gray, line, p.reset);
+    if !opts.no_tool_output {
+        for line in output.lines() {
+            let _ = writeln!(out, "  {}{}{}", p.gray, line, p.reset);
+        }
+        let _ = writeln!(out);
     }
-    let _ = writeln!(out);
 }
 
 fn short_id(s: &str) -> String {

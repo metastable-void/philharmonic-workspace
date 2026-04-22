@@ -281,7 +281,8 @@ Invoke by path (`./scripts/foo.sh`), not via `bash`.
   any submodule push fails.
 - `./scripts/codex-status.sh` — list Codex processes spawned by
   Claude Code and their descendants.
-- `./scripts/codex-logs.sh [-f|--follow] [--raw] [-n|--no-color]` —
+- `./scripts/codex-logs.sh [-f|--follow] [--raw] [-n|--no-color]
+  [--no-tool-output]` —
   print the latest Codex session spawned from Claude Code
   (filters on the `session_meta` record's
   `"originator":"Claude Code"` field under
@@ -291,8 +292,11 @@ Invoke by path (`./scripts/foo.sh`), not via `bash`.
   color-highlighted human-readable timeline; pass `--raw` for
   pure JSONL. `-f` behaves like `tail -f` (prints whole file,
   then streams appends). `-n`/`--no-color` forwards the flag
-  to `codex-fmt`. Header path goes to stderr so stdout stays
-  clean for piping.
+  to `codex-fmt`. `--no-tool-output` drops tool-output bodies,
+  keeping only the one-line summaries (`<<< [call <id>, N
+  lines]`) plus the request side — useful for eyeballing a
+  long dispatch's call pattern. Header path goes to stderr so
+  stdout stays clean for piping.
 - `./scripts/heads.sh` — show the current HEAD commit for the
   parent and every submodule, with short SHA, signature
   indicator, and subject. Use after `commit-all.sh` /
