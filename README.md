@@ -312,6 +312,14 @@ Invoke by path (`./scripts/foo.sh`), not via `bash`.
 - `./scripts/publish-crate.sh [--dry-run] <crate>` — publish one
   crate to crates.io and tag the release inside the submodule.
   Tags are created only after `cargo publish` succeeds.
+- `./scripts/verify-tag.sh <crate> [<tag>]` — verify that a
+  crate's release tag is locally present, cryptographically
+  signed (signature verifies with the local keyring), and
+  pushed to origin at the same commit. With one arg, the tag is
+  derived as `v<version>` from the crate's `Cargo.toml`. Run
+  after `publish-crate.sh` + `push-all.sh` to confirm the
+  release landed end-to-end; complements `heads.sh`
+  (which surfaces HEAD signatures across all submodules).
 - `./scripts/mktemp.sh [<slug>]` — workspace-canonical
   replacement for raw `mktemp(1)`. Prints a temp path (under
   `$TMPDIR` or `/tmp`) and creates the file; delegates to

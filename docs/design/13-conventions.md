@@ -625,6 +625,20 @@ state that was published is only trivially recoverable if a tag
 marks it. Tags also give `cargo-semver-checks` a clean baseline
 reference for release-to-release API-breakage checks.
 
+**Post-release verification.** `./scripts/verify-tag.sh <crate>
+[<tag>]` confirms the tag landed cleanly end-to-end: it checks
+that the tag exists locally, that its signature verifies with
+the local keyring, and that origin has the same tag pointing at
+the same commit. Run it after `publish-crate.sh` +
+`push-all.sh` — the three-way check surfaces half-applied
+states (e.g. local tag created but push failed, or key mismatch
+between signer and verifier) that the publish scripts can't
+notice on their own. The helper treats `--tags origin <pattern>`
+carefully because passing a pattern to `ls-remote` hides the
+`^{}` peel line that carries the annotated-tag's commit SHA;
+the script lists all tag refs and filters locally to avoid that
+pitfall.
+
 ## API breakage detection
 
 `cargo-semver-checks` compares the public API surface of one
