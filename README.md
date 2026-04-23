@@ -200,8 +200,13 @@ local Git state in the parent repo and every submodule:
   directory (absolute on the parent, relative on each submodule,
   computed via `scripts/lib/relpath.sh`). Installs the `pre-commit`
   and `commit-msg` hooks workspace-wide from a single source.
-- `commit.gpgsign=true` and `tag.gpgsign=true` — on the parent and
-  recursively on every submodule.
+- `commit.gpgsign=true`, `tag.gpgsign=true`, and
+  `rebase.gpgsign=true` — on the parent and recursively on every
+  submodule. `rebase.gpgsign` is set separately because `git
+  rebase` doesn't honor `commit.gpgsign` for the commits it
+  replays; without this, `pull-all.sh`'s rebase-on-pull would
+  land unsigned commits that the `post-commit` hook then rolls
+  back mid-rebase.
 
 It's idempotent — re-run any time.
 
@@ -288,9 +293,9 @@ Invoke by path (`./scripts/foo.sh`), not via `bash`.
 - `./scripts/setup.sh` — one-time (or post-fresh-clone).
   Initializes every submodule recursively; sets
   `push.recurseSubmodules=check`, `core.hooksPath=.githooks`
-  (relative in submodules), `commit.gpgsign=true`, and
-  `tag.gpgsign=true` on the parent and every submodule; warns
-  if Rust isn't on PATH. Idempotent.
+  (relative in submodules), `commit.gpgsign=true`,
+  `tag.gpgsign=true`, and `rebase.gpgsign=true` on the parent
+  and every submodule; warns if Rust isn't on PATH. Idempotent.
 - `./scripts/status.sh` — working-tree status of the parent and
   every submodule (clean submodules are hidden). Run at the
   start of a session.

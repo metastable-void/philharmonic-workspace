@@ -207,8 +207,8 @@ scripts in `scripts/`:
   `core.hooksPath` pointing at the repo-tracked `.githooks/`
   (relative path in submodules, computed with
   `scripts/lib/relpath.sh`), and `commit.gpgsign=true` /
-  `tag.gpgsign=true`; warns if the Rust toolchain isn't on PATH.
-  Idempotent; safe to rerun.
+  `tag.gpgsign=true` / `rebase.gpgsign=true`; warns if the Rust
+  toolchain isn't on PATH. Idempotent; safe to rerun.
 - `status.sh` — parent + every submodule's working tree.
 - `pull-all.sh` — update submodules to their tracked branches.
 - `commit-all.sh [--parent-only] [msg]` — commit pending changes
@@ -261,13 +261,23 @@ commit on each repo" pattern.
 The scripts pass both `-s` (DCO signoff, adds `Signed-off-by:`
 trailer to the commit message) and `-S` (GPG or SSH signature,
 attaches a cryptographic signature to the commit object) to
-`git commit`. `setup.sh` additionally sets `commit.gpgsign=true`
-and `tag.gpgsign=true` on the parent and every submodule, so the
-signing flag is picked up even when somebody reaches around the
-wrapper. `commit-all.sh` verifies the resulting HEAD with
-`git log --format=%G?` after every commit it makes — if the
-commit somehow lacks a signature, it is rolled back with
-`git reset --soft HEAD~1` and the script aborts.
+`git commit`. `setup.sh` additionally sets `commit.gpgsign=true`,
+`tag.gpgsign=true`, and `rebase.gpgsign=true` on the parent and
+every submodule, so the signing flag is picked up even when
+somebody reaches around the wrapper, and rebase-replayed commits
+(the `pull-all.sh` exception) sign too. `commit-all.sh` verifies
+the resulting HEAD with `git log --format=%G?` after every commit
+it makes — if the commit somehow lacks a signature, it is rolled
+back with `git reset --soft HEAD~1` and the script aborts.
+
+Why `rebase.gpgsign` separately from `commit.gpgsign`: `git
+rebase` has historically not honored `commit.gpgsign` for
+replayed commits; the documented control for rebase-replayed
+signing is `rebase.gpgsign`. Without it, `pull-all.sh`'s
+rebase-on-pull would produce unsigned commits that the
+`.githooks/post-commit` hook would roll back mid-rebase, turning
+the exception path into a stuck state. Setting both keys is
+what makes the exception usable.
 
 Consequence: if your local Git doesn't have a signing key
 configured (no GPG key, or `gpg.format=ssh` without a
@@ -275,8 +285,9 @@ configured (no GPG key, or `gpg.format=ssh` without a
 unsigned commit. Configure one once — `git config --global
 user.signingkey <key>`, and optionally `git config --global
 gpg.format ssh` for SSH signing — and `setup.sh` takes care of
-the `commit.gpgsign=true` and `tag.gpgsign=true` side per clone.
-Both checks are hard requirements, not preferences.
+the `commit.gpgsign=true` / `tag.gpgsign=true` / `rebase.gpgsign
+=true` side per clone. These checks are hard requirements, not
+preferences.
 
 **Tracked Git hooks under `.githooks/`** back the wrapper-only
 rule at the Git-client level. `setup.sh` points

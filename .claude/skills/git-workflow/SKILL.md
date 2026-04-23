@@ -232,9 +232,12 @@ aren't initialized, run `scripts/setup.sh` once — it initializes all
 submodules recursively, sets `push.recurseSubmodules=check`, points
 `core.hooksPath` at the tracked `.githooks/` (relative path inside
 each submodule, computed by `scripts/lib/relpath.sh`), turns on
-`commit.gpgsign` / `tag.gpgsign` on the parent and every submodule,
-and warns if the Rust toolchain is missing. After that, the helpers
-above work.
+`commit.gpgsign` / `tag.gpgsign` / `rebase.gpgsign` on the parent
+and every submodule, and warns if the Rust toolchain is missing.
+After that, the helpers above work. (`rebase.gpgsign` is a separate
+git config key because `commit.gpgsign` doesn't cover rebase-
+replayed commits; without it, `pull-all.sh`'s rebase-on-pull would
+land unsigned commits that `post-commit` then rolls back.)
 
 ## Tracked Git hooks
 

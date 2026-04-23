@@ -281,9 +281,10 @@ Developer: Yuka MORI.
 - Fresh clone: run `scripts/setup.sh` once — it initializes all
   submodules recursively, installs the tracked Git hooks under
   `.githooks/` (via `core.hooksPath`), configures
-  `commit.gpgsign=true` / `tag.gpgsign=true` on the parent and
-  every submodule, sets `push.recurseSubmodules=check`, and
-  warns if the Rust toolchain is missing. Idempotent.
+  `commit.gpgsign=true` / `tag.gpgsign=true` /
+  `rebase.gpgsign=true` on the parent and every submodule, sets
+  `push.recurseSubmodules=check`, and warns if the Rust
+  toolchain is missing. Idempotent.
 - Claude-side procedures live as skills under `.claude/skills/`:
   `git-workflow` (the scripts-only rule above),
   `codex-prompt-archive` (how to hand off to Codex), and

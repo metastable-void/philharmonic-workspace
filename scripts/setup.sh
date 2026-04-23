@@ -56,6 +56,16 @@ git config --local commit.gpgsign true
 ok "Configuring tag.gpgsign=true"
 git config --local tag.gpgsign true
 
+# rebase.gpgsign is distinct from commit.gpgsign — older git did
+# not auto-sign commits that `git rebase` creates, and documented
+# behavior is still that `--gpg-sign` must be opted into for rebase
+# separately. Without this, pull-all.sh's --rebase (exception 2 in
+# docs/design/13-conventions.md §Git workflow) would produce
+# unsigned commits that the post-commit hook rolls back mid-rebase,
+# breaking the flow.
+ok "Configuring rebase.gpgsign=true"
+git config --local rebase.gpgsign true
+
 REPO_ROOT=$(pwd -P)
 export REPO_ROOT
 
@@ -74,6 +84,7 @@ rel=$( relpath "$SUBMODULE_ROOT" "${REPO_ROOT}/.githooks" )
 git config --local core.hooksPath "$rel"
 git config --local commit.gpgsign true
 git config --local tag.gpgsign true
+git config --local rebase.gpgsign true
 '
 
 chmod +x ./scripts/*.sh ./.githooks/*
