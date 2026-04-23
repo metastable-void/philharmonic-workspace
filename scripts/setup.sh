@@ -50,6 +50,22 @@ git config --local push.recurseSubmodules check
 ok "Configuring core.hooksPath=.githooks"
 git config --local core.hooksPath .githooks
 
+REPO_ROOT=$(pwd -P)
+export REPO_ROOT
+
+git submodule foreach --recursive '
+set -eu
+if [ -z "$REPO_ROOT" ] || [ ! -d "$REPO_ROOT" ] ; then
+    echo "Could not find REPO_ROOT, aborting." >&2
+    exit 211
+fi
+
+. "${REPO_ROOT}/scripts/lib/relpath.sh"
+SUBMODULE_ROOT=$(pwd -P)
+rel=$( relpath "$SUBMODULE_ROOT" "${REPO_ROOT}/.githooks" )
+git config --local core.hooksPath "$rel"
+'
+
 chmod +x ./scripts/*.sh ./.githooks/*
 
 ok "Submodule status"

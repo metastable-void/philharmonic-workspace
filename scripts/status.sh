@@ -19,8 +19,9 @@ status=$(git status --porcelain=v2 --branch 2>/dev/null | grep "^# branch\.ab" |
 if [ -n "$status" ]; then
     ahead=$(echo "$status" | cut -d" " -f3)
     behind=$(echo "$status" | cut -d" " -f4)
+    branch_name=$(git branch --show-current)
     if [ "$ahead" != "+0" ] || [ "$behind" != "-0" ]; then
-        echo "  (branch: ahead=$ahead behind=$behind)"
+        echo "  (branch $branch_name: ahead=$ahead behind=$behind)"
     fi
 fi
 echo
@@ -53,8 +54,10 @@ echo "=== $name ==="
 if [ -n "$dirty" ]; then
     echo "$dirty"
 fi
+
+branch_name=$(git branch --show-current)
 if [ "$diverged" = "1" ]; then
-    echo "  (branch: ahead=$ahead behind=$behind)"
+    echo "  (branch $branch_name: ahead=$ahead behind=$behind)"
 fi
 if [ "$detached" = "1" ]; then
     echo "  (detached HEAD)"
