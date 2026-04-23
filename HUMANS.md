@@ -9,9 +9,7 @@ this file, but never edit this file.
 
 ## Short-term TODOs
 
-- point Claude Code to Codex's report about the docs,
-  and let it update the docs.
-- tell Claude Code to update the docs.
+- make sure we always make docs/roadmaps up-to-date.
 - talk with Claude Code about what to do next;
   we have a clear deadline (before the Japanese
   Golden Week holidays).
