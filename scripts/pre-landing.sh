@@ -35,6 +35,7 @@
 # POSIX sh only — see docs/design/13-conventions.md §Shell scripts.
 
 set -eu
+. "$(dirname -- "$0")/lib/colors.sh"
 . "$(dirname -- "$0")/lib/workspace-cd.sh"
 
 no_ignored=0
@@ -49,7 +50,7 @@ done
 
 if [ $# -gt 0 ]; then
     crates=$*
-    printf '=== pre-landing: explicit crates: %s ===\n' "$crates"
+    printf '%s=== pre-landing: explicit crates: %s ===%s\n' "$C_HEADER" "$crates" "$C_RESET"
 else
     # Workspace members (submodule-backed or in-tree) with
     # unstaged, staged, or untracked changes count as modified.
@@ -60,9 +61,11 @@ else
         # intentionally unquoted so default-IFS word-splitting
         # flattens the newlines.
         # shellcheck disable=SC2086
-        printf '=== pre-landing: auto-detected modified crates: %s ===\n' "$(printf '%s ' $crates)"
+        printf '%s=== pre-landing: auto-detected modified crates: %s ===%s\n' \
+            "$C_HEADER" "$(printf '%s ' $crates)" "$C_RESET"
     else
-        echo '=== pre-landing: no modified crates detected; running workspace checks only ==='
+        printf '%s=== pre-landing: no modified crates detected; running workspace checks only ===%s\n' \
+            "$C_HEADER" "$C_RESET"
     fi
 fi
 
@@ -71,15 +74,15 @@ fi
 ./scripts/rust-test.sh
 
 if [ "$no_ignored" -eq 1 ]; then
-    echo '=== pre-landing: --no-ignored; skipping step 3 ==='
+    printf '%s=== pre-landing: --no-ignored; skipping step 3 ===%s\n' "$C_HEADER" "$C_RESET"
 elif [ -n "$crates" ]; then
     # shellcheck disable=SC2086
     for c in $crates; do
-        printf '=== pre-landing: --ignored phase for %s ===\n' "$c"
+        printf '%s=== pre-landing: --ignored phase for %s ===%s\n' "$C_HEADER" "$c" "$C_RESET"
         ./scripts/rust-test.sh --ignored "$c"
     done
 else
-    echo '=== pre-landing: no --ignored phase needed (no modified crates) ==='
+    printf '%s=== pre-landing: no --ignored phase needed (no modified crates) ===%s\n' "$C_HEADER" "$C_RESET"
 fi
 
-echo '=== pre-landing: all checks passed ==='
+printf '%s=== pre-landing: all checks passed ===%s\n' "$C_OK" "$C_RESET"

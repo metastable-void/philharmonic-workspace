@@ -52,17 +52,19 @@
   public key, and minting signed authorization tokens binding
   the payload hash to the step context. Implements
   `ConfigLowerer` from `philharmonic-workflow`. Wave A mint
-  path (COSE_Sign1) landed in-tree 2026-04-22; Wave B encrypt
-  path pending. Publish held until Wave B end-to-end tests pass.
+  path (COSE_Sign1) landed 2026-04-22; Wave B encrypt path
+  (hybrid ML-KEM-768 + X25519 + AES-256-GCM COSE_Encrypt0)
+  landed 2026-04-23. Published as `0.1.0` on 2026-04-23.
 - **`philharmonic-connector-router`** — pure HTTP dispatcher
-  binary library. Routes requests by realm. Implementation
-  lands with Wave B.
+  binary library. Routes requests by realm. Landed and
+  published as `0.1.0` on 2026-04-23 alongside the rest of the
+  triangle.
 - **`philharmonic-connector-service`** — service framework for
   per-realm connector service binaries. Hosts the
   `Implementation` trait, token verification, payload
-  decryption, dispatch. Wave A verify path landed in-tree
-  2026-04-22; Wave B decrypt path pending. Publish held until
-  Wave B end-to-end tests pass.
+  decryption, dispatch. Wave A verify path landed 2026-04-22;
+  Wave B decrypt path + `verify_and_decrypt` chain landed
+  2026-04-23. Published as `0.1.0` on 2026-04-23.
 - **`philharmonic-api`** — public HTTP API.
 - Per-implementation crates (one per connector implementation —
   e.g. `philharmonic-connector-impl-http-forward`,

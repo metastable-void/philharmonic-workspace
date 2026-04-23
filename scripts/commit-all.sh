@@ -43,6 +43,7 @@
 
 set -eu
 
+. "$(dirname -- "$0")/lib/colors.sh"
 . "$(dirname -- "$0")/lib/workspace-cd.sh"
 
 parent_only=0
@@ -87,12 +88,12 @@ if [ "$parent_only" -eq 0 ]; then
 branch=$(git rev-parse --abbrev-ref HEAD)
 if ! git diff --quiet || ! git diff --cached --quiet || [ -n "$(git ls-files --others --exclude-standard)" ]; then
     if [ "$branch" = "HEAD" ]; then
-        echo "!!! $name is in detached HEAD with uncommitted changes." >&2
+        printf "%s!!! $name is in detached HEAD with uncommitted changes.%s\n" "$C_ERR" "$C_RESET" >&2
         echo "    Refusing to commit (would create an orphan)." >&2
         echo "    Checkout a branch inside the submodule and re-run." >&2
         exit 1
     fi
-    echo "=== committing in $name (branch: $branch) ==="
+    printf "%s=== committing in $name (branch: $branch) ===%s\n" "$C_HEADER" "$C_RESET"
     git add -A
     # -S forces GPG/SSH signing; commit aborts here if no key.
     git commit -s -S -F "$MSG_FILE"
@@ -100,17 +101,17 @@ if ! git diff --quiet || ! git diff --cached --quiet || [ -n "$(git ls-files --o
     # signature. %G? returns "N" for unsigned commits.
     sig=$(git log -n 1 --format=%G? HEAD)
     if [ "$sig" = "N" ]; then
-        echo "!!! $name: HEAD $(git rev-parse --short HEAD) has no signature." >&2
+        printf "%s!!! $name: HEAD $(git rev-parse --short HEAD) has no signature.%s\n" "$C_ERR" "$C_RESET" >&2
         echo "    Rolling back with git reset --soft HEAD~1." >&2
         git reset --soft HEAD~1
         exit 1
     fi
 else
-    echo "=== $name clean ==="
+    printf "%s=== $name clean ===%s\n" "$C_DIM" "$C_RESET"
 fi
 '
 else
-    echo "=== --parent-only: skipping submodules ==="
+    printf '%s=== --parent-only: skipping submodules ===%s\n' "$C_DIM" "$C_RESET"
 fi
 
 # Safety: refuse the parent commit if .claude/settings.json
@@ -144,17 +145,18 @@ fi
 
 # Commit parent's changes (including bumped submodule pointers).
 if ! git diff --quiet || ! git diff --cached --quiet || [ -n "$(git ls-files --others --exclude-standard)" ]; then
-    echo "=== committing in parent ==="
+    printf '%s=== committing in parent ===%s\n' "$C_HEADER" "$C_RESET"
     git add -A
     # -S forces GPG/SSH signing; commit aborts here if no key.
     git commit -s -S -F "$msgfile"
     sig=$(git log -n 1 --format=%G? HEAD)
     if [ "$sig" = "N" ]; then
-        echo "!!! parent: HEAD $(git rev-parse --short HEAD) has no signature." >&2
+        printf '%s!!! parent: HEAD %s has no signature.%s\n' \
+            "$C_ERR" "$(git rev-parse --short HEAD)" "$C_RESET" >&2
         echo "    Rolling back with git reset --soft HEAD~1." >&2
         git reset --soft HEAD~1
         exit 1
     fi
 else
-    echo "=== parent clean ==="
+    printf '%s=== parent clean ===%s\n' "$C_DIM" "$C_RESET"
 fi

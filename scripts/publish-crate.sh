@@ -29,6 +29,7 @@
 
 set -eu
 
+. "$(dirname -- "$0")/lib/colors.sh"
 . "$(dirname -- "$0")/lib/workspace-cd.sh"
 
 dry_run=0
@@ -57,7 +58,7 @@ crate=$1
 # marker. Submodules carry a `.git` file at their root; in-tree
 # members don't.
 if [ -d "$crate" ] && [ ! -f "$crate/.git" ]; then
-    printf '!!! %s: in-tree workspace member (not a submodule). publish-crate.sh\n' "$crate" >&2
+    printf '%s!!! %s: in-tree workspace member (not a submodule). publish-crate.sh%s\n' "$C_ERR" "$crate" "$C_RESET" >&2
     printf '    only supports submodule-backed crates; in-tree tooling like\n' >&2
     printf '    `xtask` is `publish = false` by design.\n' >&2
     exit 1
@@ -70,24 +71,24 @@ version=$(./scripts/crate-version.sh "$crate")
 
 tag="v$version"
 
-printf '=== %s %s ===\n' "$crate" "$tag"
+printf '%s=== %s %s ===%s\n' "$C_HEADER" "$crate" "$tag" "$C_RESET"
 
 # Refuse to proceed if the submodule is in a bad state.
 (
     cd "$crate"
     branch=$(git rev-parse --abbrev-ref HEAD)
     if [ "$branch" = "HEAD" ]; then
-        echo "!!! $crate: detached HEAD; checkout a branch first" >&2
+        printf '%s!!! %s: detached HEAD; checkout a branch first%s\n' "$C_ERR" "$crate" "$C_RESET" >&2
         exit 1
     fi
     if ! git diff --quiet \
         || ! git diff --cached --quiet \
         || [ -n "$(git ls-files --others --exclude-standard)" ]; then
-        echo "!!! $crate: working tree dirty; commit or clean before publishing" >&2
+        printf '%s!!! %s: working tree dirty; commit or clean before publishing%s\n' "$C_ERR" "$crate" "$C_RESET" >&2
         exit 1
     fi
     if git rev-parse --verify "refs/tags/$tag" >/dev/null 2>&1; then
-        printf '!!! %s: tag %s already exists locally\n' "$crate" "$tag" >&2
+        printf '%s!!! %s: tag %s already exists locally%s\n' "$C_ERR" "$crate" "$tag" "$C_RESET" >&2
         exit 1
     fi
 )
@@ -95,15 +96,15 @@ printf '=== %s %s ===\n' "$crate" "$tag"
 # Sanity: always run --dry-run first. Catches missing README,
 # unsatisfied dep versions, oversized tarballs, etc. before the real
 # publish.
-printf '=== cargo publish --dry-run -p %s ===\n' "$crate"
+printf '%s=== cargo publish --dry-run -p %s ===%s\n' "$C_HEADER" "$crate" "$C_RESET"
 cargo publish --dry-run -p "$crate"
 
 if [ "$dry_run" -eq 1 ]; then
-    echo "=== --dry-run: stopping; no real publish, no tag ==="
+    printf '%s=== --dry-run: stopping; no real publish, no tag ===%s\n' "$C_WARN" "$C_RESET"
     exit 0
 fi
 
-printf '=== cargo publish -p %s ===\n' "$crate"
+printf '%s=== cargo publish -p %s ===%s\n' "$C_HEADER" "$crate" "$C_RESET"
 cargo publish -p "$crate"
 
 # Tag inside the submodule's own repo. Signed annotated tag matches
@@ -111,8 +112,9 @@ cargo publish -p "$crate"
 (
     cd "$crate"
     git tag -s "$tag" -m "release $crate $tag"
-    printf '=== tagged %s %s (signed) ===\n' "$crate" "$tag"
+    printf '%s=== tagged %s %s (signed) ===%s\n' "$C_OK" "$crate" "$tag" "$C_RESET"
 )
 
 echo
-printf 'Published %s %s. Run ./scripts/push-all.sh to push the tag.\n' "$crate" "$tag"
+printf '%sPublished %s %s.%s Run ./scripts/push-all.sh to push the tag.\n' \
+    "$C_OK" "$crate" "$tag" "$C_RESET"

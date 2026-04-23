@@ -23,17 +23,14 @@ if ! git -C "$workspace_root" rev-parse --is-inside-work-tree >/dev/null 2>&1; t
 fi
 
 cd "$workspace_root"
-YELLOW=$(printf '\033[33m')
-GREEN=$(printf '\033[32m')
-BOLD=$(printf '\033[1m')
-RESET=$(printf '\033[0m')
+. "$(dirname -- "$0")/lib/colors.sh"
 
 warn() {
-    printf '%s!!! %s%s\n' "$YELLOW" "$*" "$RESET" >&2
+    printf '%s!!! %s%s\n' "$C_WARN" "$*" "$C_RESET" >&2
 }
 
 ok() {
-    printf '%s=== %s%s\n' "$GREEN" "$*" "$RESET"
+    printf '%s=== %s%s\n' "$C_OK" "$*" "$C_RESET"
 }
 
 ok "Initializing submodules recursively"
@@ -130,7 +127,7 @@ else
 fi
 
 echo
-printf '%sSetup complete.%s Next steps:\n' "$BOLD" "$RESET"
+printf '%sSetup complete.%s Next steps:\n' "$C_BOLD" "$C_RESET"
 printf '  scripts/status.sh     — see working-tree state\n'
 printf '  scripts/pull-all.sh   — update submodules to tracked branches\n'
 printf '  cargo check --workspace (once Rust is installed)\n'

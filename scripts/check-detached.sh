@@ -16,6 +16,7 @@
 # POSIX sh only — see docs/design/13-conventions.md §Shell scripts.
 
 set -eu
+. "$(dirname -- "$0")/lib/colors.sh"
 . "$(dirname -- "$0")/lib/workspace-cd.sh"
 
 # Collect rows via `$()` so SIGPIPE on a truncating consumer (e.g.
@@ -32,10 +33,11 @@ output=$(
 
 if [ -n "$output" ]; then
     count=$(printf '%s\n' "$output" | wc -l | tr -d ' ')
-    echo '!!! detached-HEAD submodules:' >&2
+    printf '%s!!! detached-HEAD submodules:%s\n' "$C_ERR" "$C_RESET" >&2
     printf '%s\n' "$output" | sed 's/^/    /' >&2
-    printf '!!! %s submodule(s) in detached HEAD. Check out a branch inside each before committing.\n' "$count" >&2
+    printf '%s!!! %s submodule(s) in detached HEAD. Check out a branch inside each before committing.%s\n' \
+        "$C_ERR" "$count" "$C_RESET" >&2
     exit 1
 fi
 
-echo 'all submodules on a branch.'
+printf '%sall submodules on a branch.%s\n' "$C_OK" "$C_RESET"

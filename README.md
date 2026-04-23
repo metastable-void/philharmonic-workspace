@@ -121,15 +121,20 @@ files tracked directly in the parent repo):
 ## Status
 
 Design is substantially settled; implementation is in active progress.
-Most crates are currently published as `0.0.0` placeholders on
-crates.io; substantial implementation is rolling out crate-by-crate
-through 2026.
+The connector triangle + foundational crates are published with
+substantive content; the per-implementation `philharmonic-connector-impl-*`
+crates remain at `0.0.0` placeholders on crates.io until their
+respective phases land.
 
 Already published with substantive content:
 `philharmonic-types`, `philharmonic-store`,
 `philharmonic-store-sqlx-mysql`, `mechanics-config`,
 `mechanics-core`, `mechanics`, `philharmonic-policy`,
-`philharmonic-connector-common`, `philharmonic-workflow`.
+`philharmonic-connector-common` (0.2.0 as of 2026-04-23),
+`philharmonic-workflow`,
+`philharmonic-connector-client` (0.1.0, 2026-04-23),
+`philharmonic-connector-service` (0.1.0, 2026-04-23),
+`philharmonic-connector-router` (0.1.0, 2026-04-23).
 
 ## Prerequisites
 

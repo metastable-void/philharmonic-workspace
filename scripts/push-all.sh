@@ -21,12 +21,13 @@
 
 set -eu
 
+. "$(dirname -- "$0")/lib/colors.sh"
 . "$(dirname -- "$0")/lib/workspace-cd.sh"
 
 git submodule foreach '
 branch=$(git rev-parse --abbrev-ref HEAD)
 if [ "$branch" = "HEAD" ]; then
-    echo "!!! $name is in detached HEAD; skipping push." >&2
+    printf "%s!!! $name is in detached HEAD; skipping push.%s\n" "$C_ERR" "$C_RESET" >&2
     echo "    If you made local commits here, checkout a branch" >&2
     echo "    and re-run this script before the parent is pushed." >&2
 else

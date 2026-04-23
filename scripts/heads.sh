@@ -26,6 +26,7 @@
 
 set -eu
 
+. "$(dirname -- "$0")/lib/colors.sh"
 . "$(dirname -- "$0")/lib/workspace-cd.sh"
 
 # Width of the longest submodule name
@@ -46,4 +47,22 @@ output=$(
     printf "%-48s %s\n" "$name" "$(git log -n 1 --format="%h %G? %s" HEAD)"
     '
 )
-printf '%s\n' "$output"
+
+# Colorize the signature character (field 3 after short SHA):
+# G (good) green, U (untrusted-but-valid) and ? (unknown) yellow,
+# everything else (N/E/B/X/Y/R) red. Awk rebuilds the line via
+# the explicit fmt we already used above so multi-space padding
+# from `%-48s` is preserved. No-op when colors are off (C_* empty).
+printf '%s\n' "$output" | awk \
+    -v ok="$C_OK" -v warn="$C_WARN" -v err="$C_ERR" -v reset="$C_RESET" '
+{
+    if (NF < 4) { print; next }
+    sig = $3
+    if (sig == "G")                c = ok
+    else if (sig == "U" || sig == "?") c = warn
+    else                             c = err
+    # Subject = fields 4..NF rejoined with single spaces.
+    subj = $4
+    for (i = 5; i <= NF; i++) subj = subj " " $i
+    printf "%-48s %s %s%s%s %s\n", $1, $2, c, sig, reset, subj
+}'

@@ -11,6 +11,7 @@
 # POSIX sh only — see docs/design/13-conventions.md §Shell scripts.
 
 set -eu
+. "$(dirname -- "$0")/lib/colors.sh"
 . "$(dirname -- "$0")/lib/workspace-cd.sh"
 
 if command -v dash >/dev/null 2>&1; then
@@ -20,11 +21,12 @@ elif command -v sh >/dev/null 2>&1; then
         "$(command -v sh)" >&2
     checker=sh
 else
-    echo '!!! no POSIX shell found (need dash or sh)' >&2
+    printf '%s!!! no POSIX shell found (need dash or sh)%s\n' "$C_ERR" "$C_RESET" >&2
     exit 1
 fi
 
-printf '=== parse-checking scripts/*.sh + scripts/lib/*.sh with %s ===\n' "$checker"
+printf '%s=== parse-checking scripts/*.sh + scripts/lib/*.sh with %s ===%s\n' \
+    "$C_HEADER" "$checker" "$C_RESET"
 
 fail=0
 # POSIX sh has no recursive glob; enumerate the subdirectories we
@@ -34,9 +36,9 @@ fail=0
 for f in scripts/*.sh scripts/lib/*.sh; do
     [ -f "$f" ] || continue  # glob expands literally if no match
     if "$checker" -n "$f" 2>/dev/null; then
-        printf 'ok   %s\n' "$f"
+        printf '%sok%s   %s\n' "$C_OK" "$C_RESET" "$f"
     else
-        printf 'FAIL %s\n' "$f" >&2
+        printf '%sFAIL%s %s\n' "$C_ERR" "$C_RESET" "$f" >&2
         # Re-run without stderr suppression so the user sees the error.
         "$checker" -n "$f" || true
         fail=1
@@ -44,8 +46,8 @@ for f in scripts/*.sh scripts/lib/*.sh; do
 done
 
 if [ "$fail" -eq 0 ]; then
-    printf '=== all scripts POSIX-clean (%s) ===\n' "$checker"
+    printf '%s=== all scripts POSIX-clean (%s) ===%s\n' "$C_OK" "$checker" "$C_RESET"
 else
-    echo '=== FAILURES — fix before landing ===' >&2
+    printf '%s=== FAILURES — fix before landing ===%s\n' "$C_ERR" "$C_RESET" >&2
     exit 1
 fi

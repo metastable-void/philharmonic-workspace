@@ -30,6 +30,7 @@
 # POSIX sh only — see docs/design/13-conventions.md §Shell scripts.
 
 set -eu
+. "$(dirname -- "$0")/lib/colors.sh"
 . "$(dirname -- "$0")/lib/workspace-cd.sh"
 
 script_dir="$(cd -- "$(dirname -- "$0")" && pwd)"
@@ -52,12 +53,12 @@ crate="$1"
 crate_dir="$crate"
 
 if [ ! -d "$crate_dir" ]; then
-    printf '!!! crate directory not found: %s\n' "$crate_dir" >&2
+    printf '%s!!! crate directory not found: %s%s\n' "$C_ERR" "$crate_dir" "$C_RESET" >&2
     exit 2
 fi
 
 if [ ! -d "$crate_dir/.git" ] && [ ! -f "$crate_dir/.git" ]; then
-    printf '!!! %s is not a git submodule (no .git entry)\n' "$crate_dir" >&2
+    printf '%s!!! %s is not a git submodule (no .git entry)%s\n' "$C_ERR" "$crate_dir" "$C_RESET" >&2
     exit 2
 fi
 
@@ -68,24 +69,24 @@ else
     tag="v${version}"
 fi
 
-printf '=== verifying tag %s in %s ===\n' "$tag" "$crate"
+printf '%s=== verifying tag %s in %s ===%s\n' "$C_HEADER" "$tag" "$crate" "$C_RESET"
 
 # (1) Local tag exists.
 if ! git -C "$crate_dir" rev-parse --verify --quiet "refs/tags/${tag}" >/dev/null; then
-    printf '  local tag:  MISSING\n' >&2
+    printf '  local tag:  %sMISSING%s\n' "$C_ERR" "$C_RESET" >&2
     printf '    fix: ./scripts/publish-crate.sh %s (if you meant to release it) or locate the missing tag\n' "$crate" >&2
     exit 1
 fi
 
 # Dereference the annotated tag to its target commit.
 local_sha="$(git -C "$crate_dir" rev-parse "${tag}^{commit}")"
-printf '  local tag:  ok (%s)\n' "$local_sha"
+printf '  local tag:  %sok%s (%s)\n' "$C_OK" "$C_RESET" "$local_sha"
 
 # (2) Signature verifies. `git tag -v` is chatty — swallow stdout/stderr.
 if git -C "$crate_dir" tag -v "$tag" >/dev/null 2>&1; then
-    printf '  signed:     ok\n'
+    printf '  signed:     %sok%s\n' "$C_OK" "$C_RESET"
 else
-    printf '  signed:     FAIL — signature invalid, missing, or verifier key not in local keyring\n' >&2
+    printf '  signed:     %sFAIL%s — signature invalid, missing, or verifier key not in local keyring\n' "$C_ERR" "$C_RESET" >&2
     printf '    fix: ensure GPG key or SSH allowed-signers entry for the tag signer is available locally\n' >&2
     exit 1
 fi
@@ -111,16 +112,16 @@ if [ -z "$origin_sha" ]; then
             | awk -v t="refs/tags/${tag}" '$2 == t {print $1}'
     )"
     if [ -z "$origin_sha" ]; then
-        printf '  origin:     MISSING — tag not pushed\n' >&2
+        printf '  origin:     %sMISSING%s — tag not pushed\n' "$C_ERR" "$C_RESET" >&2
         printf '    fix: ./scripts/push-all.sh (uses --follow-tags)\n' >&2
         exit 1
     fi
 fi
 
 if [ "$origin_sha" != "$local_sha" ]; then
-    printf '  origin:     MISMATCH — local %s vs origin %s\n' "$local_sha" "$origin_sha" >&2
+    printf '  origin:     %sMISMATCH%s — local %s vs origin %s\n' "$C_ERR" "$C_RESET" "$local_sha" "$origin_sha" >&2
     exit 1
 fi
 
-printf '  origin:     ok (%s)\n' "$origin_sha"
-printf '=== verified: %s %s signed and pushed ===\n' "$crate" "$tag"
+printf '  origin:     %sok%s (%s)\n' "$C_OK" "$C_RESET" "$origin_sha"
+printf '%s=== verified: %s %s signed and pushed ===%s\n' "$C_OK" "$crate" "$tag" "$C_RESET"

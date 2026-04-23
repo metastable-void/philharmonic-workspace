@@ -22,9 +22,10 @@
 
 set -eu
 
-BOLD=$(printf '\033[1m')
-DIM=$(printf '\033[2m')
-RESET=$(printf '\033[0m')
+. "$(dirname -- "$0")/lib/colors.sh"
+BOLD="$C_BOLD"
+DIM="$C_DIM"
+RESET="$C_RESET"
 
 # Snapshot all processes once. Columns in order: pid ppid time rss etime
 # args. `args` must be last because it can contain whitespace. No `-w`
