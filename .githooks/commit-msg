@@ -1,0 +1,53 @@
+#!/bin/sh
+# Enforce Signed-off-by trailer on every commit.
+#
+# This hook runs after the commit message has been written but before
+# the commit is finalized. $1 is the path to the message file.
+
+set -eu
+
+msg_file="$1"
+
+# Skip merge commits, fixup!/squash! commits, and reverts — these inherit
+# trailers from their target or are mechanical.
+first_line=$(head -n 1 "$msg_file")
+case "$first_line" in
+    "Merge "*|"fixup! "*|"squash! "*|"Revert "*)
+        exit 0
+        ;;
+esac
+
+# Skip if the message is empty (git will abort anyway).
+if ! grep -q '[^[:space:]]' "$msg_file"; then
+    exit 0
+fi
+
+# Require a Signed-off-by: trailer matching the committer identity.
+committer_name=$(git config user.name)
+committer_email=$(git config user.email)
+expected="Signed-off-by: ${committer_name} <${committer_email}>"
+
+if ! grep -qxF "$expected" "$msg_file"; then
+    cat >&2 <<EOF
+================================================================
+  Commit blocked: missing Signed-off-by trailer
+
+  This repository requires every commit to carry a sign-off
+  matching the committer identity:
+
+      $expected
+
+  Add it automatically with:
+      git commit -s ...
+
+  Or amend your current in-progress message to include the line
+  above, exactly, on its own line at the end.
+
+  Rationale: the sign-off is a Developer Certificate of Origin
+  attestation. See https://developercertificate.org/
+================================================================
+EOF
+    exit 1
+fi
+
+exit 0
