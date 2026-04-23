@@ -245,12 +245,15 @@ Developer: Yuka MORI.
   back any unsigned commit that slipped through.
   **Git history is append-only** — no `git commit --amend`, no
   `git rebase`, no `git reset --hard`, no `git push --force`, no
-  other history rewriting. The only authorized history change is
-  the script-enforced emergency rollback of a just-recorded,
-  not-yet-pushed unsigned commit (`git reset --soft HEAD~1` in
-  `post-commit` / `commit-all.sh`). Mistakes ship as new commits;
-  pushed mistakes get `git revert`ed. See
-  docs/design/13-conventions.md §Git workflow.
+  other history rewriting. Two authorized exceptions, both
+  script-enforced and both bounded to local not-yet-pushed
+  commits: (1) the unsigned-commit rollback in `post-commit` /
+  `commit-all.sh`, and (2) the `--rebase` in `pull-all.sh`
+  (parent `git pull --rebase` + `git submodule update --remote
+  --rebase`; replays local-only commits when upstream moved).
+  Mistakes otherwise ship as new commits; pushed mistakes get
+  `git revert`ed. See docs/design/13-conventions.md §Git
+  workflow.
 - Shell scripts are **POSIX sh** (`#!/bin/sh`), not bash. No
   bashisms; explicit deviations (e.g. `ps -o rss=`) are tracked in
   docs/design/13-conventions.md §Shell scripts. Validate with

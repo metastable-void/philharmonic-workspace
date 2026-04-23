@@ -14,6 +14,16 @@ set -eu
 # linear — local parent commits (usually submodule-pointer bumps)
 # get replayed on top of origin. Fails loudly on conflicts or a
 # dirty working tree rather than auto-merging.
+#
+# History-modification exception: the workspace's append-only
+# rule (docs/design/13-conventions.md §Git workflow, "No history
+# modification") forbids rebase in general. This `pull --rebase`
+# is exception #2 — script-enforced, only touches local
+# not-yet-pushed commits, preserves the commit message (Audit-Info
+# + Signed-off-by trailers) verbatim, and re-signs under
+# commit.gpgsign=true. Alternatives (--ff-only, default merge,
+# default submodule checkout) each violate other invariants.
+# See the conventions doc for the full rationale.
 git pull --rebase
 
 # Fetch all tags on the parent. Default fetch only pulls tags that
@@ -26,6 +36,12 @@ git fetch --tags --quiet
 # any local submodule commits on top of the remote branch instead
 # of detaching HEAD at the remote SHA, which the default checkout
 # mode would do when origin is ahead.
+#
+# Same history-modification exception as the parent pull above:
+# covered by docs/design/13-conventions.md §Git workflow (exception
+# #2). Same reasoning — only local not-yet-pushed submodule
+# commits are ever replayed; avoiding rebase here would detach
+# HEAD and break commit-all.sh's detached-HEAD guard.
 git submodule update --remote --rebase --recursive
 
 # Submodule `update --remote` fetches branches but not arbitrary

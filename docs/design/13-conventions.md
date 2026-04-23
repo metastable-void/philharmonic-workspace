@@ -326,19 +326,48 @@ that drops intervening commits, and **no** branch resets that
 discard unique commits. The rule applies to the parent repo and
 every submodule, to published and unpublished branches alike.
 
-**The narrow exception — script-enforced emergency rollback of
-local, not-yet-pushed commits.** The only authorized history
-change is the `git reset --soft HEAD~1` that
-`.githooks/post-commit` and `commit-all.sh` both perform when a
-just-recorded commit violates the signature invariant. Both
-preserve the working tree (staged changes kept) so the developer
-can re-commit correctly; both only touch the immediately-
-preceding commit on the local branch; and both only fire while
-that commit has not been pushed. Nothing else is authorized to
-rewrite history — not amend, not rebase, not reset, not anything
-else, regardless of intent. If a future need arises for another
-kind of rollback, it has to live in a script and be covered
-here; ad-hoc history edits are not how it gets introduced.
+**The narrow exceptions — script-enforced operations on local,
+not-yet-pushed commits.** Two cases, both bounded to local
+unpublished state and both living in `scripts/*.sh` or
+`.githooks/*`:
+
+1. **Unsigned-commit rollback.** The `git reset --soft HEAD~1`
+   that `.githooks/post-commit` and `commit-all.sh` both perform
+   when a just-recorded commit violates the signature invariant.
+   Both preserve the working tree (staged changes kept) so the
+   developer can re-commit correctly; both only touch the
+   immediately-preceding commit on the local branch; and both
+   only fire while that commit has not been pushed.
+
+2. **Rebase-on-pull in `scripts/pull-all.sh`.** `git pull
+   --rebase` on the parent and `git submodule update --remote
+   --rebase --recursive` on every submodule. In the typical
+   case (no local commits ahead of upstream) this is a no-op or
+   a fast-forward; in the uncommon case (local commits ahead
+   *and* upstream moved forward), it replays the local commits
+   on top of the new upstream tip. Only local, not-yet-pushed
+   commits are ever affected; `commit.gpgsign=true` is
+   workspace-wide so replayed commits are re-signed; the
+   commit messages (including `Audit-Info:` and
+   `Signed-off-by:` trailers) are preserved verbatim; author-
+   date is preserved, committer-date is refreshed. The
+   alternatives examined — `--ff-only` (fails in the uncommon
+   case and leaves the user with no wrapper-friendly recovery
+   path, since the rest of this section forbids manual rebase),
+   default merge (produces merge commits *and* would need
+   pre-commit hook wiring for submodule-driven merges), default
+   submodule checkout (detaches HEAD, breaking `commit-all.sh`'s
+   detached-HEAD guard) — each violate other workspace
+   invariants, so `--rebase` is the accepted path. Do not run
+   `git pull --rebase` or `git rebase` outside `pull-all.sh`;
+   the exception is for the script, not for the subcommand.
+
+Nothing outside these two cases is authorized to rewrite history
+— not amend, not rebase, not reset, not anything else,
+regardless of intent. If a future need for another
+script-enforced history operation arises, it has to live in a
+wrapper script and be documented here; ad-hoc history edits are
+not how new exceptions get introduced.
 
 **Why append-only:**
 

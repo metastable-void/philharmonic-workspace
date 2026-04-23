@@ -50,15 +50,22 @@ Authoritative sources (read these if anything below is unclear):
 6. **Git history is append-only.** No `git commit --amend`, no
    `git rebase` (interactive or otherwise), no `git reset --hard`,
    no `git push --force` / `--force-with-lease`, no
-   `git filter-branch`, no history surgery of any kind. The only
-   authorized rollback is the `git reset --soft HEAD~1` that
-   `.githooks/post-commit` and `commit-all.sh` both perform when
-   a just-recorded, not-yet-pushed commit violates the signature
-   invariant — and only that. Mistakes ship as **new commits**
+   `git filter-branch`, no history surgery of any kind. Two
+   script-enforced exceptions, both bounded to local
+   not-yet-pushed commits:
+   (a) the `git reset --soft HEAD~1` that `.githooks/post-commit`
+       and `commit-all.sh` both perform when a just-recorded
+       commit violates the signature invariant;
+   (b) the `git pull --rebase` (parent) + `git submodule update
+       --remote --rebase` (submodules) inside
+       `scripts/pull-all.sh`, which replay local unpushed
+       commits on top of the upstream tip when upstream moved.
+   That's it. Mistakes otherwise ship as **new commits**
    (fix-forward) or `git revert`s; never as retroactive edits.
    See docs/design/13-conventions.md §Git workflow ("No history
-   modification") for the full statement, including the
-   "if you need a mistake undone" decision tree.
+   modification") for the full statement, including why the
+   rebase-on-pull alternatives (`--ff-only`, default merge,
+   default submodule checkout) don't work cleanly.
 
 ## The scripts
 
@@ -199,6 +206,9 @@ Need something the scripts don't do?
   The append-only rule covers unpushed commits too; Yuka reviews
   history the way it landed. Fix-forward with a new commit, or if
   the earlier commit is genuinely garbage, ask before touching it.
+  The rebase inside `pull-all.sh` (exception 6b) is for
+  integrating *upstream* moves, not for reorganizing your own
+  history; don't repurpose it.
 - **"The post-commit hook rolled back my commit"** — your working
   tree is preserved; the commit message is saved at
   `.git/UNSIGNED_COMMIT_MSG`. Rerun `./scripts/commit-all.sh "msg"`.
