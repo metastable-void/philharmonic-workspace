@@ -282,7 +282,7 @@ Both checks are hard requirements, not preferences.
 rule at the Git-client level. `setup.sh` points
 `core.hooksPath` at `.githooks/` on the parent and at the
 relative-from-the-submodule equivalent in every submodule, so the
-same two hooks run everywhere:
+same three hooks run everywhere:
 
 - `.githooks/pre-commit` — refuses any commit whose invocation
   didn't set `WORKSPACE_GIT_WRAPPER=1`. `commit-all.sh` exports
@@ -295,14 +295,24 @@ same two hooks run everywhere:
   are exempt. `commit-all.sh` always passes `-s`, so this hook's
   job is to catch stray raw `git commit -m ...` invocations that
   bypassed the wrapper but still need to follow the DCO rule.
+- `.githooks/post-commit` — if the just-recorded commit has no
+  valid GPG/SSH signature (`%G?` is not `G` or `U`), rolls back
+  with `git reset --soft HEAD~1`, preserves the staged tree, and
+  saves the original message to `.git/UNSIGNED_COMMIT_MSG` so the
+  user can re-commit cleanly. `setup.sh` turns on
+  `commit.gpgsign=true` + `tag.gpgsign=true` workspace-wide, so
+  this hook is a defence-in-depth for the case where signing got
+  bypassed explicitly (e.g. `--no-gpg-sign`). The abort message
+  points offenders at `scripts/commit-all.sh`; the raw-git retry
+  path is preserved for amend/rebase flows.
 
-Together: the pre-commit hook says "go through the wrapper" and
-the commit-msg hook says "carry a sign-off" — both are
-workspace-wide invariants that used to live only in the wrapper
-script. Don't edit these hooks ad hoc; if a new invariant needs
-to be enforced, change the `.githooks/*` file in a normal
-commit-all.sh commit and it lands for every contributor on their
-next `setup.sh` run.
+Together: pre-commit says "go through the wrapper", commit-msg
+says "carry a sign-off", and post-commit says "rollback if
+unsigned" — all three are workspace-wide invariants that used to
+live only in the wrapper script. Don't edit these hooks ad hoc;
+if a new invariant needs to be enforced, change the
+`.githooks/*` file in a normal commit-all.sh commit and it
+lands for every contributor on their next `setup.sh` run.
 
 ## Shell scripts
 

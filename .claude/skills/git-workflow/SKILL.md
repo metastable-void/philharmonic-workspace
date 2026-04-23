@@ -205,8 +205,8 @@ above work.
 
 ## Tracked Git hooks
 
-Two hooks under `.githooks/` back the "go through the scripts" rule
-at the Git-client level, once `setup.sh` has wired them in:
+Three hooks under `.githooks/` back the "go through the scripts"
+rule at the Git-client level, once `setup.sh` has wired them in:
 
 - `.githooks/pre-commit` — rejects any `git commit` invocation that
   didn't set `WORKSPACE_GIT_WRAPPER=1`. Only `commit-all.sh` exports
@@ -217,6 +217,16 @@ at the Git-client level, once `setup.sh` has wired them in:
   `Signed-off-by: <name> <email>` trailer. Skips merges, reverts,
   fixups, and empty messages. `commit-all.sh` always passes `-s`,
   so this hook catches commits that bypassed the wrapper.
+- `.githooks/post-commit` — if the commit just recorded lacks a
+  valid GPG/SSH signature (`%G?` not `G`/`U`), rolls back with
+  `git reset --soft HEAD~1` and saves the message to
+  `.git/UNSIGNED_COMMIT_MSG`. Staged changes are preserved. The
+  abort message points at `scripts/commit-all.sh` as the retry
+  path; a raw-git fallback (`git commit -S -s -F <saved-msg>` or
+  `git commit -S -s -c ORIG_HEAD`) is documented for amend/rebase
+  flows. `setup.sh` turns on `commit.gpgsign=true` workspace-wide,
+  so this fires only for commits that bypassed signing
+  explicitly.
 
 Don't `--no-verify` around these hooks. If you legitimately need a
 flow the wrappers don't support, extend the wrapper.

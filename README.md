@@ -211,8 +211,8 @@ If you already cloned without `--recurse-submodules`, just run
 
 ### Tracked Git hooks
 
-The repo ships two hooks under `.githooks/` that `setup.sh` wires
-up via `core.hooksPath`:
+The repo ships three hooks under `.githooks/` that `setup.sh`
+wires up via `core.hooksPath`:
 
 - `.githooks/pre-commit` — refuses any commit that wasn't invoked
   through `./scripts/commit-all.sh` (the wrapper sets
@@ -224,6 +224,13 @@ up via `core.hooksPath`:
   `commit-all.sh` always passes `-s`, so in practice this hook
   catches stray raw `git commit -m ...` invocations that bypassed
   the wrapper some other way.
+- `.githooks/post-commit` — if the just-recorded commit lacks a
+  valid GPG/SSH signature (`%G?` ∉ `{G, U}`), rolls it back with
+  `git reset --soft HEAD~1` (staged changes preserved) and saves
+  the message to `.git/UNSIGNED_COMMIT_MSG` so the user can
+  re-commit cleanly. `setup.sh` already turns on
+  `commit.gpgsign=true` everywhere, so this is a safety net for
+  the case where signing got bypassed (e.g. `--no-gpg-sign`).
 
 These hooks enforce the invariants the wrapper scripts used to
 enforce unilaterally, now applied even when somebody reaches around

@@ -1,0 +1,58 @@
+#!/bin/sh
+# post-commit: if the commit that just happened is unsigned, undo it
+# with --soft so the user can re-commit with a signature.
+
+set -eu
+
+# Check signature status of HEAD.
+sig=$(git log -1 --format='%G?' HEAD)
+
+case "$sig" in
+    G|U)
+        exit 0  # Good signature. Nothing to do.
+        ;;
+esac
+
+# Save the message and metadata so the user can reuse them.
+saved_msg=$(git rev-parse --git-dir)/UNSIGNED_COMMIT_MSG
+git log -1 --format='%B' HEAD > "$saved_msg"
+
+# Undo the commit, keep staged changes.
+git reset --soft HEAD~1
+
+cat >&2 <<EOF
+================================================================
+  Commit was unsigned and has been rolled back.
+
+  Your changes are still staged (reset was --soft). The original
+  message was saved to:
+
+      $saved_msg
+
+  Preferred retry (workspace standard — -s -S, Audit-Info
+  trailer, submodule ordering; setup.sh sets commit.gpgsign=true
+  and tag.gpgsign=true on the parent and every submodule, so
+  signing should Just Work after this):
+
+      ./scripts/commit-all.sh "your message"
+      # commit-all.sh runs 'git add -A' before committing — if
+      # you have unrelated dirty files in the tree, clean them
+      # out first (see docs/design/13-conventions.md §Git workflow).
+
+  Raw-git fallback (amend/rebase flows, or when commit-all.sh
+  doesn't cover your case; if you reach for this often, extend
+  the wrapper rather than routing around it):
+
+      git commit -S -s -F "$saved_msg"
+      # or retry the previous HEAD's content exactly after fixing
+      # your signing config:
+      git commit -S -s -c ORIG_HEAD
+
+  Rationale: every commit in this workspace carries a DCO sign-off
+  and a GPG/SSH signature. If you got here, signing was somehow
+  bypassed (e.g. --no-gpg-sign, or commit.gpgsign toggled off
+  locally). See CLAUDE.md, AGENTS.md, and
+  docs/design/13-conventions.md §Git workflow.
+================================================================
+EOF
+exit 0

@@ -37,14 +37,24 @@ if ! grep -qxF "$expected" "$msg_file"; then
 
       $expected
 
-  Add it automatically with:
-      git commit -s ...
+  Preferred path (workspace standard — passes -s -S, walks
+  submodules in the right order, and appends the Audit-Info
+  trailer):
 
-  Or amend your current in-progress message to include the line
-  above, exactly, on its own line at the end.
+      ./scripts/commit-all.sh "your message"
+
+  Raw-git fallback (amend/rebase flows, or when commit-all.sh
+  doesn't cover your case; if you reach for this often, extend
+  the wrapper rather than routing around it):
+
+      git commit -s ...        # -s auto-adds the trailer
+      # or manually put the 'Signed-off-by:' line above, exactly,
+      # on its own line at the end of the message.
 
   Rationale: the sign-off is a Developer Certificate of Origin
-  attestation. See https://developercertificate.org/
+  attestation (https://developercertificate.org/). The canonical
+  path in this workspace is scripts/commit-all.sh — see CLAUDE.md,
+  AGENTS.md, and docs/design/13-conventions.md §Git workflow.
 ================================================================
 EOF
     exit 1

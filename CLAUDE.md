@@ -240,8 +240,9 @@ Developer: Yuka MORI.
   (wired up by `setup.sh` via `core.hooksPath` on the parent and
   every submodule) also enforce these: `.githooks/pre-commit`
   rejects any commit that didn't come through `commit-all.sh`,
-  and `.githooks/commit-msg` rejects any message without a
-  matching `Signed-off-by:` trailer. See
+  `.githooks/commit-msg` rejects any message without a matching
+  `Signed-off-by:` trailer, and `.githooks/post-commit` rolls
+  back any unsigned commit that slipped through. See
   docs/design/13-conventions.md §Git workflow.
 - Shell scripts are **POSIX sh** (`#!/bin/sh`), not bash. No
   bashisms; explicit deviations (e.g. `ps -o rss=`) are tracked in
