@@ -112,9 +112,12 @@ files tracked directly in the parent repo):
   query for published crate versions), `web-fetch` (in-
   process HTTP GET, no `curl`/`wget` dependency),
   `codex-fmt` (renders Codex rollout JSONL into a color-
-  highlighted timeline; used by `scripts/codex-logs.sh`), and
+  highlighted timeline; used by `scripts/codex-logs.sh`),
   `openai-chat` (generic OpenAI chat-completion caller; used
-  by `scripts/project-status.sh`). See
+  by `scripts/project-status.sh`), and `calendar-jp`
+  (agent-facing JST calendar with weekends + Japanese public
+  holidays + current wall-clock; run at session start to
+  ground deadline reasoning). See
   [§xtask and KIND UUID generation](#xtask-and-kind-uuid-generation)
   below.
 
@@ -736,6 +739,23 @@ Current bins:
   non-zero. Pure-Rust HTTP via `ureq` + `rustls` — no
   `python` / `node` / `curl` dependency. Primary caller:
   `scripts/project-status.sh`.
+- **`calendar-jp`** — agent-facing Japanese work-calendar
+  context for deadline reasoning. Usage:
+  `./scripts/xtask.sh calendar-jp`. Prints a 5-week grid
+  centred on today (JST), marks today as `[DD]`, Japanese
+  public holidays (祝日) as `DD*`, Saturdays/Sundays as
+  `DD·`, and normal weekdays as plain `DD`. Lists each
+  holiday in the window with its Japanese name, and closes
+  with the current JST wall-clock timestamp. Backed by
+  `chrono-tz` (no host-TZ dependency) and `yasumi` (Japanese
+  holiday dataset). **Agents (Claude Code, Codex) are
+  expected to run this at session start and whenever a task
+  touches a date-relative commitment** — the host's timezone
+  and an LLM's training-data cutoff are both unreliable for
+  deadline reasoning on this project. See the dedicated
+  blocks in [`CLAUDE.md`](CLAUDE.md) and
+  [`AGENTS.md`](AGENTS.md) plus
+  [`CONTRIBUTING.md §8`](CONTRIBUTING.md#8-in-tree-workspace-tooling-xtask).
 
 ## AI-assisted development
 

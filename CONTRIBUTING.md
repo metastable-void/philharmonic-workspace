@@ -850,9 +850,31 @@ xtask/
         ├── gen-uuid.rs           # one tool per file
         ├── crates-io-versions.rs # crates.io sparse-index query
         ├── web-fetch.rs          # in-process HTTP GET (ureq + rustls)
-        └── codex-fmt.rs          # render Codex rollout JSONL timeline;
-                                  # consumed by scripts/codex-logs.sh
+        ├── codex-fmt.rs          # render Codex rollout JSONL timeline;
+        │                         # consumed by scripts/codex-logs.sh
+        ├── openai-chat.rs        # generic OpenAI chat-completion caller;
+        │                         # consumed by scripts/project-status.sh
+        └── calendar-jp.rs        # JST workweek grid + Japanese public
+                                  # holidays; agent-facing
+                                  # deadline-context anchor
 ```
+
+### Agent usage of `calendar-jp`
+
+`calendar-jp` exists so AI agents (Claude Code, Codex) can
+ground their reasoning about deadlines in real JST time rather
+than a stale training-data cutoff or the host's timezone. It
+prints a 5-week grid centred on today, marks weekends and
+Japanese 祝日, and lists every holiday in the window with its
+Japanese name plus the current JST wall-clock timestamp. The
+rule: **agents should run `./scripts/xtask.sh calendar-jp` at
+session start, and again any time a task touches a date-relative
+commitment** ("by Thursday", "before the Golden Week freeze",
+"this sprint"). See the agent-facing short form in
+[`CLAUDE.md`](CLAUDE.md) and
+[`AGENTS.md`](AGENTS.md)
+(both have a dedicated bullet near the top of the executive
+summary / role block).
 
 New bins go under `xtask/src/bin/<name>.rs` (one tool per file),
 are invoked via `./scripts/xtask.sh <name> -- <args>`, and

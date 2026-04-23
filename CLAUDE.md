@@ -89,6 +89,17 @@ Every item here is the short form of something documented in
 full in `CONTRIBUTING.md`. Read the full section before acting
 — this summary is a prompt, not a spec.
 
+- **Ground yourself in JST time at session start.** Run
+  `./scripts/xtask.sh calendar-jp` — prints a 5-week grid
+  centred on today (JST), marks weekends and Japanese public
+  holidays, lists each 祝日 in the window with its Japanese
+  name, and shows the current JST wall-clock timestamp. Run
+  it again whenever you reason about a deadline, a release
+  window, a "before Thursday" commitment, or anything else
+  where "today" and "which days are non-working" matter. The
+  host's timezone and your training-data cutoff are both
+  unreliable; this bin's output is authoritative for
+  deadline reasoning on this project.
 - **All Git state changes go through `scripts/*.sh`** —
   `status.sh`, `pull-all.sh`, `commit-all.sh`, `push-all.sh`,
   `heads.sh`. Never raw `git commit` / `git push` / `git add`

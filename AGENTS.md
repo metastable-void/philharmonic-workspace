@@ -93,6 +93,14 @@ than proceeding.
   message rather than guessing.
 - **Don't commit, don't push, don't branch.** Leave the working
   tree dirty. Claude commits via `scripts/*.sh` after review.
+- **Ground yourself in JST time when the task involves a
+  deadline.** Run `./scripts/xtask.sh calendar-jp` — prints a
+  5-week grid centred on today (JST) with weekend/holiday
+  markers and the current JST timestamp. Use it when the prompt
+  says "by Thursday", "before the deadline", "this week", or
+  mentions any other date-relative commitment. The host's
+  timezone and your training-data cutoff are both unreliable
+  for this; the bin's output is authoritative.
 
 ## Git (what you must not do)
 
