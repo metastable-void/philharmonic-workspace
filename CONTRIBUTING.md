@@ -867,10 +867,26 @@ than a stale training-data cutoff or the host's timezone. It
 prints a 5-week grid centred on today, marks weekends and
 Japanese 祝日, and lists every holiday in the window with its
 Japanese name plus the current JST wall-clock timestamp. The
-rule: **agents should run `./scripts/xtask.sh calendar-jp` at
-session start, and again any time a task touches a date-relative
-commitment** ("by Thursday", "before the Golden Week freeze",
-"this sprint"). See the agent-facing short form in
+rule: **agents should run `./scripts/xtask.sh calendar-jp`
+regularly**, not only once per session. Specifically:
+
+- **At session start** — before the first non-trivial action.
+- **Any time a task touches a date-relative commitment** — "by
+  Thursday", "before the Golden Week freeze", "this sprint",
+  "after hours today".
+- **After any significant work is completed** — e.g. a commit
+  landed, a Codex dispatch finished, a publish wrapped. Long
+  sessions drift across the 10:00 / 19:00 / 21:00 thresholds,
+  weekday/weekend boundaries, and sometimes midnight; the
+  wall-clock at the moment of the *next* decision is what
+  matters, not the wall-clock you saw three hours ago. A fresh
+  run also refreshes the out-of-hours-commentary decision
+  (see the next subsection).
+- **Cheap by design** — the bin is a small stdout-only Rust
+  binary; re-running it does not cost anything worth
+  optimising against. When in doubt, re-run.
+
+See the agent-facing short form in
 [`CLAUDE.md`](CLAUDE.md) and
 [`AGENTS.md`](AGENTS.md)
 (both have a dedicated bullet near the top of the executive

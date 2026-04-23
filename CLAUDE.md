@@ -89,17 +89,22 @@ Every item here is the short form of something documented in
 full in `CONTRIBUTING.md`. Read the full section before acting
 — this summary is a prompt, not a spec.
 
-- **Ground yourself in JST time at session start.** Run
-  `./scripts/xtask.sh calendar-jp` — prints a 5-week grid
+- **Ground yourself in JST time — regularly, not just once.**
+  Run `./scripts/xtask.sh calendar-jp` — prints a 5-week grid
   centred on today (JST), marks weekends and Japanese public
   holidays, lists each 祝日 in the window with its Japanese
   name, and shows the current JST wall-clock timestamp. Run
-  it again whenever you reason about a deadline, a release
-  window, a "before Thursday" commitment, or anything else
-  where "today" and "which days are non-working" matter. The
-  host's timezone and your training-data cutoff are both
-  unreliable; this bin's output is authoritative for
-  deadline reasoning on this project.
+  it at session start, **again after any significant unit of
+  work completes** (commit landed, Codex dispatch finished,
+  publish done) so your next decision uses fresh time, and
+  any time you reason about a deadline, a release window, a
+  "before Thursday" commitment, or anything else where "today"
+  and "which days are non-working" matter. Long sessions drift
+  across the 10:00 / 19:00 / 21:00 thresholds and sometimes
+  midnight; a stale timestamp is the failure mode. The host's
+  timezone and your training-data cutoff are both unreliable;
+  this bin's output is authoritative for deadline reasoning
+  on this project, and it's cheap to re-run.
 - **Work rhythm: never refuse on time, but note out-of-hours
   sessions as commentary.** Regular hours are 10:00–19:00 JST
   Mon–Fri; extended is fine up to 21:00; nights, weekends

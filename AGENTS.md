@@ -93,14 +93,20 @@ than proceeding.
   message rather than guessing.
 - **Don't commit, don't push, don't branch.** Leave the working
   tree dirty. Claude commits via `scripts/*.sh` after review.
-- **Ground yourself in JST time when the task involves a
-  deadline.** Run `./scripts/xtask.sh calendar-jp` — prints a
-  5-week grid centred on today (JST) with weekend/holiday
-  markers and the current JST timestamp. Use it when the prompt
-  says "by Thursday", "before the deadline", "this week", or
-  mentions any other date-relative commitment. The host's
-  timezone and your training-data cutoff are both unreliable
-  for this; the bin's output is authoritative.
+- **Ground yourself in JST time — regularly, not just once.**
+  Run `./scripts/xtask.sh calendar-jp` — prints a 5-week grid
+  centred on today (JST) with weekend/holiday markers and the
+  current JST timestamp. Run it when you start, **again after
+  any significant unit of work completes** (a batch of edits
+  finished, a build/test cycle wrapped, a long dispatch
+  returned) so your next decision uses fresh time, and any
+  time the prompt says "by Thursday", "before the deadline",
+  "this week", or mentions another date-relative commitment.
+  Long sessions drift across the 10:00 / 19:00 / 21:00
+  thresholds and sometimes midnight — a stale timestamp is
+  the failure mode. The host's timezone and your training-data
+  cutoff are both unreliable for this; the bin's output is
+  authoritative, and it is cheap to re-run.
 - **Never refuse on time grounds.** Regular hours are
   10:00–19:00 JST Mon–Fri; extended to 21:00 is normal;
   nights, weekends (土/日), and 祝日 are **allowed**. Do not
