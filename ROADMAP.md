@@ -145,7 +145,9 @@ decision:
 - `11-security-and-cryptography.md` — threat model, crypto design,
   observability, error envelope.
 - `12-deferred-decisions.md` — what's intentionally out of scope.
-- `13-conventions.md` — code conventions.
+- `13-conventions.md` — redirect stub (development conventions
+  moved to [`/CONTRIBUTING.md`](CONTRIBUTING.md) at the repo
+  root).
 - `14-open-questions.md` — still-open design questions.
 - `15-v1-scope.md` — what ships with v1.
 
@@ -176,7 +178,7 @@ commit. The parent's Git config should have
 `scripts/` (`status.sh`, `pull-all.sh`, `commit-all.sh`,
 `push-all.sh`). They encode the submodule-first ordering and the
 signoff rule. If a script doesn't do what you need, extend it
-first and update `docs/design/13-conventions.md §Git workflow`.
+first and update [`CONTRIBUTING.md §4`](CONTRIBUTING.md#4-git-workflow).
 
 **Every commit is signed off *and* signed.** Commits in the
 parent and every submodule must carry both a `Signed-off-by:`
@@ -202,7 +204,7 @@ them for speed, step 3 exercises them per-modified-crate. Don't
 run raw `cargo fmt/check/clippy/test` when the scripts cover
 the case. Clippy runs with `-D warnings` — fix the root cause,
 don't silence at crate scope. See
-`docs/design/13-conventions.md §Pre-landing checks`.
+[`CONTRIBUTING.md §11`](CONTRIBUTING.md#11-pre-landing-checks).
 
 **Follow append-only discipline.** The substrate has no `UPDATE`
 or `DELETE` semantics. Entity state changes are new revisions;
@@ -397,7 +399,7 @@ file inventory):
   `web-fetch` (`ureq` + `rustls`, replaces the old shell
   curl/wget/fetch/ftp fallback chain). Invoked via
   `./scripts/xtask.sh <tool> -- <args>`. See
-  `docs/design/13-conventions.md §In-tree workspace tooling`.
+  [`CONTRIBUTING.md §8`](CONTRIBUTING.md#8-in-tree-workspace-tooling-xtask).
 - `.github/workflows/ci.yml` at the parent level — runs
   `setup.sh` + `pre-landing.sh` on push/PR (workspace-level; the
   `--ignored` phase runs contributor-side only).
@@ -1510,8 +1512,10 @@ ongoing development.
   list).
 - `scripts/lib/workspace-cd.sh` — sourced helper for
   workspace-root resolution with `$0`-path fallback.
-- `docs/design/*.md` — design docs (authoritative);
-  `13-conventions.md` is the one most-frequently-updated.
+- `docs/design/*.md` — architectural design docs (what
+  Philharmonic *is*).
+- `CONTRIBUTING.md` — workspace development conventions
+  (authoritative; most-frequently-updated).
 - `docs/codex-prompts/YYYY-MM-DD-NNNN-<slug>[-NN].md` —
   archived Codex prompts.
 - `docs/notes-to-humans/YYYY-MM-DD-NNNN-<slug>[-NN].md` —

@@ -3,10 +3,10 @@
 > **Who this file is for.** This file is instructions for **Codex**
 > (the OpenAI Codex CLI agent), not for Claude Code.
 >
-> In this workspace the division of labor is:
+> In this workspace the division of labour is:
 > - **Claude Code** = designer, reviewer, orchestrator, workspace
 >   caretaker. It writes the prompts you receive, reviews your
->   output, and drives Git. Claude reads `CLAUDE.md` (not this file).
+>   output, drives Git. Claude reads `CLAUDE.md` (not this file).
 > - **Codex (you)** = implementation partner. You write the real
 >   Rust. You work inside the task Claude hands you. You don't
 >   design from scratch, and you don't commit or push.
@@ -15,419 +15,283 @@
 > instruction in the prompt you received, the direct instruction
 > wins (per the built-in AGENTS.md spec).
 
-Authoritative detail for every rule summarized here lives in
-`docs/design/13-conventions.md`. Read it when a summary isn't
-enough.
+## Authoritative docs
 
-## Development host must be POSIX-ish
+- **[`CONTRIBUTING.md`](CONTRIBUTING.md) is the single authoritative
+  home for workspace conventions** — git workflow, script
+  wrappers, POSIX sh rules, Rust code rules, versioning,
+  licensing, terminology, journals. Every convention mentioned
+  below in summary form is documented in full there; read the
+  referenced section before acting on a non-trivial task.
+- [`ROADMAP.md`](ROADMAP.md) — the plan. What's next. What's
+  blocked.
+- [`docs/design/`](docs/design/) — architectural design docs. What
+  Philharmonic *is*.
+- [`docs/instructions/README.md`](docs/instructions/README.md) —
+  agent-targeted rules (e.g. the `HUMANS.md` read-only rule).
+
+## Hard stops
+
+### POSIX-ish host required
 
 This workspace assumes a POSIX-ish development host: GNU/Linux
-(incl. WSL2 on Windows), macOS (Darwin), BSDs
-(FreeBSD/OpenBSD/NetBSD/DragonFly), illumos/Solaris, or musl
-distros (Alpine). Every script is POSIX sh (`#!/bin/sh`); file-
-permission, signal, and submodule-ordering semantics assume a
-POSIX host.
+(incl. WSL2 on Windows), macOS (Darwin), BSDs, illumos/Solaris,
+or musl distros (Alpine).
 
-**Before running any script or touching files, check your
-environment.** If `uname -s` returns `Linux` / `Darwin` /
-`FreeBSD` / `OpenBSD` / `NetBSD` / `DragonFly` / `SunOS`,
-proceed. If it returns something indicating raw Microsoft
-Windows (unlikely — `#!/bin/sh` wouldn't get you this far), or
-if your runtime reports you're on native Windows, **STOP
-IMMEDIATELY** and surface the mismatch in your final message.
-Do not attempt the task. There's no runtime gate inside the
-scripts themselves (raw Windows can't execute `#!/bin/sh`, so
-it'd never fire); the gate lives here, in this document. On
-Git Bash / MSYS / Cygwin (POSIX-compat layers over Windows),
-proceed with caution and flag any submodule / signing /
-permission anomaly before continuing. See
-`docs/design/13-conventions.md §Development environment`.
+**Before running anything, check your environment.** `uname -s` →
+`Linux` / `Darwin` / `FreeBSD` / `OpenBSD` / `NetBSD` /
+`DragonFly` / `SunOS`: proceed. Raw Microsoft Windows or a native
+Windows runtime: **STOP IMMEDIATELY**, surface the mismatch in
+your final message, do not attempt the task. The gate lives in
+this document because raw Windows can't execute `#!/bin/sh` in
+the first place. Git Bash / MSYS / Cygwin: proceed with caution,
+flag any submodule / signing / permission anomaly. See
+[`CONTRIBUTING.md §2`](CONTRIBUTING.md#2-development-environment).
 
-## Your role in this workspace
+### Crypto-sensitive paths
+
+SCK encrypt/decrypt, COSE_Sign1 signing/verification, COSE_Encrypt0
+encryption/decryption, the ML-KEM-768 + X25519 + HKDF + AES-256-GCM
+hybrid, payload-hash binding, `pht_` API token generation — all
+require Yuka's personal two-gate review. You are allowed to
+implement crypto code when the task asks for it — but **call it
+out clearly in your final summary** so the review gate isn't
+missed. If the task *doesn't* mention these areas and your
+implementation drifts into touching them, stop and surface rather
+than proceeding.
+
+## Your role
 
 - **Implement what the prompt asks.** Don't redesign scope, don't
-  refactor surrounding code, don't "polish" unrelated files.
-  Claude already decided the shape of the task; your job is to
-  land a correct implementation of it.
+  refactor surrounding code, don't polish unrelated files. Claude
+  decided the shape of the task; your job is to land a correct
+  implementation of it.
 - **Claude reviews your output.** If something in the prompt is
   ambiguous or contradicts the codebase, flag it in your final
-  message rather than guessing — Claude will adjudicate and
-  re-prompt if needed.
+  message rather than guessing.
 - **Don't commit, don't push, don't branch.** Leave the working
-  tree dirty. Claude commits via `scripts/*.sh` after review. See
-  *Git* below.
+  tree dirty. Claude commits via `scripts/*.sh` after review.
 
-## Git
+## Git (what you must not do)
 
 Read-only git is fine (`git log`, `git diff`, `git show`,
-`git blame`, `git rev-parse`, `git submodule status`). State-
-changing git is Claude's job, not yours:
+`git blame`, `git rev-parse`, `git submodule status`). State
+changes are Claude's job:
 
 - **Do not run** `git commit`, `git push`, `git add`, `git reset`,
-  `git rebase`, `git stash`, `git branch` (with `-D` etc.),
-  `git checkout <branch>`, `git commit --amend`, `git push --force`.
+  `git rebase`, `git stash`, `git branch -D`, `git checkout
+  <branch>`, `git commit --amend`, `git push --force`.
 - **Never rewrite history.** This workspace is append-only. No
   amend, no rebase, no reset, no force-push, no history surgery
-  of any kind — on the parent or any submodule. Two
-  script-enforced exceptions exist (the `post-commit` /
-  `commit-all.sh` unsigned-commit rollback, and the `--rebase`
-  inside `pull-all.sh`), and they're Claude's concern, not
-  yours. Mistakes ship as new commits or `git revert`s. If the
-  prompt seems to require history modification, stop and
-  surface it.
-- **Do not touch** `.gitmodules` or submodule pointers. The
-  workspace has ~23 submodules with ordering rules encoded in
-  `scripts/*.sh`; Claude drives those.
-- When you finish, leave edits in the working tree. Claude runs
-  `scripts/commit-all.sh` and `scripts/push-all.sh`.
-- The repo installs tracked Git hooks (`.githooks/pre-commit`,
-  `.githooks/commit-msg`, `.githooks/post-commit`,
-  `.githooks/pre-push`) via `core.hooksPath`, wired up by
-  `scripts/setup.sh`. Pre-commit rejects any `git commit` that
-  didn't come through `commit-all.sh`; commit-msg rejects any
-  message without a matching `Signed-off-by:` trailer;
-  post-commit rolls back any unsigned commit that slipped
-  through; pre-push is the final backstop, rejecting any push
-  that carries unsigned or unsigned-off commits. Don't disable
-  them; don't `--no-verify` around them.
+  of any kind. Two script-enforced exceptions exist (the
+  `post-commit` / `commit-all.sh` unsigned-commit rollback, and
+  the `--rebase` inside `pull-all.sh`) — both are Claude's
+  concern, not yours. Mistakes ship as new commits or
+  `git revert`s. If the prompt seems to require history
+  modification, stop and surface it.
+  ([`CONTRIBUTING.md §4.4`](CONTRIBUTING.md#44-no-history-modification))
+- **Do not touch** `.gitmodules` or submodule pointers.
+- **Leave edits in the working tree.** Claude runs
+  `scripts/commit-all.sh` and `scripts/push-all.sh` after review.
+- The repo installs tracked Git hooks via `core.hooksPath`
+  (`.githooks/{pre-commit,commit-msg,post-commit,pre-push}`,
+  wired by `scripts/setup.sh`). Don't disable them; don't
+  `--no-verify` around them.
+  ([`CONTRIBUTING.md §4.5`](CONTRIBUTING.md#45-tracked-git-hooks))
 
-If the prompt genuinely requires a git state change (e.g. "create
-a branch and open a PR"), stop and surface that — don't guess.
+If the prompt genuinely requires a git state change (e.g.
+"create a branch and open a PR"), stop and surface that.
 
-## Rust conventions
+## Rust conventions — short form
 
-- **Workspace conventions live in the repo, not in any local
-  memory you or your runtime may keep.** If you discover a rule
-  that applies to *this project* — naming, versioning, tooling
-  choices, anything a future contributor would need to honor —
-  its durable home is this file, `CLAUDE.md`, or
-  `docs/design/13-conventions.md`. Don't rely on
-  `$CODEX_HOME`-local state, cached project files, or your own
-  in-process memory to persist such rules across sessions or
-  machines; those are per-install and don't follow the repo.
-  Surface the rule to Claude in your final summary so it can be
-  committed to the repo properly.
-- **Use `scripts/*.sh` wrappers over raw `cargo` subcommands.**
-  The wrappers encode mandated flags (`-D warnings`,
-  `--all-targets`, per-crate scoping, auto-install of
-  cargo-audit / cargo-semver-checks on first use) so your local
-  runs behave identically to CI. Raw `cargo <subcommand>` drifts.
-  The wrapper inventory:
-  - `./scripts/pre-landing.sh` — canonical fmt+check+clippy+test
-    flow, auto-detects modified crates. Run before finishing any
-    Rust-touching task.
-  - `./scripts/rust-lint.sh [<crate>]`,
-    `./scripts/rust-test.sh [--include-ignored|--ignored] [<crate>]`
-    — individual phases if you need them standalone.
-  - `./scripts/miri-test.sh --workspace | <crate>...` —
-    `cargo +nightly miri test` for routine UB checks. Not in
-    pre-landing (too slow); used pre-publish and periodically.
-    Requires nightly + miri, installed via `setup.sh`.
-  - `./scripts/cargo-audit.sh`,
-    `./scripts/check-api-breakage.sh <crate> [<version>]` —
-    pre-release checks.
-  - `./scripts/publish-crate.sh [--dry-run] <crate>` — publish +
-    signed release tag (Claude runs this, not you; it commits).
-  - `./scripts/verify-tag.sh <crate> [<tag>]` — verify a release
-    tag is locally present, signed, and pushed to origin at the
-    same commit. Claude runs this post-publish.
-  - `./scripts/crate-version.sh <crate>` / `--all` — local
-    version from Cargo.toml.
-  - `./scripts/xtask.sh crates-io-versions -- <crate>` —
-    published versions from crates.io (Rust bin; no external
-    `jq` / curl dep).
-  - `./scripts/check-toolchain.sh` — rust toolchain state.
-  If your task needs a cargo operation with no wrapper, surface
-  that in your final summary rather than silently running raw
-  cargo — the workspace convention is to extend a script first.
-  **Exempt**: read-only queries (`cargo tree`, `cargo metadata`,
-  `cargo --version`). See `docs/design/13-conventions.md §Script
-  wrappers`.
+Every rule below is summarised from
+[`CONTRIBUTING.md §10`](CONTRIBUTING.md#10-rust-code-conventions).
+Read the full section when in doubt.
+
 - **Edition 2024, MSRV 1.88.** Every `Cargo.toml` already carries
-  `edition = "2024"` and `rust-version = "1.88"` — match.
+  `edition = "2024"` and `rust-version = "1.88"`. Match.
 - **License.** All crates are `Apache-2.0 OR MPL-2.0` with both
-  license files at the crate root. **Do not add per-file copyright
-  or license headers** — this workspace doesn't use them.
-- **Errors.** Use `thiserror` for library crates. Partition errors
-  by what the caller does with them (semantic violations,
-  concurrency outcomes, backend failures). Expose predicates like
-  `is_retryable()` where useful. **Do not use `anyhow` in library
-  crates** — callers can't match on specific failure modes. Binary
-  crates may use `anyhow`.
-- **No panics in library code.** This is systems-programming
-  infrastructure (request handlers, long-lived services, crypto,
-  storage); a panicking task is user-visible failure. In any
-  `src/**/*.rs` outside `#[cfg(test)]`:
-  - No `.unwrap()` / `.expect()` on `Result` / `Option` — use
-    `?` with a typed error variant, or `.ok_or_else(...)` /
-    `.map_err(...)`.
-  - No `panic!` / `unreachable!` / `todo!` / `unimplemented!` on
-    reachable paths — model unreachability at the type level
-    (newtypes, sealed enums, `NonZero<T>`, typestates).
-  - **No unbounded indexing** — `slice[i]`, `slice[a..b]`,
-    `map[&k]` all panic on absent/OOB access. Use
-    `.get(...)` → `Option`, propagate.
-  - **No unchecked integer arithmetic** — `+`, `-`, `*`, `/`, `%`
-    (and `+=` / `-=` / etc.) panic on overflow in debug and
-    either trap or wrap silently in release. Use `checked_*` →
-    `Option` when the caller should handle overflow as an
-    error, `saturating_*` when clamping is the intent (common
-    for `usize` subtraction), `wrapping_*` when modular arith
-    is the actual semantic (counters, hash mixing). Plain `+` /
-    `-` is fine for constants and compiler-provable cases.
-  - No lossy `as` casts when the input width can exceed the
-    target's range — use `TryFrom::try_from` and propagate the
-    `TryFromIntError`. Provably-lossless casts (`u16 as u32`)
-    are fine.
-  Narrow, justified exceptions (inline comment required at the
-  call site): unrecoverable OS / hardware failure (the
-  `OsRng.try_fill_bytes(...).expect("OS RNG failure ...")`
-  pattern); build-time-validated constants (`uuid!("literal")`);
-  type-witness unreachability the compiler can't express. Tests
-  / dev-deps / `xtask/` bins can `.unwrap()` freely — panics in
-  tests are the failure-signal mechanism. See
-  `docs/design/13-conventions.md §Panics and undefined behavior`
-  for the full rule and rationale.
-- **Async.** `tokio` is the workspace default. Use `tokio::sync`
-  primitives. Use `async-trait` on traits that need to be
-  dyn-compatible.
+  license files at the crate root. **Do not add per-file
+  copyright or license headers.**
+- **Errors.** `thiserror` for library crates, partitioned by what
+  the caller does with them. Predicates like `is_retryable()`
+  where useful. **No `anyhow` in library crates** — callers
+  can't match on specific failure modes. `anyhow` is fine in
+  binary crates.
+- **No panics in library `src/`.** No `.unwrap()` / `.expect()`
+  on `Result` / `Option`, no `panic!` / `unreachable!` / `todo!`
+  / `unimplemented!` on reachable paths, no unbounded indexing,
+  no unchecked integer arithmetic, no lossy `as` casts on
+  untrusted widths. Narrow exceptions need an inline
+  justification comment. Tests / dev-deps / `xtask/` bins are
+  exempt. ([§10.3](CONTRIBUTING.md#103-panics-and-undefined-behavior))
+- **Library crates take bytes, not file paths.** File I/O,
+  env-var lookup, config-file parsing belong in the bin. Any
+  `&Path`-taking API in a crypto-adjacent crate is a smell.
+  ([§10.4](CONTRIBUTING.md#104-library-crate-boundaries))
+- **Async.** `tokio` is the default. `tokio::sync` primitives.
+  `async-trait` on traits that need to be dyn-compatible.
 - **Re-exports.** Re-export types from direct dependencies that
-  appear in a crate's own public API. Don't re-export transitive
-  dependencies. Don't re-export types the crate doesn't itself use.
-- **Trait vs. impl split.** Concerns with multiple implementations
-  live in separate crates (e.g. `philharmonic-store` traits,
-  `philharmonic-store-sqlx-mysql` impl) — not feature-gated within
-  one crate. Follow this pattern when adding new impls.
-- **Crate-name pattern.** `<subsystem>-<concern>[-<implementation>]`,
-  e.g. `philharmonic-connector-impl-sql-mysql`.
-- **Version pinning.** Peer workspace crates pin loosely to each
-  other (`philharmonic-store = "0.1"`). The cornerstone
-  (`philharmonic-types`) is pinned to minor. Pin to a specific
-  patch (`"0.3.4"`) only when relying on a feature introduced in
-  that patch — not out of habit.
-- **Testing.** Unit tests colocated (`#[cfg(test)] mod tests`).
-  Integration tests in `tests/`. Tests that need real
-  infrastructure (testcontainers, network, etc.) **must** be
-  feature-gated so default CI runs without them.
-- **Comments.** Default to *no* comments. Only write one when the
-  *why* is non-obvious (hidden constraint, subtle invariant,
-  workaround for a specific bug). Don't narrate *what* — names do
-  that.
-- **Terminology and language.** Prose you author — code
-  comments, rustdoc, error-message text, the final summary you
-  return to Claude (which may feed a commit message) — follows
-  the workspace terminology conventions at
-  `README.md §Terminology and language`. Short form:
-  - No `master`/`slave` for technical relationships (use
-    `primary`/`replica`, `leader`/`follower`, `parent`/`child`,
-    `controller`/`agent`, `main`/`workers`). Default git branch
-    here is `main`.
-  - No gendered defaults — prefer singular "they"; avoid
-    "he"/"he/she"/"(s)he" and "guys"/"man" as generics.
-  - Prefer `allowlist`/`denylist` over `whitelist`/`blacklist`;
-    `stub`/`placeholder`/`fake` over "dummy"; "smoke test" /
-    "verify" over "sanity check".
-  - **GNU/Linux** for the OS, **Linux kernel** for the kernel —
-    don't collapse the two in prose. Matching `uname -s`
-    against the literal string `Linux` is fine (that's the
-    kernel-interface identifier, not prose).
-  - **Microsoft Windows** or **Windows** in prose. No
-    `win*`-style freeform abbreviations; established
-    identifiers (`Win32` API, `x86_64-pc-windows-msvc`) ship
-    that way and are left alone.
-  - Prefer **"free software"** or **"FLOSS"** over standalone
-    **"open-source"**, except when quoting external conventions
-    (OSI proper noun, "open-source licenses" per OSI).
-  - Technical accuracy overrides aesthetic neutrality — use
-    literal external identifiers (HTTP `Authorization`, a DB
-    `MASTER` command, an external repo's `master` branch) as
-    they ship; the rule targets prose we author in this
-    workspace.
-  Full rule set with exceptions:
-  `docs/design/13-conventions.md §Naming and terminology`.
+  appear in public API. Don't re-export transitive deps. Don't
+  re-export types the crate doesn't itself use.
+- **Trait vs. impl split.** Multiple implementations → separate
+  crates, not feature-gated. Follow the pattern when adding new
+  impls.
+- **Crate naming.** `<subsystem>-<concern>[-<implementation>]`.
+- **Version pinning.** Peer workspace crates pin loosely
+  (`"0.1"`). Cornerstone pinned to minor. Pin a specific patch
+  only when relying on a patch-introduced feature — not out of
+  habit.
+- **Testing.** Unit tests colocated. Integration tests in
+  `tests/`. Tests needing real infra (testcontainers, network)
+  **must** be `#[ignore]`-gated or feature-gated so default CI
+  runs without them.
+- **Comments.** Default to *no* comments. Write one when the
+  *why* is non-obvious. Don't narrate *what* — names do that.
 
-## Shell scripts
+## Shell scripts — short form
 
-If the task has you writing or editing a shell script in this
-workspace:
+Every rule from [`CONTRIBUTING.md §6`](CONTRIBUTING.md#6-shell-script-rules-posix-sh)
+applies if you touch shell scripts:
 
-- **`#!/bin/sh`, not `#!/usr/bin/env bash`.** Scripts are POSIX
-  sh. No bashisms (`[[ ]]`, `=~`, arrays, `<<<`, `<(...)`,
-  `mapfile`, `${var:0:N}`, `$'\e[...]'`, `local`, `${BASH_SOURCE[0]}`).
-- **`set -eu`, not `set -euo pipefail`** — `pipefail` isn't POSIX.
-- **Invoke by path**: `./scripts/foo.sh`, not `bash scripts/foo.sh`.
-  Prefixing `bash` hides bashisms that would break on Alpine /
-  FreeBSD / macOS.
-- **Validate with `./scripts/test-scripts.sh`** (runs `dash -n`
-  against every `scripts/*.sh`, falling back to `sh -n`) before
-  concluding. CI runs the same check.
-- Explicit POSIX deviations (e.g. `ps -o rss=`) are tracked in
-  `docs/design/13-conventions.md §Shell scripts`. Don't introduce
-  new ones without a recorded reason.
-- **Never invoke `python`, `perl`, `ruby`, `node`, or other
-  non-baseline scripting languages from workspace tooling.** If
-  a task would lean on one, write a Rust bin in `xtask/` (the
-  in-tree, non-submodule, multi-bin crate at the workspace root,
-  `publish = false`). Existing POSIX shell scripts — `awk`,
-  `sed`, `grep`, `cut`, `tr`, standard SUSv4 pipelines — remain
-  fine as-is; the rule is about ad-hoc `python3 -c "..."` creep
-  and non-POSIX tools. **`jq`, `curl`, and `wget` also trigger
-  the Rust-bin rule** — they're not on every stripped baseline
-  (macOS ships none of them by default; Alpine base doesn't
-  either). If you'd reach for `jq`, write a Rust bin using
-  `serde_json`; HTTP fetching already lives in
-  `xtask/src/bin/web-fetch.rs`. If you're tempted to run any of
-  these from a new script, prompt for a Rust bin extraction in
-  your final summary rather than introducing the dep.
-- **UUID generation for stable wire-format constants always goes
-  through `./scripts/xtask.sh gen-uuid -- --v4`.** Every
-  `KIND: Uuid` constant, algorithm identifier, or any value that
-  once committed must never change is minted through this tool.
-  Never `python3 -c "import uuid"`, `uuidgen`, online generators,
-  or direct `cargo run` — the canonical invocation path
-  (`xtask.sh` wrapper) keeps randomness uniform across sessions
-  and machines and leaves room to add pre-build caching later.
-- **Use the wrapper scripts for `mktemp` / `curl` / `wget`, not
-  the raw tools.** These tools vary across minimal environments
-  (Alpine busybox, FreeBSD, OpenBSD, macOS, WSL); the wrappers
-  encode the portable choice once so shell scripts don't have
-  to rediscover it.
-  - Temp files: `tmp=$("$(dirname "$0")"/mktemp.sh [<slug>])`,
-    paired with `trap 'rm -f "$tmp"' EXIT INT HUP TERM` in the
-    caller (the wrapper doesn't clean up for you).
-  - HTTP GET: `"$(dirname "$0")"/web-fetch.sh <URL> [<outfile>]`.
-    User-Agent overridable via `WEB_FETCH_UA`. All backends fail
-    on HTTP 4xx/5xx (curl is passed `-f`); use `... || :` if
-    you want to tolerate HTTP errors.
-  If a wrapper doesn't cover your case, extend it. Don't reach
-  around it to raw `mktemp`/`curl`/`wget`. See
-  `docs/design/13-conventions.md §External tool wrappers`.
+- **`#!/bin/sh`, not bash.** No `[[ ]]`, `=~`, arrays, `<<<`,
+  `<(...)`, `mapfile`, `${var:0:N}`, `$'\e[...]'`, `local`,
+  `${BASH_SOURCE[0]}`.
+- **`set -eu`, not `set -euo pipefail`.** Pipefail isn't POSIX.
+- **Invoke by path**: `./scripts/foo.sh`, not `bash foo.sh`.
+- **Validate with `./scripts/test-scripts.sh`** after any
+  change. CI runs the same check.
+- **POSIX checklist**: [`POSIX_CHECKLIST.md`](POSIX_CHECKLIST.md)
+  enumerates non-POSIX constructs to avoid.
 
-## HUMANS.md (do not touch)
+### Rust bins, not Python / Perl / jq / curl
 
-`HUMANS.md` at the repo root is a human-authored note-to-self.
-It's part of your context, not your output surface.
+**Never invoke `python`, `perl`, `ruby`, `node`, `jq`, `curl`, or
+`wget` from workspace tooling.** Shell for orchestration; Rust
+bins under `xtask/` for anything non-baseline. Use the
+`./scripts/mktemp.sh` and `./scripts/web-fetch.sh` wrappers for
+temp files and HTTP. ([§7](CONTRIBUTING.md#7-external-tool-wrappers),
+[§8](CONTRIBUTING.md#8-in-tree-workspace-tooling-xtask))
+
+If you're tempted to reach for one of those, surface it in your
+final summary so Claude can decide whether to extend the Rust
+tooling.
+
+### KIND UUIDs via xtask
+
+Every stable wire-format UUID is minted via `./scripts/xtask.sh
+gen-uuid -- --v4`. Not `python3 -c "import uuid"`, not `uuidgen`,
+not online generators. ([§9](CONTRIBUTING.md#9-kind-uuid-generation))
+
+## `HUMANS.md` — do not touch
+
+`HUMANS.md` is a human-authored note-to-self. It's part of your
+context, not your output surface.
 
 - **You MAY read it** for context on Yuka's thinking, preferences,
-  and current focus. Reading it is encouraged when it might
-  inform the work you're doing.
-- **You MUST NOT modify it.** No edits, no appends, no "helpful"
-  reformatting, no auto-generated sections. No exceptions.
-- You don't commit in this workspace anyway (see §Git), so the
-  commit-side rules don't apply to you — just: read freely,
-  never modify.
+  and current focus.
+- **You MUST NOT modify it.** No edits, no appends, no
+  "helpful" reformatting, no auto-generated sections. No
+  exceptions.
+- If something in `HUMANS.md` looks wrong or outdated, flag it
+  in your final summary. Don't edit it.
 
-If something in `HUMANS.md` looks wrong, outdated, or contradicts
-the code you're touching, flag it in your final summary so
-Claude Code can bring it to Yuka's attention. Don't edit the
-file to "fix" it.
+See [`docs/instructions/README.md`](docs/instructions/README.md).
 
-For the full rule set, see `docs/instructions/README.md`
-§HUMANS.md.
+## Workspace conventions belong in the repo, not memory
 
-## Crypto-sensitive paths
+If you discover a rule that applies to *this project* — naming,
+versioning, tooling, anything a future contributor would need to
+honour — its durable home is `CONTRIBUTING.md` (or one of the
+named living docs). Don't rely on `$CODEX_HOME`-local state,
+cached project files, or in-process memory to persist such rules
+across sessions or machines. Surface the rule to Claude in your
+final summary so it can be committed to the repo properly.
 
-The following areas require Yuka's personal review and must not
-be altered silently:
+## Use the script wrappers, not raw cargo
 
-- SCK encrypt/decrypt.
-- COSE_Sign1 signing/verification; COSE_Encrypt0
-  encryption/decryption.
-- The ML-KEM-768 + X25519 + HKDF + AES-256-GCM hybrid construction.
-- Payload-hash binding.
-- `pht_` API token generation.
+If a task needs a cargo operation, use the wrapper. The wrappers
+encode the mandated flags (`-D warnings`, `--all-targets`,
+per-crate scoping, auto-install of optional tools) so your local
+runs match CI. Raw `cargo <subcommand>` drifts.
 
-You are allowed to implement crypto code when the task asks for
-it — but **call it out clearly in your final summary** so the
-review gate isn't missed. If the task *doesn't* mention these
-areas and your implementation drifts into touching them, stop
-and surface that rather than proceeding.
+- `./scripts/pre-landing.sh` — canonical fmt + check + clippy
+  (`-D warnings`) + test. Run before finishing any
+  Rust-touching task.
+- `./scripts/rust-lint.sh [<crate>]`,
+  `./scripts/rust-test.sh [--include-ignored|--ignored] [<crate>]`
+  — individual phases.
+- `./scripts/miri-test.sh <crate>` / `--workspace` — routine UB
+  checks. Not in pre-landing (too slow).
+- `./scripts/cargo-audit.sh`,
+  `./scripts/check-api-breakage.sh <crate> [<version>]` —
+  pre-release checks.
+- `./scripts/crate-version.sh <crate>` / `--all` — local version.
+- `./scripts/xtask.sh crates-io-versions -- <crate>` — published
+  versions.
+
+If your task needs a cargo operation with no wrapper, surface
+that in your final summary rather than silently running raw
+cargo. **Exempt**: read-only queries (`cargo tree`,
+`cargo metadata`, `cargo --version`) — run these raw.
+
+See [`CONTRIBUTING.md §5`](CONTRIBUTING.md#5-script-wrappers-over-raw-cargo).
 
 ## Before you hand off
 
 Before concluding any task that touched a `.rs` file (including
 transitive effects — e.g. a `Cargo.toml` dep bump), run:
 
-```bash
+```sh
 ./scripts/pre-landing.sh
 ```
 
 It auto-detects modified crates and runs the full flow:
 `rust-lint.sh` (fmt + check + clippy `-D warnings`), then
 `rust-test.sh` (`cargo test --workspace`, skips `#[ignore]`),
-then `rust-test.sh --ignored <crate>` for each modified crate
-(exercises the `#[ignore]`-gated integration tests). If any
-step fails and you can't get it green within the task, say so
-in your final summary. Don't hand off red code.
+then `rust-test.sh --ignored <crate>` for each modified crate.
+If any step fails and you can't get it green within the task,
+say so in your final summary. Don't hand off red code.
 
-- **Use the scripts**, not raw `cargo fmt/check/clippy/test`.
-  The scripts encode the mandated flags (`-D warnings`,
-  `--all-targets`, etc.) so you don't have to remember them.
-  Bespoke `cargo test <pattern>` for focused debugging remains
-  fine; the rule targets the canonical pre-landing flow.
-- Clippy runs with `-D warnings` — warnings are errors. Fix the
-  root cause. Only add `#[allow(clippy::<lint>)]` at the
-  *narrowest* scope, with a one-line comment explaining why,
-  when a lint is genuinely wrong for a specific call site.
-- If the fmt-check step fails, run `cargo fmt --all` (or
-  `cargo fmt -p <crate>`) to apply and re-run `pre-landing.sh`.
-- `#[ignore]` is the project convention for tests that need real
-  infrastructure (testcontainers, live services) and are slow.
-  The workspace-level run skips them; the per-modified-crate
-  `--ignored` phase exercises them for crates you touched.
+Clippy runs with `-D warnings` — warnings are errors. Fix the
+root cause. Only add `#[allow(clippy::<lint>)]` at the
+*narrowest* scope, with a one-line comment, when a lint is
+genuinely wrong for a specific call site.
 
-Doc-only / config-only / script-only changes can skip these (no
-`.rs` file touched).
+Doc-only / config-only / script-only changes can skip
+pre-landing (no `.rs` touched).
+
+See [`CONTRIBUTING.md §11`](CONTRIBUTING.md#11-pre-landing-checks).
 
 ## Reports (`docs/codex-reports/`)
 
-You — Codex — have a dedicated journal at
-`docs/codex-reports/` for writing your own findings back to the
-repo. Parallel to `docs/codex-prompts/` (Claude → you) and
+You have a dedicated journal at `docs/codex-reports/` for
+writing your findings back to the repo. Parallel to
+`docs/codex-prompts/` (Claude → you) and
 `docs/notes-to-humans/` (Claude → Yuka), this directory is
-**you → the repo**: observations that outlive the session-
-summary you return to Claude.
+**you → the repo**: observations that outlive the
+session-summary you return to Claude.
 
-**Filename format** (same as the other journal directories):
-
-```
-docs/codex-reports/YYYY-MM-DD-NNNN-<slug>[-NN].md
-```
-
-- `YYYY-MM-DD` — today's date.
-- `NNNN` — four-digit daily sequence *within this directory*.
-  List `docs/codex-reports/`, find the highest `NNNN` for
-  today, add one. If the directory has nothing for today yet,
-  start at `0001`. Independent from the sequences in
-  `docs/codex-prompts/` and `docs/notes-to-humans/`.
-- `<slug>` — short kebab-case. Usually mirrors the prompt's
-  slug so the two files pair by name.
-- `[-NN]` — optional two-digit round suffix for multi-round
-  follow-ups. Omit for standalone entries.
+**Filename:** `docs/codex-reports/YYYY-MM-DD-NNNN-<slug>[-NN].md`.
+`NNNN` is four-digit daily sequence counted within
+`docs/codex-reports/` — list the directory, find the highest
+`NNNN` for today, add one; start at `0001` if the directory has
+nothing for today yet. ([§15](CONTRIBUTING.md#15-journal-like-files))
 
 **Write a report when:**
 
 - The prompt explicitly asks for one.
 - You made a non-obvious design call the prompt didn't spell
-  out, and future sessions would have to re-derive it from the
-  code alone without the written rationale.
-- Substantial findings surfaced during implementation that
-  don't fit in the session-summary (test-matrix results beyond
-  the acceptance list, blocker-then-resolution sequences,
-  cross-dependency version notes).
+  out.
+- Substantial findings surfaced during implementation that don't
+  fit in the session-summary.
 - You flagged something per a flag-vs-fix policy (crypto-review,
-  zeroization gaps, `unsafe` in neighboring code) that you
-  saw but didn't fix. The session-summary mentions these; the
-  report documents them in enough detail for Yuka to act later
-  without re-running your investigation.
+  zeroization gaps, `unsafe` in neighbouring code) that you saw
+  but didn't fix.
 
-**Skip the report when** the work was routine, well-specified,
-and produced no surprises. Don't write a report for the sake
-of writing one — session-summary is sufficient for
-"done, tests green, acceptance criteria met".
+**Skip** for routine, well-specified work with no surprises.
 
-**Start each report with a header that cross-references the
-prompt**:
+**Cross-reference the prompt in a short header**:
 
 ```markdown
 # <title>
@@ -436,33 +300,35 @@ prompt**:
 **Prompt:** docs/codex-prompts/2026-04-22-0001-<slug>.md
 ```
 
-Then prose. Audience is future-Claude sessions (so they can
-pick up context without re-running the task) and Yuka (for
-human review). Complete sentences, concrete file paths, no
-session-specific in-jokes.
+Then prose. Audience: future Claude sessions and Yuka. Complete
+sentences, concrete file paths, no in-jokes.
 
-**Don't commit.** Same rule as every other file you write:
-leave it dirty in the working tree. Mention the report's path
-in your final summary so Claude picks it up on review and
-commits it alongside the implementation.
+**Don't commit.** Leave the file dirty. Mention the path in
+your final summary so Claude picks it up on review.
 
-See `docs/design/13-conventions.md §Codex reports` for the
-authoritative rule.
+## Terminology — short form
 
-## Documentation
+See [`CONTRIBUTING.md §14`](CONTRIBUTING.md#14-naming-and-terminology)
+for the full rule set. Short form:
 
-When a change warrants a doc update (new trait, new error
-variant, changed public API, new crate), update the matching
-docs:
-
-- Per-crate `README.md` for usage.
-- Rustdoc for API reference (cornerstone crates target 99%+
-  coverage).
-- `docs/design/*.md` for architectural changes.
-
-Don't create new top-level docs (`NOTES.md`, `TODO.md`, etc.)
-unless the task asks. Work from the prompt; don't leave
-scratch-files behind.
+- No `master`/`slave`; use `primary`/`replica`,
+  `leader`/`follower`, etc. Default branch here is `main`.
+- No gendered defaults; prefer singular "they".
+- `allowlist`/`denylist`, not `whitelist`/`blacklist`.
+- `stub`/`placeholder`/`fake`, not "dummy".
+- **GNU/Linux** for the OS, **Linux kernel** for the kernel —
+  don't collapse. `uname -s` matching against literal `Linux`
+  is fine (kernel-interface identifier, not prose).
+- **Microsoft Windows** / **Windows** in prose. No `win*`
+  freeform abbreviations; shipped identifiers (`Win32` API,
+  `x86_64-pc-windows-msvc`) stay as-is.
+- Prefer **"free software"** or **"FLOSS"** over standalone
+  **"open-source"**, except quoting external conventions (OSI
+  proper noun, etc.).
+- Technical accuracy overrides aesthetic neutrality — literal
+  external identifiers (HTTP `Authorization`, a DB `MASTER`
+  command, an external repo's `master` branch) ship as they
+  are.
 
 ## When in doubt
 

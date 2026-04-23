@@ -10,6 +10,11 @@ has its own issue tracker, CI, and release cycle. The workspace lets
 you develop across all of them at once without giving up that
 independence.
 
+**Contributor conventions** — git workflow, script wrappers, Rust
+code rules, versioning, licensing, terminology, everything — live
+in one place: [`CONTRIBUTING.md`](CONTRIBUTING.md). Read it before
+your first commit.
+
 ## About Philharmonic
 
 Philharmonic is a workflow orchestration system with JavaScript-based
@@ -154,7 +159,7 @@ POSIX host. In practice this means:
   minimal images) doesn't need extra tooling.
 - **BSD family** — FreeBSD, OpenBSD, NetBSD, DragonFlyBSD —
   covered by the POSIX-sh discipline; deviations are tracked in
-  `docs/design/13-conventions.md §Shell scripts`.
+  [`CONTRIBUTING.md §6`](CONTRIBUTING.md#6-shell-script-rules-posix-sh).
 - **illumos / Solaris** — POSIX-ish; should work, less
   exercised in practice.
 - **Alpine / musl-based distros** — supported (including
@@ -179,7 +184,7 @@ and Codex MUST verify they're on a POSIX-ish host before doing
 development work in this repo, and MUST stop and surface the
 problem if they're running under raw Windows. See
 [`CLAUDE.md`](CLAUDE.md), [`AGENTS.md`](AGENTS.md), and
-[`docs/design/13-conventions.md §Development environment`](docs/design/13-conventions.md).
+[`CONTRIBUTING.md §2 Development environment`](CONTRIBUTING.md#2-development-environment).
 
 ## Cloning
 
@@ -277,7 +282,7 @@ read-only exception: use `./scripts/heads.sh`, not raw
 workspace.
 If a script doesn't cover a case you need, extend the script
 rather than reaching for raw git — see
-`docs/design/13-conventions.md §Git workflow`.
+[`CONTRIBUTING.md §4 Git workflow`](CONTRIBUTING.md#4-git-workflow).
 
 Typical flow for a cross-crate change:
 
@@ -377,7 +382,7 @@ Invoke by path (`./scripts/foo.sh`), not via `bash`.
   `--workspace` blindly. `MIRIFLAGS` is forwarded
   (e.g. `-Zmiri-disable-isolation`). Not in `pre-landing.sh` —
   run manually before publishing and on a periodic schedule.
-  See [`docs/design/13-conventions.md` §Testing — Miri](docs/design/13-conventions.md).
+  See [`CONTRIBUTING.md §10.10 Miri`](CONTRIBUTING.md#1010-miri).
 - `./scripts/pre-landing.sh [--no-ignored] [<crate>...]` —
   canonical pre-landing driver. Auto-detects modified crates
   from dirty submodules, then runs `rust-lint.sh`,
@@ -430,8 +435,8 @@ Invoke by path (`./scripts/foo.sh`), not via `bash`.
   Per-crate, not `--workspace`, because the parent here is a
   virtual-workspace submodule repo and the git-clone-based
   baseline modes can't resolve submodule members — see
-  `docs/design/13-conventions.md §API breakage detection` for
-  the rationale. Installs `cargo-semver-checks` on first run.
+  [`CONTRIBUTING.md §12.3 API breakage detection`](CONTRIBUTING.md#123-api-breakage-detection)
+  for the rationale. Installs `cargo-semver-checks` on first run.
 - `./scripts/publish-crate.sh [--dry-run] <crate>` — publish one
   crate to crates.io and tag the release inside the submodule.
   Tags are created only after `cargo publish` succeeds.
@@ -471,9 +476,9 @@ Invoke by path (`./scripts/foo.sh`), not via `bash`.
   call site if you want to tolerate HTTP errors. Never call
   `curl`/`wget` directly from a workspace script.
 
-See `docs/design/13-conventions.md §Shell scripts` for the POSIX-
-sh conventions the scripts follow and explicit deviations, and
-§Script wrappers / §External tool wrappers for the rule that no
+See [`CONTRIBUTING.md §6`](CONTRIBUTING.md#6-shell-script-rules-posix-sh)
+for the POSIX-sh conventions the scripts follow and explicit
+deviations, and §5 / §7 for the rule that no
 raw `cargo` / `mktemp` / `curl` / `wget` calls are allowed in
 workspace scripts.
 
@@ -585,8 +590,8 @@ standard pipelines) remains fine — the existing `scripts/*.sh`
 are good as-is. HTTP fetching is already a Rust bin
 (`xtask/src/bin/web-fetch.rs`), with `scripts/web-fetch.sh`
 kept as a thin shim for shell callers. See
-[`docs/design/13-conventions.md`](docs/design/13-conventions.md)
-§In-tree workspace tooling for the decision table.
+[`CONTRIBUTING.md §8`](CONTRIBUTING.md#8-in-tree-workspace-tooling-xtask)
+for the decision table.
 
 Invoke tools via the **`./scripts/xtask.sh`** wrapper — don't
 call `cargo run -p xtask --bin <tool>` directly at call sites.
@@ -612,8 +617,8 @@ Current bins:
   change. Not `python3 -c "import uuid"`, not `uuidgen`, not
   online generators. One canonical source keeps randomness
   uniform across sessions and machines. See
-  [`docs/design/13-conventions.md`](docs/design/13-conventions.md)
-  §KIND UUID generation for the rule.
+  [`CONTRIBUTING.md §9 KIND UUID generation`](CONTRIBUTING.md#9-kind-uuid-generation)
+  for the rule.
 - **`crates-io-versions`** — list published, non-yanked versions
   of a crate on crates.io, one per line. Usage:
   `./scripts/xtask.sh crates-io-versions -- <crate>`. Queries
@@ -751,7 +756,7 @@ exceptional cases.
 Doc-only / script-only / config-only commits may skip these.
 Anything that could affect a `.rs` file's compilation or test
 outcome must run all phases. See
-`docs/design/13-conventions.md §Pre-landing checks`.
+[`CONTRIBUTING.md §11 Pre-landing checks`](CONTRIBUTING.md#11-pre-landing-checks).
 
 Individual crates can also be built standalone from their own
 directories, using only that crate's own manifest and dependency
@@ -912,7 +917,7 @@ Enforcement is by review; there's no prose linter. Fix
 violations opportunistically when editing an affected file. The
 authoritative statement, with the full anti-pattern list and
 the `uname -s` / `Win32` exceptions spelled out, is
-[`docs/design/13-conventions.md §Naming and terminology`](docs/design/13-conventions.md).
+[`CONTRIBUTING.md §14 Naming and terminology`](CONTRIBUTING.md#14-naming-and-terminology).
 
 ## Editions and MSRV
 

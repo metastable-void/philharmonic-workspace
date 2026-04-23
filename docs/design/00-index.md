@@ -55,8 +55,11 @@ the difference.
 - `12-deferred-decisions.md` — features explicitly out of scope
   for v1, with rationale for each deferral and notes on how the
   architecture keeps options open.
-- `13-conventions.md` — workspace-wide practices: naming,
-  versioning, Rust edition, MSRV, CI, licensing.
+- `13-conventions.md` — **moved.** Workspace development
+  conventions (git workflow, POSIX shell rules, Rust code rules,
+  versioning, licensing, terminology, journal formats) now live
+  at [`/CONTRIBUTING.md`](../../CONTRIBUTING.md). The
+  `13-conventions.md` file remains as a redirect stub.
 - `14-open-questions.md` — decisions still pending, organized by
   urgency. Resolved questions moved to the "already answered"
   section for reference.

@@ -2,11 +2,11 @@
 
 This directory holds human-authored rules for coding agents
 (Claude Code, Codex, and any future agent) working in this
-workspace. Unlike `docs/design/13-conventions.md` (workspace-
-level design invariants) or the repo `README.md` (public-facing
-docs), files here are the human developer's direct instructions
-*to* the agents about how to behave around specific artifacts
-or situations.
+workspace. Unlike [`/CONTRIBUTING.md`](../../CONTRIBUTING.md)
+(workspace-wide development conventions) or the repo `README.md`
+(public-facing docs), files here are the human developer's direct
+instructions *to* the agents about how to behave around specific
+artifacts or situations.
 
 Agents: treat these as binding. If a rule here conflicts with
 something elsewhere in the repo, surface the conflict rather
