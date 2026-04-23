@@ -25,8 +25,15 @@ Developer: Yuka MORI.
   graph, complete a phase, reorganise `scripts/`), update
   `README.md` in the same commit** — see
   [`CONTRIBUTING.md §18.1`](CONTRIBUTING.md#181-readmemd--whole-project-executive-summary).
-- [`ROADMAP.md`](ROADMAP.md) — linear plan: what's next, what's
-  blocked on what.
+- [`ROADMAP.md`](ROADMAP.md) — **single authoritative home for any
+  roadmap or plan.** Current phase, what's next, what's blocked,
+  what was deferred and why. No parallel TODO lists or
+  plans-of-record elsewhere. **When plans change (phase done, new
+  blocker, deferred task, approach changed), update `ROADMAP.md`
+  in the same commit as the work that changes them** — see
+  [`CONTRIBUTING.md §16`](CONTRIBUTING.md#16-roadmap-maintenance)
+  and
+  [`§18.3`](CONTRIBUTING.md#183-roadmapmd--authoritative-home-for-plans).
 - [`docs/design/`](docs/design/) — architectural design docs (what
   Philharmonic *is*, not how to develop on it).
 - [`.claude/skills/`](.claude/skills/) — git-workflow,

@@ -11,18 +11,25 @@ conventions. When a convention is disputed or unclear, the rule
 here wins; every other doc (per-repo `README.md`, `CLAUDE.md`,
 `AGENTS.md`, design docs) links back here rather than restating.
 
-**Two standing rules that shape how this repo is documented**
+**Three standing rules that shape how this repo is documented**
 (spelled out in full in §18):
 
 1. **[`README.md`](README.md) is the whole-project executive
    summary.** Self-contained, concise, up-to-date. It will be
    fed to coding sub-agents as the project's one-page mental
-   model; broken or stale claims there are bugs.
+   model; broken or stale claims there are bugs. See §18.1.
 2. **This file is the authoritative home for every convention.**
    When you change a convention in practice — add a new rule,
    change an existing one, retire an old one, or discover an
    unwritten rule that should be authoritative — **update
    `CONTRIBUTING.md` in the same commit**. See §18.2.
+3. **[`ROADMAP.md`](ROADMAP.md) is the authoritative home for
+   every roadmap and plan.** Current phase, what's next, what's
+   blocked on what, what was deferred and why — all live there.
+   No parallel TODO lists, no plans-of-record in chat / notes /
+   a person's head. **When plans change, update `ROADMAP.md` in
+   the same commit as the work that changes them.** See §16 for
+   mechanics and §18.3 for scope.
 
 Related authoritative docs that stay as their own homes:
 - [`ROADMAP.md`](ROADMAP.md) — linear plan (what to work on next).
@@ -1565,8 +1572,11 @@ it up on review.
 
 ## 16. ROADMAP maintenance
 
-[`ROADMAP.md`](ROADMAP.md) at the repo root is the linear plan:
-where the project is, what's next, what's blocked on what. Its
+[`ROADMAP.md`](ROADMAP.md) at the repo root is the **single
+authoritative home for any roadmap or plan** in this workspace
+(see §18.3 for the same-commit rule that parallels
+`README.md` / `CONTRIBUTING.md`). It's the linear plan: where
+the project is, what's next, what's blocked on what. Its
 audience is Claude Code working sessions (and anyone
 re-orienting to the project after a break). It's not a
 historical diary or a wish list — it's the document that tells
@@ -1746,7 +1756,32 @@ in `ROADMAP.md`. Per-crate usage belongs in that crate's
 `README.md`. If a rule spans boundaries, pick the authoritative
 home and cross-reference from the others.
 
-### 18.3 Per-submodule / per-crate READMEs
+### 18.3 `ROADMAP.md` — authoritative home for plans
+
+[`ROADMAP.md`](ROADMAP.md) at the repo root is the **single
+authoritative home for any roadmap or plan** in this workspace:
+where the project is, which phase is next, what's blocked on
+what, what was deferred and why. No scattered TODO lists, no
+plans-of-record living in chat / `docs/notes-to-humans/` / a
+person's head — if it's a plan that matters for "what to do
+next," it lives in `ROADMAP.md`.
+
+**Rule: when plans change, update `ROADMAP.md` in the same
+commit as the work that changes them.** Covers:
+
+- Completing a phase or task (mark it done with a date).
+- Discovering a planned approach was wrong and choosing a new
+  one (update the plan with a one-line "why").
+- Adding a new initiative, milestone, or blocker.
+- Removing or deferring something no longer planned.
+
+§16 has the full update-mechanics (including the "don't paper
+over an unclear roadmap with code" guardrail). Same-commit
+discipline is the common thread across README.md (§18.1),
+CONTRIBUTING.md (§18.2), and this file — three parallel
+"authoritative home" commitments the workspace relies on.
+
+### 18.4 Per-submodule / per-crate READMEs
 
 Each submodule's `README.md` is **self-contained for that
 crate** — not for the whole project. A reader arriving at the
@@ -1776,7 +1811,7 @@ into `docs/design/` from the workspace if depth is needed.
 member crate (non-submodule), and its README documents what
 `xtask` is *as an in-tree tool crate*, not the whole project.
 
-### 18.4 Design docs (`docs/design/`)
+### 18.5 Design docs (`docs/design/`)
 
 [`docs/design/`](docs/design/) documents **what Philharmonic
 is** — architectural decisions, layer boundaries, threat model,
@@ -1789,24 +1824,24 @@ implementation reveals the design was wrong, update the design
 doc in the same commit as the code that changes it (same
 discipline as §16).
 
-### 18.5 Journal archives (`docs/codex-prompts/`, `docs/codex-reports/`, `docs/notes-to-humans/`)
+### 18.6 Journal archives (`docs/codex-prompts/`, `docs/codex-reports/`, `docs/notes-to-humans/`)
 
 These are **append-only** — format detail in §15. Historical
 entries are left as-is even when their references go stale;
 they're a record of what was true at the time of writing, not
 live pointers.
 
-### 18.6 Don't invent new top-level docs
+### 18.7 Don't invent new top-level docs
 
-If information doesn't fit one of the homes above, the right
-answer is almost always to extend an existing home, not to add
-`NOTES.md` / `TODO.md` / `STATUS.md` / etc. A new top-level
-doc requires justification and must be added to this §18 list
-at the same time so its role is part of the authoritative
-map. `HUMANS.md` and `POSIX_CHECKLIST.md` are the two existing
-top-level docs that have their own roles and aren't covered by
-the five homes above — `HUMANS.md` is the human developer's
-personal note-to-self (agent-readable but
+If information doesn't fit one of the six homes above, the
+right answer is almost always to extend an existing home, not
+to add `NOTES.md` / `TODO.md` / `STATUS.md` / etc. A new
+top-level doc requires justification and must be added to this
+§18 list at the same time so its role is part of the
+authoritative map. `HUMANS.md` and `POSIX_CHECKLIST.md` are
+the two existing top-level docs that have their own roles and
+aren't covered by the six homes above — `HUMANS.md` is the
+human developer's personal note-to-self (agent-readable but
 agent-writable-forbidden; see §17.4), and
 `POSIX_CHECKLIST.md` is an external-reference checklist of
 non-POSIX constructs to avoid in shell code (§6 references it).
