@@ -450,6 +450,16 @@ Invoke by path (`./scripts/foo.sh`), not via `bash`.
   pending toolchain updates. Called as step 0 by
   `pre-landing.sh` so each local run nudges against CI-vs-local
   drift.
+- `./scripts/check-md-bloat.sh` — lists line counts for every
+  `.md` / `.MD` file reachable from the workspace root (excluding
+  `target/` build trees); output ends with a `total` line. Pipe
+  through `sort -n | tail -20` to surface the biggest files.
+  Use after doc restructures, or when deciding whether a doc
+  has grown past its intended role per
+  [`CONTRIBUTING.md §18`](CONTRIBUTING.md#18-documentation-obligations).
+  Detector, not a rule — some docs (CONTRIBUTING, ROADMAP, the
+  per-phase design docs) legitimately need size; the script
+  surfaces candidates for inspection.
 - `./scripts/check-api-breakage.sh <crate> [<baseline-version>]` —
   run `cargo-semver-checks` for a single workspace crate against
   a crates.io baseline. Without `<baseline-version>` the tool
