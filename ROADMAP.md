@@ -69,14 +69,15 @@ serving real tenants).
   Claude's two audit notes (round 1 +
   zeroization-delta) under
   `docs/notes-to-humans/2026-04-23-000{1,2}-*.md`.
-- Phase 5 triangle publish: **in progress** 2026-04-23.
+- Phase 5 triangle publish: **done** 2026-04-23.
   `philharmonic-connector-common 0.2.0` (adds `iat` claim;
   breaking over 0.1.0), `philharmonic-connector-client 0.1.0`,
   `philharmonic-connector-service 0.1.0`,
-  `philharmonic-connector-router 0.1.0` — first real releases
-  for client/service/router (names were never reserved at
-  0.0.0 on crates.io; `0.1.0` is the initial published
-  version).
+  `philharmonic-connector-router 0.1.0` — all four on crates.io
+  with signed `v0.2.0` / `v0.1.0` tags (verified via
+  `verify-tag.sh`: local + signed + pushed, ok). First real
+  releases for client/service/router (names were never
+  reserved at 0.0.0 on crates.io).
 - Phases 6–9: not started.
 
 Work through phases in order unless a phase is explicitly noted
@@ -879,8 +880,12 @@ wave pattern and it kept round-trips manageable.
 Neither wave publishes on its own — the triangle's crates
 publish as `0.1.0` only after Wave B's end-to-end tests pass.
 Waves are internal review milestones; crates-io consumers see
-only the completed surface. **Publish in progress 2026-04-23**
-after both waves' Gate-2 clearance.
+only the completed surface. **Published 2026-04-23**:
+`philharmonic-connector-common 0.2.0`,
+`philharmonic-connector-client 0.1.0`,
+`philharmonic-connector-service 0.1.0`,
+`philharmonic-connector-router 0.1.0` — all four with signed
+release tags (`verify-tag.sh`: local + signed + pushed, ok).
 
 **Crates touched**: `philharmonic-connector-client`,
 `philharmonic-connector-router`, `philharmonic-connector-service`.
