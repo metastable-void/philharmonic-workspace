@@ -7,12 +7,19 @@
 
 Codex finished the Wave B implementation run cleanly after a
 botched first dispatch. Self-reported scope: full Wave B across
-client/service/router, tests, docs, validation. The three
-submodule working trees are dirty and un-pushed; **Gate-2 review
-is the next gate before anything commits or publishes**. I have
-not pulled the structured output yet — say the word when you
-want me to run `/codex:result task-mob2cian-d255lb` and
-reconstruct the `## Outcome` section of the archived prompt.
+client/service/router, tests, docs, validation. I ran my own
+pre-Gate-2 review pass (lint + tests + code read); everything
+that can be mechanically checked is green, and the construction
+aligns with the Gate-1-approved proposal. Three nit-level
+implementation comments plus one version-pin deviation are
+flagged below for your Gate-2 read. **Yuka Gate-2 review is
+still required** — my pass is a scaffolding layer, not a
+substitute. Per your instruction, the workspace is being
+committed + pushed with an explicit "not yet Gate-2 reviewed"
+notice so the append-only history reflects today's actual state.
+I have not pulled the structured `codex:result` output yet — say
+the word when you want me to and I'll reconstruct the archived
+prompt's `## Outcome` section from it.
 
 ## What actually happened (not in git log)
 
@@ -88,6 +95,163 @@ fix-by-kill works.
   `## Outcome` section still reads *"Pending — will be updated
   after the Codex run completes."* I'll fill it in as part of
   the Gate-2 follow-up.
+
+## My review (not a substitute for Gate-2)
+
+Read of:
+[philharmonic-connector-client/src/encrypt.rs](../../philharmonic-connector-client/src/encrypt.rs),
+[philharmonic-connector-client/src/error.rs](../../philharmonic-connector-client/src/error.rs),
+[philharmonic-connector-client/tests/encryption_vectors.rs](../../philharmonic-connector-client/tests/encryption_vectors.rs),
+[philharmonic-connector-service/src/decrypt.rs](../../philharmonic-connector-service/src/decrypt.rs),
+[philharmonic-connector-service/src/error.rs](../../philharmonic-connector-service/src/error.rs),
+[philharmonic-connector-service/src/verify.rs](../../philharmonic-connector-service/src/verify.rs),
+[philharmonic-connector-service/src/realm_keys.rs](../../philharmonic-connector-service/src/realm_keys.rs),
+[philharmonic-connector-service/tests/decryption_vectors.rs](../../philharmonic-connector-service/tests/decryption_vectors.rs),
+[philharmonic-connector-service/tests/e2e_roundtrip.rs](../../philharmonic-connector-service/tests/e2e_roundtrip.rs),
+[philharmonic-connector-router/src/dispatch.rs](../../philharmonic-connector-router/src/dispatch.rs),
+[philharmonic-connector-router/src/config.rs](../../philharmonic-connector-router/src/config.rs),
+plus all three `Cargo.toml`s and CHANGELOGs.
+
+### Mechanical verdicts
+
+- `./scripts/pre-landing.sh` — **passed** (fmt, check, clippy
+  with `-D warnings`, workspace `cargo test`, `--ignored` per
+  modified crate).
+- Test counts confirmed via
+  `./scripts/rust-test.sh philharmonic-connector-service`:
+  decryption_vectors 16/16, e2e_roundtrip 1/1, verify_vectors
+  (Wave A) 11/11 — all pass. encryption_vectors 1/1 on the
+  client side also ran green in the workspace sweep.
+
+### Construction alignment with Gate-1 proposal
+
+All approved-at-Gate-1 choices are implemented verbatim:
+
+- HKDF IKM order: `kem_ss` (32 B) first, then `ecdh_ss` (32 B) —
+  matches Gate-1 answer #1.
+- HKDF info string: `b"philharmonic/wave-b/hybrid-kem/v1/aead-key"`,
+  byte-identical between encrypt and decrypt sides.
+- AEAD nonce: 12 random bytes per encryption (answer #5).
+- AAD: named-field CBOR map → SHA-256, passed as the
+  `external_aad` to `coset::CoseEncrypt0::try_create_ciphertext` /
+  `decrypt_ciphertext` (answer #4).
+- COSE `alg = A256GCM` (IANA #3) + custom text-keyed
+  `kem_ct` / `ecdh_eph_pk` headers (answer #7).
+- Zeroization policy: `Zeroizing<[u8; …]>` on `kem_ss`, `ecdh_ss`,
+  HKDF `ikm`, plaintext; `SecretBox` on the AEAD key; ML-KEM raw
+  decap key bytes stored `Zeroizing<[u8; 2400]>` (answer #2).
+
+### Verification order (service side)
+
+[philharmonic-connector-service/src/verify.rs](../../philharmonic-connector-service/src/verify.rs)
+carries the 11 Wave A steps numbered `// 1.` through `// 11.`
+(parse → alg pin → kid lookup → window → size cap → signature →
+claims decode → kid cross-check → expiry → constant-time
+payload-hash compare → realm binding). `verify_and_decrypt`
+chains into
+[philharmonic-connector-service/src/decrypt.rs](../../philharmonic-connector-service/src/decrypt.rs)
+for steps 12 (realm-key lookup by kid), 12a (realm-key window),
+13 (KEM decap + ECDH + HKDF + AEAD decrypt), 14 (inner-realm
+JSON parse), 15 (inner-realm ≡ `claims.realm`). `ct_eq` from
+`subtle` is used for the payload-hash compare — no timing
+sidechannel.
+
+### Test hygiene
+
+- All reference vectors loaded via `include_str!` from
+  `docs/crypto-vectors/wave-b/*.hex` and
+  `docs/crypto-vectors/wave-a/wave_a_composition_*.hex`.
+  Compile-time, so a misnamed vector file or truncated hex would
+  fail to build, not silently skip.
+- Intermediate-value assertions throughout `encryption_vectors.rs`:
+  `kem_ct`, `kem_ss`, `ecdh_ss`, `hkdf_ikm`, `aead_key`,
+  `external_aad`, `cose_encrypt0` (whole envelope),
+  `enc_structure`, `ciphertext_and_tag`, `payload_hash`. This is
+  the "intermediate-value vector, not just final ciphertext"
+  discipline the `crypto-review-protocol` skill calls for.
+- `decryption_vectors.rs` covers the full malformation surface:
+  truncated envelope, wrong alg, nonempty unprotected header,
+  short `kem_ct` / `ecdh_eph_pk` / IV, unknown custom label,
+  unknown realm kid, realm-key window, realm-key realm
+  mismatch, tag tamper, `kem_ct` tamper, `ecdh_eph_pk` tamper,
+  AAD mismatch, inner-realm mismatch. Each has its own `#[test]`.
+- `e2e_roundtrip.rs` runs the full mint (Wave A) + encrypt
+  (Wave B) → verify + decrypt chain against the pre-committed
+  composition vectors and asserts byte-for-byte equality of
+  intermediates plus a final plaintext equality.
+
+### Safety discipline
+
+- `grep -rn "\.unwrap()\|\.expect(\|panic!\|unreachable!\|todo!\|unimplemented!\|unsafe " <crate>/src/`
+  across all three crates: clean. Only `.expect(...)` calls are
+  inside [philharmonic-connector-router/src/dispatch.rs](../../philharmonic-connector-router/src/dispatch.rs)
+  at line 194+, inside `#[cfg(test)] mod tests` — §10.3-exempt.
+- No `unsafe` blocks anywhere.
+- All error paths route through the declared `TokenVerifyError` /
+  `EncryptError` variants; no panics on attacker-controlled input.
+- Realm-key realm binding is explicit: decrypt rejects with
+  `RealmKeyRealmMismatch` if the registered key's `realm` field
+  differs from the service's own `service_realm` argument.
+  Defence against a realm's key material being used to decrypt
+  traffic targeted at a different realm.
+
+### Nits flagged for your Gate-2 read
+
+These are polish-level — I would not block on them, but they are
+worth your eye:
+
+1. **`aead_key_bytes` stack array is not zeroized** before being
+   copied into `SecretBox<Box<[u8; 32]>>`. Happens on both sides:
+   [philharmonic-connector-client/src/encrypt.rs:183](../../philharmonic-connector-client/src/encrypt.rs#L183)
+   and
+   [philharmonic-connector-service/src/decrypt.rs:82](../../philharmonic-connector-service/src/decrypt.rs#L82).
+   The stack local holds the 32-byte AEAD key unwrapped from
+   function entry through the `SecretBox::new(Box::new(_))` call;
+   the stack copy is only dropped at end-of-scope with no
+   zeroization. Tiny window, but the rest of the file wraps
+   everything in `Zeroizing` so this stands out. Fix: construct
+   directly as `Zeroizing<[u8; 32]>` and move-into-Box via an
+   intermediate `Zeroizing`-aware adapter, or convert to
+   `SecretBox<Zeroizing<[u8; 32]>>`.
+
+2. **Dead `prk_bytes` buffer** —
+   [philharmonic-connector-client/src/encrypt.rs:180-181](../../philharmonic-connector-client/src/encrypt.rs#L180-L181)
+   and
+   [philharmonic-connector-service/src/decrypt.rs:79-80](../../philharmonic-connector-service/src/decrypt.rs#L79-L80):
+   both sides allocate a `Zeroizing<[u8; 32]>`, copy the HKDF
+   PRK into it, and never read the buffer again (HKDF expansion
+   uses the `hkdf` context object, not `prk_bytes`). Clippy
+   missed it because it's assigned-to, not just bound. Looks
+   like scaffolding from an intermediate refactor that's never
+   removed. Harmless but worth deleting.
+
+3. **`hkdf` crate pinned at `0.13`**, but the Gate-1 proposal
+   (`docs/design/crypto-proposals/2026-04-22-phase-5-wave-b-hybrid-kem-cose-encrypt0.md`
+   §"Primitives and library versions", line 216) specified
+   `hkdf = "0.12"` with the note *"latest 0.13.0 (new major;
+   check compatibility before pinning to "0.13")"*. Codex took
+   the newer pin, apparently after verifying compatibility
+   (the tests pass against the committed vectors, so the HKDF
+   output bytes match byte-for-byte). Not a construction
+   change — HKDF-SHA256 outputs are algorithmically identical
+   across the crate's 0.12 → 0.13 major. But the
+   `crypto-review-protocol` skill says *"Explicitly prohibit
+   changing any primitive or construction choice without
+   flagging."* Codex didn't flag; I'm flagging now. Your call
+   whether to accept the bump or have Codex re-pin to 0.12.
+
+### Router sanity
+
+[philharmonic-connector-router](../../philharmonic-connector-router/)
+is a plain HTTP dispatcher on axum + hyper + tower — no crypto
+deps, no key material. Config splits into
+[`DispatchConfig`](../../philharmonic-connector-router/src/config.rs)
+(host + per-realm upstream map with validation) and a
+[`Forwarder`](../../philharmonic-connector-router/src/dispatch.rs)
+trait that the production `HyperForwarder` implements, and that
+the single mock test substitutes for capturing the forwarded
+request. Matches the "minimal HTTP dispatcher (no crypto)" scope
+in the prompt.
 
 ## What I need from you
 
