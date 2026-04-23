@@ -110,9 +110,11 @@ files tracked directly in the parent repo):
   Today's bins: `gen-uuid` (canonical source for every wire-
   format UUID we mint), `crates-io-versions` (sparse-index
   query for published crate versions), `web-fetch` (in-
-  process HTTP GET, no `curl`/`wget` dependency), and
+  process HTTP GET, no `curl`/`wget` dependency),
   `codex-fmt` (renders Codex rollout JSONL into a color-
-  highlighted timeline; used by `scripts/codex-logs.sh`). See
+  highlighted timeline; used by `scripts/codex-logs.sh`), and
+  `openai-chat` (generic OpenAI chat-completion caller; used
+  by `scripts/project-status.sh`). See
   [§xtask and KIND UUID generation](#xtask-and-kind-uuid-generation)
   below.
 
@@ -450,6 +452,24 @@ Invoke by path (`./scripts/foo.sh`), not via `bash`.
   pending toolchain updates. Called as step 0 by
   `pre-landing.sh` so each local run nudges against CI-vs-local
   drift.
+- `./scripts/project-status.sh [-n <log-lines>] [--model <model>]` —
+  generate an LLM-written summary of the workspace's development
+  history and current status. Assembles `README.md`, `ROADMAP.md`,
+  and `./scripts/git-log.sh -n <N>` (default 500) into a single
+  prompt payload, pipes it through
+  `./scripts/xtask.sh openai-chat --`, and **writes the model's
+  reply to a timestamped file under
+  `docs/project-status-reports/YYYY-MM-DD-hh-mm-ss.md`** (a
+  committed archive, not `.gitignore`-d). Only the output path
+  is printed to stdout, so running the script again doesn't cost
+  another OpenAI call — past snapshots are re-read with `cat`.
+  Requires `OPENAI_API_KEY` in the environment or in `./.env`
+  at the workspace root (the `.env` file is `.gitignore`-d).
+  Default model is `gpt-5.4`; override with `--model`. POSIX sh;
+  the actual API call lives in the `openai-chat` xtask bin so
+  shell stays orchestration-only. See
+  [`docs/project-status-reports/README.md`](docs/project-status-reports/README.md)
+  for the archive's role and editorial policy.
 - `./scripts/check-md-bloat.sh` — lists line counts for every
   `.md` / `.MD` file reachable from the workspace root (excluding
   `target/` build trees); output ends with a `total` line. Pipe
@@ -680,6 +700,19 @@ Current bins:
   calls surface as `>>>` / `<<<` with call IDs. `--no-color`
   forces ANSI off; auto-disabled when stdout isn't a TTY so
   piping to `less` or a file stays clean.
+- **`openai-chat`** — generic one-shot OpenAI chat-completion
+  caller. Usage:
+  `./scripts/xtask.sh openai-chat -- [--system-prompt <TEXT>] [--prompt <TEXT>] [--model <MODEL>]`.
+  Reads the API key from `$OPENAI_API_KEY` or from a
+  `OPENAI_API_KEY=<value>` line in `./.env` at the workspace
+  root (which is `.gitignore`-d). User prompt comes from
+  `--prompt` if given, otherwise from stdin — so large
+  assembled payloads can be piped in without argv-length
+  concerns. Default model is `gpt-5.4`. Assistant message is
+  written to stdout; HTTP 4xx/5xx and JSON-shape errors exit
+  non-zero. Pure-Rust HTTP via `ureq` + `rustls` — no
+  `python` / `node` / `curl` dependency. Primary caller:
+  `scripts/project-status.sh`.
 
 ## AI-assisted development
 
