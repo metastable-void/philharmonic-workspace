@@ -293,7 +293,7 @@ preferences.
 rule at the Git-client level. `setup.sh` points
 `core.hooksPath` at `.githooks/` on the parent and at the
 relative-from-the-submodule equivalent in every submodule, so the
-same three hooks run everywhere:
+same four hooks run everywhere:
 
 - `.githooks/pre-commit` — refuses any commit whose invocation
   didn't set `WORKSPACE_GIT_WRAPPER=1`. `commit-all.sh` exports
@@ -318,14 +318,34 @@ same three hooks run everywhere:
   retry path documented for the rare case the wrapper doesn't
   cover (the retry itself is a fresh commit, not an amend — see
   "No history modification" below).
+- `.githooks/pre-push` — final backstop before commits leave the
+  machine. Walks every ref-update in the push and, for each new
+  commit, rejects it if (a) the GPG/SSH signature status `%G?`
+  is not `G`/`U`, or (b) the commit message lacks a plausible
+  `Signed-off-by:` trailer (matching `commit-msg`'s exemptions
+  for `Merge `/`fixup! `/`squash! `/`Revert ` first-line
+  prefixes). Redundant with `commit-msg` + `post-commit` in the
+  normal `commit-all.sh` flow — its value is catching commits
+  that bypassed those (`--no-verify` at commit time, imports via
+  `cherry-pick`/`merge`, commits produced by tools). The abort
+  message does **not** offer amend or interactive-rebase fixes
+  because the append-only rule below forbids them; it instead
+  tells the user to trace why the commit escaped `commit-msg` /
+  `post-commit`, and fix-forward with a new commit or `git
+  revert` (for pushed content). A narrow escape hatch —
+  `git config hooks.allowUnsignedPush true`, push, unset — is
+  preserved for genuine emergencies, with a "ask Yuka first"
+  framing in the message.
 
 Together: pre-commit says "go through the wrapper", commit-msg
-says "carry a sign-off", and post-commit says "rollback if
-unsigned" — all three are workspace-wide invariants that used to
-live only in the wrapper script. Don't edit these hooks ad hoc;
-if a new invariant needs to be enforced, change the
-`.githooks/*` file in a normal commit-all.sh commit and it
-lands for every contributor on their next `setup.sh` run.
+says "carry a sign-off", post-commit says "rollback if
+unsigned", and pre-push says "don't let anything that bypassed
+the first three out of the machine" — all four are workspace-
+wide invariants that used to live only in the wrapper script.
+Don't edit these hooks ad hoc; if a new invariant needs to be
+enforced, change the `.githooks/*` file in a normal
+commit-all.sh commit and it lands for every contributor on
+their next `setup.sh` run.
 
 **No history modification.** Git history in this workspace is
 append-only. **No** `git commit --amend`, **no** `git rebase`

@@ -216,7 +216,7 @@ If you already cloned without `--recurse-submodules`, just run
 
 ### Tracked Git hooks
 
-The repo ships three hooks under `.githooks/` that `setup.sh`
+The repo ships four hooks under `.githooks/` that `setup.sh`
 wires up via `core.hooksPath`:
 
 - `.githooks/pre-commit` — refuses any commit that wasn't invoked
@@ -236,6 +236,18 @@ wires up via `core.hooksPath`:
   re-commit cleanly. `setup.sh` already turns on
   `commit.gpgsign=true` everywhere, so this is a safety net for
   the case where signing got bypassed (e.g. `--no-gpg-sign`).
+- `.githooks/pre-push` — final backstop: before any commits
+  leave the machine, walks every new commit in the push and
+  rejects the push if any of them is unsigned or lacks a
+  `Signed-off-by:` trailer (with the same
+  `Merge`/`fixup!`/`squash!`/`Revert` exemptions as
+  `commit-msg`). Matches the commit-time enforcement so commits
+  that bypassed `commit-msg` + `post-commit` (via `--no-verify`,
+  cherry-pick from elsewhere, etc.) can't silently reach origin.
+  The abort message does not suggest amend/rebase — it points
+  at fix-forward and `git revert` — per the append-only rule.
+  A `git config hooks.allowUnsignedPush true` emergency bypass
+  exists (ask Yuka first).
 
 These hooks enforce the invariants the wrapper scripts used to
 enforce unilaterally, now applied even when somebody reaches around

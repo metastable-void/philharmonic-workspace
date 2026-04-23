@@ -241,8 +241,10 @@ Developer: Yuka MORI.
   every submodule) also enforce these: `.githooks/pre-commit`
   rejects any commit that didn't come through `commit-all.sh`,
   `.githooks/commit-msg` rejects any message without a matching
-  `Signed-off-by:` trailer, and `.githooks/post-commit` rolls
-  back any unsigned commit that slipped through.
+  `Signed-off-by:` trailer, `.githooks/post-commit` rolls
+  back any unsigned commit that slipped through, and
+  `.githooks/pre-push` rejects a push that would carry any
+  unsigned / unsigned-off commits (final backstop before origin).
   **Git history is append-only** — no `git commit --amend`, no
   `git rebase`, no `git reset --hard`, no `git push --force`, no
   other history rewriting. Two authorized exceptions, both

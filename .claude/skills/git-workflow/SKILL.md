@@ -241,7 +241,7 @@ land unsigned commits that `post-commit` then rolls back.)
 
 ## Tracked Git hooks
 
-Three hooks under `.githooks/` back the "go through the scripts"
+Four hooks under `.githooks/` back the "go through the scripts"
 rule at the Git-client level, once `setup.sh` has wired them in:
 
 - `.githooks/pre-commit` — rejects any `git commit` invocation that
@@ -258,11 +258,27 @@ rule at the Git-client level, once `setup.sh` has wired them in:
   `git reset --soft HEAD~1` and saves the message to
   `.git/UNSIGNED_COMMIT_MSG`. Staged changes are preserved. The
   abort message points at `scripts/commit-all.sh` as the retry
-  path; a raw-git fallback (`git commit -S -s -F <saved-msg>` or
-  `git commit -S -s -c ORIG_HEAD`) is documented for amend/rebase
-  flows. `setup.sh` turns on `commit.gpgsign=true` workspace-wide,
-  so this fires only for commits that bypassed signing
+  path; a raw-git fallback (`git commit -S -s -F <saved-msg>`
+  or `git commit -S -s -c ORIG_HEAD`) is documented as a fresh
+  commit, not an amend (rule 6 forbids amend). `setup.sh` turns
+  on `commit.gpgsign=true` and `rebase.gpgsign=true` workspace-
+  wide, so this fires only for commits that bypassed signing
   explicitly.
+- `.githooks/pre-push` — walks every new commit in the push and
+  rejects the push if any commit is unsigned (`%G?` not `G`/`U`)
+  or lacks a `Signed-off-by:` trailer. Same exemptions as
+  `commit-msg` for `Merge `/`fixup! `/`squash! `/`Revert `
+  first-line prefixes. Redundant with commit-msg + post-commit
+  for the normal `commit-all.sh` flow — it earns its keep by
+  catching commits that got in via `--no-verify`, external
+  `cherry-pick`, or tool-produced merges. Fires for every `git
+  push` in parent and submodules (push-all.sh pushes each
+  submodule first, then the parent; each push triggers the
+  hook in its own repo). The abort message does **not** suggest
+  amend / rebase / reset (rule 6), and instead asks you to
+  trace how an unsigned / unsigned-off commit got into local
+  history in the first place. Emergency escape hatch via
+  `git config hooks.allowUnsignedPush true` — ask Yuka first.
 
 Don't `--no-verify` around these hooks. If you legitimately need a
 flow the wrappers don't support, extend the wrapper.

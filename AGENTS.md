@@ -81,13 +81,15 @@ changing git is Claude's job, not yours:
 - When you finish, leave edits in the working tree. Claude runs
   `scripts/commit-all.sh` and `scripts/push-all.sh`.
 - The repo installs tracked Git hooks (`.githooks/pre-commit`,
-  `.githooks/commit-msg`, `.githooks/post-commit`) via
-  `core.hooksPath`, wired up by `scripts/setup.sh`. Pre-commit
-  rejects any `git commit` that didn't come through
-  `commit-all.sh`; commit-msg rejects any message without a
-  matching `Signed-off-by:` trailer; post-commit rolls back any
-  unsigned commit that slipped through. Don't disable them;
-  don't `--no-verify` around them.
+  `.githooks/commit-msg`, `.githooks/post-commit`,
+  `.githooks/pre-push`) via `core.hooksPath`, wired up by
+  `scripts/setup.sh`. Pre-commit rejects any `git commit` that
+  didn't come through `commit-all.sh`; commit-msg rejects any
+  message without a matching `Signed-off-by:` trailer;
+  post-commit rolls back any unsigned commit that slipped
+  through; pre-push is the final backstop, rejecting any push
+  that carries unsigned or unsigned-off commits. Don't disable
+  them; don't `--no-verify` around them.
 
 If the prompt genuinely requires a git state change (e.g. "create
 a branch and open a PR"), stop and surface that — don't guess.
