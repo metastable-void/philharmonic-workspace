@@ -1,8 +1,9 @@
 #!/bin/sh
 # Pretty-print the workspace git log with DCO sign-off and GPG/SSH
-# signature status per commit. Last 500 commits; parent repo only
-# (submodules keep their own histories — use `cd <sub> &&
-# ../scripts/git-log.sh` for those).
+# signature status per commit. Parent workspace repo only (the
+# script sources scripts/lib/workspace-cd.sh, which cd's to the
+# workspace root before running). Default: last 500 commits;
+# override with `-n <N>` or `--count <N>`.
 #
 # Columns:
 #   <short-sha>  <YYYY-MM-DD>  [<%G?>]  [<sign-off-label>]  <author>  |  <subject>
@@ -37,10 +38,10 @@ set -eu
 
 usage() {
     cat <<'EOF'
-Usage: git-log.sh [-h|--help]
+Usage: git-log.sh [-n <N> | --count <N>] [-h|--help]
 
 Pretty-print workspace git log with DCO sign-off + GPG/SSH
-signature status per commit (last 500 commits, parent repo only).
+signature status per commit (parent repo only).
 
 Columns:
   <short-sha>  <YYYY-MM-DD>  [<%G?>]  [<sign-off-label>]  <author>  |  <subject>
@@ -58,26 +59,56 @@ Sign-off label:
   [NOT signed-off]    No Signed-off-by: trailer — violates the DCO rule.
 
 Options:
-  -h, --help    Show this help and exit.
+  -n <N>, --count <N>  Show the last N commits (default 500). N must be
+                       a positive integer.
+  -h, --help           Show this help and exit.
 EOF
+}
+
+count=500
+
+# Positive-integer validation (no leading zero, no sign, non-empty).
+is_positive_int() {
+    case "$1" in
+        ''|*[!0-9]*) return 1 ;;
+        0*)          return 1 ;;
+        *)           return 0 ;;
+    esac
 }
 
 while [ $# -gt 0 ]; do
     case "$1" in
-        -h|--help) usage; exit 0 ;;
-        --)        shift; break ;;
-        -*)        printf 'git-log.sh: unknown flag: %s\n\n' "$1" >&2
-                   usage >&2
-                   exit 2 ;;
-        *)         printf 'git-log.sh: unexpected argument: %s\n\n' "$1" >&2
-                   usage >&2
-                   exit 2 ;;
+        -h|--help)
+            usage; exit 0 ;;
+        -n|--count)
+            if [ $# -lt 2 ]; then
+                printf 'git-log.sh: %s requires an argument\n\n' "$1" >&2
+                usage >&2
+                exit 2
+            fi
+            if ! is_positive_int "$2"; then
+                printf 'git-log.sh: %s argument must be a positive integer, got: %s\n\n' "$1" "$2" >&2
+                usage >&2
+                exit 2
+            fi
+            count="$2"
+            shift 2 ;;
+        --)
+            shift; break ;;
+        -*)
+            printf 'git-log.sh: unknown flag: %s\n\n' "$1" >&2
+            usage >&2
+            exit 2 ;;
+        *)
+            printf 'git-log.sh: unexpected argument: %s\n\n' "$1" >&2
+            usage >&2
+            exit 2 ;;
     esac
 done
 
 . "$(dirname -- "$0")/lib/workspace-cd.sh"
 
-git log -n 500 --date=short \
+git log -n "$count" --date=short \
   --pretty=tformat:'%h%x09%ad%x09%G?%x09%(trailers:key=Signed-off-by,valueonly=true,separator=%x1f)%x09%ae%x09%an <%ae>%x09%s' \
   | awk -F '\t' '
     {

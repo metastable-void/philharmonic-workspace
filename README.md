@@ -363,6 +363,20 @@ Invoke by path (`./scripts/foo.sh`), not via `bash`.
   `push-all.sh` to verify every commit carries a cryptographic
   signature. Canonical replacement for raw `git log -n 1` across
   repos.
+- `./scripts/git-log.sh [-n <N>|--count <N>]` — pretty-print the
+  parent-repo git log (default last 500 commits) with DCO
+  sign-off and GPG/SSH signature status per commit. Columns:
+  short SHA, date, `%G?` signature, sign-off label
+  (`[signed-off]` / `[unknown sign-off]` / `[NOT signed-off]`),
+  author, subject. The sign-off label matches
+  `Signed-off-by:` trailers against the commit's author email
+  (`%ae`), so imported patches and co-author-only sign-offs are
+  surfaced distinctly from violations of the DCO rule. Useful
+  for auditing workspace history — e.g. `./scripts/git-log.sh |
+  grep -E '\[(N|NOT signed-off)\]'` to find commits that
+  escaped the signing / DCO invariants. Requires git ≥ 2.32
+  (uses `valueonly=true` and `separator=%x1f` on
+  `%(trailers:key=…)`).
 - `./scripts/rust-lint.sh [<crate>]` — workspace-wide (or
   per-crate) `cargo fmt --check` + `cargo check` + `cargo
   clippy --all-targets -- -D warnings`. Canonical pre-landing

@@ -144,6 +144,21 @@ good, `U` = good+untrusted; anything else on a pushed commit is a
 problem). Canonical replacement for ad-hoc `git log -n 1` across
 repos — do not invoke raw `git log -n 1` for HEAD-state queries.
 
+### `scripts/git-log.sh [-n <N>|--count <N>]`
+Pretty-prints the parent-repo git log (default last 500 commits)
+with DCO sign-off + GPG/SSH signature status per commit. Columns:
+short SHA, date, `%G?`, sign-off label, author, subject. The
+sign-off label matches `Signed-off-by:` trailers against the
+commit's author email (`%ae`), distinguishing `[signed-off]`
+(author's own sign-off present), `[unknown sign-off]` (trailers
+exist but none match the author), and `[NOT signed-off]` (no
+trailer — DCO violation). Use for auditing workspace history
+against the sign-off + signature invariants — e.g.
+`./scripts/git-log.sh | grep -E '\[(N|NOT signed-off)\]'`
+surfaces every commit that escaped them. Parent workspace repo
+only (sources `workspace-cd.sh`, which cd's to the workspace
+root regardless of invocation directory). Requires git ≥ 2.32.
+
 ### `scripts/check-api-breakage.sh <crate> [<baseline-version>]`
 Runs `cargo semver-checks check-release -p <crate>` against a
 crates.io baseline (latest non-yanked by default, or the version
