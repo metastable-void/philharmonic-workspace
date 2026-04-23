@@ -103,14 +103,16 @@ changes are Claude's job:
 - **Do not run** `git commit`, `git push`, `git add`, `git reset`,
   `git rebase`, `git stash`, `git branch -D`, `git checkout
   <branch>`, `git commit --amend`, `git push --force`.
-- **Never rewrite history.** This workspace is append-only. No
-  amend, no rebase, no reset, no force-push, no history surgery
-  of any kind. Two script-enforced exceptions exist (the
-  `post-commit` / `commit-all.sh` unsigned-commit rollback, and
-  the `--rebase` inside `pull-all.sh`) — both are Claude's
-  concern, not yours. Mistakes ship as new commits or
-  `git revert`s. If the prompt seems to require history
-  modification, stop and surface it.
+- **Never rewrite history, and never `git revert` either.** This
+  workspace is append-only and the revert form of "undo" is also
+  forbidden. No amend, no rebase, no reset, no force-push, no
+  `git revert`, no history surgery of any kind. Two
+  script-enforced exceptions exist (the `post-commit` /
+  `commit-all.sh` unsigned-commit rollback, and the `--rebase`
+  inside `pull-all.sh`) — both are Claude's concern, not yours.
+  Mistakes ship as new fix-forward commits. If the prompt seems
+  to require history modification or a revert, stop and surface
+  it.
   ([`CONTRIBUTING.md §4.4`](CONTRIBUTING.md#44-no-history-modification))
 - **Do not touch** `.gitmodules` or submodule pointers.
 - **Leave edits in the working tree.** Claude runs

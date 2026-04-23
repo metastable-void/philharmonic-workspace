@@ -367,9 +367,19 @@ exceptions get introduced.
 - Force-pushing a rewritten history through ~23 submodules
   means every other clone has to untangle itself; the cost is
   not yours alone.
-- Mistakes ship as **new commits** — a fix-forward, or a
-  `git revert` (which itself creates a new commit). History
-  stays honest.
+- Mistakes ship as **new commits** via fix-forward — a new
+  commit that makes the state right. The imperfect earlier
+  commit stays in the log; the fix lives on top.
+
+**`git revert` is also forbidden.** Even though it creates a new
+commit and so respects the letter of append-only, the "undo"
+framing clutters the log and turns history review into
+bookkeeping about which past commits are still live versus
+which have been rescinded. Fix-forward with a real change
+instead: make a commit that brings the code to the state it
+should be in, and let the earlier imperfect commit stand as
+part of the honest record. The log's job is to tell what
+happened; revert commits pretend otherwise.
 
 **If you need a mistake undone:**
 
@@ -383,13 +393,26 @@ exceptions get introduced.
   rerun `./scripts/commit-all.sh "msg"`. The hook's abort
   message spells out the exact retry path.
 - *Any commit that has been pushed, regardless of how recent*:
-  `git revert <sha>` produces a new commit that undoes it.
-  That's the only supported undo for a commit that's reached
-  origin.
+  fix-forward — make a new commit that brings the code to the
+  state it should be in, and push that. No `git revert`, no
+  amend, no rebase. Live with the imperfect earlier commit in
+  the log.
 
-If you find yourself reaching for amend / rebase / reset for a
-"legitimate" reason that isn't in the list above, stop and
+If you find yourself reaching for amend / rebase / reset / revert
+for a "legitimate" reason that isn't in the list above, stop and
 surface it. This rule has no quiet exceptions.
+
+**Push early, push often — mid-work pushes are encouraged.** The
+local hook layer (§4.5) and the GitHub-side ruleset (§4.7) both
+accept work-in-progress commits on `main` as long as they're
+signed, signed-off, and not force-pushes. Do not hoard commits
+locally out of a "wait until it's clean" habit — in an
+append-only world a lost local commit has no amend/rebase
+recovery path, so a disk failure or an accidental clone wipe
+takes unique work with it. Push the imperfect commit, push the
+fix-forward on top, push the next fix-forward. The log tells the
+honest story and origin is the backup; that's the whole
+contract.
 
 ### 4.5 Tracked Git hooks
 

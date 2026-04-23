@@ -251,8 +251,9 @@ wires up via `core.hooksPath`:
   `commit-msg`). Matches the commit-time enforcement so commits
   that bypassed `commit-msg` + `post-commit` (via `--no-verify`,
   cherry-pick from elsewhere, etc.) can't silently reach origin.
-  The abort message does not suggest amend/rebase — it points
-  at fix-forward and `git revert` — per the append-only rule.
+  The abort message does not suggest amend/rebase/revert — it
+  points at fix-forward only — per the append-only rule (§4.4
+  forbids `git revert` too).
   A `git config hooks.allowUnsignedPush true` emergency bypass
   exists (ask Yuka first).
 

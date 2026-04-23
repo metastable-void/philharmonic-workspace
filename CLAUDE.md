@@ -96,10 +96,16 @@ full in `CONTRIBUTING.md`. Read the full section before acting
   signature + `Audit-Info:` trailer; hooks enforce this.
   ([§4](CONTRIBUTING.md#4-git-workflow))
 - **Git history is append-only.** No amend, no rebase, no reset,
-  no force-push. Two narrow script-enforced exceptions — the
-  `post-commit` unsigned-rollback and `pull-all.sh`'s
-  `--rebase`. Mistakes ship as new commits or `git revert`.
+  no force-push, and no `git revert` either. Two narrow
+  script-enforced exceptions — the `post-commit`
+  unsigned-rollback and `pull-all.sh`'s `--rebase`. Mistakes
+  ship as new fix-forward commits only.
   ([§4.4](CONTRIBUTING.md#44-no-history-modification))
+- **Push early, push often.** Mid-work pushes on `main` are
+  encouraged — in an append-only world, unpushed commits can't
+  be recovered if the local clone is lost. Hooks + GitHub
+  ruleset accept WIP as long as it's signed, signed-off, and
+  not force-pushed. ([§4.4](CONTRIBUTING.md#44-no-history-modification))
 - **Prefer `scripts/*.sh` wrappers over raw `cargo`.** The
   wrappers encode flag choices, auto-install, workspace-cd,
   POSIX-compat guards. Read-only queries (`cargo tree`,
