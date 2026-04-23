@@ -303,8 +303,10 @@ same three hooks run everywhere:
   `commit.gpgsign=true` + `tag.gpgsign=true` workspace-wide, so
   this hook is a defence-in-depth for the case where signing got
   bypassed explicitly (e.g. `--no-gpg-sign`). The abort message
-  points offenders at `scripts/commit-all.sh`; the raw-git retry
-  path is preserved for amend/rebase flows.
+  points offenders at `scripts/commit-all.sh`, with a raw-git
+  retry path documented for the rare case the wrapper doesn't
+  cover (the retry itself is a fresh commit, not an amend — see
+  "No history modification" below).
 
 Together: pre-commit says "go through the wrapper", commit-msg
 says "carry a sign-off", and post-commit says "rollback if
@@ -313,6 +315,65 @@ live only in the wrapper script. Don't edit these hooks ad hoc;
 if a new invariant needs to be enforced, change the
 `.githooks/*` file in a normal commit-all.sh commit and it
 lands for every contributor on their next `setup.sh` run.
+
+**No history modification.** Git history in this workspace is
+append-only. **No** `git commit --amend`, **no** `git rebase`
+(interactive or otherwise), **no** `git reset --hard`, **no**
+`git reset --mixed` / `--soft` except the narrow exception below,
+**no** `git push --force` / `--force-with-lease`, **no**
+`git filter-branch` / `git-filter-repo`, **no** `git cherry-pick`
+that drops intervening commits, and **no** branch resets that
+discard unique commits. The rule applies to the parent repo and
+every submodule, to published and unpublished branches alike.
+
+**The narrow exception — script-enforced emergency rollback of
+local, not-yet-pushed commits.** The only authorized history
+change is the `git reset --soft HEAD~1` that
+`.githooks/post-commit` and `commit-all.sh` both perform when a
+just-recorded commit violates the signature invariant. Both
+preserve the working tree (staged changes kept) so the developer
+can re-commit correctly; both only touch the immediately-
+preceding commit on the local branch; and both only fire while
+that commit has not been pushed. Nothing else is authorized to
+rewrite history — not amend, not rebase, not reset, not anything
+else, regardless of intent. If a future need arises for another
+kind of rollback, it has to live in a script and be covered
+here; ad-hoc history edits are not how it gets introduced.
+
+**Why append-only:**
+
+- Every commit carries a GPG/SSH signature; amending rewrites
+  the commit object and the original signature becomes
+  meaningless. The signed audit trail stops being an audit trail.
+- Every commit carries an `Audit-Info:` trailer recording the
+  environment that produced it. Amend would rewrite the trailer;
+  the whole point is that it cannot be rewritten in-place.
+- Force-pushing a rewritten history through ~23 submodules
+  means every other clone has to untangle itself; the cost is
+  not yours alone.
+- Mistakes ship as **new commits** — a fix-forward, or a
+  `git revert` (which itself creates a new commit). History
+  stays honest.
+
+**If you need a mistake undone:**
+
+- *Uncommitted working-tree changes*: edit and make a new commit
+  via `commit-all.sh`.
+- *Most recent commit, not yet pushed, and you want to tweak
+  the code*: commit the tweak as the next commit. Do **not**
+  amend.
+- *Most recent commit, not yet pushed, got rolled back by
+  post-commit or commit-all.sh*: the working tree is preserved;
+  rerun `./scripts/commit-all.sh "msg"` (the hook's abort
+  message spells out the exact retry path).
+- *Any commit that has been pushed, regardless of how recent*:
+  `git revert <sha>` produces a new commit that undoes it.
+  That's the only supported undo for a commit that's reached
+  origin.
+
+If you find yourself reaching for amend / rebase / reset for a
+"legitimate" reason that isn't in the list above, stop and
+surface it. This rule has no quiet exceptions.
 
 ## Shell scripts
 

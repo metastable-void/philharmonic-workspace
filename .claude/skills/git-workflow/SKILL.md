@@ -47,6 +47,18 @@ Authoritative sources (read these if anything below is unclear):
    24 repos (parent + submodules) in one call with the canonical
    SHA-sig-subject format; raw `git log -n 1` would need 24
    invocations to match and drifts in format between them.
+6. **Git history is append-only.** No `git commit --amend`, no
+   `git rebase` (interactive or otherwise), no `git reset --hard`,
+   no `git push --force` / `--force-with-lease`, no
+   `git filter-branch`, no history surgery of any kind. The only
+   authorized rollback is the `git reset --soft HEAD~1` that
+   `.githooks/post-commit` and `commit-all.sh` both perform when
+   a just-recorded, not-yet-pushed commit violates the signature
+   invariant — and only that. Mistakes ship as **new commits**
+   (fix-forward) or `git revert`s; never as retroactive edits.
+   See docs/design/13-conventions.md §Git workflow ("No history
+   modification") for the full statement, including the
+   "if you need a mistake undone" decision tree.
 
 ## The scripts
 
@@ -178,9 +190,20 @@ Need something the scripts don't do?
 
 ## Common failure modes
 
-- **"I just need to amend quickly"** — no. Amend drops the signoff
-  unless you pass `-s` again, and the scripts don't amend. Make a new
-  commit via `commit-all.sh`; history stays honest.
+- **"I just need to amend quickly"** — no. Amend is a history
+  rewrite; rule 6 forbids it unconditionally. It also invalidates
+  the previous commit's signature and rewrites the `Audit-Info:`
+  trailer. Make a new commit via `commit-all.sh`; history stays
+  honest.
+- **"I need to rebase / squash / reset before pushing"** — still no.
+  The append-only rule covers unpushed commits too; Yuka reviews
+  history the way it landed. Fix-forward with a new commit, or if
+  the earlier commit is genuinely garbage, ask before touching it.
+- **"The post-commit hook rolled back my commit"** — your working
+  tree is preserved; the commit message is saved at
+  `.git/UNSIGNED_COMMIT_MSG`. Rerun `./scripts/commit-all.sh "msg"`.
+  That rollback is the one rule-6 exception; no other `reset`
+  invocation is authorized.
 - **"The parent push failed: some submodule commit is missing on
   remote"** — that's `push.recurseSubmodules=check` working as
   designed. Push the submodule (or rerun `push-all.sh` from scratch),

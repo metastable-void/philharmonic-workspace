@@ -242,7 +242,14 @@ Developer: Yuka MORI.
   rejects any commit that didn't come through `commit-all.sh`,
   `.githooks/commit-msg` rejects any message without a matching
   `Signed-off-by:` trailer, and `.githooks/post-commit` rolls
-  back any unsigned commit that slipped through. See
+  back any unsigned commit that slipped through.
+  **Git history is append-only** — no `git commit --amend`, no
+  `git rebase`, no `git reset --hard`, no `git push --force`, no
+  other history rewriting. The only authorized history change is
+  the script-enforced emergency rollback of a just-recorded,
+  not-yet-pushed unsigned commit (`git reset --soft HEAD~1` in
+  `post-commit` / `commit-all.sh`). Mistakes ship as new commits;
+  pushed mistakes get `git revert`ed. See
   docs/design/13-conventions.md §Git workflow.
 - Shell scripts are **POSIX sh** (`#!/bin/sh`), not bash. No
   bashisms; explicit deviations (e.g. `ps -o rss=`) are tracked in

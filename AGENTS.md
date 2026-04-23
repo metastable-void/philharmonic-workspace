@@ -65,7 +65,13 @@ changing git is Claude's job, not yours:
 
 - **Do not run** `git commit`, `git push`, `git add`, `git reset`,
   `git rebase`, `git stash`, `git branch` (with `-D` etc.),
-  `git checkout <branch>`.
+  `git checkout <branch>`, `git commit --amend`, `git push --force`.
+- **Never rewrite history.** This workspace is append-only. No
+  amend, no rebase, no reset (beyond the `post-commit` hook's
+  own emergency rollback), no force-push, no history surgery of
+  any kind — on the parent or any submodule. Mistakes ship as
+  new commits or `git revert`s. If the prompt seems to require
+  history modification, stop and surface it.
 - **Do not touch** `.gitmodules` or submodule pointers. The
   workspace has ~23 submodules with ordering rules encoded in
   `scripts/*.sh`; Claude drives those.

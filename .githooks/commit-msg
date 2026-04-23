@@ -43,9 +43,11 @@ if ! grep -qxF "$expected" "$msg_file"; then
 
       ./scripts/commit-all.sh "your message"
 
-  Raw-git fallback (amend/rebase flows, or when commit-all.sh
-  doesn't cover your case; if you reach for this often, extend
-  the wrapper rather than routing around it):
+  Raw-git fallback (when commit-all.sh genuinely doesn't cover
+  your case — if you reach for this often, extend the wrapper
+  rather than routing around it; this workspace does NOT allow
+  amend/rebase/reset history rewriting, see
+  docs/design/13-conventions.md §Git workflow):
 
       git commit -s ...        # -s auto-adds the trailer
       # or manually put the 'Signed-off-by:' line above, exactly,

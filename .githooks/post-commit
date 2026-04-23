@@ -39,13 +39,15 @@ cat >&2 <<EOF
       # you have unrelated dirty files in the tree, clean them
       # out first (see docs/design/13-conventions.md §Git workflow).
 
-  Raw-git fallback (amend/rebase flows, or when commit-all.sh
-  doesn't cover your case; if you reach for this often, extend
-  the wrapper rather than routing around it):
+  Raw-git fallback (when commit-all.sh genuinely doesn't cover
+  your case — this is a fresh commit, not an amend; this
+  workspace does NOT allow amend/rebase/reset history rewriting,
+  see docs/design/13-conventions.md §Git workflow):
 
       git commit -S -s -F "$saved_msg"
-      # or retry the previous HEAD's content exactly after fixing
-      # your signing config:
+      # or retry the previous HEAD's content after fixing your
+      # signing config (ORIG_HEAD still points at the rolled-back
+      # commit; this creates a NEW commit, not an amend):
       git commit -S -s -c ORIG_HEAD
 
   Rationale: every commit in this workspace carries a DCO sign-off
