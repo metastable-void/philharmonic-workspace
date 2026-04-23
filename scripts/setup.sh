@@ -50,8 +50,16 @@ git config --local push.recurseSubmodules check
 ok "Configuring core.hooksPath=.githooks"
 git config --local core.hooksPath .githooks
 
+ok "Configuring commit.gpgsign=true"
+git config --local commit.gpgsign true
+
+ok "Configuring tag.gpgsign=true"
+git config --local tag.gpgsign true
+
 REPO_ROOT=$(pwd -P)
 export REPO_ROOT
+
+ok "Configuring submodules recursively..."
 
 git submodule foreach --recursive '
 set -eu
@@ -64,6 +72,8 @@ fi
 SUBMODULE_ROOT=$(pwd -P)
 rel=$( relpath "$SUBMODULE_ROOT" "${REPO_ROOT}/.githooks" )
 git config --local core.hooksPath "$rel"
+git config --local commit.gpgsign true
+git config --local tag.gpgsign true
 '
 
 chmod +x ./scripts/*.sh ./.githooks/*
