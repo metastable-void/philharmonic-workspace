@@ -363,20 +363,28 @@ Invoke by path (`./scripts/foo.sh`), not via `bash`.
   `push-all.sh` to verify every commit carries a cryptographic
   signature. Canonical replacement for raw `git log -n 1` across
   repos.
-- `./scripts/git-log.sh [-n <N>|--count <N>]` — pretty-print the
-  parent-repo git log (default last 500 commits) with DCO
-  sign-off and GPG/SSH signature status per commit. Columns:
-  short SHA, date, `%G?` signature, sign-off label
-  (`[signed-off]` / `[unknown sign-off]` / `[NOT signed-off]`),
-  author, subject. The sign-off label matches
+- `./scripts/git-log.sh [-n <N>|--count <N>] [<submodule-path>]` —
+  pretty-print a repo's git log (default last 500 commits) with
+  DCO sign-off and GPG/SSH signature status per commit.
+  Default target is the parent workspace repo; pass a submodule
+  path relative to the workspace root (e.g. `mechanics-core`,
+  `philharmonic-types`) to inspect that submodule's own
+  history. Columns: short SHA, date, `%G?` signature, sign-off
+  label (`[signed-off]` / `[unknown sign-off]` / `[NOT
+  signed-off]`), author, subject. The sign-off label matches
   `Signed-off-by:` trailers against the commit's author email
   (`%ae`), so imported patches and co-author-only sign-offs are
   surfaced distinctly from violations of the DCO rule. Useful
-  for auditing workspace history — e.g. `./scripts/git-log.sh |
-  grep -E '\[(N|NOT signed-off)\]'` to find commits that
-  escaped the signing / DCO invariants. Requires git ≥ 2.32
-  (uses `valueonly=true` and `separator=%x1f` on
-  `%(trailers:key=…)`).
+  for auditing history — e.g. `./scripts/git-log.sh | grep -E
+  '\[(N|NOT signed-off)\]'` finds parent-repo commits that
+  escaped the signing / DCO invariants; loop over submodule
+  names (or run across every submodule via `git submodule
+  foreach 'cd $toplevel && ./scripts/git-log.sh "$name"'`) to
+  audit the whole workspace. Rejects paths that aren't a repo
+  root (subdirectories of the parent and the in-tree `xtask/`
+  member are not submodules — their history is the parent's).
+  Requires git ≥ 2.32 (uses `valueonly=true` and
+  `separator=%x1f` on `%(trailers:key=…)`).
 - `./scripts/rust-lint.sh [<crate>]` — workspace-wide (or
   per-crate) `cargo fmt --check` + `cargo check` + `cargo
   clippy --all-targets -- -D warnings`. Canonical pre-landing

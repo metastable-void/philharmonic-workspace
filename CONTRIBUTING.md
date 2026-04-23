@@ -238,20 +238,26 @@ for history browsing; the prohibition is on state changes.
 - `heads.sh` — short-SHA / `%G?` / subject for parent +
   every submodule in one pass. Canonical replacement for raw
   `git log -n 1` across repos.
-- `git-log.sh [-n <N>|--count <N>]` — pretty-print the
-  parent-repo git log (default last 500 commits) with DCO
-  sign-off and GPG/SSH signature status per commit. Emits
-  columns `<sha> <date> [<%G?>] [<sign-off-label>] <author> |
-  <subject>`; the sign-off label matches `Signed-off-by:`
-  trailers against the commit's author email (`%ae`) so
-  imported patches, co-author-only sign-offs, and genuine DCO
-  violations are distinguishable. Useful for auditing commit
-  history against §4.3's sign-off + signature invariants — e.g.
-  `./scripts/git-log.sh | grep -E '\[(N|NOT signed-off)\]'`
-  lists every commit that escaped them. Parent workspace repo
-  only (the script sources `scripts/lib/workspace-cd.sh`, which
-  cd's to the workspace root before running). Requires git ≥
-  2.32.
+- `git-log.sh [-n <N>|--count <N>] [<submodule-path>]` —
+  pretty-print a repo's git log (default last 500 commits) with
+  DCO sign-off and GPG/SSH signature status per commit. Default
+  target is the parent workspace repo; pass a submodule path
+  relative to the workspace root (e.g. `mechanics-core`,
+  `philharmonic-types`) to inspect that submodule's own
+  history. Emits columns `<sha> <date> [<%G?>]
+  [<sign-off-label>] <author> | <subject>`; the sign-off label
+  matches `Signed-off-by:` trailers against the commit's author
+  email (`%ae`) so imported patches, co-author-only sign-offs,
+  and genuine DCO violations are distinguishable. Useful for
+  auditing commit history against §4.3's sign-off + signature
+  invariants — `./scripts/git-log.sh | grep -E '\[(N|NOT
+  signed-off)\]'` for the parent; loop over submodule names (or
+  `git submodule foreach 'cd $toplevel && ./scripts/git-log.sh
+  "$name"'`) to audit the whole workspace. Rejects paths that
+  aren't a git-repo root, so subdirectories of the parent and
+  the in-tree `xtask/` member (which share the parent's
+  history) don't accidentally masquerade as submodules.
+  Requires git ≥ 2.32.
 - `check-detached.sh` — fails non-zero if any submodule is in
   detached HEAD. Pre-flight for `commit-all.sh`.
 - `show-dirty.sh` — one-per-line list of dirty submodule names.

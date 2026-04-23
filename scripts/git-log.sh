@@ -1,9 +1,15 @@
 #!/bin/sh
 # Pretty-print the workspace git log with DCO sign-off and GPG/SSH
-# signature status per commit. Parent workspace repo only (the
-# script sources scripts/lib/workspace-cd.sh, which cd's to the
-# workspace root before running). Default: last 500 commits;
-# override with `-n <N>` or `--count <N>`.
+# signature status per commit. Default target is the parent
+# workspace repo; pass a submodule path (relative to the workspace
+# root) as a positional argument to inspect that submodule's own
+# history instead. Default count: last 500 commits; override with
+# `-n <N>` or `--count <N>`.
+#
+# The script sources scripts/lib/workspace-cd.sh, which cd's to
+# the workspace root before anything runs, so the submodule path
+# is always resolved relative to that root regardless of where
+# the script was invoked from.
 #
 # Columns:
 #   <short-sha>  <YYYY-MM-DD>  [<%G?>]  [<sign-off-label>]  <author>  |  <subject>
@@ -27,8 +33,13 @@
 #   [NOT signed-off]   — no Signed-off-by: trailer at all; violates
 #                        the DCO rule (CONTRIBUTING.md §4.3).
 #
-# Typical post-filter:
+# Typical post-filter — audit the entire workspace for commits that
+# escaped the sign-off / signature invariants:
+#
 #   ./scripts/git-log.sh | grep -E '\[(N|NOT signed-off)\]'
+#   for sub in philharmonic-types mechanics-core ...; do
+#       ./scripts/git-log.sh "$sub" | grep -E '\[(N|NOT signed-off)\]'
+#   done
 #
 # Requires git >= 2.32 (uses `valueonly=true` and `separator=%x1f`
 # on `%(trailers:key=...)`, added in 2.32). POSIX sh — see
@@ -38,10 +49,15 @@ set -eu
 
 usage() {
     cat <<'EOF'
-Usage: git-log.sh [-n <N> | --count <N>] [-h|--help]
+Usage: git-log.sh [-n <N> | --count <N>] [<submodule-path>] [-h|--help]
 
 Pretty-print workspace git log with DCO sign-off + GPG/SSH
-signature status per commit (parent repo only).
+signature status per commit.
+
+Positional:
+  <submodule-path>     Path to a submodule (relative to the
+                       workspace root) whose history to display.
+                       Omit to target the parent workspace repo.
 
 Columns:
   <short-sha>  <YYYY-MM-DD>  [<%G?>]  [<sign-off-label>]  <author>  |  <subject>
@@ -62,10 +78,17 @@ Options:
   -n <N>, --count <N>  Show the last N commits (default 500). N must be
                        a positive integer.
   -h, --help           Show this help and exit.
+
+Examples:
+  ./scripts/git-log.sh
+  ./scripts/git-log.sh -n 50
+  ./scripts/git-log.sh mechanics-core
+  ./scripts/git-log.sh -n 200 philharmonic-types
 EOF
 }
 
 count=500
+target=""
 
 # Positive-integer validation (no leading zero, no sign, non-empty).
 is_positive_int() {
@@ -100,15 +123,54 @@ while [ $# -gt 0 ]; do
             usage >&2
             exit 2 ;;
         *)
-            printf 'git-log.sh: unexpected argument: %s\n\n' "$1" >&2
-            usage >&2
-            exit 2 ;;
+            if [ -n "$target" ]; then
+                printf 'git-log.sh: unexpected extra argument: %s (already targeting %s)\n\n' "$1" "$target" >&2
+                usage >&2
+                exit 2
+            fi
+            target="$1"
+            shift ;;
     esac
 done
 
+# Remaining positional args after `--` (if any) are unsupported.
+if [ $# -gt 0 ]; then
+    if [ -n "$target" ] || [ $# -gt 1 ]; then
+        printf 'git-log.sh: unexpected extra argument(s) after --: %s\n\n' "$*" >&2
+        usage >&2
+        exit 2
+    fi
+    target="$1"
+fi
+
 . "$(dirname -- "$0")/lib/workspace-cd.sh"
 
-git log -n "$count" --date=short \
+# Validate and resolve the optional submodule path. `git -C` takes
+# the path as-is; we just need to make sure it names a real git-repo
+# root (not a subdirectory of the parent, not a non-git directory,
+# not a missing path).
+if [ -n "$target" ]; then
+    if [ ! -d "$target" ]; then
+        printf 'git-log.sh: directory not found: %s\n' "$target" >&2
+        exit 2
+    fi
+    if ! top=$(git -C "$target" rev-parse --show-toplevel 2>/dev/null); then
+        printf 'git-log.sh: not a git repository: %s\n' "$target" >&2
+        exit 2
+    fi
+    # Reject passing a subdirectory of the parent: if we resolve
+    # inside the parent working tree (not at a submodule root),
+    # `rev-parse --show-toplevel` returns the parent's root, not
+    # the path the user passed. Compare absolute paths.
+    abs_target=$(cd "$target" && pwd -P)
+    if [ "$top" != "$abs_target" ]; then
+        printf 'git-log.sh: %s is not a git-repo root (submodule expected); its rev-parse --show-toplevel resolved to %s\n' \
+            "$target" "$top" >&2
+        exit 2
+    fi
+fi
+
+git -C "${target:-.}" log -n "$count" --date=short \
   --pretty=tformat:'%h%x09%ad%x09%G?%x09%(trailers:key=Signed-off-by,valueonly=true,separator=%x1f)%x09%ae%x09%an <%ae>%x09%s' \
   | awk -F '\t' '
     {
