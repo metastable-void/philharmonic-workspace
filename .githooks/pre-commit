@@ -1,0 +1,26 @@
+#!/bin/sh
+# Ensure this git invocation was launched via scripts/commit-all.sh.
+# The wrapper sets WORKSPACE_GIT_WRAPPER=1 in its environment.
+
+set -eu
+
+if [ "${WORKSPACE_GIT_WRAPPER:-}" = "1" ]; then
+    # Called through the wrapper. Proceed.
+    echo "Good: Git called through the proper wrapper." >&2
+    exit 0
+fi
+
+cat >&2 <<'EOF'
+================================================================
+  Commit blocked: git was not invoked via scripts/commit-all.sh
+
+  This repository requires commits go through the wrapper, which
+  runs pre-flight checks and enforces a signature and a sign-off.
+
+  To bypass this hook for a legitimate reason:
+      git commit --no-verify
+
+  For rationale, see README.md § Development workflow.
+================================================================
+EOF
+exit 1

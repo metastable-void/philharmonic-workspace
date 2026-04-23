@@ -77,6 +77,10 @@ printf '%s\n\n' "$msg" > "$msgfile"
 printf 'Audit-Info: %s\n' "$( "$(dirname "$0")"/print-audit-info.sh $audit_flags )" >> "$msgfile"
 export MSG_FILE="$msgfile"
 
+# Signal that we call Git through a proper wrapper.
+WORKSPACE_GIT_WRAPPER=1
+export WORKSPACE_GIT_WRAPPER
+
 # Commit each submodule's changes (if any), unless --parent-only.
 if [ "$parent_only" -eq 0 ]; then
     git submodule foreach --quiet '

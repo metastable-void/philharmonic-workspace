@@ -47,6 +47,11 @@ git submodule update --init --recursive
 ok "Configuring push.recurseSubmodules=check"
 git config --local push.recurseSubmodules check
 
+ok "Configuring core.hooksPath=.githooks"
+git config --local core.hooksPath .githooks
+
+chmod +x ./scripts/*.sh ./.githooks/*
+
 ok "Submodule status"
 git submodule status --recursive
 
