@@ -232,6 +232,79 @@ fixes implementation nits, not the Gate-1-approved approach.
 
 ## Outcome
 
-Pending — will be updated after the Codex run completes.
-Expected content: the bullet list under "Structured output
-contract" above, verbatim.
+**Codex job:** `task-mob67y42-1fo299`, session
+`019db947-7c2d-7291-a260-348c22747857`. Ran via direct
+`codex-companion.mjs task --background` (see the 2026-04-23
+mishap note for why not through the subagent's bash-background).
+Exit status: `completed`, phase `done`.
+
+### Summary
+Removed dead HKDF PRK scratch usage (`prk_bytes` + `prk` tuple
+binding) and tightened AEAD key handling by explicitly zeroizing
+the stack `aead_key_bytes` buffer immediately after
+`SecretBox::new(Box::new(_))`. Derivation order, HKDF info
+string, and output length are unchanged.
+
+### Touched files
+- `philharmonic-connector-client/src/encrypt.rs` — 3 hunks,
+  approx `+3/-4`.
+- `philharmonic-connector-client/CHANGELOG.md` — `+5` under
+  `[Unreleased] ### Changed`.
+- `philharmonic-connector-service/src/decrypt.rs` — 3 hunks,
+  approx `+3/-4`.
+- `philharmonic-connector-service/CHANGELOG.md` — `+5` under
+  `[Unreleased] ### Changed`.
+
+### Zeroization-fix shape
+Stack `aead_key_bytes: [u8; AEAD_KEY_LEN]` is populated by
+`hkdf.expand`, copied into `SecretBox::new(Box::new(_))`, and
+then explicitly zeroed with `aead_key_bytes.zeroize()` — using
+the `zeroize` crate's volatile-write pattern so the compiler
+cannot elide it. No unzeroized 32-byte AEAD key copy remains on
+the stack after the function returns.
+
+### `prk_bytes` disposition
+Removed. The buffer was write-only (read once from
+`prk.as_ref()`, never read again); HKDF expansion already uses
+the `hkdf` context object, not `prk_bytes`. The tuple binding
+is now `let (_, hkdf) = …`.
+
+### Verification verdicts (all re-run by Claude; see
+`docs/notes-to-humans/2026-04-23-0002-phase-5-wave-b-zeroization-followup-audit.md`)
+- `./scripts/pre-landing.sh` — **PASS** (`=== pre-landing: all
+  checks passed ===`).
+- `./scripts/rust-test.sh philharmonic-connector-client` —
+  `encryption_vectors` 1/1, `signing_vectors` 2/2.
+- `./scripts/rust-test.sh philharmonic-connector-service` —
+  `decryption_vectors` 16/16, `e2e_roundtrip` 1/1,
+  `verify_vectors` 11/11.
+- `grep -rn "\.unwrap()\|\.expect(\|panic!\|unreachable!\|todo!\|unsafe " …` — zero hits in library `src/`.
+- `./scripts/xtask.sh crates-io-versions -- hkdf` — latest
+  non-prerelease is `0.13.0`; pin `"0.13"` resolves to it.
+- `./scripts/cargo-audit.sh` — **not clean**: 2 vulnerabilities
+  (`RUSTSEC-2023-0071` rsa via sqlx-mysql; `RUSTSEC-2026-0104`
+  rustls-webpki via ureq/testcontainers) + 1 unmaintained
+  warning (`RUSTSEC-2024-0436` paste via boa/mechanics). All
+  pre-existing, none on Wave B crypto paths. Flagged as
+  workspace-wide triage item in the audit note, not a Gate-2
+  blocker for this round.
+
+### Residual risks / flagged concerns
+Codex explicitly flagged that this dispatch touches
+crypto-sensitive key-material handling paths (`encrypt.rs` /
+`decrypt.rs` AEAD derivation lifecycle) and asked for Yuka's
+Gate-2 review. The crypto-review-protocol two-gate posture
+stands; nothing else surprising surfaced.
+
+### Git state
+Working tree left dirty and uncommitted as instructed. Only
+`src/encrypt.rs` / `src/decrypt.rs` / `CHANGELOG.md` modified in
+the two submodules; no commits, pushes, branch / tag / revert /
+reset / amend / publish operations performed.
+
+### Claude's audit
+[`docs/notes-to-humans/2026-04-23-0002-phase-5-wave-b-zeroization-followup-audit.md`](../notes-to-humans/2026-04-23-0002-phase-5-wave-b-zeroization-followup-audit.md)
+— independent re-verification of every verdict above, analysis
+of the cargo-audit findings' dependency paths (none on Wave B),
+and the recommendation that Yuka Gate-2 this round on the code
+plus the first-round dispatch together.
