@@ -18,3 +18,5 @@ target/
 .claude/.cache/
 .claude/scheduled_tasks.lock
 
+# .env files
+.env
