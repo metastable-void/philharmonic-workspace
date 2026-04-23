@@ -945,3 +945,10 @@ the FSF's approved list).
 Individual crates carry their own `LICENSE` files under each
 submodule. The workspace repository itself carries copies for
 reference.
+
+---
+
+**Funding note**:
+_The maintainer of this project (Yuka MORI, `metastable-void` on Github)_
+_is paid for the work inside it by a company, which is not Menhera.org:_
+_This is not a Menhera.org project._
