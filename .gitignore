@@ -1,4 +1,12 @@
 target/
+# Separate target dir for `./scripts/xtask.sh` invocations (see
+# the script's header and CONTRIBUTING.md §8). Keeping xtask
+# builds out of the shared `target/` avoids target-lock
+# contention with concurrent `cargo test` / Codex cargo runs,
+# which can freeze workspace tooling (e.g. `commit-all.sh` →
+# `print-audit-info.sh` → `cargo xtask web-fetch`) for the
+# duration of the competing build.
+target-xtask/
 **/*.rs.bk
 .DS_Store
 .vscode/settings.json

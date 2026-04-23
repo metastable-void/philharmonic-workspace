@@ -18,7 +18,18 @@
 # future wrapper-level flags (e.g. a `--release` toggle) can't
 # collide with a bin's own flag of the same name.
 #
-# POSIX sh only — see docs/design/13-conventions.md §Shell scripts.
+# Target dir: every cargo invocation from this wrapper runs under
+# `CARGO_TARGET_DIR=target-xtask` (overridable by exporting
+# `CARGO_TARGET_DIR` before the call). The separate dir keeps
+# xtask builds out of the shared `target/`, so workspace tooling
+# driven through this wrapper — notably `print-audit-info.sh`'s
+# `cargo xtask web-fetch` — does not contend with a concurrent
+# member-crate `cargo test` or Codex cargo build on
+# `target/debug/.cargo-lock`. The cost is one-time dual build
+# (once in each target dir); the benefit is that `commit-all.sh`
+# keeps moving mid-Codex. See `.gitignore` and CONTRIBUTING.md §8.
+#
+# POSIX sh only — see CONTRIBUTING.md §6.
 
 set -eu
 . "$(dirname -- "$0")/lib/workspace-cd.sh"
@@ -94,5 +105,8 @@ if [ ! -f "$bins_dir/$tool.rs" ]; then
     list_bins | sed 's/^/      /' >&2
     exit 1
 fi
+
+CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-target-xtask}"
+export CARGO_TARGET_DIR
 
 exec cargo xtask "$tool" -- "$@"

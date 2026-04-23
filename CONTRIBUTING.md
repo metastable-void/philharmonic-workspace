@@ -874,7 +874,44 @@ the same name. Don't call `cargo run -p xtask --bin <name> --`
 directly at call sites — `xtask.sh` is the single invocation
 surface.
 
-### 8.1 Non-submodule member plumbing
+### 8.1 Separate target dir for xtask builds
+
+`scripts/xtask.sh` exports
+`CARGO_TARGET_DIR=target-xtask` (overridable — the wrapper only
+sets a default via `${CARGO_TARGET_DIR:-target-xtask}`) before
+`exec`ing `cargo xtask`. Every cargo invocation that flows
+through the wrapper compiles into `target-xtask/` instead of the
+shared `target/`. `.gitignore` lists `target-xtask/` alongside
+`target/`.
+
+**Why:** without this split, workspace tooling driven through
+`xtask.sh` contends with concurrent member-crate builds for
+`target/debug/.cargo-lock`. The concrete failure mode seen
+2026-04-23: `commit-all.sh` → `print-audit-info.sh` →
+`./scripts/xtask.sh web-fetch` sat for six minutes waiting for
+a concurrent Codex cargo build to finish compiling the connector
+crates, because both wanted the same target-dir lock.
+Separating the target dirs lets the audit-info flow complete
+regardless of whatever compile is running in `target/`, which
+directly supports the "push early, push often" policy in §4.4.
+
+**Cost:** xtask bins get built twice — once into `target-xtask/`
+by the wrapper, once into `target/` by any workspace-wide
+`cargo test --workspace` (which pulls `xtask` in as a workspace
+member). This is a one-time compile cost per target dir and
+negligible after caching; the avoided stall is minutes. Not
+worth a more elaborate fix (e.g. excluding `xtask` from the
+workspace) just to de-duplicate.
+
+**Caveat:** other scripts that invoke cargo for member crates
+(`rust-lint.sh`, `rust-test.sh`, `pre-landing.sh`, etc.) do
+**not** set `CARGO_TARGET_DIR` — they use `target/` as normal.
+The split is specifically for the xtask wrapper, because that's
+the path workspace orchestration scripts take; member-crate
+compiles are already expected to hold the `target/` lock for
+the duration of the build.
+
+### 8.2 Non-submodule member plumbing
 
 The scripts that walk "workspace members" (`show-dirty.sh`,
 `crate-version.sh --all`) enumerate members from the root
