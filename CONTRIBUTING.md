@@ -1418,13 +1418,69 @@ mysql` is an implementation.
   how the OSI describes licenses on their approved list), not
   as the default neutral term.
 
-### 14.6 Enforcement
+### 14.6 English as the default
+
+Prose authored in this workspace is in **English** — commit
+messages (title + body + trailers), code comments (rustdoc,
+inline, module-level), library-surface error messages and log
+strings, design docs, ROADMAP entries, notes-to-humans,
+codex-prompts, codex-reports, PR descriptions, and review
+comments.
+
+**Multilingual contributors are welcome, and imperfect English
+is not a blocker.** Grammar slips, typos, awkward phrasing,
+non-native-sounding wording — these are fixable in passing (a
+follow-up commit or a PR-comment suggestion is fine), but they
+are **not grounds to reject a commit or PR** when the
+technical intent is clear. Reviewers fix what they can and
+move on. A substantive mis-wording that changes meaning (e.g.
+a comment that documents the opposite of what the code does)
+is a correctness issue, not a grammar one — handle it like any
+other technical review comment.
+
+**Non-English text is explicitly allowed when it is itself
+the artefact**:
+
+- **i18n / localisation work.** Strings in other languages are
+  the thing being tested or shipped. Non-English prose in
+  tests, fixtures, and user-facing localised output is normal.
+- **Unicode handling tests.** Byte-level, CJK, RTL, combining
+  marks, emoji, ZWJ sequences — pick the strings that exercise
+  the path being tested, in whichever script is needed.
+- **Literal external-identifier quotation.** Foreign-language
+  error messages from upstream tools, literal field values from
+  a spec — same principle as "technical accuracy overrides
+  aesthetic neutrality" in §14.2.
+
+**For non-English text whose meaning isn't self-evident, add an
+English gloss alongside** (as a comment, or in the commit-
+message body when the commit is about such fixtures):
+
+```rust
+// "こんにちは世界" — "Hello, world" (CJK fixture for the
+// UTF-8-length regression at https://github.com/...).
+let greeting = "こんにちは世界";
+```
+
+The gloss is the "why this specific string" note future
+maintainers and LLM reviewers need — without it, they can't
+distinguish legitimate test input from a stray literal. When
+the meaning is obvious from surrounding context (e.g. a single
+emoji character in a "it accepts astral-plane codepoints" test),
+a gloss is not required.
+
+### 14.7 Enforcement
 
 Enforcement is by review, not tooling — the workspace has no
 linter for prose conventions. Sweeps happen opportunistically
 when editing an affected file; a dedicated cleanup pass is
 unnecessary unless a pattern is repeated enough to warrant
 campaigning.
+
+The English-as-default rule in §14.6 is enforced with the same
+spirit: reviewers note and fix obvious cases when editing, do
+not reject PRs over it, and flag only when meaning is actually
+unclear.
 
 ---
 

@@ -351,6 +351,16 @@ for the full rule set. Short form:
   external identifiers (HTTP `Authorization`, a DB `MASTER`
   command, an external repo's `master` branch) ship as they
   are.
+- **Prose is in English by default** — code comments,
+  rustdoc, error-message text, the summary you return to
+  Claude (which may feed a commit message). Non-English text is
+  fine when it's the artefact (i18n strings, Unicode-handling
+  test fixtures, literal quotation from external sources) and
+  should carry an English gloss in a nearby comment or in the
+  summary to Claude when the meaning isn't self-evident. See
+  [`CONTRIBUTING.md §14.6`](CONTRIBUTING.md#146-english-as-the-default).
+  Grammar / typo issues in the final summary are not worth
+  flagging as blockers — Claude will polish prose during review.
 
 ## When in doubt
 

@@ -149,6 +149,14 @@ full in `CONTRIBUTING.md`. Read the full section before acting
   accurate, FSF-preferred for free-software framing. Literal
   external identifiers (HTTP `Authorization`, `Win32`,
   `x86_64-pc-windows-msvc`) stay as they ship.
+- **Prose is in English by default** — commit messages, code
+  comments, docs, notes-to-humans, PR/review text. Multilingual
+  contributors' grammar/typo issues are **fixed best-effort in
+  review**, never grounds to reject a contribution. Non-English
+  text is explicitly allowed when it's the artefact (i18n
+  strings, Unicode tests, literal external identifiers); add an
+  English gloss alongside when the meaning isn't self-evident.
+  ([§14.6](CONTRIBUTING.md#146-english-as-the-default))
 
 ## Memory / persistence policy
 
