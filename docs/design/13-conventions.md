@@ -202,8 +202,13 @@ All Git operations on this workspace go through the helper
 scripts in `scripts/`:
 
 - `setup.sh` — one-time (or post-fresh-clone) initialization.
-  Initializes every submodule recursively and warns if the Rust
-  toolchain isn't on PATH. Idempotent; safe to rerun.
+  Initializes every submodule recursively; configures the parent
+  and every submodule with `push.recurseSubmodules=check`,
+  `core.hooksPath` pointing at the repo-tracked `.githooks/`
+  (relative path in submodules, computed with
+  `scripts/lib/relpath.sh`), and `commit.gpgsign=true` /
+  `tag.gpgsign=true`; warns if the Rust toolchain isn't on PATH.
+  Idempotent; safe to rerun.
 - `status.sh` — parent + every submodule's working tree.
 - `pull-all.sh` — update submodules to their tracked branches.
 - `commit-all.sh [--parent-only] [msg]` — commit pending changes
@@ -256,19 +261,48 @@ commit on each repo" pattern.
 The scripts pass both `-s` (DCO signoff, adds `Signed-off-by:`
 trailer to the commit message) and `-S` (GPG or SSH signature,
 attaches a cryptographic signature to the commit object) to
-`git commit`. Additionally, `commit-all.sh` verifies the
-resulting HEAD with `git log --format=%G?` after every commit it
-makes — if the commit somehow lacks a signature, it is rolled
-back with `git reset --soft HEAD~1` and the script aborts.
+`git commit`. `setup.sh` additionally sets `commit.gpgsign=true`
+and `tag.gpgsign=true` on the parent and every submodule, so the
+signing flag is picked up even when somebody reaches around the
+wrapper. `commit-all.sh` verifies the resulting HEAD with
+`git log --format=%G?` after every commit it makes — if the
+commit somehow lacks a signature, it is rolled back with
+`git reset --soft HEAD~1` and the script aborts.
 
-Consequence: if your local Git doesn't have signing configured
-(no GPG key, or `gpg.format=ssh` without a `user.signingkey`),
-`commit-all.sh` will fail before producing an unsigned commit.
-Configure signing once — `git config --global user.signingkey
-<key>`, `git config --global commit.gpgsign true`, and optionally
-`git config --global gpg.format ssh` for SSH signing — and you
-won't have to think about it again. Both checks are hard
-requirements, not preferences.
+Consequence: if your local Git doesn't have a signing key
+configured (no GPG key, or `gpg.format=ssh` without a
+`user.signingkey`), `commit-all.sh` will fail before producing an
+unsigned commit. Configure one once — `git config --global
+user.signingkey <key>`, and optionally `git config --global
+gpg.format ssh` for SSH signing — and `setup.sh` takes care of
+the `commit.gpgsign=true` and `tag.gpgsign=true` side per clone.
+Both checks are hard requirements, not preferences.
+
+**Tracked Git hooks under `.githooks/`** back the wrapper-only
+rule at the Git-client level. `setup.sh` points
+`core.hooksPath` at `.githooks/` on the parent and at the
+relative-from-the-submodule equivalent in every submodule, so the
+same two hooks run everywhere:
+
+- `.githooks/pre-commit` — refuses any commit whose invocation
+  didn't set `WORKSPACE_GIT_WRAPPER=1`. `commit-all.sh` exports
+  that env var; nothing else in the workspace does. The hook
+  message points offenders at the wrapper and documents the
+  `--no-verify` escape hatch for legitimate one-off cases.
+- `.githooks/commit-msg` — refuses any commit whose message
+  doesn't carry `Signed-off-by: <name> <email>` matching the
+  committer identity. Merges, reverts, fixups, and empty messages
+  are exempt. `commit-all.sh` always passes `-s`, so this hook's
+  job is to catch stray raw `git commit -m ...` invocations that
+  bypassed the wrapper but still need to follow the DCO rule.
+
+Together: the pre-commit hook says "go through the wrapper" and
+the commit-msg hook says "carry a sign-off" — both are
+workspace-wide invariants that used to live only in the wrapper
+script. Don't edit these hooks ad hoc; if a new invariant needs
+to be enforced, change the `.githooks/*` file in a normal
+commit-all.sh commit and it lands for every contributor on their
+next `setup.sh` run.
 
 ## Shell scripts
 

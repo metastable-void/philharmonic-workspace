@@ -236,8 +236,13 @@ Developer: Yuka MORI.
   first rather than running ad-hoc git commands. Every commit is
   DCO-signed off (`-s`) and cryptographically signed (`-S`, GPG
   or SSH); `commit-all.sh` enforces both and verifies the
-  signature post-commit. See docs/design/13-conventions.md §Git
-  workflow.
+  signature post-commit. Tracked Git hooks under `.githooks/`
+  (wired up by `setup.sh` via `core.hooksPath` on the parent and
+  every submodule) also enforce these: `.githooks/pre-commit`
+  rejects any commit that didn't come through `commit-all.sh`,
+  and `.githooks/commit-msg` rejects any message without a
+  matching `Signed-off-by:` trailer. See
+  docs/design/13-conventions.md §Git workflow.
 - Shell scripts are **POSIX sh** (`#!/bin/sh`), not bash. No
   bashisms; explicit deviations (e.g. `ps -o rss=`) are tracked in
   docs/design/13-conventions.md §Shell scripts. Validate with
@@ -263,8 +268,11 @@ Developer: Yuka MORI.
   `CODEX_HOME=.codex`). Don't edit AGENTS.md casually — it's the
   contract Codex sees every run.
 - Fresh clone: run `scripts/setup.sh` once — it initializes all
-  submodules recursively and warns if the Rust toolchain is
-  missing.
+  submodules recursively, installs the tracked Git hooks under
+  `.githooks/` (via `core.hooksPath`), configures
+  `commit.gpgsign=true` / `tag.gpgsign=true` on the parent and
+  every submodule, sets `push.recurseSubmodules=check`, and
+  warns if the Rust toolchain is missing. Idempotent.
 - Claude-side procedures live as skills under `.claude/skills/`:
   `git-workflow` (the scripts-only rule above),
   `codex-prompt-archive` (how to hand off to Codex), and

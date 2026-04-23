@@ -196,5 +196,27 @@ Need something the scripts don't do?
 
 If this is a fresh clone and scripts are failing because submodules
 aren't initialized, run `scripts/setup.sh` once — it initializes all
-submodules recursively and warns if the Rust toolchain is missing.
-After that, the helpers above work.
+submodules recursively, sets `push.recurseSubmodules=check`, points
+`core.hooksPath` at the tracked `.githooks/` (relative path inside
+each submodule, computed by `scripts/lib/relpath.sh`), turns on
+`commit.gpgsign` / `tag.gpgsign` on the parent and every submodule,
+and warns if the Rust toolchain is missing. After that, the helpers
+above work.
+
+## Tracked Git hooks
+
+Two hooks under `.githooks/` back the "go through the scripts" rule
+at the Git-client level, once `setup.sh` has wired them in:
+
+- `.githooks/pre-commit` — rejects any `git commit` invocation that
+  didn't set `WORKSPACE_GIT_WRAPPER=1`. Only `commit-all.sh` exports
+  that env var. If you see the "Commit blocked: git was not invoked
+  via scripts/commit-all.sh" message, you ran raw `git commit` —
+  back up, stage nothing manually, run `commit-all.sh` instead.
+- `.githooks/commit-msg` — rejects any message without a matching
+  `Signed-off-by: <name> <email>` trailer. Skips merges, reverts,
+  fixups, and empty messages. `commit-all.sh` always passes `-s`,
+  so this hook catches commits that bypassed the wrapper.
+
+Don't `--no-verify` around these hooks. If you legitimately need a
+flow the wrappers don't support, extend the wrapper.

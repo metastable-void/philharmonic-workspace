@@ -192,13 +192,42 @@ cd philharmonic-workspace
 ```
 
 `setup.sh` initializes all submodules recursively and configures
-`push.recurseSubmodules=check` on the local Git config (required
-for `push-all.sh`'s safety rail). It's idempotent — re-run any
-time.
+local Git state in the parent repo and every submodule:
+
+- `push.recurseSubmodules=check` — required for `push-all.sh`'s
+  safety rail.
+- `core.hooksPath` — points at the repo-tracked `.githooks/`
+  directory (absolute on the parent, relative on each submodule,
+  computed via `scripts/lib/relpath.sh`). Installs the `pre-commit`
+  and `commit-msg` hooks workspace-wide from a single source.
+- `commit.gpgsign=true` and `tag.gpgsign=true` — on the parent and
+  recursively on every submodule.
+
+It's idempotent — re-run any time.
 
 If you already cloned without `--recurse-submodules`, just run
 `./scripts/setup.sh` from the workspace root; it handles the
 `git submodule update --init --recursive` step for you.
+
+### Tracked Git hooks
+
+The repo ships two hooks under `.githooks/` that `setup.sh` wires
+up via `core.hooksPath`:
+
+- `.githooks/pre-commit` — refuses any commit that wasn't invoked
+  through `./scripts/commit-all.sh` (the wrapper sets
+  `WORKSPACE_GIT_WRAPPER=1` in its environment). Bypass with
+  `git commit --no-verify` if you have a legitimate reason, but
+  the default path is the wrapper.
+- `.githooks/commit-msg` — refuses any commit whose message doesn't
+  carry a `Signed-off-by:` trailer matching the committer identity.
+  `commit-all.sh` always passes `-s`, so in practice this hook
+  catches stray raw `git commit -m ...` invocations that bypassed
+  the wrapper some other way.
+
+These hooks enforce the invariants the wrapper scripts used to
+enforce unilaterally, now applied even when somebody reaches around
+the wrapper (by mistake or for an ad-hoc rebase).
 
 ## Development workflow
 
@@ -251,8 +280,10 @@ Invoke by path (`./scripts/foo.sh`), not via `bash`.
 
 - `./scripts/setup.sh` — one-time (or post-fresh-clone).
   Initializes every submodule recursively; sets
-  `push.recurseSubmodules=check`; warns if Rust isn't on PATH.
-  Idempotent.
+  `push.recurseSubmodules=check`, `core.hooksPath=.githooks`
+  (relative in submodules), `commit.gpgsign=true`, and
+  `tag.gpgsign=true` on the parent and every submodule; warns
+  if Rust isn't on PATH. Idempotent.
 - `./scripts/status.sh` — working-tree status of the parent and
   every submodule (clean submodules are hidden). Run at the
   start of a session.

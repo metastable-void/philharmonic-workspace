@@ -7,6 +7,24 @@ writing or auditing `/bin/sh` scripts.
 Everything listed here is **non-portable** and should either be avoided, or
 handled as a marked exception (see the bottom of this file).
 
+**Two categories to keep separate:**
+
+1. *Standardization status* — whether a construct is in POSIX.1-2024
+   at all. Issue 8 picked up a number of historically-GNU or
+   historically-BSD features (e.g. `find -iname`, `xargs -r`,
+   `xargs -0`, `find -print0`, `tail -r`, `timeout`, `head -c`,
+   `tail -c`, `sed -E`, `date +%s`, `uuencode`/`uudecode`,
+   `realpath`, `readlink` basic form, `read -d`); this file flags
+   each one with an "as of POSIX.1-2024" note so you can tell
+   them apart from still-non-POSIX extensions.
+2. *Implementation family* — GNU vs. BSD vs. Solaris behavioral
+   splits, which can apply to utilities that *are* in POSIX (e.g.
+   `date -r` has incompatible GNU/BSD semantics; neither is POSIX).
+   Flags with GNU/BSD/Solaris drift are called out separately.
+
+A construct being in POSIX.1-2024 doesn't mean your target shell
+supports it — check your deployment floor.
+
 ---
 
 ## Shebang
@@ -90,7 +108,10 @@ Use `#!/bin/sh` exclusively.
 - [ ] `read -s` — silent (password). Use `stty -echo; read; stty echo`.
 - [ ] `read -t timeout` — bash timeout. Not portable.
 - [ ] `read -a array` — arrays. Not POSIX.
-- [ ] `read -d delim` — custom delimiter (bash). Not POSIX.
+- [ ] `read -d delim` — custom delimiter. Until recently non-POSIX;
+      `-d delim` with a single-byte `delim` (or an empty string, meaning
+      NUL) is standardized in POSIX.1-2024. Other `delim` values remain
+      unspecified. Safe to use in POSIX.1-2024-only code.
 - [ ] `read` without `-r` — backslash interpretation is surprising; always use `-r`.
 - [ ] `declare`, `typeset` — not POSIX (typeset is ksh).
 - [ ] `trap ... ERR`, `trap ... DEBUG`, `trap ... RETURN` — bash-only signals.
@@ -125,7 +146,8 @@ All listed file-test primaries in `[ ]` *are* POSIX (`-e`, `-f`, `-d`, `-h`,
 - [ ] `-delete` — GNU. Use `-exec rm {} +`.
 - [ ] `-printf fmt` — GNU. Use `-exec` with a format command.
 - [ ] `-regex`, `-iregex` — GNU. Use globs + `grep`.
-- [ ] `-iname` — GNU (BSD has it too). Not POSIX.
+- [ ] `-iname` — BSD/GNU; standardized in POSIX.1-2024 (Issue 8,
+      Austin Group Defect 1031). Safe in POSIX.1-2024-only code.
 - [ ] `-readable`, `-writable`, `-executable` — GNU. Use `-perm`.
 - [ ] `-empty` — GNU. Use `-size 0`.
 - [ ] `-not` — GNU synonym for `!`. Use `!`.
@@ -138,7 +160,10 @@ All listed file-test primaries in `[ ]` *are* POSIX (`-e`, `-f`, `-d`, `-h`,
 - [ ] `-I` — ignore binary (GNU). No POSIX equivalent.
 - [ ] `--color` — coloring flag is universal but not POSIX.
 
-Note: `grep -o` is POSIX as of 2024.
+Note: `grep -o` is **not** in POSIX.1-2024. POSIX Issue 8 `grep`
+exposes only `-E -F -c -e -f -i -l -n -q -s -v -x` as options; `-o`
+remains a GNU/BSD extension. Use `sed`/`awk` to emit only matched
+fragments in portable code.
 
 ### `sed`
 
@@ -167,9 +192,11 @@ POSIX awk has: `split`, `sub`, `gsub`, `match`, `index`, `length`, `substr`,
 
 - [ ] `-P N` — parallel (GNU/BSD). No POSIX alternative; use a loop with `&`.
 - [ ] `-d delim` — custom delimiter (GNU). Use `tr` to preprocess.
-- [ ] `-r` / `--no-run-if-empty` — GNU. Filter empty input explicitly.
+- [ ] `--no-run-if-empty` — the long-form spelling is GNU. The short
+      form `-r` is standardized in POSIX.1-2024; prefer `-r`.
 
-Note: `xargs -0` and `find -print0` are POSIX as of 2024.
+Note: `xargs -r`, `xargs -0`, and `find -print0` are all standardized
+in POSIX.1-2024 (Issue 8).
 
 ### File manipulation
 
@@ -203,7 +230,8 @@ Note: `xargs -0` and `find -print0` are POSIX as of 2024.
 ### Text processing
 
 - [ ] `seq` — not POSIX. Use `while`/`until` with arithmetic, or `awk 'BEGIN{for(...)}'`.
-- [ ] `tac` — GNU reverse-cat. Use `tail -r` (BSD), `awk`, or `sed '1!G;h;$!d'`.
+- [ ] `tac` — GNU reverse-cat. Use `tail -r` (standardized in
+      POSIX.1-2024; historically BSD), `awk`, or `sed '1!G;h;$!d'`.
 - [ ] `rev` — reverse each line (util-linux). Use `awk`.
 - [ ] `shuf` — GNU random shuffle. Use `awk` with `rand()`.
 - [ ] `sort -R` / `--random-sort` — GNU.
@@ -222,7 +250,10 @@ Note: `xargs -0` and `find -print0` are POSIX as of 2024.
 - [ ] `md5sum`, `sha1sum`, `sha256sum` — GNU coreutils.
       BSD uses `md5`, `sha1`, `sha256` with different output format.
       POSIX has only `cksum` (CRC, not cryptographic).
-- [ ] `uuencode`, `uudecode` — were removed from POSIX in 2001 but often present.
+- [ ] `uuencode`, `uudecode` — were dropped from POSIX.1-2001 and the
+      2008 edition; re-introduced in POSIX.1-2024 (Issue 8), so they
+      are standardized again. Safe in POSIX.1-2024-only code. Treat
+      as non-POSIX if you need to build on older systems.
 
 ### System / environment
 
@@ -233,7 +264,9 @@ Note: `xargs -0` and `find -print0` are POSIX as of 2024.
 - [ ] `mktemp` without template — behavior varies. Always pass a template.
 - [ ] `mktemp -t` — semantics differ between GNU and BSD.
 - [ ] `flock` — util-linux, not POSIX. Use `mkdir` as a lock primitive.
-- [ ] `timeout` — GNU/coreutils. Not POSIX. Use `alarm`-style trap with `&`.
+- [ ] `timeout` — historically GNU/coreutils; standardized in
+      POSIX.1-2024 (Issue 8). Safe in POSIX.1-2024-only code. On
+      older systems, fall back to an `alarm`-style trap with `&`.
 - [ ] `yes` — common but not POSIX.
 - [ ] `watch` — not POSIX.
 - [ ] `script` — not POSIX.
@@ -259,7 +292,12 @@ Note: `xargs -0` and `find -print0` are POSIX as of 2024.
 ### Date / time
 
 - [ ] `date -d "string"` — GNU date string parsing. BSD uses `date -j -f fmt`.
-- [ ] `date -r N` (epoch to date) — GNU form; BSD has different semantics.
+- [ ] `date -r` — `-r N` (epoch seconds → formatted date) is the
+      **BSD** form; GNU `date -r FILE` / `--reference=FILE` prints the
+      *mtime of FILE* instead. Neither semantics is POSIX. Portable
+      code should compute the date another way (e.g. `awk`'s
+      `strftime()` under gawk; for POSIX-only, there is no portable
+      option).
 - [ ] `date +%N` — nanoseconds, GNU only.
 - [ ] `date --iso-8601` — GNU. Use `date +%Y-%m-%dT%H:%M:%S%z` explicitly.
 
@@ -311,12 +349,18 @@ Just to set the record straight — these are fine:
 - `read -r`.
 - `while ... do ... done < file`.
 - `case` / `esac`.
-- `select` / `in` — surprising but specified.
+- (`select` / `in`: **not** a required POSIX construct. POSIX.1-2024
+  §2.4 lists `select` among the reserved words that *may* be
+  recognized by an implementation, with unspecified results. Don't
+  rely on it in portable code — use a `case` / loop-and-`read`
+  prompt instead.)
 - Here-documents `<<EOF` and `<<-EOF`.
 - `pwd -L`, `pwd -P`.
 - `test`, `[ ]`, all file-test primaries listed above.
 - `find ... -print0` and `xargs -0` — as of POSIX.1-2024.
-- `head -c`, `tail -c`, `sed -E`, `grep -o` — as of POSIX.1-2024.
+- `head -c`, `tail -c`, `tail -r`, `sed -E`, `find -iname` — as of
+  POSIX.1-2024. (Note: `grep -o` is **not** POSIX; see the `grep`
+  section above.)
 - `date +%s` — as of POSIX.1-2024.
 - `realpath`, `readlink` — basic forms, as of POSIX.1-2024.
 
