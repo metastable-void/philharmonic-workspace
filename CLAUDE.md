@@ -100,6 +100,21 @@ full in `CONTRIBUTING.md`. Read the full section before acting
   host's timezone and your training-data cutoff are both
   unreliable; this bin's output is authoritative for
   deadline reasoning on this project.
+- **Work rhythm: never refuse on time, but note out-of-hours
+  sessions as commentary.** Regular hours are 10:00–19:00 JST
+  Mon–Fri; extended is fine up to 21:00; nights, weekends
+  (土/日), and 祝日 are **allowed** (Yuka compensates herself
+  separately for off-hours work) but **availability is not
+  assumed** — don't queue work that needs a human hand-off at
+  23:00 on a Sunday. If the current JST time from
+  `calendar-jp` is outside regular hours, add a one-sentence
+  note in your reply so the session transcript carries the
+  context (*"(JST now 21:47 木 — outside regular hours;
+  proceeding.)"*). The note is a log artefact, not a
+  permission request — **never** stall or wait-for-morning
+  because of the clock.
+  ([CONTRIBUTING.md §8 → "Work rhythm and out-of-hours
+  commentary"](CONTRIBUTING.md#work-rhythm-and-out-of-hours-commentary))
 - **All Git state changes go through `scripts/*.sh`** —
   `status.sh`, `pull-all.sh`, `commit-all.sh`, `push-all.sh`,
   `heads.sh`. Never raw `git commit` / `git push` / `git add`

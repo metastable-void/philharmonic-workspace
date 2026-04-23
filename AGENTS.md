@@ -101,6 +101,15 @@ than proceeding.
   mentions any other date-relative commitment. The host's
   timezone and your training-data cutoff are both unreliable
   for this; the bin's output is authoritative.
+- **Never refuse on time grounds.** Regular hours are
+  10:00–19:00 JST Mon–Fri; extended to 21:00 is normal;
+  nights, weekends (土/日), and 祝日 are **allowed**. Do not
+  stall, defer, or ask "should I wait until Monday" — just
+  do the work. If the current JST time from `calendar-jp` is
+  outside regular hours, add one short note in your final
+  message so the transcript shows the context
+  (*"(JST now 20:14 土 — out-of-hours session; proceeding.)"*).
+  The note is a log artefact, not a permission request.
 
 ## Git (what you must not do)
 

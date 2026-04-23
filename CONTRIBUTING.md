@@ -876,6 +876,54 @@ commitment** ("by Thursday", "before the Golden Week freeze",
 (both have a dedicated bullet near the top of the executive
 summary / role block).
 
+#### Work rhythm and out-of-hours commentary
+
+The JST grid is descriptive — it tells you *when* now is and
+which days are non-working by default — but it is **not a
+refusal condition**. Agents must not decline or defer work on
+the grounds that "today is Saturday / a 祝日 / after hours."
+Two orthogonal facts govern the right behaviour:
+
+- **Regular working hours: 10:00–19:00 JST, Mon–Fri.**
+  Extended hours are normal up to **21:00 JST** (Yuka
+  generally goes home by then). These are the hours Yuka's
+  interactive availability is highest and turn-around is
+  fastest.
+- **Working outside those hours — weekends, 祝日, late
+  nights — is not forbidden.** Yuka compensates herself
+  separately for off-hours work, so a session on a Saturday
+  evening or a 憲法記念日 morning is a valid working session.
+  But agents must **not assume availability** there: plan
+  work so that `commit-all.sh` + `push-all.sh` can happen
+  without requiring Yuka to approve something interactively
+  at 23:00 on a Sunday. In-flight Codex dispatches and
+  long-running tests are fine; anything that needs a human
+  hand-off should target regular hours.
+
+**The practical rule for every agent session**:
+
+1. *Never* refuse a task, stall, or wait-for-morning based on
+   the clock or the weekday. Proceed with the work as
+   requested.
+2. *If* the current JST time (from `calendar-jp`) is outside
+   regular hours — i.e. weekday 19:00–21:00 "extended",
+   weekday before 10:00 or after 21:00, Saturday, Sunday, or
+   a Japanese 祝日 — **note it briefly in your response as
+   commentary**. One sentence is enough: *"(JST now 21:47 on
+   木 2026-04-23 — outside the regular 10:00–19:00 / extended
+   21:00 window; proceeding anyway.)"* or *"(Today is
+   みどりの日, a 祝日; proceeding.)"*
+3. The commentary is a log artefact, not a permission
+   request. Do not wait for an answer before continuing — the
+   purpose is for Yuka (and anyone reading the session
+   transcript later) to know the context, not to gate the
+   work.
+
+Agent-facing mirrors of this rule are in
+[`CLAUDE.md`](CLAUDE.md) and
+[`AGENTS.md`](AGENTS.md)
+alongside the calendar-jp bullets.
+
 New bins go under `xtask/src/bin/<name>.rs` (one tool per file),
 are invoked via `./scripts/xtask.sh <name> -- <args>`, and
 should be added to the decision table above when they replace
