@@ -16,6 +16,12 @@ rustflags = [
     "-C", "link-arg=-Wl,-z,noexecstack",
 ]
 
+[source.crates-io]
+replace-with = "menhera-cooldown"
+
+[source.menhera-cooldown]
+registry = "sparse+https://index.crates.menhera.org/7d/"
+
 [registries.crates-io]
 protocol = "sparse"
 
