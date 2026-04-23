@@ -461,7 +461,68 @@ is cross-checking "which machine produced this" against a
 local-state map. It's not a substitute for the DCO or the
 signature.
 
-### 4.7 Other git rules
+### 4.7 GitHub-side ruleset (parent workspace repo only)
+
+The local hooks described in §4.5 are defence-in-depth, but they
+run on the contributor's machine and can be bypassed
+(`--no-verify`, deleted hooks, a reach-around commit from a stale
+clone). A server-side backstop closes that gap for anything that
+actually reaches GitHub. Applies to the parent
+[`metastable-void/philharmonic-workspace`](https://github.com/metastable-void/philharmonic-workspace)
+repository only — submodule repositories do not currently carry
+matching rulesets.
+
+**Ruleset: `Safety rules`**, target **branch**, scope **`~ALL`**
+(every branch, not just `main`), enforcement **active**,
+**no bypass actors** (including repo admins — `current_user_can_bypass: "never"`).
+Three GitHub-native rules are on:
+
+- **`required_signatures`** — every commit pushed to the repo
+  must carry a valid GPG/SSH signature GitHub can verify. This
+  is the server-side mirror of §4.3 + `.githooks/pre-push`; it
+  catches anything the local layer missed. Imports (cherry-pick,
+  merge) that carry an unsigned commit are rejected at push
+  time.
+- **`non_fast_forward`** — prevents force-pushes and any push
+  that would rewrite history on the receiving branch. Server-side
+  mirror of §4.4. The append-only invariant is enforced at the
+  ref-update layer — not just by the client's voluntary discipline.
+- **`deletion`** — branches (including feature branches) cannot
+  be deleted through the API or UI. Prevents accidental (or
+  deliberate) removal of commit reachability.
+
+**Intentionally not enforced server-side:**
+
+- **DCO / `Signed-off-by:` trailer.** GitHub's native ruleset
+  grammar has no DCO rule type. A GitHub Actions DCO check exists
+  but is not installed — the workspace relies on `commit-msg` +
+  `pre-push` for sign-off enforcement, and the trailer is verified
+  post-landing via `scripts/git-log.sh`'s `[signed-off]` /
+  `[NOT signed-off]` labelling (see §4.5 and the script's header).
+  If sign-off enforcement ever needs a server-side backstop, it
+  will be a workflow / app addition, not a ruleset rule.
+
+**Submodule repos: not covered, on purpose for now.** Matching
+rulesets on every submodule repo is manual one-off work and a
+maintenance cost per new submodule. The expected defence for
+submodules today is the local hook layer (§4.5) — every
+submodule inherits `core.hooksPath` via `setup.sh`, so
+`pre-push` runs for submodule pushes too. Extending the
+server-side ruleset to submodules is a deliberate follow-up when
+the submodule list stabilises; adding it now would need a
+rollout strategy each time a new submodule is added.
+
+**Changing the ruleset.** Modifications go through
+`gh api --method PUT repos/metastable-void/philharmonic-workspace/rulesets/<id>`
+(or the GitHub web UI) and are audited on the GitHub side. Mention
+the change in the same commit that touches this section so the
+in-repo documentation stays aligned with what's actually
+configured. There is no CI check that cross-validates the two
+today; drift is caught by reviewing this section against
+`gh api repos/metastable-void/philharmonic-workspace/rulesets/<id>`
+output when anything changes.
+
+### 4.8 Other git rules
 
 - **Don't invoke `git log -n 1`** to list HEAD state across the
   workspace — use `./scripts/heads.sh`. Raw `git log` remains

@@ -260,6 +260,23 @@ These hooks enforce the invariants the wrapper scripts used to
 enforce unilaterally, now applied even when somebody reaches around
 the wrapper (by mistake or for an ad-hoc rebase).
 
+**Server-side backstop (parent repo only):** GitHub carries a
+`Safety rules` repository ruleset on
+[`metastable-void/philharmonic-workspace`](https://github.com/metastable-void/philharmonic-workspace)
+covering every branch (`~ALL`, active, no bypass actors) with three
+GitHub-native rules turned on: `required_signatures` (rejects any
+commit without a valid GPG/SSH signature), `non_fast_forward`
+(rejects force-push / history rewrite — server-side mirror of the
+append-only rule), and `deletion` (branches cannot be removed).
+DCO sign-off is intentionally **not** part of the server-side
+ruleset — GitHub's native ruleset grammar has no DCO rule type;
+sign-offs remain a local-hook + `scripts/git-log.sh` review
+concern. Submodule repositories do not carry matching rulesets
+today; the local hook layer is the defence line there. See
+[`CONTRIBUTING.md §4.7`](CONTRIBUTING.md#47-github-side-ruleset-parent-workspace-repo-only)
+for the full breakdown and the command to inspect the current
+ruleset.
+
 ## Development workflow
 
 Open the repository root in your editor. `rust-analyzer` and other
