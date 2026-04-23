@@ -13,7 +13,18 @@ Developer: Yuka MORI.
   for workspace conventions.** Git workflow, script wrappers, POSIX
   shell rules, Rust code rules, versioning, licensing, terminology,
   journal formats, everything. When a rule seems to apply, read the
-  relevant §here rather than restating.
+  relevant §here rather than restating. **When you change a
+  convention in practice (new rule, changed rule, retired rule,
+  or an ad-hoc rule that deserves to be authoritative), update
+  `CONTRIBUTING.md` in the same commit** — see its §18.2.
+- [`README.md`](README.md) — **whole-project executive summary.**
+  Self-contained, concise, up-to-date. Will be fed to LLM
+  sub-agents as the project's one-page mental model; structurally
+  stale claims there are bugs. **When you change anything
+  structurally visible (add/rename a crate, reshape the dep
+  graph, complete a phase, reorganise `scripts/`), update
+  `README.md` in the same commit** — see
+  [`CONTRIBUTING.md §18.1`](CONTRIBUTING.md#181-readmemd--whole-project-executive-summary).
 - [`ROADMAP.md`](ROADMAP.md) — linear plan: what's next, what's
   blocked on what.
 - [`docs/design/`](docs/design/) — architectural design docs (what

@@ -11,6 +11,19 @@ conventions. When a convention is disputed or unclear, the rule
 here wins; every other doc (per-repo `README.md`, `CLAUDE.md`,
 `AGENTS.md`, design docs) links back here rather than restating.
 
+**Two standing rules that shape how this repo is documented**
+(spelled out in full in §18):
+
+1. **[`README.md`](README.md) is the whole-project executive
+   summary.** Self-contained, concise, up-to-date. It will be
+   fed to coding sub-agents as the project's one-page mental
+   model; broken or stale claims there are bugs.
+2. **This file is the authoritative home for every convention.**
+   When you change a convention in practice — add a new rule,
+   change an existing one, retire an old one, or discover an
+   unwritten rule that should be authoritative — **update
+   `CONTRIBUTING.md` in the same commit**. See §18.2.
+
 Related authoritative docs that stay as their own homes:
 - [`ROADMAP.md`](ROADMAP.md) — linear plan (what to work on next).
 - [`docs/design/`](docs/design/) — architectural design docs
@@ -37,6 +50,7 @@ Quick navigation (major sections):
 - [15. Journal-like files](#15-journal-like-files)
 - [16. ROADMAP maintenance](#16-roadmap-maintenance)
 - [17. Conventions-about-conventions](#17-conventions-about-conventions)
+- [18. Documentation obligations](#18-documentation-obligations)
 
 ---
 
@@ -457,6 +471,7 @@ The inventory:
 | `./scripts/cargo-audit.sh [...]` | `cargo audit` | Auto-installs `cargo-audit` on first run. |
 | `./scripts/check-api-breakage.sh <crate> [<baseline>]` | `cargo semver-checks check-release -p <crate> --baseline-version <ver>` | Per-crate; crates.io baseline (default: newest published). See §12.3. |
 | `./scripts/publish-crate.sh [--dry-run] <crate>` | `cargo publish -p <crate>` + signed release tag | Enforces clean tree, branch-HEAD, no-existing-tag invariants. Tag created only on publish success. |
+| `./scripts/verify-tag.sh <crate> [<tag>]` | Three-way check that a release tag is locally present, signed, and on origin at the same commit | Run after `publish-crate.sh` + `push-all.sh`. See §12.4. |
 | `./scripts/crate-version.sh <crate> \| --all` | Parses `version = "..."` from `<crate>/Cargo.toml` | Single-crate for programmatic use; `--all` prints every workspace member's version. |
 | `./scripts/xtask.sh crates-io-versions -- <crate>` | crates.io sparse-index query | Lists non-yanked published versions. Rust bin in `xtask/`. |
 | `./scripts/xtask.sh <tool> -- <args>` | wrapper for in-tree Rust bins | Canonical invocation for any `xtask/` bin; mandatory `--` separates wrapper-level flags from bin args. |
@@ -723,8 +738,15 @@ xtask/
     └── bin/
         ├── gen-uuid.rs           # one tool per file
         ├── crates-io-versions.rs # crates.io sparse-index query
-        └── web-fetch.rs          # in-process HTTP GET (ureq + rustls)
+        ├── web-fetch.rs          # in-process HTTP GET (ureq + rustls)
+        └── codex-fmt.rs          # render Codex rollout JSONL timeline;
+                                  # consumed by scripts/codex-logs.sh
 ```
+
+New bins go under `xtask/src/bin/<name>.rs` (one tool per file),
+are invoked via `./scripts/xtask.sh <name> -- <args>`, and
+should be added to the decision table above when they replace
+any non-baseline tool.
 
 Each bin is invoked via the `xtask.sh` wrapper:
 
@@ -1581,7 +1603,8 @@ Conventions aren't immutable. Signs one should be revisited:
 - **Ecosystem drift**: broader Rust conventions change.
 
 Convention changes are workspace events: announced, applied in
-coordinated releases, documented here.
+coordinated releases, documented here. See §18.2 for the
+same-commit update obligation when a convention changes.
 
 ### 17.2 Workspace inspirations
 
@@ -1631,3 +1654,160 @@ to invoke the relevant skill when its trigger fires.
 Those files should carry executive summaries + pointers, not
 restate the rules. This file is the authoritative home; the
 others are contextualised orientations.
+
+---
+
+## 18. Documentation obligations
+
+This workspace's docs are partitioned deliberately, and each
+home has a contract. When you add, change, or discover
+something, update the right home — don't duplicate a rule into
+another doc, don't invent a new top-level doc for something
+that fits an existing home, and don't let the authoritative
+copy go stale.
+
+### 18.1 `README.md` — whole-project executive summary
+
+[`README.md`](README.md) at the repo root is the **whole-project
+executive summary**. It must be:
+
+- **Up-to-date.** Structural claims (crates, dependency graph,
+  phase status, key entry points, how the scripts are
+  organised) must match the current state of the tree. Stale
+  structural claims are bugs, not "things we'll fix later."
+- **Self-contained** for orienting a new reader who hasn't seen
+  the project before, without needing to chase links. Anything
+  a reader needs to form a correct mental model of the project
+  *as a whole* belongs here in concise form.
+- **Concise.** It's an executive summary, not a tutorial.
+  Depth lives in `CONTRIBUTING.md`, `docs/design/`, and
+  per-crate READMEs. README.md points at those — it does not
+  re-explain them.
+- **LLM-ingest-ready.** `README.md` will be fed to coding
+  sub-agents as the project's executive summary, so it must be
+  comprehensible in isolation. Broken cross-references, stale
+  phase status, missing context, and "see also" handwaving
+  that leaves a critical fact only reachable two hops away are
+  all bugs — an agent reading only `README.md` should come
+  away with the right mental model for the whole project.
+
+**When to update `README.md`:** any commit that changes
+something structurally visible to a reader — adding or
+retiring a crate, renaming a submodule, changing the
+dependency graph, completing a roadmap phase, reorganising
+`scripts/` — touches `README.md` in the same commit. Same
+discipline as [ROADMAP maintenance](#16-roadmap-maintenance).
+
+### 18.2 `CONTRIBUTING.md` — authoritative conventions
+
+This file is the **single authoritative home for every
+workspace convention.** Every rule about how to develop in this
+workspace lives here: git workflow, script wrappers, POSIX
+shell rules, Rust code rules, versioning, licensing,
+terminology, journal formats, documentation obligations (this
+section), conventions-about-conventions.
+
+**Rule: when you change a convention in practice, update this
+file in the same commit.** "Change a convention in practice"
+covers:
+
+- Adding a new rule (a new wrapper script, a new hook, a new
+  required ceremony, a new prohibited tool).
+- Changing an existing rule (renamed wrapper, tightened or
+  relaxed requirement, new exception to an existing rule).
+- Retiring an old rule (removing an obsolete wrapper, dropping
+  a support target, deleting a directory).
+- Discovering a rule that was ad-hoc and *should* be
+  authoritative — if several contributors (human or agent) have
+  been following an unwritten rule, it belongs here.
+
+The update lands **in the same commit** as the practical
+change, not as a follow-up. A stale authoritative-conventions
+doc is worse than none: contributors (and agents) will
+reasonably assume what's here is current, and when it isn't,
+the failure mode is silent drift.
+
+**Agents specifically.** Workspace conventions belong in this
+file, not in per-agent-install memory or per-install state.
+Memory is per-machine and per-install; the repo follows the
+project across clones, contributors, and fresh hosts. If you're
+an agent (Claude Code / Codex) and you notice a rule that
+applies to *this project* — naming, versioning, tooling
+choices, ceremony around a particular area, anything a future
+contributor would need to honour — its durable home is this
+file. Don't commit it only to your own memory store. See §17.4
+for how `CLAUDE.md` / `AGENTS.md` relate to this file (short
+executive summaries + pointers, not restatements).
+
+**When in doubt where a rule goes.** Convention rules belong
+here. Architectural rules ("Philharmonic encrypts config at
+rest with AES-256-GCM") belong in `docs/design/`. Plans belong
+in `ROADMAP.md`. Per-crate usage belongs in that crate's
+`README.md`. If a rule spans boundaries, pick the authoritative
+home and cross-reference from the others.
+
+### 18.3 Per-submodule / per-crate READMEs
+
+Each submodule's `README.md` is **self-contained for that
+crate** — not for the whole project. A reader arriving at the
+submodule directly from crates.io should be able to understand
+what the crate is, how to use it, and where to find more
+context, without first needing to read the workspace's
+`README.md`.
+
+Include:
+
+- What the crate does — one or two paragraphs of scope.
+- Minimum-viable usage, or a Quick Start code block, for
+  libraries with a non-trivial API surface.
+- Which workspace-member crates it depends on or is depended
+  on by (at the abstraction level relevant to this crate).
+- A link to the workspace meta-repo
+  (`metastable-void/philharmonic-workspace`) and its
+  `CONTRIBUTING.md` — the `## Contributing` block every
+  submodule README carries.
+- License block.
+
+Don't duplicate whole-project context (full phase status, the
+workflow engine's design, etc.) into a submodule README. Link
+into `docs/design/` from the workspace if depth is needed.
+
+`xtask/` has its own README following the same rule — it's a
+member crate (non-submodule), and its README documents what
+`xtask` is *as an in-tree tool crate*, not the whole project.
+
+### 18.4 Design docs (`docs/design/`)
+
+[`docs/design/`](docs/design/) documents **what Philharmonic
+is** — architectural decisions, layer boundaries, threat model,
+crypto design. Not *how* to contribute (that's this file); not
+the current state of the world (that's `ROADMAP.md`); not
+release-ready usage (that's per-crate READMEs).
+
+Design docs evolve when an architectural decision changes. If
+implementation reveals the design was wrong, update the design
+doc in the same commit as the code that changes it (same
+discipline as §16).
+
+### 18.5 Journal archives (`docs/codex-prompts/`, `docs/codex-reports/`, `docs/notes-to-humans/`)
+
+These are **append-only** — format detail in §15. Historical
+entries are left as-is even when their references go stale;
+they're a record of what was true at the time of writing, not
+live pointers.
+
+### 18.6 Don't invent new top-level docs
+
+If information doesn't fit one of the homes above, the right
+answer is almost always to extend an existing home, not to add
+`NOTES.md` / `TODO.md` / `STATUS.md` / etc. A new top-level
+doc requires justification and must be added to this §18 list
+at the same time so its role is part of the authoritative
+map. `HUMANS.md` and `POSIX_CHECKLIST.md` are the two existing
+top-level docs that have their own roles and aren't covered by
+the five homes above — `HUMANS.md` is the human developer's
+personal note-to-self (agent-readable but
+agent-writable-forbidden; see §17.4), and
+`POSIX_CHECKLIST.md` is an external-reference checklist of
+non-POSIX constructs to avoid in shell code (§6 references it).
+Any further top-level `.md` files warrant a conversation first.

@@ -23,6 +23,19 @@
   licensing, terminology, journals. Every convention mentioned
   below in summary form is documented in full there; read the
   referenced section before acting on a non-trivial task.
+  **If you discover an unwritten convention during the task or
+  need to change one, surface it in your final summary so
+  Claude can update `CONTRIBUTING.md`** — conventions belong in
+  the repo, not in your per-install memory. See its §18.2.
+- **[`README.md`](README.md) is the whole-project executive
+  summary** — self-contained, concise, LLM-ingest-ready (yes,
+  also for you). If the prompt you received conflicts with
+  `README.md`'s structural claims, surface that — one of the
+  two is wrong. If your implementation changes something
+  structurally visible (crate added/renamed, dep graph shift,
+  phase completed, scripts reorganised), flag it so Claude can
+  update `README.md` in the same commit. See
+  [`CONTRIBUTING.md §18.1`](CONTRIBUTING.md#181-readmemd--whole-project-executive-summary).
 - [`ROADMAP.md`](ROADMAP.md) — the plan. What's next. What's
   blocked.
 - [`docs/design/`](docs/design/) — architectural design docs. What
