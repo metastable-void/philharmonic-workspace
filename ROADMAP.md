@@ -50,23 +50,33 @@ serving real tenants).
   approval at `-01.md` alongside.
 - Phase 3 (`philharmonic-connector-common`): **done**
   (2026-04-22). Published as `philharmonic-connector-common
-  0.1.0`. Workspace tree now holds the `0.2.0` bump (adds `iat`
-  claim to `ConnectorTokenClaims` — landed alongside Wave A
-  Gate-2 follow-up); publish held with the rest of the
-  connector triangle (see Phase 5).
+  0.1.0`. `0.2.0` (adds `iat` claim to `ConnectorTokenClaims`)
+  publishes alongside the connector triangle 2026-04-23 —
+  see Phase 5.
 - Phase 4 (`philharmonic-workflow`): **done** (2026-04-22).
   Published as `philharmonic-workflow 0.1.0` with signed
   `v0.1.0` tag.
 - Phase 5 Wave A (COSE_Sign1 authorization tokens): **landed
-  2026-04-22**, Gate-2 approved by Yuka. Implementations in
-  `philharmonic-connector-client` (mint) and
-  `philharmonic-connector-service` (verify) held at `0.0.0` on
-  crates.io; publish waits for Wave B end-to-end tests.
-- Phase 5 Wave B (hybrid KEM + COSE_Encrypt0): **Gate-1
-  approved** 2026-04-22 (proposal r3). Reference vectors at
-  `docs/crypto-vectors/wave-b/`; Codex prompt archived at
-  `docs/codex-prompts/2026-04-22-0005-phase-5-wave-b-hybrid-kem-cose-encrypt0.md`;
-  implementation dispatch pending.
+  2026-04-22**, Gate-2 approved. Client-side mint and
+  service-side verify live in the triangle crates.
+- Phase 5 Wave B (hybrid KEM + COSE_Encrypt0): **landed
+  2026-04-23**, Gate-2 approved
+  (`docs/design/crypto-approvals/2026-04-23-0001-phase-5-wave-b-codex-dispatch-complete.md`).
+  Two Codex rounds — main implementation
+  (`docs/codex-prompts/2026-04-22-0005-phase-5-wave-b-hybrid-kem-cose-encrypt0.md`)
+  + zeroization/dead-code follow-up
+  (`docs/codex-prompts/2026-04-23-0001-phase-5-wave-b-zeroization-followup.md`).
+  Claude's two audit notes (round 1 +
+  zeroization-delta) under
+  `docs/notes-to-humans/2026-04-23-000{1,2}-*.md`.
+- Phase 5 triangle publish: **in progress** 2026-04-23.
+  `philharmonic-connector-common 0.2.0` (adds `iat` claim;
+  breaking over 0.1.0), `philharmonic-connector-client 0.1.0`,
+  `philharmonic-connector-service 0.1.0`,
+  `philharmonic-connector-router 0.1.0` — first real releases
+  for client/service/router (names were never reserved at
+  0.0.0 on crates.io; `0.1.0` is the initial published
+  version).
 - Phases 6–9: not started.
 
 Work through phases in order unless a phase is explicitly noted
@@ -852,21 +862,25 @@ wave pattern and it kept round-trips manageable.
   Codex security review at
   `docs/codex-reports/2026-04-22-0005-phase-5-wave-b-hybrid-kem-cose-encrypt0-security-review.md`).
   Reference vectors live at `docs/crypto-vectors/wave-b/`
-  (23 hex files + JSON plaintext + README). Codex implementation
-  prompt archived at
-  `docs/codex-prompts/2026-04-22-0005-phase-5-wave-b-hybrid-kem-cose-encrypt0.md`;
-  dispatch pending. Wave B also lands the
-  `philharmonic-connector-common 0.2.0` bump (adds `iat` claim
-  per Wave A Gate-2 decision (A) later) — already in the
-  workspace tree; forced a Wave A reference-vector regeneration
-  and added a composition-vector family
+  (23 hex files + JSON plaintext + README). **Landed 2026-04-23**
+  across two Codex rounds — main implementation
+  (`docs/codex-prompts/2026-04-22-0005-phase-5-wave-b-hybrid-kem-cose-encrypt0.md`)
+  + zeroization/dead-code follow-up
+  (`docs/codex-prompts/2026-04-23-0001-phase-5-wave-b-zeroization-followup.md`).
+  **Gate-2 approved 2026-04-23**
+  (`docs/design/crypto-approvals/2026-04-23-0001-phase-5-wave-b-codex-dispatch-complete.md`).
+  Wave B also lands the `philharmonic-connector-common 0.2.0`
+  bump (adds `iat` claim per Wave A Gate-2 decision (A) later)
+  — forced a Wave A reference-vector regeneration and added a
+  composition-vector family
   (`docs/crypto-vectors/wave-a/wave_a_composition_*.hex`) that
   points at Wave B's `payload_hash`.
 
 Neither wave publishes on its own — the triangle's crates
 publish as `0.1.0` only after Wave B's end-to-end tests pass.
 Waves are internal review milestones; crates-io consumers see
-only the completed surface.
+only the completed surface. **Publish in progress 2026-04-23**
+after both waves' Gate-2 clearance.
 
 **Crates touched**: `philharmonic-connector-client`,
 `philharmonic-connector-router`, `philharmonic-connector-service`.
