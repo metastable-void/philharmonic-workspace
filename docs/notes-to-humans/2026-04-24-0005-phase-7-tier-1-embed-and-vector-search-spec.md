@@ -8,9 +8,14 @@ model; vector_search = stateless in-memory kNN).
 end-to-end. Any residual questions are listed at the bottom;
 otherwise this is ready to split into two Codex dispatch
 prompts.
-**Status**: **approved for Codex prompt archival** pending
-Yuka's sign-off on the four residual questions at the bottom
-(all narrow; reasonable defaults named for each).
+**Status**: **approved for Codex prompt archival.** All four
+residual questions resolved by Yuka on 2026-04-24 with the
+bolded defaults (see §Decisions below). Related workstream:
+an `xtask` for **build-time HF model fetching** (for
+deployments preparing their connector-service binaries; not
+for tests). That xtask is separate from the two impl crates
+and is Claude's workstream — doesn't block the Codex
+dispatches below.
 **Crates**:
 - [`philharmonic-connector-impl-embed`](https://github.com/metastable-void/philharmonic-connector-impl-embed)
 - [`philharmonic-connector-impl-vector-search`](https://github.com/metastable-void/philharmonic-connector-impl-vector-search)
@@ -514,66 +519,58 @@ Locked in by Yuka during the spec round:
    `[-1, 1]` natively with higher = closer. No
    normalization layer needed.
 
-## Residual open questions (narrow; my default in bold)
+## Residual decisions (resolved 2026-04-24 by Yuka)
 
-**Qe5. Multi-model support in a single connector binary?**
+- **Qe5 → A.** `Embed` holds one model; multi-model binaries
+  construct multiple `Embed` instances.
+- **Qv6 → A.** Whole-corpus length pre-scan before scoring;
+  error names the offending offset.
+- **Qe6 → A.** Env-var-gated live-inference tests; no ONNX
+  committed to the repo. **Separately**, Yuka wants tooling
+  for **build-time HF model fetching** (for deployments, not
+  for tests) — see related workstream below.
+- **Qv7 → A.** Corpus item IDs are strings only;
+  non-strings produce `InvalidRequest`.
 
-- Option A: `Embed` holds one model; binaries with multiple
-  models construct multiple `Embed` instances (one per
-  model_id) and register them separately in the
-  `Implementation` registry.
-- Option B: `Embed` holds a map of `model_id -> (model,
-  tokenizer)`; dispatch internally by config's `model_id`.
-  One `Implementation` registration per binary.
-- **My default: A (one model per `Embed`).** Simpler surface;
-  multi-model binaries construct multiple instances. Upgrade
-  to B in 0.2.0 if the registration-multiplicity becomes
-  awkward in practice.
+## Related workstream: `xtask hf-fetch-embed-model`
 
-**Qv6. Corpus vector length consistency check: whole-corpus
-or first-item-only?**
+**Not part of either impl crate.** A workspace `xtask` bin
+that fetches a specific HuggingFace embedding-model's ONNX +
+tokenizer-files bundle into a local directory, pinned to a
+revision SHA for reproducibility. Used at **deployment
+build time** — a deployment preparing its connector-service
+binary runs the xtask to materialize the weights, then
+`include_bytes!`s them into its binary. Never run at
+runtime (Yuka's hard constraint — connector binaries must
+not phone HF).
 
-- Option A: Check all corpus items have the same length as
-  the query (O(N) pre-scan before scoring).
-- Option B: Check the first corpus item matches the query;
-  subsequent mismatches error mid-scoring with the offset.
-- **My default: A (whole-corpus pre-scan).** At target scale
-  (thousands × few hundred dims), the pre-scan cost is
-  negligible and the error is clearer: "corpus item 42 has
-  length 385, expected 384" rather than "scoring failed at
-  item 42."
+Shape sketch (Claude to implement after both Codex
+dispatches below are in flight):
 
-**Qe6. Crate-level test model fixture: env-var gated (as
-above), or commit a tiny ONNX fixture (say, a trimmed
-3-layer MiniLM)?**
+- `./scripts/xtask.sh hf-fetch-embed-model -- --model
+  <hf-repo-id> --revision <sha> --out <dir>`
+- Downloads: `onnx/model.onnx` (or wherever that repo
+  places it), `tokenizer.json`, `tokenizer_config.json`,
+  `config.json`, `special_tokens_map.json`.
+- Writes them under `<dir>/<sanitized-model-id>/` with a
+  `manifest.json` recording HF revision SHA + per-file
+  SHA256 for tamper-evident re-verification.
+- Uses `xtask::http::fetch_text` / a sibling byte-fetching
+  helper (ureq + rustls) — no new HTTP client.
+- Supports re-running idempotently against an already-
+  populated output directory (checksum-verify and skip).
 
-- Option A: Env-var gated. `#[ignore]`-d by default.
-- Option B: Commit a tiny ONNX + tokenizer under
-  `tests/fixtures/`. Tests always run locally; adds ~10-50MB
-  to the submodule repo.
-- **My default: A (env-var gated).** Matches the "no
-  redistributed ONNX in the repo" principle; committed model
-  files are a license-compliance risk (multilingual models
-  have varied licenses) that we should only cross if the
-  testing payoff justifies it. CI runs unit tests; live-
-  inference verification is a developer's local task.
-
-**Qv7. Corpus IDs: strings only, or accept JSON numbers and
-coerce?**
-
-- Option A: Strings only. Scripts pass `"42"` for numeric
-  IDs. `InvalidRequest` on non-string ID.
-- Option B: Accept `string | number` and coerce numbers
-  to strings at ingest.
-- **My default: A (strings only).** Uniform representation;
-  scripts passing numeric IDs trivially wrap them. B adds
-  coercion surface without real value.
+Lives under the next-available xtask bin slot:
+`xtask/src/bin/hf-fetch-embed-model.rs`. Scope kept
+embedding-specific for v1 to avoid the "generic
+HF-downloader" scope creep; a generalization can happen
+later if other use cases emerge.
 
 ---
 
-Next step: once Yuka signs off on the four residuals above
-(or tweaks), I'll split this into two Codex dispatch prompts
+Next step: I'll split this into two Codex dispatch prompts
 (`docs/codex-prompts/2026-04-24-0005-phase-7-embed.md` and
-`2026-04-24-0006-phase-7-vector-search.md`) and dispatch both
-in parallel, alongside the still-running SQL pair if they
-haven't returned by then.
+`2026-04-24-0006-phase-7-vector-search.md`), dispatch both in
+parallel alongside the still-running SQL pair, and separately
+pick up the `hf-fetch-embed-model` xtask as a Claude
+workstream.
