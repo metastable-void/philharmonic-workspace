@@ -815,6 +815,17 @@ xtask extension".
    Precursor scope spelled out in the next section —
    tooling change lands before the Codex prompt is archived.
 
+   *Decision trail*: briefly considered pivoting
+   `openai_native` to `/v1/responses` as "2026's OpenAI
+   usage," reverted same session — chat-completions isn't
+   deprecated (no announcement as of 2026-04-24), is the
+   single endpoint that vLLM / Together / Groq / OpenRouter
+   all mimic, so targeting it covers all three dialects
+   without a second translation path. If OpenAI deprecates
+   chat-completions later, `openai_native` grows a second
+   target (or forks into `openai_chat` / `openai_responses`)
+   in a minor bump.
+
 3. **Retry policy for v1 → hardcoded minimal (option 2).**
    Baked-in retry: 2 retry attempts (so max_attempts = 3) on
    HTTP 429, HTTP 5xx, network I/O errors; full-jitter
