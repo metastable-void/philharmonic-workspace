@@ -26,7 +26,8 @@
       "Bash(./scripts/rust-test.sh philharmonic-connector-client *)",
       "Bash(./scripts/rust-test.sh philharmonic-connector-common *)",
       "Bash(./scripts/pre-landing.sh)",
-      "Bash(./scripts/xtask.sh calendar-jp *)"
+      "Bash(./scripts/xtask.sh calendar-jp *)",
+      "Bash(./scripts/xtask.sh codex-fmt *)"
     ],
     "additionalDirectories": [
       "/tmp"

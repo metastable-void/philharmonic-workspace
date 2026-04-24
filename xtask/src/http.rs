@@ -60,3 +60,29 @@ pub fn fetch_text(url: &str) -> Result<String, HttpError> {
         .map_err(|e| HttpError::Read(e.to_string()))?;
     Ok(buf)
 }
+
+/// GET `url` and return the body as raw bytes.
+///
+/// For callers that need binary payloads (ONNX weights,
+/// tokenizer JSON that we'll SHA256 pre-decode, etc.). Same
+/// User-Agent + ureq+rustls defaults as `fetch_text`.
+///
+/// Callers that expect large bodies should consider adding a
+/// size cap or streaming variant — this buffers the whole body
+/// into memory. No built-in cap; each bin chooses.
+pub fn fetch_bytes(url: &str) -> Result<Vec<u8>, HttpError> {
+    let ua = std::env::var("WEB_FETCH_UA").unwrap_or_else(|_| DEFAULT_UA.to_owned());
+
+    let response = match ureq::get(url).header("User-Agent", &ua).call() {
+        Ok(r) => r,
+        Err(ureq::Error::StatusCode(code)) => return Err(HttpError::StatusCode { code }),
+        Err(e) => return Err(HttpError::Transport(e.to_string())),
+    };
+
+    let mut reader = response.into_body().into_reader();
+    let mut buf = Vec::new();
+    reader
+        .read_to_end(&mut buf)
+        .map_err(|e| HttpError::Read(e.to_string()))?;
+    Ok(buf)
+}
