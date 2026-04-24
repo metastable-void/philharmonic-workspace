@@ -529,6 +529,57 @@ Three inputs:
 to keep `connector-common` free of dependencies on
 `philharmonic-policy` or `philharmonic-workflow`.
 
+#### Why `async_trait` (in 2026)
+
+The trait is declared with the `#[async_trait]` macro from the
+`async-trait` crate rather than with native `async fn` in
+traits (stabilized in Rust 1.75). The choice is deliberate
+because of subtle compatibility friction that the native
+mechanism still has in 2026:
+
+- **Dyn-compatibility (object safety).** The service
+  framework's implementation registry holds impls as
+  `Box<dyn Implementation>` (or `Arc<dyn Implementation>`) in
+  a `HashMap<impl_name, _>`. Native `async fn` in traits
+  doesn't produce a dyn-compatible trait on its own — the
+  return-position `impl Future` makes the method un-object-safe
+  without either rewriting every method as
+  `fn foo(&self, …) -> Pin<Box<dyn Future<Output = …> + Send + 'a>>`
+  by hand, or opting into the `trait_variant::make` workaround
+  with its own macro surface. `#[async_trait]` does that Box-
+  allocated Pin rewrite for us, uniformly, at the trait
+  declaration site.
+- **`Send`-bound inference on returned futures.** Native async
+  methods produce opaque futures whose `Send`-ness is inferred
+  from captured state and is **not** advertised in the trait
+  method signature. Every caller that wants to move the future
+  across threads has to add `where T::Output: Send` bounds or
+  use the `trait_variant` pattern to re-expose a `Send` bound.
+  `#[async_trait]` hard-codes `+ Send` on the boxed future,
+  which is what the service framework (tokio-multi-threaded
+  request handling) requires anyway.
+- **Cost is negligible for this workload.** `async_trait`'s
+  per-call cost is one `Box` allocation for the future. Every
+  `Implementation::execute` call is dominated by external I/O
+  (HTTP, SQL, SMTP, LLM-provider APIs); a heap allocation on
+  that scale does not show up.
+- **Ecosystem alignment.** As of 2026, `async_trait` is still
+  the idiomatic choice across the Rust async ecosystem for
+  dyn-compatible traits with async methods (tower services,
+  axum extractors, actor frameworks). New contributors meet
+  it on familiar terms.
+- **Migration is mechanical.** If/when a future Rust release
+  makes native async-fn-in-traits fully dyn-compatible without
+  macro gymnastics, swapping `#[async_trait]` out is a
+  trait-declaration-plus-impl-site mechanical change. The
+  macro does not lock the ecosystem in.
+
+Pinning: `async-trait = "0.1"`. The crate has been at 0.1.x
+with an exceptionally stable surface for years. `connector-impl-api`
+re-exports `async_trait::async_trait` so impl crates use the
+same macro version the trait was declared with, avoiding any
+multi-version drift.
+
 ## v1 implementation set
 
 Implementations in the v1 set, organized by external-service

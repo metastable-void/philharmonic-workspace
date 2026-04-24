@@ -226,10 +226,20 @@ night.
   to name the new crate in §"Crate organization" and
   §"Implementation trait"; ROADMAP Phase 6 grew a Task 0
   making impl-api creation a prerequisite.
-- **Blockers 2 and 3**: still open at the time of writing.
+- **Blocker 2**: Yuka picked **`async_trait` macro** —
+  rationale is the subtle-but-real compat friction that native
+  `async fn` in traits still has in 2026: dyn-compatibility
+  (the impl registry holds `Box<dyn Implementation>`) and
+  `Send`-bound inference on returned futures. Doc 08 grew a
+  §"Why `async_trait` (in 2026)" subsection spelling this out;
+  ROADMAP Task 0 cross-references it. Pinned at
+  `async-trait = "0.1"` (stable surface for years); impl-api
+  re-exports the macro so every impl crate uses the matching
+  version.
+- **Blocker 3**: still open (reqwest + tokio vs alternatives).
 - **Doc drift** (HttpEndpoint::validate_config →
   prepare_runtime): fixed in the same commit.
 
-Next gate before any Codex dispatch: Yuka's call on Blockers
-2 and 3, then a fresh scoping note for `http_forward` against
-the new `connector-impl-api` contract.
+Next gate before any Codex dispatch: Yuka's call on Blocker
+3, then a fresh scoping note for `http_forward` against the
+new `connector-impl-api` contract.

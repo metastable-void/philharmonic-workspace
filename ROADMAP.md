@@ -1104,8 +1104,14 @@ subsection.
      `connector-common`, and a re-export of `async_trait` from
      the `async-trait` crate.
    - Dependencies: `philharmonic-connector-common`,
-     `async-trait`, `serde_json` (for `serde_json::Value`).
-     No crypto deps, no HTTP stack, no tokio.
+     `async-trait = "0.1"`, `serde_json` (for
+     `serde_json::Value`). No crypto deps, no HTTP stack, no
+     tokio.
+   - Async mechanism: `#[async_trait]` macro, deliberately
+     chosen over native async-fn-in-traits for dyn-compat +
+     `Send`-bound-inference reasons that still bite in 2026.
+     See doc 08 §"Why `async_trait` (in 2026)" for the full
+     rationale.
    - Publish as `0.1.0`. Workspace members list + publish-queue
      order updated accordingly.
 
