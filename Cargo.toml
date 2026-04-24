@@ -14,6 +14,7 @@ members = [
     "philharmonic-connector-client",
     "philharmonic-connector-router",
     "philharmonic-connector-service",
+    "philharmonic-connector-impl-api",
     "philharmonic-connector-impl-http-forward",
     "philharmonic-connector-impl-llm-openai-compat",
     "philharmonic-connector-impl-llm-anthropic",
@@ -55,6 +56,7 @@ philharmonic-connector-impl-email-smtp = { path = "philharmonic-connector-impl-e
 philharmonic-connector-impl-embed = { path = "philharmonic-connector-impl-embed" }
 philharmonic-connector-impl-vector-search = { path = "philharmonic-connector-impl-vector-search" }
 philharmonic-api = { path = "philharmonic-api" }
+philharmonic-connector-impl-api = { path = "philharmonic-connector-impl-api" }
 
 [profile.release]
 opt-level = 3

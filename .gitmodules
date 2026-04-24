@@ -90,3 +90,6 @@
 	path = mechanics-config
 	url = https://github.com/metastable-void/mechanics-config.git
 	branch = main
+[submodule "philharmonic-connector-impl-api"]
+	path = philharmonic-connector-impl-api
+	url = https://github.com/metastable-void/philharmonic-connector-impl-api.git
