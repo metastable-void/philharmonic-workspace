@@ -7,6 +7,7 @@ target/
 # `print-audit-info.sh` → `cargo xtask web-fetch`) for the
 # duration of the competing build.
 target-xtask/
+target-publish/
 **/*.rs.bk
 .DS_Store
 .vscode/settings.json
