@@ -16,14 +16,17 @@ rustflags = [
     "-C", "link-arg=-Wl,-z,noexecstack",
 ]
 
+[registries.menhera-cooldown]
+index = "sparse+https://index.crates.menhera.org/3d/"
+
+[registry]
+default = "menhera-cooldown"
+
 [source.crates-io]
 replace-with = "menhera-cooldown"
 
 [source.menhera-cooldown]
-registry = "sparse+https://index.crates.menhera.org/7d/"
-
-[registries.crates-io]
-protocol = "sparse"
+registry = "sparse+https://index.crates.menhera.org/3d/"
 
 [net]
 retry = 3          # default 2; 3 is friendlier on flaky connections

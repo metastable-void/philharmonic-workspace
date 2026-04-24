@@ -36,6 +36,13 @@
 //!    recently-published versions are "too fresh to depend on
 //!    yet"*. Set `--min-age-days 0` to disable the age check.
 //!
+//! The `pubtime` field now lives in each sparse-index JSON line
+//! (RFC3339 UTC), so the age check reads it directly from the
+//! single sparse-index fetch. No additional API round-trips;
+//! works even when the crates.io REST API is unreachable (e.g.,
+//! behind a filtering cooldown proxy like
+//! `index.crates.menhera.org/7d/`).
+//!
 //! ## Flags
 //!
 //!   --include-prereleases   keep `-rc / -beta / -alpha / -pre / -dev`
@@ -47,9 +54,13 @@
 //!
 //! ## HTTP path
 //!
-//! All crates.io traffic goes through `xtask::http::fetch_text`
-//! (ureq 3 + rustls + workspace `User-Agent`), the same path the
-//! `web-fetch` xtask bin uses. See `xtask/src/http.rs`.
+//! One call per invocation — the sparse-index fetch — through
+//! `xtask::http::fetch_text` (ureq 3 + rustls + workspace
+//! `User-Agent`), the same path the `web-fetch` xtask bin uses.
+//! See `xtask/src/http.rs`. We talk to `https://index.crates.io`
+//! directly (not the source-replaced mirror from
+//! `.cargo/config.toml`) because this tool's job is to report
+//! the authoritative "what's on crates.io right now" view.
 //!
 //! ## Stream separation
 //!
@@ -67,7 +78,8 @@
 //!   1    input error (empty crate name, bad `--min-age-days`).
 //!   2    crate not found on crates.io (HTTP 404), network
 //!        error, or malformed upstream response on the index
-//!        fetch. Age-check fetch failures are non-fatal: a
+//!        fetch. A missing `pubtime` on an index line (older
+//!        entries might not have it) is non-fatal: a
 //!        `!! ... could not verify age` note goes to stderr and
 //!        the walk stops, but the exit code stays 0.
 //!
@@ -112,16 +124,18 @@ struct Args {
 struct IndexEntry {
     vers: String,
     yanked: bool,
+    /// RFC3339 UTC publish timestamp. Present on crates.io
+    /// sparse-index lines; defensively `Option` in case an
+    /// alternate registry mirror doesn't emit it.
+    #[serde(default)]
+    pubtime: Option<String>,
 }
 
-#[derive(Deserialize)]
-struct VersionDetailEnvelope {
-    version: VersionDetail,
-}
-
-#[derive(Deserialize)]
-struct VersionDetail {
-    created_at: String,
+/// One kept (non-yanked, non-filtered) version together with
+/// its publish timestamp as it appeared in the sparse index.
+struct KeptVersion {
+    vers: String,
+    pubtime: Option<String>,
 }
 
 fn sparse_index_path(name: &str) -> String {
@@ -183,7 +197,9 @@ fn main() -> ExitCode {
     };
 
     // 2. Parse + filter (yanked, and optionally prereleases).
-    let mut versions: Vec<String> = Vec::new();
+    //    Keep pubtime alongside each kept version so the age
+    //    check below doesn't need a second HTTP round-trip.
+    let mut versions: Vec<KeptVersion> = Vec::new();
     for line in body.lines() {
         if line.trim().is_empty() {
             continue;
@@ -200,39 +216,46 @@ fn main() -> ExitCode {
         if !args.include_prereleases && is_prerelease(&entry.vers) {
             continue;
         }
-        versions.push(entry.vers);
+        versions.push(KeptVersion {
+            vers: entry.vers,
+            pubtime: entry.pubtime,
+        });
     }
 
     // 3. Print versions (machine-readable, one per line, stdout).
     for v in &versions {
-        println!("{}", v);
+        println!("{}", v.vers);
     }
 
     // 4. Age check (stderr warnings, oldest-walk from newest).
+    //    Uses `pubtime` from the sparse-index line we already
+    //    fetched — no extra network calls.
     if args.min_age_days > 0 && !versions.is_empty() {
         let threshold_seconds: i64 = i64::from(args.min_age_days).saturating_mul(86_400);
         let now: DateTime<Utc> = Utc::now();
 
         // Walk newest → oldest. Stop at the first version that
-        // passes the threshold (or on a fetch failure / parse
-        // failure — those are treated as "cannot verify, stop").
-        for version in versions.iter().rev() {
-            match age_seconds(&name, version, now) {
+        // passes the threshold (or at the first version whose
+        // pubtime can't be parsed — "cannot verify, stop").
+        for v in versions.iter().rev() {
+            match age_seconds(&v.pubtime, now) {
                 Ok(age) if age < threshold_seconds => {
                     let days = age / 86_400;
                     let hours = (age % 86_400) / 3_600;
                     eprintln!(
-                        "!! crates-io-versions: {version} is {days}d{hours}h old \
-                         (< {}d threshold)",
-                        args.min_age_days
+                        "!! crates-io-versions: {vers} is {days}d{hours}h old \
+                         (< {threshold}d threshold)",
+                        vers = v.vers,
+                        threshold = args.min_age_days,
                     );
-                    // recurse to the next-older version
+                    // continue to the next-older version
                 }
                 Ok(_) => break,
                 Err(msg) => {
                     eprintln!(
-                        "!! crates-io-versions: could not verify age of {version}: {msg} \
-                         (stopping age walk)"
+                        "!! crates-io-versions: could not verify age of {vers}: {msg} \
+                         (stopping age walk)",
+                        vers = v.vers,
                     );
                     break;
                 }
@@ -243,17 +266,16 @@ fn main() -> ExitCode {
     ExitCode::SUCCESS
 }
 
-/// Fetches the version-detail JSON from crates.io API and
-/// returns the age of the version in whole seconds relative to
-/// `now`. Returns `Err(String)` with a short human-readable
-/// reason on any failure (HTTP, JSON, timestamp parse).
-fn age_seconds(name: &str, version: &str, now: DateTime<Utc>) -> Result<i64, String> {
-    let url = format!("https://crates.io/api/v1/crates/{name}/{version}");
-    let body = http::fetch_text(&url).map_err(|e| e.to_string())?;
-    let envelope: VersionDetailEnvelope =
-        serde_json::from_str(&body).map_err(|e| format!("bad JSON: {e}"))?;
-    let published = DateTime::parse_from_rfc3339(&envelope.version.created_at)
-        .map_err(|e| format!("bad created_at: {e}"))?
+/// Returns the age of a version in whole seconds relative to
+/// `now`, using the `pubtime` string from the sparse-index line.
+/// Returns `Err(String)` with a short human-readable reason if
+/// the field was absent or the timestamp failed to parse.
+fn age_seconds(pubtime: &Option<String>, now: DateTime<Utc>) -> Result<i64, String> {
+    let raw = pubtime
+        .as_deref()
+        .ok_or_else(|| String::from("no pubtime in sparse-index line"))?;
+    let published = DateTime::parse_from_rfc3339(raw)
+        .map_err(|e| format!("bad pubtime {raw:?}: {e}"))?
         .with_timezone(&Utc);
     Ok(now.signed_duration_since(published).num_seconds())
 }
