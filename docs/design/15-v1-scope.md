@@ -275,11 +275,14 @@ crates (split, settled):
 
 ### Ships with v1
 
-- Tenant-scoped subdomain routing
-  (`<tenant>.api.our-domain.tld`).
-- Deployment-operator endpoints at
-  `https://admin.our-domain.tld/` (distinct subdomain; no
-  ambiguity about cross-tenant requests).
+- Tenant-scoped request routing via a deployment-supplied
+  `request → tenant-id` resolver. Subdomain-per-tenant,
+  path-prefix-per-tenant, single-tenant, and mTLS-per-tenant
+  are all supported shapes (see `10-api-layer.md`).
+- Deployment-operator endpoints distinguishable from tenant
+  requests by the resolver (distinct subdomain, reserved
+  path prefix, or separate listener — the deployment's
+  choice).
 - Long-lived API token authentication (opaque bearer strings
   with substrate-hash lookup).
 - Ephemeral API token authentication (COSE_Sign1, up to 24h
@@ -323,42 +326,50 @@ crates (split, settled):
 
 ## Deployment topology
 
+Philharmonic is a framework; topology is the deployment's
+choice. v1 scope covers *what the framework must make
+possible*, not *which specific shape every deployment must
+use*.
+
 ### Supported for v1
 
-Standard three-tier SaaS:
+Process-layer shapes supported end-to-end:
 
 - MySQL-family database (MySQL 8, MariaDB 10.5+, Aurora
-  MySQL, TiDB).
-- API + workflow engine tier (horizontally scaled behind load
-  balancer or anycast). API processes host the
-  `WorkflowEngine` with plugged-in lowerer
-  (`connector-client`) and HTTP executor client (pointing at
-  mechanics fleet).
+  MySQL, TiDB), as the one storage substrate implementation
+  shipping in v1.
+- API + workflow engine tier (horizontally scaled). API
+  processes host the `WorkflowEngine` with plugged-in
+  lowerer (`connector-client`) and HTTP executor client
+  (pointing at mechanics fleet).
 - Mechanics worker fleet (horizontally scaled).
 - Connector service fleet per realm (horizontally scaled).
 - Connector router per realm (thin dispatcher).
+- Alternate topology: a deployment can collapse layers —
+  one binary hosting API + workflow engine + mechanics +
+  connectors — for single-user or single-tenant use. The
+  crate boundaries support this directly.
 
-Subdomains:
+URL / routing shapes supported end-to-end:
 
-- `https://<tenant>.api.our-domain.tld/` — API.
-- `https://<tenant>.app.our-domain.tld/` — Web UI.
-- `https://<realm>.connector.our-domain.tld/` — connector
-  router per realm.
-- `https://admin.our-domain.tld/` — deployment-operator
-  endpoints.
+- Subdomain-per-tenant with wildcard HTTPS cert.
+- Path-prefix-per-tenant on a single certificate.
+- Single-tenant (one fixed tenant ID).
+- mTLS-per-tenant (tenant ID in client-cert CN/SAN).
+- Any other `request → tenant-id` resolver the deployment
+  supplies.
 
-Wildcard HTTPS certificates cover the subdomain patterns.
-
-Single region, single AZ (or multi-AZ within region).
+Region layout for v1: single region. Deployments can be
+single-AZ or multi-AZ within that region.
 
 ### Not supported for v1
 
 - Multi-region deployments.
 - Edge-distributed connector services.
-- In-process "all-in-one" mode.
-- Arbitrary operator-chosen URL layouts (the subdomain
-  structure above is load-bearing; operators deploy using
-  this shape).
+- Storage backends other than the MySQL-family one shipping
+  in v1 (the `philharmonic-store` trait surface supports
+  additional backends; adding one is explicitly outside v1
+  scope).
 
 ## Security
 

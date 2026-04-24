@@ -220,7 +220,10 @@ boundaries.
 Pure HTTP dispatcher. Deployed as a small static binary per
 realm.
 
-- Terminates TLS for `<realm>.connector.our-domain.tld`.
+- Terminates TLS for whichever realm-scoped URL the
+  deployment configures (a per-realm subdomain and a
+  per-realm path prefix are both common; the router is
+  agnostic).
 - Forwards requests to connector services in the realm.
 - Load-balances across connector service instances.
 - No token verification (services do this).
@@ -1133,10 +1136,17 @@ Philharmonic via native tooling.
 
 ## Deployment topology
 
-- `https://<realm>.connector.our-domain.tld/` — per-realm
-  connector router URL.
-- Wildcard HTTPS certificate for `*.connector.our-domain.tld`.
-- Connector router per realm, small static binary.
+Topology is a deployment choice, not a framework
+requirement. The connector layer ships as crates; the
+deployment binds them to URLs.
+
+- One connector router per realm (small static binary), at
+  whichever URL the deployment configures. Subdomain-per-realm
+  (e.g. `https://<realm>.connector.<deployment-domain>/`) and
+  path-per-realm (e.g.
+  `https://<deployment-domain>/connector/<realm>/`) are both
+  typical shapes; collapsing routers into a single binary that
+  dispatches by realm header is also valid.
 - Connector services behind each router, horizontally scaled.
 - Implementations bundled into each realm's service binary at
   build time. No runtime plug-ins.

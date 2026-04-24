@@ -152,9 +152,11 @@ settled.
   [a-z0-9-]{1,62}`, no leading digit, no consecutive hyphens,
   reserved names include realm names plus `admin`, `api`,
   `www`, `app`, `connector`.
-- **Deployment-operator endpoint location**:
-  `https://admin.our-domain.tld/`; distinct subdomain from
-  tenant and realm subdomains.
+- **Deployment-operator endpoint location**: whichever
+  ingress the deployment designates — a distinct subdomain,
+  a reserved path prefix, or a separate listener, as long
+  as it is unambiguously distinct from any tenant's routing
+  scope.
 - **Principal model details**: persistent identity with
   long-lived API token (SHA-256 hashed in substrate).
   `epoch` scalar included on the entity for future

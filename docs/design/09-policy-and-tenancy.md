@@ -70,21 +70,32 @@ impl Entity for Tenant {
 }
 ```
 
-### Subdomain naming rules
+### Tenant naming rules
 
-Tenant subdomains are `<tenant>.api.our-domain.tld` and
-`<tenant>.app.our-domain.tld`. Tenant names must match
-`[a-z0-9][a-z0-9-]{1,62}` — lowercase alphanumerics and
-hyphens, no leading digit, no consecutive hyphens, 2–63
-characters.
+Tenant names must match `[a-z0-9][a-z0-9-]{1,62}` —
+lowercase alphanumerics and hyphens, no leading digit, no
+consecutive hyphens, 2–63 characters. The constraint is
+RFC 1035 / DNS-label compatible so that deployments which
+project tenant IDs into subdomains (a common but not
+required shape) can do so without a translation layer.
 
 Reserved names that cannot be assigned to tenants:
 
-- `admin`, `api`, `www`, `app`, `connector`.
-- Every realm name used under `connector.our-domain.tld`.
-- The `admin.our-domain.tld` subdomain is reserved for
-  deployment-operator endpoints; no tenant takes the name
-  `admin`.
+- `admin`, `api`, `www`, `app`, `connector`. These are
+  reserved across the framework because deployments
+  commonly use them for non-tenant purposes (operator
+  endpoints, wildcard-adjacent labels), and the reserved
+  set keeps tenant IDs safe to drop into URL paths and
+  subdomains interchangeably.
+- Every realm name the deployment configures for connector
+  routing. Realm names and tenant names share the flat
+  identifier namespace as far as URL construction goes, so
+  the framework keeps them disjoint.
+
+Deployments that don't project tenant IDs into DNS or URL
+paths can treat the reserved set as trivia, but the naming
+rules themselves are the framework's contract and always
+apply.
 
 ## Principal model
 
@@ -294,8 +305,10 @@ entity family):
   operationally distinct concerns.
 
 **Deployment-operator permissions** (granted only to
-principals in the operator tenant, enforced on the
-`admin.our-domain.tld` subdomain, not relevant for tenant
+principals in the operator tenant, enforced on whichever
+ingress the deployment designates for operator endpoints —
+separate subdomain, reserved path prefix, or separate
+listener; not relevant for tenant
 users):
 - `deployment:tenant_manage` — create / suspend / resume /
   retire tenants.

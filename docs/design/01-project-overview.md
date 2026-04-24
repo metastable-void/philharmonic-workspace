@@ -9,19 +9,24 @@ and connector services mediating all external I/O under per-step
 authorization.
 
 The crates are released publicly under `Apache-2.0 OR MPL-2.0` and
-designed to be usable across a range of deployment shapes —
-single-user self-hosted, single-tenant application backend,
-multi-tenant SaaS, research platform, scheduled-job runner, and
-others. The layered design (see `02-design-principles.md`) lets
-consumers pick up only the layers they need: the storage substrate
-and execution substrate are each usable standalone, and the policy
-layer is optional for deployments that don't require multi-tenancy.
+designed as a generic framework — **not a SaaS product** —
+usable across a range of deployment shapes: single-user
+self-hosted, single-tenant application backend, multi-tenant
+SaaS, research platform, scheduled-job runner, and others.
+The layered design (see `02-design-principles.md`) lets
+consumers pick up only the layers they need: the storage
+substrate and execution substrate are each usable standalone,
+and the policy layer is optional for deployments that don't
+require multi-tenancy.
 
-Our own deployment (Menhera®) happens to be multi-tenant SaaS on
-our own infrastructure, and some concrete shapes described in these
-docs reflect that. Deployment-specific material is fenced under
-sections explicitly labeled as such; crate-level design does not
-depend on it.
+Deployment topology — where services live, how requests route
+to tenants, what the URL shape looks like, which processes
+host which layers — is the **deployment's choice**, not the
+framework's. Framework docs describe crate contracts and
+configurable inputs; they avoid hardcoding any single
+deployment's shape. Where a concrete example helps explain a
+contract, the example is labeled as one of several possible
+shapes, not as "the" shape.
 
 ## The architectural picture
 
@@ -104,47 +109,50 @@ workflow layer itself receives a `SubjectContext` opaquely.
    (`Running`, `Completed`, or `Failed`).
 10. The cycle repeats until the instance reaches a terminal status.
 
-## Our own deployment topology
+## Deployment topology (example shapes)
 
-This section describes the production shape Menhera® runs. It is
-not a requirement of any crate; consumers deploy however suits
-them. Other files in this directory should reference this section
-rather than re-describe the topology.
+Philharmonic is a framework; deployments choose their own
+topology. This section sketches the kinds of shapes a
+deployment might take. None of them is privileged; the
+crates don't know or care which shape the deployment adopts.
 
-Our deployment targets our own infrastructure (on-premises or
-IaaS), not arbitrary cloud SaaS. The shape looks like:
+One common multi-tenant shape (subdomain-per-tenant):
 
-- `https://<tenant>.app.our-domain.tld/` — Web UI, tenant-scoped
-  by subdomain.
-- `https://<tenant>.api.our-domain.tld/` — API, same scope.
-- `https://<realm>.connector.our-domain.tld/` — connector router
-  per realm, forwarding to connector services in that realm.
+- `https://<tenant>.app.<deployment-domain>/` — Web UI,
+  tenant-scoped by subdomain.
+- `https://<tenant>.api.<deployment-domain>/` — API, same
+  scope.
+- `https://<realm>.connector.<deployment-domain>/` —
+  connector router per realm, forwarding to connector
+  services in that realm.
 
-Wildcard HTTPS certificates handle the subdomains. The tenant-in-
-subdomain pattern gives origin-level isolation in browsers, which
-matters for browser-delivered ephemeral tokens.
+Wildcard HTTPS certificates handle the subdomain patterns.
+The tenant-in-subdomain pattern gives origin-level
+isolation in browsers, which matters for browser-delivered
+ephemeral tokens.
 
-Connector services: one static binary per realm, containing all
-implementations supported in that realm. Horizontally scaled
-behind the realm's connector router.
+Other shapes are equally valid and equally supported:
 
-Executors: horizontally scaled fleet of `mechanics` worker nodes.
-Load balancer in front; orchestrator talks to the fleet via the
-LB.
+- **Path-prefix-per-tenant** (single-domain deployment,
+  single certificate, no browser-origin isolation).
+- **Single-tenant** (one fixed tenant ID; the policy layer
+  is optional in this mode).
+- **Collapsed realms** (one connector service binary
+  hosting multiple realms behind one router).
+- **In-process all-in-one** (API, orchestrator, executor,
+  connector all in one process for a single user).
+- **Path-based, header-based, or mTLS-based tenant
+  routing** — whatever the deployment's ingress produces
+  as a tenant identifier.
 
-Storage: MySQL-family DB (MySQL 8, MariaDB, Aurora MySQL, or
-TiDB). Shared across the API and orchestrator tiers.
-
-Single region, single AZ (or multi-AZ within region, as
-operationally appropriate).
-
-Nothing above is baked into the crates. Subdomain-based routing,
-per-realm connector binaries, the specific MySQL variant, and the
-choice of on-premises hosting are all operational choices.
-Consumers may route tenants by path prefix or header, collapse
-realms into one binary, swap in a different storage backend once
-`philharmonic-store` has additional implementations, run the whole
-thing in-process for a single user, and so on.
+Executor fleet, storage backend, region layout, and
+process topology are likewise deployment choices.
+`philharmonic-store` takes storage-backend implementations
+as a dep-injected trait; `philharmonic-workflow` takes the
+executor client and lowerer as plugged-in dependencies; the
+API layer takes `request → tenant-id` resolution as
+deployment-supplied configuration. None of these are baked
+into the crates.
 
 ## What this system is not
 

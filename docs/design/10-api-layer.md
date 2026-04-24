@@ -39,23 +39,51 @@ What it doesn't do:
 - Implement business logic beyond request translation and
   policy enforcement.
 
-## Deployment topology
+## Request routing
 
-- `https://<tenant>.api.our-domain.tld/` — tenant-scoped API.
-- `https://admin.our-domain.tld/` — deployment-operator
-  endpoints (tenant CRUD, realm management, cross-tenant
-  audit). Distinct subdomain; no ambiguity about which
-  requests are cross-tenant.
-- Wildcard HTTPS certificate covering `*.api.our-domain.tld`
-  plus a certificate for `admin.our-domain.tld`.
-- Horizontally scaled behind a load balancer (or IP anycast
-  with per-flow ECMP).
+Topology is a **deployment concern, not a framework
+requirement**. The `philharmonic-api` crate accepts a
+`request → tenant-id` resolution from its deployment-supplied
+configuration — whether that resolution reads a subdomain, a
+path prefix, a TLS client-cert CN, a fixed tenant (for
+single-tenant deployments), or something else entirely is up
+to whoever builds the binary that hosts `philharmonic-api`.
+The crate treats "what tenant does this request belong to?"
+as an input, not a derivation.
 
-The tenant-in-subdomain pattern gives origin-level isolation:
-`tenant-a.api.our-domain.tld` is a different origin from
-`tenant-b.api.our-domain.tld`, so browser security rules prevent
-cross-tenant access at the HTTP layer. This matters most for the
-chat-app pattern where ephemeral tokens ride in browser API calls.
+Any of these shapes is supported:
+
+- **Subdomain-per-tenant**: `<tenant>.api.<deployment-domain>`.
+  Wildcard certificate, origin-level browser isolation.
+- **Path-prefix-per-tenant**:
+  `<deployment-domain>/t/<tenant>/…`. Single certificate, no
+  origin-level browser isolation.
+- **Single-tenant**: the resolver returns one fixed tenant ID
+  regardless of request. Suitable for single-tenant
+  application backends and self-hosted deployments.
+- **Client-cert-per-tenant**: mTLS with the tenant ID
+  encoded in the client-cert CN or SAN.
+- Anything else a deployment wires up, as long as it produces
+  a tenant ID by the time auth middleware runs.
+
+Operator endpoints must likewise be distinguishable from
+tenant requests by the resolver (a separate subdomain, a
+reserved path prefix, a separate binary listening on a
+separate port — the deployment's choice). The framework only
+needs `"this request is operator-scoped"` vs. `"this request
+is tenant-scoped, tenant=X"` as input; it is agnostic to how
+that determination is made.
+
+### Browser-embedded clients
+
+Deployments that serve browser-embedded clients (e.g., chat-
+app pattern where ephemeral tokens ride in in-browser API
+calls) typically benefit from origin-level isolation between
+tenants, which subdomain-per-tenant provides naturally and
+path-prefix-per-tenant does not. Deployments that don't
+serve browser-embedded clients are free to pick a simpler
+shape. This is an informed deployment trade-off, not a
+framework prescription.
 
 ## Authentication
 
@@ -394,9 +422,10 @@ could be added later as an ergonomic helper; not in v1.
 - `PATCH /v1/tenant` — update settings (new settings
   revision). Requires `tenant:settings_manage`.
 
-Deployment-operator-level tenant management (creating tenants,
-suspending them) lives outside tenant subdomains at
-`admin.our-domain.tld`.
+Deployment-operator-level tenant management (creating
+tenants, suspending them) lives on whichever ingress the
+deployment designates for operator endpoints — distinct
+from any tenant's routing scope.
 
 ### Audit log access
 
