@@ -1,0 +1,60 @@
+{
+    "model": "HuggingFaceH4/zephyr-7b-beta",
+    "messages": [
+        {
+            "role": "system",
+            "content": "you are a helpful assistant"
+        },
+        {
+            "role": "user",
+            "content": "Give an example JSON for an employee profile that fits this schema: <sample_json_schema inline>"
+        }
+    ],
+    "max_completion_tokens": 1000,
+    "structured_outputs": {
+        "json": {
+            "type": "object",
+            "properties": {
+                "name": {"type": "string"},
+                "age": {"type": "integer"},
+                "skills": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "grade": {
+                    "type": "string",
+                    "pattern": "^[A-D]$"
+                },
+                "email": {
+                    "type": "string",
+                    "pattern": "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$"
+                },
+                "work_history": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "company": {"type": "string"},
+                            "duration": {
+                                "type": "number",
+                                "minimum": 0.0,
+                                "maximum": 100.0
+                            },
+                            "position": {"type": "string"}
+                        },
+                        "required": ["company", "duration", "position"],
+                        "additionalProperties": false
+                    },
+                    "minItems": 0,
+                    "maxItems": 3
+                }
+            },
+            "required": ["name", "age", "skills", "grade", "email", "work_history"],
+            "additionalProperties": false,
+            "minProperties": 1,
+            "maxProperties": 10
+        }
+    }
+}

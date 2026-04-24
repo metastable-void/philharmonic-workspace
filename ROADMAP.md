@@ -1173,16 +1173,25 @@ subsection.
        (same pattern as http_forward's `request_vectors.rs`).
        CI-safe, deterministic, dialect-translation coverage
        is the contract.
-     - Fixture provenance — lift from upstream:
-       - `vllm_native`: request shape + input schema lifted
-         from vLLM's own test suite (Apache-2.0; attribute):
-         `tests/conftest.py::sample_json_schema` and
-         `tests/entrypoints/openai/chat_completion/test_chat.py::test_structured_outputs_json_chat`.
-         That test shows `structured_outputs={"json": <schema>}`
-         passed via the openai Python client's `extra_body`,
-         which merges into the top-level HTTP body — so doc 08's
-         "top-level `structured_outputs`" shape is upstream-
-         verified.
+     - Fixture provenance — extracted from upstream to our
+       tree as pure JSON (no Python); commit under
+       [`docs/upstream-fixtures/vllm/`](docs/upstream-fixtures/vllm/)
+       with pinned SHAs + license attribution in the
+       directory's `README.md`:
+       - `vllm_native` — extracted from vLLM's own test
+         suite (Apache-2.0) at commit
+         `cf8a613a87264183058801309868722f9013e101`:
+         - `sample_json_schema.json` (from
+           `tests/conftest.py:sample_json_schema`) — the
+           employee-profile schema.
+         - `structured_outputs_json_chat_request.json`
+           (from `tests/entrypoints/openai/chat_completion/test_chat.py::test_structured_outputs_json_chat`)
+           — the on-the-wire HTTP request body showing
+           `structured_outputs: {"json": <schema>}` at the
+           top level (confirming doc 08's shape directly
+           against upstream, since the Python client's
+           `extra_body=dict(structured_outputs=...)` merges
+           into the top of the HTTP body).
        - `openai_native` + `tool_call_fallback`: request +
          response shapes follow the OpenAI chat-completion
          public API spec (`response_format: {type: "json_schema"
