@@ -1169,10 +1169,34 @@ subsection.
    - Testing discipline — **deterministic tests first,
      external-dep tests `#[ignore]`-d by default**:
      - Primary: `wiremock`-backed integration tests with
-       captured JSON fixtures for each dialect's request +
-       response shape (same pattern as http_forward's
-       `request_vectors.rs`). CI-safe, deterministic,
-       dialect-translation coverage is the contract.
+       fixtures for each dialect's request + response shape
+       (same pattern as http_forward's `request_vectors.rs`).
+       CI-safe, deterministic, dialect-translation coverage
+       is the contract.
+     - Fixture provenance — lift from upstream:
+       - `vllm_native`: request shape + input schema lifted
+         from vLLM's own test suite (Apache-2.0; attribute):
+         `tests/conftest.py::sample_json_schema` and
+         `tests/entrypoints/openai/chat_completion/test_chat.py::test_structured_outputs_json_chat`.
+         That test shows `structured_outputs={"json": <schema>}`
+         passed via the openai Python client's `extra_body`,
+         which merges into the top-level HTTP body — so doc 08's
+         "top-level `structured_outputs`" shape is upstream-
+         verified.
+       - `openai_native` + `tool_call_fallback`: request +
+         response shapes follow the OpenAI chat-completion
+         public API spec (`response_format: {type: "json_schema"
+         ...}`, `tools + tool_choice` for the fallback).
+         Fixtures synthesized against the documented envelope
+         (`choices[0].message`, `usage`, `finish_reason`).
+     - Response-body fixtures for the wiremock path are
+       synthesized to match the documented envelope, not
+       captured from a live run — upstream only commits
+       request patterns; actual response bytes only exist
+       when their tests run. Envelope shape itself is stable
+       enough (OpenAI chat-completion public API) that
+       synthesis is safe; the drift-catching role falls to
+       the smokes below.
      - Optional smoke against real OpenAI API: `#[ignore]`
        + an env gate such as `OPENAI_SMOKE_ENABLED=1
        OPENAI_API_KEY=...`. Manual only; not on any CI
@@ -1185,7 +1209,11 @@ subsection.
        48 physical cores); it is a non-starter on typical
        ultrabook dev hosts. Tests must not assume the box
        is available — `#[ignore]` keeps `cargo test` from
-       failing when it isn't.
+       failing when it isn't. This smoke is the drift check
+       against committed fixtures: diff real-vLLM output
+       against the synthesized-envelope fixtures; any
+       non-empty diff is either upstream drift or our
+       stale cache.
 
 **Acceptance criteria**:
 - `philharmonic-connector-impl-api` published as `0.1.0` before
