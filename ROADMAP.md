@@ -1166,8 +1166,26 @@ subsection.
    - Validate output against `output_schema` using `jsonschema`
      or similar; if validation fails, return
      `SchemaValidationFailed`.
-   - Integration tests: real OpenAI API (minimal, cheap model) and
-     a local vLLM container for `vllm_native`.
+   - Testing discipline — **deterministic tests first,
+     external-dep tests `#[ignore]`-d by default**:
+     - Primary: `wiremock`-backed integration tests with
+       captured JSON fixtures for each dialect's request +
+       response shape (same pattern as http_forward's
+       `request_vectors.rs`). CI-safe, deterministic,
+       dialect-translation coverage is the contract.
+     - Optional smoke against real OpenAI API: `#[ignore]`
+       + an env gate such as `OPENAI_SMOKE_ENABLED=1
+       OPENAI_API_KEY=...`. Manual only; not on any CI
+       path; small cheap model.
+     - Optional smoke against a CPU INT8 vLLM endpoint:
+       `#[ignore]` + an env gate such as
+       `VLLM_SMOKE_ENABLED=1 VLLM_BASE_URL=http://...`.
+       vLLM-on-CPU is viable on the Xeon 8259CL box
+       (AVX-512 + AVX512_VNNI accelerate INT8 dot products,
+       48 physical cores); it is a non-starter on typical
+       ultrabook dev hosts. Tests must not assume the box
+       is available — `#[ignore]` keeps `cargo test` from
+       failing when it isn't.
 
 **Acceptance criteria**:
 - `philharmonic-connector-impl-api` published as `0.1.0` before
