@@ -1139,7 +1139,7 @@ subsection.
      (preferred for determinism in CI); `httpbin.org` smokes
      optional and gated on an env flag.
 
-2. **`llm_openai_compat`** ← _next up; awaiting a focused impl spec round modeled on the http_forward spec (`docs/notes-to-humans/2026-04-24-0001-phase-6-task-1-http-forward-impl-spec.md`)_:
+2. **`llm_openai_compat`** ✓ _(done 2026-04-24, published as 0.1.0; spec `docs/notes-to-humans/2026-04-24-0003-phase-6-task-2-llm-openai-compat-impl-spec.md`, review `docs/notes-to-humans/2026-04-24-0004-phase-6-llm-openai-compat-review.md`)_:
    - Depends on `philharmonic-connector-impl-api` (same
      no-crypto dep surface as `http_forward`).
    - Config shape: `{base_url, api_key, dialect, timeout_ms}`.
