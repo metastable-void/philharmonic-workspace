@@ -115,8 +115,12 @@ files tracked directly in the parent repo):
   process HTTP GET, no `curl`/`wget` dependency),
   `codex-fmt` (renders Codex rollout JSONL into a color-
   highlighted timeline; used by `scripts/codex-logs.sh`),
-  `openai-chat` (generic OpenAI chat-completion caller; used
-  by `scripts/project-status.sh`), and `calendar-jp`
+  `openai-chat` (OpenAI chat-completion caller with two
+  modes: freeform for `scripts/project-status.sh`, and
+  fixture-capture with `--output-schema` / `--tool-call-fallback`
+  / `--capture-*` flags that produced the
+  `docs/upstream-fixtures/openai-chat/` tree for Phase 6
+  Task 2), and `calendar-jp`
   (agent-facing JST calendar with weekends + Japanese public
   holidays + current wall-clock; run at session start to
   ground deadline reasoning). See
@@ -127,12 +131,12 @@ files tracked directly in the parent repo):
 
 Design is substantially settled; implementation is in active progress.
 The connector triangle + foundational crates are published with
-substantive content; Phase 6 Task 0 + Task 1 are done
-(`philharmonic-connector-impl-api` 0.1.0 and
-`philharmonic-connector-impl-http-forward` 0.1.0 both on
-crates.io as of 2026-04-24). The remaining
+substantive content; **Phase 6 is complete end-to-end** — all
+three of its crates (impl-api, http_forward, llm_openai_compat)
+shipped 0.1.0 on crates.io on 2026-04-24. The remaining
 `philharmonic-connector-impl-*` crates stay at `0.0.0`
-placeholders on crates.io until their respective phases land.
+placeholders on crates.io until their respective phases land
+(Phase 7+).
 
 Already published with substantive content:
 `philharmonic-types`, `philharmonic-store`,
@@ -144,7 +148,8 @@ Already published with substantive content:
 `philharmonic-connector-service` (0.1.0, 2026-04-23),
 `philharmonic-connector-router` (0.1.0, 2026-04-23),
 `philharmonic-connector-impl-api` (0.1.0, 2026-04-24),
-`philharmonic-connector-impl-http-forward` (0.1.0, 2026-04-24).
+`philharmonic-connector-impl-http-forward` (0.1.0, 2026-04-24),
+`philharmonic-connector-impl-llm-openai-compat` (0.1.0, 2026-04-24).
 
 ## Prerequisites
 

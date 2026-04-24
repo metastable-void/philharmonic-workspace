@@ -16,8 +16,8 @@
   AES-256-GCM at-rest encryption, roles, role memberships,
   minting authorities, audit events; `pht_` long-lived API
   token format.
-- **`philharmonic-connector-common`** (v0.1.0 on crates.io;
-  v0.2.0 pending in-tree) — shared vocabulary for the connector
+- **`philharmonic-connector-common`** (v0.2.0 on crates.io,
+  published 2026-04-23) — shared vocabulary for the connector
   layer: COSE token and payload types (`ConnectorTokenClaims`,
   `ConnectorSignedToken`, `ConnectorEncryptedPayload`), realm
   model (`RealmId`, `RealmPublicKey`, `RealmRegistry`),
@@ -41,9 +41,8 @@
   step-record audit discipline (persisted subject drops
   `claims` and `tenant_id` by type construction).
 
-## Published as 0.0.0 placeholders
+## Connector triangle (published 2026-04-23)
 
-- **`philharmonic`** — meta-crate placeholder.
 - **`philharmonic-connector-client`** — the lowerer. Produces
   concrete `MechanicsConfig` values by fetching
   `TenantEndpointConfig` entities via policy, decrypting each
@@ -65,15 +64,40 @@
   decryption, dispatch. Wave A verify path landed 2026-04-22;
   Wave B decrypt path + `verify_and_decrypt` chain landed
   2026-04-23. Published as `0.1.0` on 2026-04-23.
-- **`philharmonic-api`** — public HTTP API.
-- Per-implementation crates (one per connector implementation —
-  e.g. `philharmonic-connector-impl-http-forward`,
-  `philharmonic-connector-impl-llm-openai-compat`,
+
+## Connector implementations (Phase 6 — published 2026-04-24)
+
+- **`philharmonic-connector-impl-api`** — non-crypto
+  trait-only crate hosting the `#[async_trait] Implementation`
+  trait plus re-exports of `ConnectorCallContext`,
+  `ImplementationError`, `JsonValue`, and the `async_trait`
+  macro. Published as `0.1.0` on 2026-04-24 (Phase 6 Task 0).
+- **`philharmonic-connector-impl-http-forward`** — generic
+  HTTP-forwarding connector. Reuses
+  `mechanics_config::HttpEndpoint` for config; handles
+  per-body-type decoding, full-jitter exponential retry with
+  Retry-After support, `response_max_bytes` enforcement via
+  streamed accumulator. Published as `0.1.0` on 2026-04-24
+  (Phase 6 Task 1).
+- **`philharmonic-connector-impl-llm-openai-compat`** —
+  OpenAI-compatible LLM connector covering OpenAI itself +
+  vLLM + Together + Groq + OpenRouter via three dialects
+  (`openai_native` / `vllm_native` / `tool_call_fallback`),
+  all with `strict: true` token-level schema enforcement.
+  Published as `0.1.0` on 2026-04-24 (Phase 6 Task 2).
+
+## Published as 0.0.0 placeholders (Phase 7+ and beyond)
+
+- **`philharmonic`** — meta-crate placeholder.
+- **`philharmonic-api`** — public HTTP API (Phase 8+).
+- Per-implementation crates pending for Phase 7:
   `philharmonic-connector-impl-llm-anthropic`,
   `philharmonic-connector-impl-llm-gemini`,
   `philharmonic-connector-impl-sql-postgres`,
   `philharmonic-connector-impl-sql-mysql`,
-  `philharmonic-connector-impl-email-smtp`, and so on).
+  `philharmonic-connector-impl-email-smtp`,
+  `philharmonic-connector-impl-embed`,
+  `philharmonic-connector-impl-vector-search`.
 
 The single `philharmonic-connector` crate in the earlier sketch
 has been split into four (common / client / router / service)

@@ -107,22 +107,31 @@ Published and stable:
   execution sequence, architecturally-enforced step-record
   audit discipline)
 
+Implemented and published (as of 2026-04-24):
+
+- `philharmonic-connector-client`, `-router`, `-service`
+  (the "connector triangle") — 0.1.0 on crates.io 2026-04-23.
+- `philharmonic-connector-impl-api` — 0.1.0 on crates.io
+  2026-04-24 (Phase 6 Task 0).
+- `philharmonic-connector-impl-http-forward` — 0.1.0 on
+  crates.io 2026-04-24 (Phase 6 Task 1).
+- `philharmonic-connector-impl-llm-openai-compat` — 0.1.0 on
+  crates.io 2026-04-24 (Phase 6 Task 2).
+
 Designed, not yet implemented:
 
-- `philharmonic-connector-client`
-- `philharmonic-connector-router`
-- `philharmonic-connector-service`
-- Per-implementation crates (one crate each, named
-  `philharmonic-connector-impl-<n>`)
-- `philharmonic-api`
+- Remaining per-implementation crates for Phase 7:
+  `llm-anthropic`, `llm-gemini`, `sql-postgres`, `sql-mysql`,
+  `email-smtp`, `embed`, `vector-search`.
+- `philharmonic-api` (Phase 8+).
 
 Remaining items blocking v1, per `14-open-questions.md`:
 
-- Per-implementation wire-protocol details — the exact
-  request/response JSON shapes for each v1 implementation
-  (`llm_generate`, `http_forward`, `sql_query`, `email_send`,
-  `embed`, `vector_search`), to be sketched against the first
-  impl and iterated.
+- Per-implementation wire-protocol details for the remaining
+  Phase 7 impls (`llm_anthropic`, `llm_gemini`, `sql_query`,
+  `email_send`, `embed`, `vector_search`). Phase 6's
+  `http_forward` and `llm_openai_compat` shipped 2026-04-24;
+  their wire-protocol details are concrete and published.
 
 The permission atom vocabulary in `09-policy-and-tenancy.md`
 is treated as closed for v1 and adjusted deliberately if

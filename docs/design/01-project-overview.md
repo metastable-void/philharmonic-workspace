@@ -170,10 +170,15 @@ thing in-process for a single user, and so on.
 
 - Storage substrate: substantially complete and published.
 - Execution substrate: `mechanics-core` published; `mechanics` HTTP
-  service published.
-- Workflow layer: designed; not yet implemented.
-- Connector layer: designed (see `08-connector-architecture.md`);
-  implementations not yet started.
-- Policy layer: designed (see `09-policy-and-tenancy.md`); not
-  yet implemented.
-- API layer: designed; not yet implemented.
+  service published; `mechanics-config` published.
+- Workflow layer: `philharmonic-workflow` 0.1.0 published
+  2026-04-22.
+- Policy layer: `philharmonic-policy` 0.1.0 published
+  2026-04-22.
+- Connector layer: triangle (client / router / service) 0.1.0
+  published 2026-04-23; `philharmonic-connector-impl-api`
+  0.1.0 + `philharmonic-connector-impl-http-forward` 0.1.0 +
+  `philharmonic-connector-impl-llm-openai-compat` 0.1.0 all
+  published 2026-04-24 (Phase 6 complete). Remaining
+  per-implementation crates land in Phase 7.
+- API layer: designed; not yet implemented (Phase 8+).

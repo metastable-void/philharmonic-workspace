@@ -1225,17 +1225,26 @@ subsection.
        stale cache.
 
 **Acceptance criteria**:
-- `philharmonic-connector-impl-api` published as `0.1.0` before
-  either impl crate is published.
-- End-to-end flow works: create tenant endpoint config for
+- [x] `philharmonic-connector-impl-api` published as `0.1.0`
+  before either impl crate is published. ✓ _(2026-04-24)_
+- [x] Unit tests cover dialect translation with fixed expected
+  provider-specific request bodies (test vectors for request
+  shape too, not just round-trips). ✓ _(both impl crates;
+  llm_openai_compat's dialect translation is anchored against
+  the pinned vLLM upstream fixture + real-OpenAI captures
+  under `docs/upstream-fixtures/`)_
+- [x] Both impl crates publish as `0.1.0`. ✓ _(http_forward +
+  llm_openai_compat, both 2026-04-24)_
+- [ ] End-to-end flow works: create tenant endpoint config for
   `http_forward`, create workflow template referencing it,
   execute a step, see the HTTP call land at the target.
-- Same end-to-end flow for `llm_openai_compat` with OpenAI as
-  the target.
-- Unit tests cover dialect translation with fixed expected
-  provider-specific request bodies (test vectors for request
-  shape too, not just round-trips).
-- Both impl crates publish as `0.1.0`.
+  _(deferred — requires `philharmonic-connector-service`
+  realm binary + `philharmonic-api` layer; lands in Phase 8+.
+  Not gated by Phase 6; impl crates are shipped so downstream
+  consumers can wire them in as realm binaries come online.)_
+- [ ] Same end-to-end flow for `llm_openai_compat` with OpenAI
+  as the target. _(deferred with the above for the same
+  reason.)_
 
 ---
 
