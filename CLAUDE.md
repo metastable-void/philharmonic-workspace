@@ -160,6 +160,16 @@ full in `CONTRIBUTING.md`. Read the full section before acting
 - **Library crates take bytes, not file paths.** File I/O,
   env-var lookup, config-file parsing belong in the bin.
   Crypto-adjacent APIs especially. ([§10.4](CONTRIBUTING.md#104-library-crate-boundaries))
+- **HTTP client split is strict.** Runtime crates (connector
+  impls, realm service binaries, `philharmonic-api`,
+  anything that ships) use **`reqwest` + `rustls-tls` + tokio**,
+  or `hyper` + rustls directly when reqwest's abstraction is
+  too thick. Workspace tooling (`xtask/` bins) uses **`ureq` +
+  rustls** via `xtask::http::fetch_text`. **Never `ureq` in a
+  runtime crate**, never `reqwest` + tokio in an xtask bin.
+  rustls for both; no native-tls, no OpenSSL. No third HTTP
+  client without scoping first.
+  ([§10.9](CONTRIBUTING.md#109-http-client-runtime-stack-vs-tooling-stack))
 - **Shell scripts are POSIX sh** (`#!/bin/sh`), not bash.
   Invoke by path (`./scripts/foo.sh`), never `bash foo.sh`.
   Validate with `./scripts/test-scripts.sh` after any change.

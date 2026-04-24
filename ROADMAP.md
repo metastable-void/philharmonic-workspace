@@ -1130,7 +1130,11 @@ subsection.
    - Error handling: upstream 4xx/5xx returns as a normal
      response (not an error); only network/timeout failures
      surface as `ImplementationError`.
-   - Use `reqwest` with `rustls-tls`.
+   - Use `reqwest` with `rustls-tls` (per the workspace HTTP-
+     client split — see CONTRIBUTING.md §10.9). tokio runtime;
+     a single `reqwest::Client` reused across calls; per-
+     request timeout from `HttpEndpoint.timeout_ms`. No
+     `ureq`, no `native-tls`.
    - Integration tests against a `wiremock`-backed local mock
      (preferred for determinism in CI); `httpbin.org` smokes
      optional and gated on an env flag.

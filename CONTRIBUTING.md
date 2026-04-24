@@ -1268,9 +1268,72 @@ appropriate.
 
 `async-trait` is used where trait objects need to be
 dyn-compatible (current Rust stable async-in-traits support is
-insufficient for trait-object use).
+insufficient for trait-object use). See
+[`docs/design/08-connector-architecture.md`](docs/design/08-connector-architecture.md)
+§"Why `async_trait` (in 2026)" for the specific compat
+reasons that drove the choice on the `Implementation` trait
+in `philharmonic-connector-impl-api`.
 
-### 10.9 Testing
+### 10.9 HTTP client: runtime stack vs. tooling stack
+
+The workspace uses two distinct HTTP clients, split strictly
+by role:
+
+| Role                                   | Client                | Runtime |
+| ---                                    | ---                   | ---     |
+| **Runtime crates** (libraries and bin crates that ship — connector impls, realm service binaries, `philharmonic-api`, etc.) | **`reqwest`** with `rustls-tls` (or **`hyper`** + `rustls` directly when reqwest's abstraction is too thick) | `tokio` |
+| **Workspace tooling** (`xtask/` bins — `web-fetch`, `crates-io-versions`, `openai-chat`, anything future) | **`ureq`** with `rustls` via `xtask::http::fetch_text` | synchronous |
+
+Hard rules:
+
+- **`ureq` is tooling-only.** No runtime crate depends on
+  `ureq`. A member crate's `Cargo.toml` pulling `ureq` is a
+  review block — either the crate is actually dev tooling and
+  belongs under `xtask/` (see [§8](#8-in-tree-workspace-tooling-xtask)),
+  or it should depend on `reqwest` instead.
+- **Runtime crates pick `reqwest` first, `hyper` only when
+  reqwest's abstraction genuinely gets in the way.** Custom
+  trailer handling, streaming body mutations, HTTP/2 frame
+  control, and similar lower-level concerns justify hyper.
+  "I prefer hyper's ergonomics" does not.
+- **No third HTTP client.** `isahc`, `surf`, `curl`-the-crate,
+  etc. are not approved. A new runtime HTTP dependency needs
+  an explicit scoping discussion before landing.
+- **Single TLS stack.** Both reqwest (with the `rustls-tls`
+  feature) and ureq (with the `rustls` feature) use rustls —
+  not native-tls, not OpenSSL, not system TLS. Keeps
+  statically-linkable musl builds simple, keeps the C-library
+  dep surface at zero, keeps the Windows-build story clean.
+- **tokio stays on the runtime side.** `xtask/` bins must
+  not pull tokio just to make one HTTP call — `ureq` (sync) is
+  the point.
+
+Reasoning for the split:
+
+- **Async fit.** Every runtime crate in Philharmonic lives in
+  tokio territory (per §10.8). `reqwest`'s async API composes
+  with the rest of the runtime naturally; `ureq` in a tokio
+  context would force `spawn_blocking` wrappers at every call
+  site — strictly worse than just using reqwest.
+- **Scoping clarity.** Reading a `Cargo.toml` tells you which
+  side of the split a crate is on without further context. A
+  `ureq` dep means "dev tooling"; a `reqwest` dep means
+  "service crate doing real network I/O."
+- **Dep surface, reviewed twice.** ureq is the smallest viable
+  sync HTTP client; reqwest carries hyper + tower + tokio
+  transitively. Forcing runtime crates through reqwest
+  concentrates the heavy dep-graph audit in one place rather
+  than spread across every impl crate.
+- **Tooling stays cheap.** xtask bins are short-lived shell
+  commands; the build cost of pulling tokio into each of them
+  would dominate the actual work they do.
+
+Doc 08 §"http_forward" spells the concrete shape for the
+first runtime consumer of this rule (reqwest + rustls-tls,
+`Client` reused across calls, per-request timeout from
+`HttpEndpoint.timeout_ms`).
+
+### 10.10 Testing
 
 Unit tests colocated with source (`#[cfg(test)] mod tests` or
 `mod.rs` tests). Integration tests in `tests/`. Real-
@@ -1281,7 +1344,7 @@ Test helpers factored into a shared module within the tests
 directory; no separate testing crates unless the helpers are
 genuinely shared across crates.
 
-### 10.10 Miri
+### 10.11 Miri
 
 Run `cargo +nightly miri test` routinely, via
 `./scripts/miri-test.sh`. Miri is an interpreter for Rust's

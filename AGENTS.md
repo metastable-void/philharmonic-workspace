@@ -177,7 +177,17 @@ Read the full section when in doubt.
   `&Path`-taking API in a crypto-adjacent crate is a smell.
   ([§10.4](CONTRIBUTING.md#104-library-crate-boundaries))
 - **Async.** `tokio` is the default. `tokio::sync` primitives.
-  `async-trait` on traits that need to be dyn-compatible.
+  `async-trait` on traits that need to be dyn-compatible — see
+  doc 08 §"Why `async_trait` (in 2026)" for the specific compat
+  reasons on the connector `Implementation` trait.
+- **HTTP client split.** Runtime crates (impl crates, service
+  binaries, `philharmonic-api`, anything shipping) use
+  **`reqwest` + `rustls-tls` + tokio** — or `hyper` + rustls
+  directly when reqwest's abstraction is too thick. `xtask/`
+  tooling bins use **`ureq` + rustls**. `ureq` in any runtime
+  crate is a review block. rustls in both; no native-tls, no
+  OpenSSL.
+  ([§10.9](CONTRIBUTING.md#109-http-client-runtime-stack-vs-tooling-stack))
 - **Re-exports.** Re-export types from direct dependencies that
   appear in public API. Don't re-export transitive deps. Don't
   re-export types the crate doesn't itself use.

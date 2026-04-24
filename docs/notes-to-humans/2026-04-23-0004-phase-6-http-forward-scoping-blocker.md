@@ -236,10 +236,25 @@ night.
   `async-trait = "0.1"` (stable surface for years); impl-api
   re-exports the macro so every impl crate uses the matching
   version.
-- **Blocker 3**: still open (reqwest + tokio vs alternatives).
+- **Blocker 3**: Yuka picked **`reqwest` (or raw `hyper` +
+  `rustls`) + `tokio`**. Broader rule: **`ureq` is tooling-
+  only** — `xtask/` bins continue using ureq; no runtime
+  crate may depend on ureq. Elevated to a workspace-wide
+  convention in CONTRIBUTING.md §10.9 "HTTP client: runtime
+  stack vs. tooling stack". CLAUDE.md + AGENTS.md mirror
+  bullets added so both agent families see the rule in their
+  executive summaries. Doc 08 §"Per-implementation crates"
+  and ROADMAP Phase 6 Task 1 updated to cross-reference §10.9
+  and spell out the `rustls-tls` feature, reused
+  `reqwest::Client`, and `HttpEndpoint.timeout_ms`-sourced
+  per-request timeout as the first concrete consumer of the
+  convention.
 - **Doc drift** (HttpEndpoint::validate_config →
-  prepare_runtime): fixed in the same commit.
+  prepare_runtime): fixed alongside Blocker 1.
 
-Next gate before any Codex dispatch: Yuka's call on Blocker
-3, then a fresh scoping note for `http_forward` against the
-new `connector-impl-api` contract.
+All three Phase 6 scoping blockers are now resolved. Next
+step before any Codex dispatch: a fresh focused scoping note
+for `http_forward` (against the new `connector-impl-api`
+contract, with `reqwest` and `wiremock` confirmed) — followed
+by creation + publish of `connector-impl-api` as Task 0 of
+Phase 6.

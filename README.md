@@ -436,7 +436,7 @@ Invoke by path (`./scripts/foo.sh`), not via `bash`.
   `--workspace` blindly. `MIRIFLAGS` is forwarded
   (e.g. `-Zmiri-disable-isolation`). Not in `pre-landing.sh` —
   run manually before publishing and on a periodic schedule.
-  See [`CONTRIBUTING.md §10.10 Miri`](CONTRIBUTING.md#1010-miri).
+  See [`CONTRIBUTING.md §10.11 Miri`](CONTRIBUTING.md#1011-miri).
 - `./scripts/pre-landing.sh [--no-ignored] [<crate>...]` —
   canonical pre-landing driver. Auto-detects modified crates
   from dirty submodules, then runs `rust-lint.sh`,

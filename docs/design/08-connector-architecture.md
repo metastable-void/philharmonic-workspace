@@ -284,8 +284,10 @@ and little else from the philharmonic namespace.
 
 One crate per implementation. Each implements the
 `Implementation` trait from `connector-impl-api`. Each carries
-its own external dependencies (reqwest, sqlx, lettre,
-qdrant-client, etc.).
+its own external dependencies — `reqwest` with `rustls-tls`
+for HTTP (per the workspace rule in CONTRIBUTING.md §10.9,
+which forbids `ureq` in runtime crates), `sqlx`, `lettre`,
+`qdrant-client`, etc., as the concern requires.
 
 Implementation crates depend only on `connector-impl-api`
 (and transitively `connector-common`); they don't see
