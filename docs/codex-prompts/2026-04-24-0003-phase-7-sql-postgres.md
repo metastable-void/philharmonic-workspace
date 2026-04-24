@@ -377,4 +377,21 @@ git -C . status --short
 
 ## Outcome
 
-Pending — will be updated after Codex run.
+Round 01 — **incomplete**. Codex session
+`019dbf1f-2702-70d0-84f1-042e09620c31` ran 10:53→11:03 UTC and
+**terminated mid-run** before executing `./scripts/pre-landing.sh`
+— no `task_complete` event, no structured summary. The 0.1.0
+scaffold (`Cargo.toml` / 7 `src/*.rs` / 4 `tests/*.rs` /
+`CHANGELOG.md` / `README.md`) is on disk but the crate **does not
+compile**: three errors in `src/types.rs` (`u32` is not
+`sqlx::Decode<Postgres>`; `PgTimeTz` lacks `Display`; unused
+`Column` import → would be clippy-fatal under `-D warnings`).
+
+Review: [`docs/notes-to-humans/2026-04-24-0006-phase-7-sql-postgres-review.md`](../notes-to-humans/2026-04-24-0006-phase-7-sql-postgres-review.md).
+
+Next step: either a narrow Codex round 02 scoped to the three
+compile fixes + unused-import + `tests/helpers.rs` →
+`tests/common/mod.rs` rename, or Claude-side housekeeping fix —
+see the review for the breakdown. Claude applied `cargo fmt -p
+philharmonic-connector-impl-sql-postgres` during the review pass
+(the only tree edit); otherwise Codex's tree is untouched.

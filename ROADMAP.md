@@ -1260,17 +1260,38 @@ implementation's wire protocol.
 
 **Priority ordering** (2026-04-24, captured from Yuka):
 
-- **Tier 1 — data-layer connectors** (do first):
-  - `philharmonic-connector-impl-sql-postgres`
-  - `philharmonic-connector-impl-sql-mysql`
-  - `philharmonic-connector-impl-vector-search`
-  - `philharmonic-connector-impl-embed`
+- **Tier 1 — data-layer connectors** (in progress):
+  - `philharmonic-connector-impl-sql-postgres` — 0.1.0
+    implementation landed 2026-04-24 (Codex round 01 +
+    Claude housekeeping fixes: Oid type, drop `timetz`
+    arm, `postgresql://` scheme alias, `tests/common/mod.rs`
+    layout, Docker-serialized integration tests). Ready
+    to publish.
+  - `philharmonic-connector-impl-sql-mysql` — 0.1.0
+    implementation landed 2026-04-24 (Codex round 01,
+    reviewer-approved). Docker-serialized integration
+    tests. Ready to publish.
+  - `philharmonic-connector-impl-vector-search` — 0.1.0
+    implementation landed 2026-04-24 (Codex round 01,
+    stateless in-memory cosine kNN per the spec). 34
+    tests passing, no external deps. Ready to publish.
+  - `philharmonic-connector-impl-embed` — round 01
+    (fastembed + ort) **reverted as a library choice**
+    after the glibc-only ort-download-binaries link
+    constraint was surfaced 2026-04-24; Yuka picked
+    `tract` + `tokenizers` for musl-native pure-Rust
+    inference. Rewrite plan in
+    [`docs/notes-to-humans/2026-04-24-0008-phase-7-embed-tract-pivot-plan.md`](docs/notes-to-humans/2026-04-24-0008-phase-7-embed-tract-pivot-plan.md).
+    Round-01 fastembed code committed as a checkpoint
+    (not published); tract-based round-02 Codex dispatch
+    is the next embed-scoped action.
 
-  SQL + vector + embed together unblock the data-access
-  shape of real workflows. `sqlx` handles both SQL
-  drivers; embed + vector-search share enough shape that
-  landing them in the same window keeps the mental context
-  loaded. Tier 1 is the active Phase-7 focus.
+  Three of four Tier 1 crates are compile-clean, green, and
+  publish-ready at 0.1.0. Publishing postponed this session
+  awaiting alignment + possibly co-landing with the tract-
+  based embed once it's in. Docker-backed integration tests
+  in both SQL crates use `serial_test`'s `#[file_serial(docker)]`
+  to prevent containers from piling up and OOMing the host.
 
 - **Tier 2 — SMTP** (do after Tier 1):
   - `philharmonic-connector-impl-email-smtp`
