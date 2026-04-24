@@ -213,3 +213,23 @@ I'll wait for your direction. Current JST 19:32 木 — still
 inside the extended-hours window, ~1 hour until 20:30, but I'd
 rather not dispatch Codex after I've left the loop for the
 night.
+
+---
+
+## Resolution (2026-04-24)
+
+- **Blocker 1**: Yuka picked **Option B** — a new non-crypto
+  crate `philharmonic-connector-impl-api` defines the trait.
+  Rationale: keep the crypto-reviewed `connector-service`'s
+  Gate-2 snapshot stable; impl crates don't pull a crypto dep
+  surface into their tree. Doc 08 updated in the same commit
+  to name the new crate in §"Crate organization" and
+  §"Implementation trait"; ROADMAP Phase 6 grew a Task 0
+  making impl-api creation a prerequisite.
+- **Blockers 2 and 3**: still open at the time of writing.
+- **Doc drift** (HttpEndpoint::validate_config →
+  prepare_runtime): fixed in the same commit.
+
+Next gate before any Codex dispatch: Yuka's call on Blockers
+2 and 3, then a fresh scoping note for `http_forward` against
+the new `connector-impl-api` contract.

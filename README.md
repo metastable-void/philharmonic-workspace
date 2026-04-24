@@ -55,6 +55,7 @@ philharmonic-workspace/
 ├── philharmonic-connector-client/             # submodule
 ├── philharmonic-connector-router/             # submodule
 ├── philharmonic-connector-service/            # submodule
+├── philharmonic-connector-impl-api/           # submodule
 ├── philharmonic-connector-impl-*/             # submodules (one per impl)
 ├── philharmonic-api/                          # submodule
 └── philharmonic/                              # submodule
@@ -86,6 +87,7 @@ Each submodule is a standalone Git repository at
 - `philharmonic-connector-client` — the lowerer (produces per-step encrypted payloads)
 - `philharmonic-connector-router` — per-realm HTTP dispatcher
 - `philharmonic-connector-service` — service framework for per-realm connector binaries
+- `philharmonic-connector-impl-api` — trait-only contract between service framework and impl crates (non-crypto)
 
 **Connector implementations** (one crate each):
 - `philharmonic-connector-impl-http-forward`
@@ -127,7 +129,9 @@ Design is substantially settled; implementation is in active progress.
 The connector triangle + foundational crates are published with
 substantive content; the per-implementation `philharmonic-connector-impl-*`
 crates remain at `0.0.0` placeholders on crates.io until their
-respective phases land.
+respective phases land. `philharmonic-connector-impl-api` is
+scheduled for creation alongside the first implementations
+(Phase 6) — see ROADMAP.
 
 Already published with substantive content:
 `philharmonic-types`, `philharmonic-store`,

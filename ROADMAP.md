@@ -1079,17 +1079,44 @@ the end-to-end path works: one generic HTTP implementation
 case).
 
 **Reference**: `08-connector-architecture.md`, specifically the
-full wire protocol specs under "v1 implementation set".
+full wire protocol specs under "v1 implementation set" and the
+§"Crate organization" → `philharmonic-connector-impl-api`
+subsection.
 
 **Crates touched**:
+`philharmonic-connector-impl-api` (new, prerequisite),
 `philharmonic-connector-impl-http-forward`,
 `philharmonic-connector-impl-llm-openai-compat`.
 
 **Tasks**:
 
+0. **`philharmonic-connector-impl-api` (prerequisite for 1 and 2)**:
+   - New non-crypto trait-only crate, created and published
+     before any impl crate in this phase. Rationale: doc 08
+     §"Implementation trait" locates the trait here rather than
+     in the crypto-reviewed `connector-service` crate, so that
+     non-breaking trait-surface changes don't re-trigger crypto
+     Gate 1 / Gate 2 on `connector-service`, and impl crates
+     don't pull the crypto dep surface into their tree.
+   - Public surface: the `#[async_trait] Implementation` trait
+     (full signature in doc 08) plus re-exports of
+     `ConnectorCallContext` and `ImplementationError` from
+     `connector-common`, and a re-export of `async_trait` from
+     the `async-trait` crate.
+   - Dependencies: `philharmonic-connector-common`,
+     `async-trait`, `serde_json` (for `serde_json::Value`).
+     No crypto deps, no HTTP stack, no tokio.
+   - Publish as `0.1.0`. Workspace members list + publish-queue
+     order updated accordingly.
+
 1. **`http_forward`**:
+   - Depends on `philharmonic-connector-impl-api` and
+     `mechanics-config`. Does **not** depend on
+     `philharmonic-connector-service` directly.
    - Config shape reuses `mechanics_config::HttpEndpoint`. Do not
      reinvent; depend on `mechanics-config` and use its type.
+     Load-time validation uses `HttpEndpoint::prepare_runtime`;
+     cache the returned `PreparedHttpEndpoint` for reuse.
    - Request shape: `{url_params, query, headers, body}`,
      validated against the config's `HttpEndpoint`.
    - Response shape: `{status, headers, body}`. Headers filtered
@@ -1098,10 +1125,13 @@ full wire protocol specs under "v1 implementation set".
      response (not an error); only network/timeout failures
      surface as `ImplementationError`.
    - Use `reqwest` with `rustls-tls`.
-   - Integration tests against `httpbin.org` or a local test
-     server.
+   - Integration tests against a `wiremock`-backed local mock
+     (preferred for determinism in CI); `httpbin.org` smokes
+     optional and gated on an env flag.
 
 2. **`llm_openai_compat`**:
+   - Depends on `philharmonic-connector-impl-api` (same
+     no-crypto dep surface as `http_forward`).
    - Config shape: `{base_url, api_key, dialect, timeout_ms}`.
    - Dialect enum: `openai_native` | `vllm_native` |
      `tool_call_fallback`.
@@ -1130,6 +1160,8 @@ full wire protocol specs under "v1 implementation set".
      a local vLLM container for `vllm_native`.
 
 **Acceptance criteria**:
+- `philharmonic-connector-impl-api` published as `0.1.0` before
+  either impl crate is published.
 - End-to-end flow works: create tenant endpoint config for
   `http_forward`, create workflow template referencing it,
   execute a step, see the HTTP call land at the target.
@@ -1138,7 +1170,7 @@ full wire protocol specs under "v1 implementation set".
 - Unit tests cover dialect translation with fixed expected
   provider-specific request bodies (test vectors for request
   shape too, not just round-trips).
-- Both crates publish as `0.1.0`.
+- Both impl crates publish as `0.1.0`.
 
 ---
 

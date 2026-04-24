@@ -162,7 +162,7 @@ applies to any implementation.
 
 ## Crate organization
 
-Four crates plus per-implementation crates:
+Five crates plus per-implementation crates:
 
 ### `philharmonic-connector-common`
 
@@ -231,6 +231,34 @@ realm.
 Minimal dependencies: `connector-common` for routing model
 types, plus standard HTTP infrastructure.
 
+### `philharmonic-connector-impl-api`
+
+Trait-only contract that per-implementation crates and the
+service framework agree on. Non-crypto; no key material; no
+network.
+
+- `Implementation` trait (one `async fn execute` method + a
+  `name` accessor — full signature in the §"Implementation
+  trait" below).
+- Re-exports `ConnectorCallContext` and `ImplementationError`
+  from `connector-common` so impl crates depend on exactly one
+  connector crate at call-site granularity.
+
+Depends on `connector-common` and `async-trait`. Nothing else
+from the philharmonic namespace; nothing crypto-sensitive.
+This separation means: updating the `Implementation` trait
+surface never touches the crypto-reviewed
+`connector-service` crate, and impl crates don't transitively
+pull crypto code into their dependency tree.
+
+Versioning discipline: the trait is an API seam between the
+service framework and every in-tree / third-party impl crate.
+A breaking change here forces a coordinated bump across every
+impl crate; a non-breaking extension (default-method, new
+optional re-export) is the typical release. Bumps to this
+crate don't trigger the crypto review protocol (the crate
+holds no keys and speaks no wire format).
+
 ### `philharmonic-connector-service`
 
 Framework for per-realm connector service binaries.
@@ -240,26 +268,30 @@ Framework for per-realm connector service binaries.
 - COSE_Encrypt0 payload decryption with the realm private key.
 - Token claim checking (expiry, realm, payload hash).
 - Implementation registry built at binary startup from linked
-  impl crates.
+  impl crates (holds `Box<dyn Implementation>` values from
+  `connector-impl-api`).
 - Dispatch to the implementation named by the decrypted
   payload's `impl` field.
 - Response path back to the executor.
 
 Per-realm binaries link the service framework together with
 the specific implementation crates configured for that realm.
-Depends on `connector-common` and little else from the
-philharmonic namespace.
+Depends on `connector-common` (crypto primitives, token
+claims), `connector-impl-api` (the trait it dispatches to),
+and little else from the philharmonic namespace.
 
 ### Per-implementation crates
 
 One crate per implementation. Each implements the
-`Implementation` trait from `connector-service`. Each carries
+`Implementation` trait from `connector-impl-api`. Each carries
 its own external dependencies (reqwest, sqlx, lettre,
 qdrant-client, etc.).
 
-Implementation crates depend only on `connector-service` and
-`connector-common`; they don't see workflow, policy, or
-storage concerns.
+Implementation crates depend only on `connector-impl-api`
+(and transitively `connector-common`); they don't see
+workflow, policy, storage, or any crypto concerns directly.
+The service framework in `connector-service` hands them only
+decrypted plaintext + verified context.
 
 Naming convention: `philharmonic-connector-impl-<name>`.
 
@@ -443,6 +475,14 @@ The framework never looks inside `config`.
 
 ### Implementation trait
 
+Defined in the dedicated trait-only crate
+`philharmonic-connector-impl-api`. The crypto-reviewed
+`connector-service` crate depends on it for dispatch; impl
+crates depend on it for the trait definition. Both routes
+converge on the same symbol without either depending on the
+other, and without pulling the crypto crate's dep surface into
+impl crates.
+
 ```rust
 #[async_trait]
 pub trait Implementation: Send + Sync {
@@ -465,6 +505,13 @@ pub struct ConnectorCallContext {
     pub expires_at: UnixMillis,
 }
 ```
+
+`ConnectorCallContext` and `ImplementationError` originate in
+`connector-common` and are re-exported by `connector-impl-api`,
+so impl crates can work against one direct dependency
+(`connector-impl-api`) rather than juggling the common crate
+alongside. The async-trait macro ships from the separate
+`async-trait` crate; `connector-impl-api` re-exports that too.
 
 Three inputs:
 
@@ -606,8 +653,10 @@ exactly. Summarized for reference:
   statuses eligible for retry).
 
 The connector service deserializes the `endpoint` object and
-calls `HttpEndpoint::validate_config` at load time; invalid
-configs fail before any external call happens.
+calls `HttpEndpoint::prepare_runtime` at load time; invalid
+configs fail (with an `io::Error`) before any external call
+happens, and the returned `PreparedHttpEndpoint` is cached for
+reuse across requests to the same config.
 
 #### Request shape (from script)
 
