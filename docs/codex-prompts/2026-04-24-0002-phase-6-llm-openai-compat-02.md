@@ -222,4 +222,63 @@ risks, git state, dep versions) applies unchanged.
 
 ## Outcome
 
-Pending — will be updated after Codex round-02 run.
+Completed 2026-04-24 (金); submodule `7bb5b61`, parent
+pointer `b3548e1`, pushed to origin.
+
+**Telling narrative wrinkle**: Codex initially regressed on
+the fixture-location correction — wrote the same
+`../../docs/upstream-fixtures/...` path-escape pattern that
+round 01 had used, despite the round-02 prompt being
+explicit. Claude reported to Yuka that Codex had finished
+(based on the `<task-notification>` completion signal) and
+was about to start a maintenance-level fix for the fixture
+paths, when Yuka spotted via `./scripts/codex-logs.sh` that
+Codex was in fact still running. At 09:45 JST the logs
+showed Codex `ls`-ing its own broken `tests/fixtures/` tree,
+immediately followed by the corrective `mkdir` + `cp` chain
+that produced the correct layout (`vllm/` subtree + full
+`openai-chat/` tree copied in from the workspace-root
+`docs/upstream-fixtures/`). Codex self-corrected mid-run
+before ultimately finishing for real. Moral: the
+orchestration-level completion notification isn't always
+accurate for codex-rescue dispatches; `codex-logs.sh` is
+the authoritative running-or-not signal. Claude held the
+tree untouched after Yuka's flag and resumed review only
+after Codex was truly done.
+
+**Final state**: 41 tests passing, pre-landing green,
+`cargo package --list` confirms fixtures pack correctly
+(every `tests/fixtures/**` file shows up in the tarball).
+All spec decisions honored:
+- `jsonschema = "0.46"` Draft 2020-12 ✓
+- Hardcoded minimal retry (3 attempts, full jitter, base
+  1000ms / cap 8000ms, Retry-After seconds only) ✓
+- `strict: true` on `response_format.json_schema` AND
+  `tools[0].function` ✓
+- `tool_call_fallback` happy path normalizes `finish_reason:
+  "stop"` to `EndTurn` ✓
+- `reqwest = "0.13"` matches http_forward pin ✓
+
+**Self-added module**: Codex introduced `src/types.rs` (40
+LOC) for shared provider-envelope types (`ChatCompletionResponse`
+et al.) used by the three dialect modules. Round-02 prompt
+explicitly permitted this; kept.
+
+**Flattened smokes**: round-02 followed the spec's file-tree
+block literally, placing smokes at `tests/smokes/*.rs`.
+Cargo's integration-test harness only picks up `.rs` files
+directly under `tests/`, so the three `#[ignore]`-d smoke
+fns were orphaned (not compiled). Claude moved them up to
+`tests/openai_smoke.rs` + `tests/vllm_smoke.rs` during the
+review pass; `cargo test -- --ignored --list` now discovers
+all three. Spec bug on my side — the module-layout block
+suggested the subdirectory. Not a Codex error.
+
+**Claude's end-to-end review** is at
+[`docs/notes-to-humans/2026-04-24-0004-phase-6-llm-openai-compat-review.md`](../notes-to-humans/2026-04-24-0004-phase-6-llm-openai-compat-review.md).
+Six non-blocking flags (hand-rolled SplitMix64 for jitter
+instead of a transitive `rand` or simpler nanos-modulus
+approach; spec-bug smokes-subdir carried into Codex's tree
+then flattened by Claude; a few minor doc-density and
+const-visibility notes). Review recommends publishing 0.1.0
+and landing follow-ups post-publish.
