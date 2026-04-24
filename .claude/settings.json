@@ -24,7 +24,8 @@
       "Bash(./scripts/pre-landing.sh philharmonic-connector-service *)",
       "Bash(./scripts/rust-test.sh philharmonic-connector-service *)",
       "Bash(./scripts/rust-test.sh philharmonic-connector-client *)",
-      "Bash(./scripts/rust-test.sh philharmonic-connector-common *)"
+      "Bash(./scripts/rust-test.sh philharmonic-connector-common *)",
+      "Bash(./scripts/pre-landing.sh)"
     ],
     "additionalDirectories": [
       "/tmp"

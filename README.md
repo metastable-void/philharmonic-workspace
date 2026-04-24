@@ -129,9 +129,9 @@ Design is substantially settled; implementation is in active progress.
 The connector triangle + foundational crates are published with
 substantive content; the per-implementation `philharmonic-connector-impl-*`
 crates remain at `0.0.0` placeholders on crates.io until their
-respective phases land. `philharmonic-connector-impl-api` is
-scheduled for creation alongside the first implementations
-(Phase 6) — see ROADMAP.
+respective phases land. `philharmonic-connector-impl-api`
+(Phase 6 Task 0) is in-tree at `0.1.0` — trait + re-exports
+populated, not yet published to crates.io pending Yuka's call.
 
 Already published with substantive content:
 `philharmonic-types`, `philharmonic-store`,

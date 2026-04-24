@@ -1090,7 +1090,7 @@ subsection.
 
 **Tasks**:
 
-0. **`philharmonic-connector-impl-api` (prerequisite for 1 and 2)**:
+0. **`philharmonic-connector-impl-api` (prerequisite for 1 and 2)** — _in-tree at 0.1.0 as of 2026-04-24; publish pending_:
    - New non-crypto trait-only crate, created and published
      before any impl crate in this phase. Rationale: doc 08
      §"Implementation trait" locates the trait here rather than
