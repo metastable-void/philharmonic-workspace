@@ -127,11 +127,12 @@ files tracked directly in the parent repo):
 
 Design is substantially settled; implementation is in active progress.
 The connector triangle + foundational crates are published with
-substantive content; the per-implementation `philharmonic-connector-impl-*`
-crates remain at `0.0.0` placeholders on crates.io until their
-respective phases land. `philharmonic-connector-impl-api`
-(Phase 6 Task 0) is in-tree at `0.1.0` — trait + re-exports
-populated, not yet published to crates.io pending Yuka's call.
+substantive content; Phase 6 Task 0 + Task 1 are done
+(`philharmonic-connector-impl-api` 0.1.0 and
+`philharmonic-connector-impl-http-forward` 0.1.0 both on
+crates.io as of 2026-04-24). The remaining
+`philharmonic-connector-impl-*` crates stay at `0.0.0`
+placeholders on crates.io until their respective phases land.
 
 Already published with substantive content:
 `philharmonic-types`, `philharmonic-store`,
@@ -141,7 +142,9 @@ Already published with substantive content:
 `philharmonic-workflow`,
 `philharmonic-connector-client` (0.1.0, 2026-04-23),
 `philharmonic-connector-service` (0.1.0, 2026-04-23),
-`philharmonic-connector-router` (0.1.0, 2026-04-23).
+`philharmonic-connector-router` (0.1.0, 2026-04-23),
+`philharmonic-connector-impl-api` (0.1.0, 2026-04-24),
+`philharmonic-connector-impl-http-forward` (0.1.0, 2026-04-24).
 
 ## Prerequisites
 

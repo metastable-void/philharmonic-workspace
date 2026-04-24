@@ -1090,7 +1090,7 @@ subsection.
 
 **Tasks**:
 
-0. **`philharmonic-connector-impl-api` (prerequisite for 1 and 2)** — _in-tree at 0.1.0 as of 2026-04-24; publish pending_:
+0. **`philharmonic-connector-impl-api` (prerequisite for 1 and 2)** ✓ _(done 2026-04-24, published as 0.1.0)_:
    - New non-crypto trait-only crate, created and published
      before any impl crate in this phase. Rationale: doc 08
      §"Implementation trait" locates the trait here rather than
@@ -1115,7 +1115,7 @@ subsection.
    - Publish as `0.1.0`. Workspace members list + publish-queue
      order updated accordingly.
 
-1. **`http_forward`**:
+1. **`http_forward`** ✓ _(done 2026-04-24, published as 0.1.0)_:
    - Depends on `philharmonic-connector-impl-api` and
      `mechanics-config`. Does **not** depend on
      `philharmonic-connector-service` directly.
@@ -1139,7 +1139,7 @@ subsection.
      (preferred for determinism in CI); `httpbin.org` smokes
      optional and gated on an env flag.
 
-2. **`llm_openai_compat`**:
+2. **`llm_openai_compat`** ← _next up; awaiting a focused impl spec round modeled on the http_forward spec (`docs/notes-to-humans/2026-04-24-0001-phase-6-task-1-http-forward-impl-spec.md`)_:
    - Depends on `philharmonic-connector-impl-api` (same
      no-crypto dep surface as `http_forward`).
    - Config shape: `{base_url, api_key, dialect, timeout_ms}`.
