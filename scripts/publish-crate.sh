@@ -97,38 +97,40 @@ printf '%s=== %s %s ===%s\n' "$C_HEADER" "$crate" "$tag" "$C_RESET"
 # only while this script runs. The committed
 # `.cargo/config.toml` is NOT modified.
 #
-# 1. CARGO_REGISTRY_DEFAULT=crates-io
-#    `.cargo/config.toml` has `[registry] default =
-#    "menhera-cooldown"`. Without this override, `cargo publish`
-#    would target the cooldown mirror; cargo then refuses with
-#    "dependencies sourced from other registries" because every
-#    third-party dep is tagged as coming from `crates-io`
-#    internally, and it treats the mirror as a different
-#    registry even when the mirror's `config.json` routes its
-#    `api` to real crates.io. Setting the env here makes the
-#    publish target crates-io directly (matching dep identity).
+# 1. `cargo pub-fresh` — workspace alias in
+#    `.cargo/config.toml` that expands to
+#    `cargo publish --config 'registry.default = "crates-io"'
+#                   --config 'source.menhera-cooldown.registry =
+#                             "sparse+https://index.crates.menhera.org/0d/"'`.
+#    (Name is `pub-fresh`, not `publish-fresh` or
+#    `fresh-publish` — both of those break in cargo 1.95
+#    with an extra `publish` positional appearing in the
+#    alias expansion. See `.cargo/config.toml`'s comment on
+#    the alias for the empirical matrix and the workaround.)
 #
-# 2. --config source.menhera-cooldown.registry =
-#    "sparse+https://index.crates.menhera.org/0d/"
-#    `.cargo/config.toml` also has
-#    `[source.crates-io].replace-with = "menhera-cooldown"`,
-#    which routes every source-resolution lookup (including
-#    the verify-build phase of `cargo publish`) through the
-#    Menhera mirror. The committed config points the
-#    `menhera-cooldown` source at `/3d/`, the 3-day cooldown
-#    endpoint — any workspace-internal dep published inside
-#    that window (e.g., philharmonic-connector-common 0.2.0
-#    when publishing impl-api the next day) is invisible and
-#    verify-build fails with "no matching package". The `/0d/`
-#    endpoint on the same Menhera proxy serves the index with
-#    no cooldown filtering; redirecting `menhera-cooldown` to
-#    it just for this invocation lets verify-build see fresh
-#    deps without touching the committed source-replacement
-#    wiring. Consumers pulling the newly-published crate
-#    through the default `/3d/` mirror will still see the
-#    usual ~3-day cooldown by design.
+#    The two `--config` overrides together let a publish run
+#    under the workspace's `.cargo/config.toml` cooldown-mirror
+#    shape (which has `[registry] default = "menhera-cooldown"`
+#    and `[source.crates-io].replace-with = "menhera-cooldown"`
+#    pointing at the `/3d/` endpoint). The first override aims
+#    the publish at `crates-io` so dep-registry identity
+#    matches the third-party deps' own `crates-io` tag (cargo
+#    otherwise refuses with "dependencies sourced from other
+#    registries"). The second redirects the source-replacement
+#    chain to the `/0d/` no-cooldown endpoint Yuka runs on the
+#    same Menhera proxy, so the verify-build step sees
+#    workspace-internal deps published inside the 3-day window
+#    (e.g., `philharmonic-connector-common 0.2.0` the next day)
+#    instead of failing with "no matching package".
 #
-# 3. CARGO_TARGET_DIR=target-publish
+#    Packaging the overrides as a cargo alias (rather than
+#    passing them here per-invocation) means every entry point
+#    to "publish under the workspace" converges on the same
+#    flags — `cargo pub-fresh` from a shell works exactly
+#    like this script does, and there's one place to maintain
+#    the `/0d/` URL if the proxy ever moves.
+#
+# 2. CARGO_TARGET_DIR=target-publish
 #    Verify-build compiles the packaged tarball; without a
 #    separate target directory, those artefacts would land in
 #    the shared `target/` that normal development (and any
@@ -138,28 +140,31 @@ printf '%s=== %s %s ===%s\n' "$C_HEADER" "$crate" "$tag" "$C_RESET"
 #    (see `.gitignore` and CONTRIBUTING.md §8.1).
 #
 # Cargo.lock is NOT modified by this flow — empirically
-# verified via the dry-run path; the workspace lockfile is
-# unaffected because the sparse-index URL switch produces no
-# resolution diff that would change source URLs in the lock.
-CARGO_REGISTRY_DEFAULT="crates-io"
+# verified; the `/3d/` → `/0d/` URL swap produces no
+# resolution diff because the resolver still picks identical
+# versions and the sparse-index URL is not recorded into the
+# lockfile.
+#
+# Consumers pulling the newly-published crate through the
+# workspace's default `/3d/` mirror are still 3-day-delayed
+# by design — that is a feature of the cooldown setup, not a
+# gap.
 CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-target-publish}"
-export CARGO_REGISTRY_DEFAULT CARGO_TARGET_DIR
-
-pub_config='source.menhera-cooldown.registry = "sparse+https://index.crates.menhera.org/0d/"'
+export CARGO_TARGET_DIR
 
 # Sanity: always run --dry-run first. Catches missing README,
 # unsatisfied dep versions, oversized tarballs, etc. before the real
 # publish.
-printf '%s=== cargo publish --dry-run -p %s ===%s\n' "$C_HEADER" "$crate" "$C_RESET"
-cargo publish --dry-run --config "$pub_config" -p "$crate"
+printf '%s=== cargo pub-fresh --dry-run -p %s ===%s\n' "$C_HEADER" "$crate" "$C_RESET"
+cargo pub-fresh --dry-run -p "$crate"
 
 if [ "$dry_run" -eq 1 ]; then
     printf '%s=== --dry-run: stopping; no real publish, no tag ===%s\n' "$C_WARN" "$C_RESET"
     exit 0
 fi
 
-printf '%s=== cargo publish -p %s ===%s\n' "$C_HEADER" "$crate" "$C_RESET"
-cargo publish --config "$pub_config" -p "$crate"
+printf '%s=== cargo pub-fresh -p %s ===%s\n' "$C_HEADER" "$crate" "$C_RESET"
+cargo pub-fresh -p "$crate"
 
 # Tag inside the submodule's own repo. Signed annotated tag matches
 # the workspace commit-signing rule.

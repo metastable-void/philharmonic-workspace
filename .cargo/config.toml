@@ -1,5 +1,35 @@
 [alias]
 xtask = "run --quiet -p xtask --bin"
+# pub-fresh: `cargo publish` with overrides that make the
+# publish flow work under this workspace's cooldown-mirror
+# config (see `[source.crates-io]` + `[registry]` below).
+# Consumed by scripts/publish-crate.sh. Without this alias,
+# a publish would either target the mirror by default (and
+# fail cargo's cross-registry identity check) or fail
+# verify-build when a workspace-internal dep was published
+# inside the 3-day cooldown window. The /0d/ endpoint on the
+# same Menhera proxy serves the index with no cooldown
+# filtering — used ONLY at publish time; normal builds stay
+# on /3d/.
+#
+# The name is `pub-fresh`, not `publish-fresh` or
+# `fresh-publish`. Both of those names break under cargo 1.95:
+# the alias expansion produces an extra `publish` token that
+# ends up as an unexpected positional argument to
+# `cargo publish`, triggering "unexpected argument 'publish'
+# found" before the overrides are applied. Reproduced in
+# isolation with a minimal CARGO_HOME + array-form alias, and
+# verified against single-hyphen variants (`fresh2-publish`,
+# `fres-publish`, etc.) which all work — the two failing
+# names collide with something in cargo's alias-resolution
+# ordering around the `publish` subcommand. `pub-fresh` has
+# no such collision, so that's what we use. Not worth
+# chasing upstream; the workaround is stable and named.
+pub-fresh = [
+    "publish",
+    "--config", "registry.default = \"crates-io\"",
+    "--config", "source.menhera-cooldown.registry = \"sparse+https://index.crates.menhera.org/0d/\"",
+]
 
 
 # Linker-level hardening for all GNU/Linux builds, any arch. The link
