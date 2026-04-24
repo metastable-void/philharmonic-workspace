@@ -569,4 +569,34 @@ guessing:
 
 ## Outcome
 
-Pending — will be updated after Codex run.
+**Halted 2026-04-24 ~18:40 JST (task id `a350df678cb92cf70`,
+stopped via `TaskStop`).**
+
+Codex had progressed substantially before the halt: modified
+`Cargo.toml`, `CHANGELOG.md`, `README.md`, and `src/lib.rs`
+in the submodule; added all module files (`src/client.rs`,
+`src/config.rs`, `src/dialect/` subtree, `src/error.rs`,
+`src/request.rs`, `src/response.rs`, `src/retry.rs`,
+`src/schema.rs`) plus a self-added `src/types.rs` that wasn't
+in the spec, plus a `tests/` directory. Parent tree: modified
+`Cargo.lock` and the submodule pointer.
+
+**Reason for halt**: item 5 of "In scope" was structurally
+wrong — instructed fixtures to be loaded via
+`include_str!("../../../docs/upstream-fixtures/...")` from
+the submodule's `tests/*.rs`, which escapes the submodule
+boundary. That breaks (a) standalone clone + build of the
+impl repo (GitHub Actions CI in the submodule repo has no
+access to the parent's `docs/upstream-fixtures/` tree), (b)
+`cargo publish --dry-run`'s "file is outside package
+directory" check, and (c) the published `.crate` tarball —
+downstream consumers couldn't build tests. Surfaced by Yuka
+mid-dispatch.
+
+**Resolution**: redispatch as **round 02** with fixtures
+copied into the submodule's own `tests/fixtures/` tree. See
+[`2026-04-24-0002-phase-6-llm-openai-compat-02.md`](./2026-04-24-0002-phase-6-llm-openai-compat-02.md)
+for the round-02 prompt and outcome. Partial work from this
+round is left in the submodule working tree as a starting
+state that round 02 can pick up and adapt (or replace) as
+needed.
