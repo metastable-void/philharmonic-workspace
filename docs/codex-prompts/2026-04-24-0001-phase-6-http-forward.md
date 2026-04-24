@@ -382,4 +382,32 @@ guessing:
 
 ## Outcome
 
-Pending — will be updated after Codex run completes.
+Completed cleanly 2026-04-24 (木→金 session; Codex run
+finished ~16:30 JST). Codex session id
+`019dbe49-92c4-7302-9d05-92ba6f801cf8`, job
+`task-mock8uqm-7in7om`.
+
+Codex produced all 7 `src/` modules + 4 `tests/` integration
+suites + updated Cargo.toml / CHANGELOG.md / README.md.
+Tests: **30 passed / 0 failed / 0 ignored** (13 unit in lib +
+8 error_cases + 3 happy_path + 1 request_vectors + 5 retry).
+Pre-landing: `=== pre-landing: all checks passed ===`. No
+commit, no push (correct per the prompt's Git rules). No
+`unsafe`, no panics in library `src/`, no `anyhow`. All
+three pre-resolved decisions (body:String JSON-encoded
+payload; mandatory response_max_bytes; reqwest 0.13)
+honored.
+
+Claude's end-to-end review is at
+[`docs/notes-to-humans/2026-04-24-0002-phase-6-http-forward-review.md`](../notes-to-humans/2026-04-24-0002-phase-6-http-forward-review.md).
+Six small flags identified (reqwest feature-name drift;
+`body: null` handling; `build_*_prepared` `pub(crate)`
+visibility in mechanics-config; dead `url` dep;
+`POSIX_CHECKLIST.md` file-mode change; workspace Cargo.lock
+legitimately-required diff) — all non-blocking; review
+recommends publishing 0.1.0 and deferring follow-ups.
+
+Codex's own summary flagged the three most interesting
+points (prepared-builder visibility, reqwest feature-name,
+Cargo.lock handling) accurately; the remaining flags were
+caught during Claude's review pass.
