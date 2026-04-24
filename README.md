@@ -138,6 +138,24 @@ shipped 0.1.0 on crates.io on 2026-04-24. The remaining
 placeholders on crates.io until their respective phases land
 (Phase 7+).
 
+**Phase 7 Tier 1 is in progress** (2026-04-24). Three of four
+Tier 1 data-layer connectors — `sql-postgres`, `sql-mysql`, and
+`vector-search` — are compile-clean, green, and locally ready
+at 0.1.0; publish is held until the fourth lands so Tier 1 can
+ship as a coherent set. The fourth, `embed`, is mid-pivot from
+`fastembed` + `ort` to pure-Rust `tract` + `tokenizers` after
+the glibc-only ort-download-binaries link constraint was
+surfaced (the deployment targets include musl); the round-01
+fastembed code is committed as a checkpoint and the tract
+rewrite plan is at
+[`docs/notes-to-humans/2026-04-24-0008-phase-7-embed-tract-pivot-plan.md`](docs/notes-to-humans/2026-04-24-0008-phase-7-embed-tract-pivot-plan.md).
+Docker-backed integration tests in the SQL crates are
+serialized across test binaries via
+`serial_test`'s `#[file_serial(docker)]` to keep containers
+from piling up and OOMing the host. See [`ROADMAP.md` §Phase 7](ROADMAP.md#phase-7--additional-implementations-parallel-safe)
+for the full tier breakdown and the Golden Week 2026 deferral
+of Tier 3.
+
 Already published with substantive content:
 `philharmonic-types`, `philharmonic-store`,
 `philharmonic-store-sqlx-mysql`, `mechanics-config`,
