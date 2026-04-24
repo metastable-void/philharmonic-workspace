@@ -794,6 +794,7 @@ the portable choice once.
 |---|---|---|
 | `./scripts/mktemp.sh [<slug>]` | `mktemp` | Delegates to `mktemp(1)` when present; falls back to a 10-char `[A-Za-z0-9]` suffix from `/dev/urandom` + `touch`. Fallback does **not** set 0600 perms (`chmod` after creation for confidential content). Caller **must** register cleanup: `trap 'rm -f "$tmp"' EXIT INT HUP TERM`. |
 | `./scripts/web-fetch.sh <URL> [<outfile>]` | `curl`, `wget` | Thin shim that `exec`s `./scripts/xtask.sh web-fetch -- "$@"`; the real implementation is `xtask/src/bin/web-fetch.rs` using `ureq` + `rustls`, so there's no dependency on `curl` / `wget` / `fetch` / `ftp` being on `PATH`. UA override via `WEB_FETCH_UA` (default `philharmonic-dev-agent/1.0`). HTTP 4xx/5xx fails the fetch (exit 2). Callers that want to continue regardless of HTTP status use `./scripts/web-fetch.sh ... || :` at the call site. |
+| `./scripts/new-submodule.sh --name <N> --description <D> --remote-url <URL> [--before <M>] [--skip-workspace-member] [--dry-run]` | hand-running `git submodule add` + template files by hand | Thin shim that `exec`s `./scripts/xtask.sh new-submodule -- "$@"`. Scaffolds a new submodule crate with workspace-standard `Cargo.toml` / `README.md` / `CHANGELOG.md` / `.gitignore` / licenses, configures the submodule's git (hooks path + gpg-sign mirroring `setup.sh`), and inserts the new crate into root `Cargo.toml` `[workspace].members` + `[patch.crates-io]`. Does **not** create the GitHub repo (caller does that) and does **not** commit (caller runs `commit-all.sh` + `push-all.sh`). See `xtask/src/bin/new-submodule.rs` for the full flow and exit-code story. |
 
 **When the wrapper's semantics don't match your need, extend
 it.** Don't reach around to raw `curl -fsSL` / `mktemp
@@ -854,9 +855,14 @@ xtask/
         │                         # consumed by scripts/codex-logs.sh
         ├── openai-chat.rs        # generic OpenAI chat-completion caller;
         │                         # consumed by scripts/project-status.sh
-        └── calendar-jp.rs        # JST workweek grid + Japanese public
-                                  # holidays; agent-facing
-                                  # deadline-context anchor
+        ├── calendar-jp.rs        # JST workweek grid + Japanese public
+        │                         # holidays; agent-facing
+        │                         # deadline-context anchor
+        └── new-submodule.rs      # scaffold a new workspace submodule
+                                  # crate (git submodule add + file
+                                  # templates + Cargo.toml member/patch
+                                  # insert); consumed by
+                                  # scripts/new-submodule.sh
 ```
 
 ### Agent usage of `calendar-jp`
