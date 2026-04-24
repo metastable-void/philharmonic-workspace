@@ -1313,6 +1313,17 @@ Hard rules:
 - **tokio stays on the runtime side.** `xtask/` bins must
   not pull tokio just to make one HTTP call — `ureq` (sync) is
   the point.
+- **reqwest version is workspace-wide consistent.** Every
+  reqwest-using crate in the workspace pins to the same
+  `major.minor` (e.g., `reqwest = "0.13"`). When a bump is
+  needed — a security advisory, an ecosystem-wide move to a
+  new major, a feature we actually need — every reqwest-using
+  crate moves together in the same PR / release window, not
+  piecemeal. Reason: mismatched reqwest majors balloon the
+  dep graph with two copies of hyper / http / tower, which
+  is both a disk-and-compile-time cost and a latent
+  behavior-drift risk when the two versions disagree on
+  e.g. HTTP/2 framing.
 
 Reasoning for the split:
 

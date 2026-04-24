@@ -1,10 +1,11 @@
 # Phase 6 Task 1 — `http_forward` implementation spec
 
 **Author**: Claude Code
-**Date**: 2026-04-24 (木)
+**Date**: 2026-04-24 (木); open questions resolved same day
 **Audience**: Yuka — review before I archive a Codex prompt
 derived from this doc.
-**Status**: draft for review
+**Status**: **approved for Codex prompt archival** (all three
+open questions resolved — see bottom of this doc)
 **Crate**: [`philharmonic-connector-impl-http-forward`](https://github.com/metastable-void/philharmonic-connector-impl-http-forward)
 
 ## Purpose
@@ -37,10 +38,12 @@ async-trait = "0.1"                        # 0.1.89 published
 philharmonic-connector-impl-api = "0.1"    # 0.1.0 — trait + JsonValue/ctx/error re-exports
 philharmonic-connector-common = "0.2"      # 0.2.0 — ImplementationError variants
 mechanics-config = "0.1"                   # 0.1.0 — HttpEndpoint + PreparedHttpEndpoint
-reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json", "gzip", "deflate", "brotli"] }
-# CAVEAT: reqwest latest at draft time is 0.13.2; pin to 0.13
-# once confirmed compatible with the rest of the stack — Codex
-# prompt will verify with crates-io-versions before landing.
+reqwest = { version = "0.13", default-features = false, features = ["rustls-tls", "json", "gzip", "deflate", "brotli"] }
+# 0.13 per resolution of Q3 below. First reqwest user in the
+# workspace; future reqwest-using crates also pin to 0.13. When
+# the workspace bumps reqwest (e.g., to 0.14), every reqwest-
+# using crate moves in lockstep in the same PR/release window
+# (CONTRIBUTING.md §10.9).
 tokio = { version = "1", features = ["rt", "macros", "time"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
@@ -400,13 +403,9 @@ a JSON-serialized `{ "status", "headers", "body" }` sub-object.
 Script-side inspection uses `JSON.parse(err.body)`. This
 matches the wire protocol doc 08 specifies.
 
-**Decision to confirm with Yuka**: is the `body: String` →
-JSON-encoded-string idiom acceptable, or should we extend
-`ImplementationError::UpstreamError` in `connector-common`
-0.3.0 to carry typed `headers` / `body` fields? (0.3.0 bump
-would trigger another Gate 1/2 cycle on connector-common.)
-Default: stick with `body: String` and JSON-encode — no
-breaking change to a crypto crate.
+**Resolved (Q1 below)**: keep `body: String` with JSON-encoded
+payload. No connector-common 0.3.0 bump; no additional crypto
+Gate 1/2 cycle.
 
 ## Response-body size enforcement
 
@@ -416,11 +415,13 @@ check on each chunk rather than buffering the whole thing. If
 the accumulator crosses the limit mid-stream, abort and return
 `ResponseTooLarge { limit, actual: accumulator }`.
 
-If `response_max_bytes` is `None`, fall back to a framework
-default (e.g., 8 MiB) — document the default in the crate's
-README. Alternative: require `response_max_bytes` to be set at
-config validation time. **Decision to confirm with Yuka**:
-framework default, or hard requirement?
+**Resolved (Q2 below)**: `response_max_bytes` is a **hard
+requirement** at config validation time. A config without the
+field fails load with `InvalidConfig { detail: "missing
+response_max_bytes" }` before any HTTP call. Rationale:
+unbounded response limits are an operational footgun; forcing
+the admin to choose the cap surfaces the decision rather than
+hiding it behind a default that might not match the workload.
 
 ## Testing plan
 
@@ -535,30 +536,27 @@ Plus from the Phase 6 preamble:
   1/2, but Claude reviews the Codex output end-to-end before
   publish).
 
-## Open questions for Yuka
+## Decisions (resolved 2026-04-24)
 
-Three decisions before I draft the Codex prompt:
+1. **`UpstreamError` payload shape**: keep `body: String` with
+   a JSON-encoded `{ status, headers, body }` sub-object. No
+   bump of `philharmonic-connector-common` to 0.3.0; no
+   additional crypto Gate 1/2 cycle. Script-side inspection
+   pattern: `JSON.parse(err.body)`.
+2. **`response_max_bytes`**: **mandatory** at config load.
+   Config without it fails with `InvalidConfig { detail:
+   "missing response_max_bytes" }`. No framework default;
+   surfaces the cap choice to the admin rather than hiding
+   it.
+3. **reqwest version pin**: **`"0.13"`** (newest stable minor
+   at time of writing; 0.13.2). `http_forward` is the first
+   reqwest user in the workspace. Going forward, every
+   subsequent reqwest-using crate pins to the same major.minor,
+   and any reqwest bump moves every reqwest-using crate in
+   lockstep within the same PR/release window. This policy is
+   documented in CONTRIBUTING.md §10.9.
 
-1. **`body: String` JSON-encoded-string idiom** for
-   `UpstreamError` payloads (status + headers + body bundled
-   into a JSON string), vs. bumping `connector-common` to
-   `0.3.0` with typed `headers` + `body` fields on the
-   `UpstreamError` variant. Default: keep `body: String`.
-
-2. **`response_max_bytes` default** when the config omits it.
-   Candidate values: 8 MiB (generous, matches modern JSON
-   API norms), 1 MiB (tight, matches the example in doc 08),
-   or make the field mandatory at config-load time (no
-   default; reject configs without it). Default proposal:
-   mandatory.
-
-3. **reqwest version pin**: `"0.12"` or `"0.13"`? Latest on
-   crates.io is 0.13.2; the rest of the workspace doesn't yet
-   have a reqwest dep to align with. Default proposal: pin to
-   `"0.13"` (newest stable minor).
-
-Once these are decided + you sign off on this spec, I archive
-a Codex prompt under
+Next step: archive a Codex prompt under
 `docs/codex-prompts/YYYY-MM-DD-NNNN-phase-6-http-forward.md`
-that inlines this spec (so Codex reads it in full) and spawn
-the Codex session per the `codex-prompt-archive` skill.
+that inlines this spec (so Codex reads it in full), then
+spawn the Codex session per the `codex-prompt-archive` skill.
