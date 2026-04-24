@@ -1,0 +1,36 @@
+{
+  "choices": [
+    {
+      "finish_reason": "stop",
+      "index": 0,
+      "logprobs": null,
+      "message": {
+        "annotations": [],
+        "content": "{\n  \"age\": 29,\n  \"email\": \"jane.doe@example.com\",\n  \"grade\": \"B\",\n  \"name\": \"Jane Doe\",\n  \"skills\": [\n    \"Project Management\",\n    \"Team Leadership\",\n    \"Data Analysis\",\n    \"Communication\"\n  ],\n  \"work_history\": [\n    {\n      \"company\": \"Tech Solutions Inc.\",\n      \"duration\": 3,\n      \"position\": \"Project Manager\"\n    },\n    {\n      \"company\": \"Creative Agency LLC\",\n      \"duration\": 2,\n      \"position\": \"Team Leader\"\n    },\n    {\n      \"company\": \"Data Insights Corp.\",\n      \"duration\": 1,\n      \"position\": \"Data Analyst\"\n    }\n  ]\n}",
+        "refusal": null,
+        "role": "assistant"
+      }
+    }
+  ],
+  "created": 1777021875,
+  "id": "chatcmpl-DY6r5ZwMiULLJeDmjrNuXP96zcyv5",
+  "model": "gpt-4o-mini-2024-07-18",
+  "object": "chat.completion",
+  "service_tier": "default",
+  "system_fingerprint": "fp_e2f9fd5023",
+  "usage": {
+    "completion_tokens": 154,
+    "completion_tokens_details": {
+      "accepted_prediction_tokens": 0,
+      "audio_tokens": 0,
+      "reasoning_tokens": 0,
+      "rejected_prediction_tokens": 0
+    },
+    "prompt_tokens": 132,
+    "prompt_tokens_details": {
+      "audio_tokens": 0,
+      "cached_tokens": 0
+    },
+    "total_tokens": 286
+  }
+}

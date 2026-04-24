@@ -4,15 +4,13 @@
 **Date**: 2026-04-24 (金)
 **Audience**: Yuka — review before I archive a Codex prompt
 derived from this doc.
-**Status**: **approved for Codex prompt archival (pending
-openai-chat xtask extension + fixture capture)** — all three
+**Status**: **approved for Codex prompt archival** — all three
 open questions resolved 2026-04-24 (see Decisions section at
-bottom). Before the Codex prompt can be archived and spawned,
-the `openai-chat` xtask (`xtask/src/bin/openai-chat.rs`) must
-be extended to support fixture capture, Yuka must run it with
-her OpenAI key to produce committed static JSON fixtures for
-the `openai_native` and `tool_call_fallback` dialects, and
-those fixtures must land in the tree.
+bottom). openai-chat xtask extension landed, OpenAI-strict-
+compatible fixtures captured and committed under
+[`docs/upstream-fixtures/openai-chat/`](../upstream-fixtures/openai-chat/).
+Project-wide `strict: true` discipline established (see
+§"Schema-strictness discipline" below).
 **Crate**: [`philharmonic-connector-impl-llm-openai-compat`](https://github.com/metastable-void/philharmonic-connector-impl-llm-openai-compat)
 
 ## Purpose
@@ -435,6 +433,7 @@ Outbound request to `{base_url}/chat/completions`:
       "function": {
         "name": "emit_output",
         "description": "Produce the structured output.",
+        "strict": true,
         "parameters": <output_schema>
       }
     }
@@ -450,13 +449,22 @@ Outbound request to `{base_url}/chat/completions`:
 }
 ```
 
+Note `"strict": true` on the function definition — same
+discipline as `response_format.json_schema.strict` in the
+`openai_native` path. Enforces token-level schema compliance
+in tool-calling mode.
+
 Response extraction: `choices[0].message.tool_calls[0].function.arguments`
-is a JSON string that parses into `output`. `finish_reason` is
-expected to be `tool_calls` on the happy path; map
-`tool_calls → EndTurn` for this dialect specifically (the
-tool-call is the normal completion here). `stop → EndTurn`
-(model gave up without calling; output will likely fail schema
-validation), `length → MaxTokens`.
+is a JSON string that parses into `output`. **`finish_reason`
+is `"stop"` on the happy path** — empirically verified against
+a real OpenAI capture (`docs/upstream-fixtures/openai-chat/
+tool_call_fallback/response.json`); when `tool_choice` forces
+a specific function and the model complies, OpenAI reports
+`finish_reason: "stop"`, not `"tool_calls"`, despite some docs
+suggesting otherwise. Map `stop → EndTurn` for this dialect
+just like the others. `length → MaxTokens`. `tool_calls` as a
+finish_reason (if ever seen) also → `EndTurn` for this
+dialect.
 
 If `tool_calls` is empty or absent, that's
 `MalformedProviderPayload` → `Internal` on the wire: the server
@@ -464,6 +472,31 @@ didn't call our forced tool despite `tool_choice`, and the
 resulting "output" from `content` is almost certainly not
 schema-shaped. Distinct from `SchemaValidationFailed` because
 we don't have an output to validate at all.
+
+### Schema-strictness discipline
+
+Both `openai_native` and `tool_call_fallback` send `strict:
+true` (on `json_schema` and `function` respectively). This is
+project-wide discipline, not a dialect-specific choice. The
+impl will **not** expose a `strict: false` escape hatch in
+v1; callers who configure an `output_schema` that uses
+strict-incompatible features (`pattern`, `minimum`/`maximum`,
+`minItems`/`maxItems`, `minProperties`/`maxProperties`,
+`format`, `minLength`/`maxLength`, `multipleOf`) will see
+OpenAI's 400 surface as `UpstreamError { status: 400, body:
+"... Invalid schema for response_format 'output': ..." }`.
+Out-of-the-box strict subsets that work: object types with
+all fields `required`, `additionalProperties: false` at every
+level, `enum` for finite string sets, arrays of simple types
+or simple objects. The committed
+[`docs/upstream-fixtures/openai-chat/sample_json_schema.json`](../upstream-fixtures/openai-chat/sample_json_schema.json)
+is the canonical example.
+
+**Future**: if a real caller needs richer schema features we
+can't express in strict mode, the escape is adding a new
+dialect variant (`openai_native_loose` or similar) in 0.2.0,
+not weakening the existing variant. Strict-by-default is the
+stance, with explicit opt-out per-dialect if/when needed.
 
 Header: `Authorization: Bearer <api_key>`. Content-Type: `application/json`.
 
@@ -556,10 +589,10 @@ pub fn validate(
 
 | provider `finish_reason` | `openai_native` → | `vllm_native` → | `tool_call_fallback` → |
 | ---                      | ---               | ---             | ---                    |
-| `stop`                   | `EndTurn`         | `EndTurn`       | `EndTurn` (fallback, output likely invalid) |
+| `stop`                   | `EndTurn`         | `EndTurn`       | `EndTurn` (the observed happy path — tool_choice-forced completion reports "stop", not "tool_calls") |
 | `length`                 | `MaxTokens`       | `MaxTokens`     | `MaxTokens`            |
 | `content_filter`         | `ContentFilter`   | `ContentFilter` | `ContentFilter`        |
-| `tool_calls`             | `Error`           | `Error`         | `EndTurn` (the expected happy path) |
+| `tool_calls`             | `Error`           | `Error`         | `EndTurn` (secondary happy path if ever observed) |
 | (other)                  | `Error`           | `Error`         | `Error`                |
 
 Any `finish_reason` not in the table maps to `Error` with the
@@ -898,7 +931,10 @@ freeform-text mode unchanged.
 
 ### What to commit
 
-Once Yuka runs:
+Captured 2026-04-24 via the committed xtask extension (commit
+history of `xtask/src/bin/openai-chat.rs` + the
+`docs/upstream-fixtures/openai-chat/` tree documents the
+actual runs):
 
 ```sh
 # openai_native dialect
@@ -924,7 +960,7 @@ Resulting tree:
 ```
 docs/upstream-fixtures/openai-chat/
 ├── README.md                              # provenance: model, date, capture command
-├── sample_json_schema.json                # input schema (same employee-profile shape as vLLM fixture)
+├── sample_json_schema.json                # OpenAI-strict-compatible variant of the vLLM schema
 ├── openai_native/
 │   ├── request.json                       # outbound HTTP body our impl should match byte-for-byte
 │   └── response.json                      # captured response envelope
@@ -933,20 +969,24 @@ docs/upstream-fixtures/openai-chat/
     └── response.json
 ```
 
-Note the deliberate shape-match with the vLLM fixture tree
-— same schema, same employee profile, so the three dialects
-are directly comparable and a reader can eyeball how each
-provider renders the same input.
+### `sample_json_schema.json` — not a symlink, deliberately
 
-### Sharing the input schema with the vLLM fixture
+The OpenAI fixture schema is an **OpenAI-strict-compatible
+variant** of the vLLM employee-profile schema, not a symlink
+to it. OpenAI's `strict: true` rejects the feature set the
+vLLM schema uses (`pattern` on `grade`/`email`, `minimum`/
+`maximum` on `duration`, `minItems`/`maxItems` on
+`work_history`, `minProperties`/`maxProperties` at top
+level), so we scrubbed those — `grade` uses `enum: ["A",
+"B", "C", "D"]` in place of the pattern, email drops its
+regex, the bounds / size constraints are dropped. Semantic
+parity (same keys, same required set, same
+`additionalProperties: false` discipline) is preserved.
 
-`sample_json_schema.json` at
-`docs/upstream-fixtures/openai-chat/` will be a **symlink**
-to `docs/upstream-fixtures/vllm/sample_json_schema.json` —
-one source of truth for "what schema are we testing
-against," avoiding divergence if either one is ever
-updated. (Symlinks commit fine under git; POSIX-hosts only
-per the workspace's WSL2 + macOS baseline.)
+This is a structural consequence of project-wide
+strict-mode discipline (see §"Schema-strictness discipline"
+above) and is documented in
+[`docs/upstream-fixtures/openai-chat/README.md`](../upstream-fixtures/openai-chat/README.md).
 
 ### Unit tests for the extension
 
@@ -981,13 +1021,22 @@ per the workspace's WSL2 + macOS baseline.)
 
 ---
 
-Next step (in order):
-1. **Claude**: extend `xtask/src/bin/openai-chat.rs` per the
-   precursor scope above. Land as its own commit.
-2. **Yuka**: run the capture commands, commit the resulting
-   fixtures under `docs/upstream-fixtures/openai-chat/`.
-3. **Claude**: archive a Codex prompt under
-   `docs/codex-prompts/YYYY-MM-DD-NNNN-phase-6-llm-openai-compat.md`
-   that inlines this spec (with the now-committed fixtures
-   referenced by path) and spawn the Codex session per the
-   `codex-prompt-archive` skill.
+Next step: **Claude** archives a Codex prompt under
+`docs/codex-prompts/YYYY-MM-DD-NNNN-phase-6-llm-openai-compat.md`
+that inlines this spec (with the committed fixtures referenced
+by path) and spawns the Codex session per the
+`codex-prompt-archive` skill.
+
+Completed precursor steps (2026-04-24):
+- xtask extension: `xtask/src/bin/openai-chat.rs` gained the
+  `--output-schema` / `--tool-call-fallback` / generation-knob
+  / `--capture-*` flags; `strict: true` on both the
+  `response_format.json_schema` and the `tools[].function`
+  paths. Unit tests land alongside. Backward-compat preserved
+  for `project-status.sh`.
+- Fixtures captured via the xtask against real OpenAI (model
+  `gpt-4o-mini`, resolved `gpt-4o-mini-2024-07-18`): request
+  + response JSON for both `openai_native` and
+  `tool_call_fallback`, plus an OpenAI-strict-compatible
+  `sample_json_schema.json` and a provenance README.md — all
+  under `docs/upstream-fixtures/openai-chat/`.

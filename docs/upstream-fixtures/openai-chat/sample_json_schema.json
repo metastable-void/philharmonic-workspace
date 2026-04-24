@@ -1,0 +1,33 @@
+{
+    "type": "object",
+    "properties": {
+        "name": {"type": "string"},
+        "age": {"type": "integer"},
+        "skills": {
+            "type": "array",
+            "items": {
+                "type": "string"
+            }
+        },
+        "grade": {
+            "type": "string",
+            "enum": ["A", "B", "C", "D"]
+        },
+        "email": {"type": "string"},
+        "work_history": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "company": {"type": "string"},
+                    "duration": {"type": "number"},
+                    "position": {"type": "string"}
+                },
+                "required": ["company", "duration", "position"],
+                "additionalProperties": false
+            }
+        }
+    },
+    "required": ["name", "age", "skills", "grade", "email", "work_history"],
+    "additionalProperties": false
+}

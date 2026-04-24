@@ -1,0 +1,46 @@
+{
+  "choices": [
+    {
+      "finish_reason": "stop",
+      "index": 0,
+      "logprobs": null,
+      "message": {
+        "annotations": [],
+        "content": null,
+        "refusal": null,
+        "role": "assistant",
+        "tool_calls": [
+          {
+            "function": {
+              "arguments": "{\"age\":30,\"email\":\"jane.doe@example.com\",\"grade\":\"A\",\"name\":\"Jane Doe\",\"skills\":[\"JavaScript\",\"Python\",\"Project Management\",\"Communication\"],\"work_history\":[{\"company\":\"Tech Solutions Inc.\",\"duration\":3,\"position\":\"Software Engineer\"},{\"company\":\"Global Innovations Ltd.\",\"duration\":2,\"position\":\"Project Manager\"}]}",
+              "name": "emit_output"
+            },
+            "id": "call_CvOcf0WInY8kyMHA7noMdVLW",
+            "type": "function"
+          }
+        ]
+      }
+    }
+  ],
+  "created": 1777021894,
+  "id": "chatcmpl-DY6rONLe5kBpv0fmYDFfFoh56vImF",
+  "model": "gpt-4o-mini-2024-07-18",
+  "object": "chat.completion",
+  "service_tier": "default",
+  "system_fingerprint": "fp_95c773cefe",
+  "usage": {
+    "completion_tokens": 71,
+    "completion_tokens_details": {
+      "accepted_prediction_tokens": 0,
+      "audio_tokens": 0,
+      "reasoning_tokens": 0,
+      "rejected_prediction_tokens": 0
+    },
+    "prompt_tokens": 111,
+    "prompt_tokens_details": {
+      "audio_tokens": 0,
+      "cached_tokens": 0
+    },
+    "total_tokens": 182
+  }
+}

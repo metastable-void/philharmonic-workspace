@@ -1,0 +1,81 @@
+{
+  "messages": [
+    {
+      "content": "Return an employee profile as JSON.",
+      "role": "system"
+    },
+    {
+      "content": "Give an example employee profile.",
+      "role": "user"
+    }
+  ],
+  "model": "gpt-4o-mini",
+  "response_format": {
+    "json_schema": {
+      "name": "output",
+      "schema": {
+        "additionalProperties": false,
+        "properties": {
+          "age": {
+            "type": "integer"
+          },
+          "email": {
+            "type": "string"
+          },
+          "grade": {
+            "enum": [
+              "A",
+              "B",
+              "C",
+              "D"
+            ],
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "skills": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "work_history": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "company": {
+                  "type": "string"
+                },
+                "duration": {
+                  "type": "number"
+                },
+                "position": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "company",
+                "duration",
+                "position"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "name",
+          "age",
+          "skills",
+          "grade",
+          "email",
+          "work_history"
+        ],
+        "type": "object"
+      },
+      "strict": true
+    },
+    "type": "json_schema"
+  }
+}

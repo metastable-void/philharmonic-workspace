@@ -231,6 +231,7 @@ fn build_request_body(
                     "function": {
                         "name": "emit_output",
                         "description": "Produce the structured output.",
+                        "strict": true,
                         "parameters": schema,
                     }
                 }]),
@@ -385,21 +386,30 @@ fn main() -> ExitCode {
 
     let auth = format!("Bearer {api_key}");
 
-    let response = match ureq::post(API_URL)
+    // Configure ureq to NOT turn 4xx/5xx into an Err — we want the
+    // response body regardless of status so callers can see what
+    // OpenAI actually said (e.g., "schema feature X not supported
+    // in strict mode") and so --capture-response writes a useful
+    // diagnostic fixture on error.
+    let agent: ureq::Agent = ureq::Agent::config_builder()
+        .http_status_as_error(false)
+        .build()
+        .into();
+
+    let response = match agent
+        .post(API_URL)
         .header("Authorization", &auth)
         .header("Content-Type", "application/json")
         .send(&body_bytes[..])
     {
         Ok(r) => r,
-        Err(ureq::Error::StatusCode(code)) => {
-            eprintln!("!!! openai-chat: HTTP {code} from OpenAI");
-            return ExitCode::from(2);
-        }
         Err(e) => {
             eprintln!("!!! openai-chat: request failed: {e}");
             return ExitCode::from(2);
         }
     };
+
+    let status = response.status().as_u16();
 
     let body_str = match response.into_body().read_to_string() {
         Ok(s) => s,
@@ -409,10 +419,14 @@ fn main() -> ExitCode {
         }
     };
 
+    // Parse as JSON — on non-2xx this may be an error envelope
+    // (`{"error": {"message": ..., "type": ..., "code": ...}}`)
+    // or a plain-text error; treat malformed JSON as a hard failure.
     let response_value: Value = match serde_json::from_str(&body_str) {
         Ok(v) => v,
         Err(e) => {
-            eprintln!("!!! openai-chat: failed to parse response JSON: {e}");
+            eprintln!("!!! openai-chat: HTTP {status} from OpenAI; response is not JSON: {e}");
+            eprintln!("!!! openai-chat: raw body:\n{body_str}");
             return ExitCode::from(2);
         }
     };
@@ -422,6 +436,15 @@ fn main() -> ExitCode {
     {
         eprintln!("!!! openai-chat: failed to write {}: {e}", path.display());
         return ExitCode::from(1);
+    }
+
+    if !(200..300).contains(&status) {
+        let detail = response_value
+            .pointer("/error/message")
+            .and_then(Value::as_str)
+            .unwrap_or(&body_str);
+        eprintln!("!!! openai-chat: HTTP {status} from OpenAI: {detail}");
+        return ExitCode::from(2);
     }
 
     // Freeform mode: print the assistant's content to stdout.
@@ -510,6 +533,7 @@ mod tests {
         assert_eq!(tools.len(), 1);
         assert_eq!(tools[0]["type"], "function");
         assert_eq!(tools[0]["function"]["name"], "emit_output");
+        assert_eq!(tools[0]["function"]["strict"], true);
         assert_eq!(tools[0]["function"]["parameters"], schema);
 
         let choice = body.get("tool_choice").expect("tool_choice present");
