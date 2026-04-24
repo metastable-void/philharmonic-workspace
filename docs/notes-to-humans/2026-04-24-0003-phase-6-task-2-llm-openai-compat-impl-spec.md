@@ -4,10 +4,15 @@
 **Date**: 2026-04-24 (金)
 **Audience**: Yuka — review before I archive a Codex prompt
 derived from this doc.
-**Status**: **draft — three open questions at the bottom awaiting
-resolution** (Q1 jsonschema crate, Q2 non-vLLM fixture policy,
-Q3 retry-policy shape). Once resolved, status flips to
-"approved for Codex prompt archival".
+**Status**: **approved for Codex prompt archival (pending
+openai-chat xtask extension + fixture capture)** — all three
+open questions resolved 2026-04-24 (see Decisions section at
+bottom). Before the Codex prompt can be archived and spawned,
+the `openai-chat` xtask (`xtask/src/bin/openai-chat.rs`) must
+be extended to support fixture capture, Yuka must run it with
+her OpenAI key to produce committed static JSON fixtures for
+the `openai_native` and `tool_call_fallback` dialects, and
+those fixtures must land in the tree.
 **Crate**: [`philharmonic-connector-impl-llm-openai-compat`](https://github.com/metastable-void/philharmonic-connector-impl-llm-openai-compat)
 
 ## Purpose
@@ -45,7 +50,7 @@ tokio = { version = "1", features = ["rt", "macros", "time"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 thiserror = "2"
-jsonschema = "0.46"                        # 0.46.2 — Q1 below; contentious
+jsonschema = "0.46"                        # 0.46.2 — Q1 resolved; passes --min-age-days 3 cooldown as of 2026-04-24
 # No direct `url`, no direct `base64`: URLs are joined as strings
 # (simple `{base_url}/chat/completions` concat with single-slash
 # normalization), and there are no opaque-bytes body fields.
@@ -61,8 +66,9 @@ Notes:
   rustls, json, gzip/deflate/brotli. Same major.minor pin
   (0.13) as http_forward per CONTRIBUTING.md §10.9 workspace-
   consistency rule.
-- `jsonschema` is pinned to `"0.46"` tentatively — see Q1
-  below. If we go with a different crate, this line changes.
+- `jsonschema` is pinned to `"0.46"` (Q1 resolved): the
+  Stranger6667/jsonschema crate, Draft 2020-12 support, latest
+  stable is `0.46.2` and clears the 3-day cooldown check.
 - No `rand` or `httpdate` dep needed unless Q3 resolves with a
   retry policy that uses jitter or parses `Retry-After`. Left
   out of this block; add if Q3 pulls them in.
@@ -663,20 +669,50 @@ subtly wrong.
   - For each dialect × each provider `finish_reason`, assert
     the normalized `StopReason` per the table above.
 
-### Fixture provenance (see Q2)
+### Fixture provenance (Q2 resolved)
 
 - `vllm_native` request fixtures: committed upstream JSON at
   `docs/upstream-fixtures/vllm/`, pinned
   `cf8a613a87264183058801309868722f9013e101`. Tamper-evident.
-- `openai_native` + `tool_call_fallback` request fixtures:
-  **to-be-synthesized** from OpenAI's public chat-completions
-  API docs (no upstream Python source to extract from; tests
-  aren't public JSON). Q2 below asks how to anchor these
-  against drift.
-- Response fixtures for all three dialects: synthesized to
-  match the OpenAI chat-completion envelope (stable,
-  documented, mimicked by vLLM). Drift-catching falls to the
-  smokes below.
+- `openai_native` + `tool_call_fallback` request **and
+  response** fixtures: **captured from the real OpenAI API**
+  via the `openai-chat` xtask (extended for fixture capture;
+  see precursor step below). Committed under
+  `docs/upstream-fixtures/openai-chat/` alongside the vLLM
+  fixtures, each with a sidecar `README.md` recording the
+  model, timestamp, and captured-from command line. Tamper-
+  evident against drift: re-running the capture against the
+  same model + prompt yields byte-comparable output modulo
+  the documented non-determinism fields (see below).
+- Response fixtures for `vllm_native`: committed as a
+  captured response from the `vllm_smoke` run (when Yuka is
+  in-network to the Xeon 8259CL box); until that capture
+  lands, the tests use a synthesized response that follows
+  the OpenAI chat-completion envelope (which vLLM mimics).
+
+Re-capture cadence: any time the impl is suspected of
+dialect drift, re-run the xtask fixture-capture with the
+same inputs; any non-empty diff against the committed
+fixture is either upstream drift (provider's wire format
+changed) or a real regression in the impl.
+
+**Non-determinism handling**: OpenAI responses include
+fields that vary per call — `id` (request ID), `created`
+(Unix timestamp), `system_fingerprint`, and of course the
+actual generated `content`/`tool_calls.arguments`. The
+xtask captures the full response verbatim, but the test
+assertions assert only the **shape** (presence + types) of
+those fields, not their values; the deterministic-bytes
+assertion is scoped to the **request** body only.
+
+### Precursor step — `openai-chat` xtask extension
+
+Before any Codex dispatch for the impl itself, extend the
+existing `xtask/src/bin/openai-chat.rs` to support fixture
+capture. The extension is workspace tooling, so it's
+Claude's job (not Codex's). Proposed scope — separate
+section below the main spec; see "Precursor: `openai-chat`
+xtask extension".
 
 ### Optional smokes (`#[ignore]`-d, env-gated)
 
@@ -751,78 +787,196 @@ subtly wrong.
 - [ ] Publishes as `0.1.0` (after Codex implementation + Claude
   review + Gate-2-equivalent review).
 
-## Open questions (to resolve before Codex prompt archival)
+## Decisions (resolved 2026-04-24)
 
-1. **Q1: `jsonschema` crate choice.**
-   Options:
-   - **`jsonschema = "0.46"`** (Stranger6667/jsonschema) —
-     current draft spec baseline. Draft 2020-12 support,
-     moderately fast, actively maintained, ~450k downloads/month.
-     Transitive deps include `fancy-regex`, `fraction`,
-     `uuid`, `url`. Roughly 15 deps total.
-   - **`boon` = "0.6"`** — slimmer alternative; fewer deps
-     (~8), JSON-Schema-2020-12 only, comparable speed. Less
-     ecosystem familiarity.
-   - **Hand-rolled subset validation** — implement only the
-     schema keywords OpenAI's `response_format: json_schema`
-     accepts (`type`, `properties`, `required`, `items`,
-     `additionalProperties`, `enum`, `pattern`, `minimum`/
-     `maximum`, `minItems`/`maxItems`, `minProperties`/
-     `maxProperties`). ~500 LOC, zero dep cost, brittle
-     against schemas that go beyond that subset.
+1. **`jsonschema` crate choice → `jsonschema = "0.46"`**
+   (Stranger6667/jsonschema). Conditional on being the latest
+   non-rc with 3-day cooldown clearance — confirmed: 0.46.2
+   is the latest stable and clears the cooldown check via
+   `./scripts/xtask.sh crates-io-versions -- jsonschema`.
+   Draft 2020-12 support, matches OpenAI's cited schema
+   draft. The transitive-dep weight (~15 crates incl.
+   fancy-regex, fraction, uuid, url) is acceptable for a
+   security-adjacent validation path; hand-rolling would
+   invite bugs.
 
-   **My recommendation: `jsonschema = "0.46"`.** It's the
-   canonical choice; the transitive weight is modest; hand-
-   rolling invites bugs in a security-adjacent code path
-   (schema validation is what stops a compromised LLM from
-   smuggling structured injection payloads past the script's
-   type checks).
+2. **Non-vLLM fixture anchoring → real-API capture via
+   extended `openai-chat` xtask.**
+   The existing `xtask/src/bin/openai-chat.rs` gets extended
+   with fixture-capture flags. Yuka runs it with her OpenAI
+   API key to capture a one-off request/response pair per
+   dialect (`openai_native` and `tool_call_fallback`);
+   captured bytes land in `docs/upstream-fixtures/openai-chat/`
+   with per-file sidecar metadata. Future: a sibling xtask
+   for OpenAI's newer `/v1/responses` endpoint (not needed
+   for Task 2 since `llm_openai_compat` per doc 08 targets
+   `/chat/completions`; out of scope here, open for when we
+   want to cover the new endpoint's shape).
+   Precursor scope spelled out in the next section —
+   tooling change lands before the Codex prompt is archived.
 
-2. **Q2: Non-vLLM fixture anchoring.**
-   We have tamper-evident vllm_native fixtures from upstream.
-   `openai_native` + `tool_call_fallback` have no equivalent
-   public-tests source — OpenAI's openai-python repo has
-   mocked unit tests but doesn't commit byte-exact wire
-   fixtures, and the Azure/OpenAI API reference is in prose.
-   Options:
-   - **Synthesize-and-smoke.** Write expected request bytes
-     by hand against the API docs, commit as fixtures, rely
-     on the `#[ignore]`-d `openai_smoke` to catch drift.
-     (Current draft position.)
-   - **Extract from openai-python unit tests.** Their tests
-     under `tests/api_resources/chat/test_completions.py` have
-     mock-response bodies but the request bytes are
-     constructed in-test from Pydantic. Less clean than vLLM's
-     upstream; would need mechanical lift + verification
-     against the API docs anyway.
-   - **Import a small "golden" capture from a real API run.**
-     Tee one real request/response per dialect into a
-     check-summed fixture. Higher fidelity but requires a
-     one-off live API call; fixture would need periodic
-     refresh when models / schemas drift.
-
-   **My recommendation: synthesize-and-smoke.** The
-   openai-chat-completions wire contract is ~decade-stable;
-   synthesis from the API docs gets us a deterministic CI,
-   and the optional smoke catches drift whenever it happens.
-   Low fidelity loss.
-
-3. **Q3: Retry policy for v1.**
-   See "Retry" section above. Three options: no retries /
-   hardcoded minimal / config-carried.
-
-   **My recommendation: hardcoded minimal (option 2).**
-   LLM-provider 429s are frequent enough that "ignore and
-   tell the script to handle it" is user-hostile, but
-   config-carried retry adds surface we don't yet know the
-   shape of. Ship basic retries (2 attempts, exp backoff,
-   respect `Retry-After` seconds) baked in; promote to
-   config-carried in 0.2.0 if anyone complains.
+3. **Retry policy for v1 → hardcoded minimal (option 2).**
+   Baked-in retry: 2 retry attempts (so max_attempts = 3) on
+   HTTP 429, HTTP 5xx, network I/O errors; full-jitter
+   exponential backoff with base 1000ms, cap 8000ms; honor
+   `Retry-After` on 429 for seconds-format (HTTP-date format
+   out of scope per non-goals). No `retry_policy` field in
+   the config in v1. Promote to config-carried retry in
+   0.2.0 if a real caller needs it. This pulls `rand` 0.9 as
+   a transitive of `reqwest` already, so no new direct dep;
+   verify at implementation time.
 
 ---
 
-Next step: archive a Codex prompt under
-`docs/codex-prompts/YYYY-MM-DD-NNNN-phase-6-llm-openai-compat.md`
-that inlines this spec (so Codex reads it in full), then
-spawn the Codex session per the `codex-prompt-archive` skill.
-Only once Q1/Q2/Q3 are resolved.
+## Precursor: `openai-chat` xtask extension
+
+Goal: let Yuka capture a small, stable set of real OpenAI
+`/chat/completions` request/response fixtures for the two
+non-vLLM dialects without hand-writing bytes or pasting from
+a browser.
+
+### Scope
+
+Extend the existing bin at
+[`xtask/src/bin/openai-chat.rs`](../../xtask/src/bin/openai-chat.rs).
+**Backward compatible** — the `project-status.sh` caller
+continues to work unchanged (existing flags stay; new flags
+are all optional).
+
+New flags:
+
+- `--output-schema <PATH>` — JSON file containing a JSON
+  Schema. When set, the request uses `response_format:
+  {"type": "json_schema", "json_schema": {"name": "output",
+  "strict": true, "schema": <schema>}}`. Enables the
+  `openai_native` dialect's fixture-capture path.
+- `--tool-call-fallback` — when set together with
+  `--output-schema`, the request uses the synthetic
+  `tools` + `tool_choice` pattern instead of
+  `response_format`. Enables the `tool_call_fallback`
+  dialect's fixture-capture path. Mutually exclusive with
+  the no-op "native" path: setting this flag without
+  `--output-schema` fails with a clear error.
+- `--max-completion-tokens <N>`, `--temperature <F>`,
+  `--top-p <F>`, `--stop <TOKEN>` (repeatable) — forwarded
+  to the request verbatim. Generation-knob coverage.
+- `--capture-request <PATH>` — write the outbound HTTP
+  request body (JSON) to PATH before sending. Pretty-
+  printed via `serde_json::to_string_pretty` so the
+  committed fixture is readable diff-wise.
+- `--capture-response <PATH>` — write the raw HTTP
+  response body to PATH after receiving (whether 2xx or
+  error). Also pretty-printed.
+- `--capture-dir <DIR>` — convenience: equivalent to
+  `--capture-request <DIR>/request.json --capture-response
+  <DIR>/response.json`. Creates the directory if missing.
+
+### Output-schema behavior changes
+
+The bin currently parses the response as a simple
+`ChatResponse { choices: Vec<{ message: { content: String }}> }`
+and prints `content`. With `--output-schema` or
+`--tool-call-fallback`, that parser would fail on any
+structured-output response (content is JSON-in-a-string, or
+`content` is null and `tool_calls` carries the payload).
+
+The simplest fix: when either structured-output flag is
+set, **skip the content-to-stdout step entirely** — capture
+flags are the only meaningful output of that mode. Existing
+freeform-text mode unchanged.
+
+### What to commit
+
+Once Yuka runs:
+
+```sh
+# openai_native dialect
+./scripts/xtask.sh openai-chat -- \
+    --model gpt-4o-mini \
+    --system-prompt "Return an employee profile as JSON." \
+    --prompt "Give an example employee profile." \
+    --output-schema docs/upstream-fixtures/openai-chat/sample_json_schema.json \
+    --capture-dir docs/upstream-fixtures/openai-chat/openai_native/
+
+# tool_call_fallback dialect
+./scripts/xtask.sh openai-chat -- \
+    --model gpt-4o-mini \
+    --system-prompt "Return an employee profile as JSON." \
+    --prompt "Give an example employee profile." \
+    --output-schema docs/upstream-fixtures/openai-chat/sample_json_schema.json \
+    --tool-call-fallback \
+    --capture-dir docs/upstream-fixtures/openai-chat/tool_call_fallback/
+```
+
+Resulting tree:
+
+```
+docs/upstream-fixtures/openai-chat/
+├── README.md                              # provenance: model, date, capture command
+├── sample_json_schema.json                # input schema (same employee-profile shape as vLLM fixture)
+├── openai_native/
+│   ├── request.json                       # outbound HTTP body our impl should match byte-for-byte
+│   └── response.json                      # captured response envelope
+└── tool_call_fallback/
+    ├── request.json
+    └── response.json
+```
+
+Note the deliberate shape-match with the vLLM fixture tree
+— same schema, same employee profile, so the three dialects
+are directly comparable and a reader can eyeball how each
+provider renders the same input.
+
+### Sharing the input schema with the vLLM fixture
+
+`sample_json_schema.json` at
+`docs/upstream-fixtures/openai-chat/` will be a **symlink**
+to `docs/upstream-fixtures/vllm/sample_json_schema.json` —
+one source of truth for "what schema are we testing
+against," avoiding divergence if either one is ever
+updated. (Symlinks commit fine under git; POSIX-hosts only
+per the workspace's WSL2 + macOS baseline.)
+
+### Unit tests for the extension
+
+- `openai-chat` currently has no unit tests (it's a
+  thin I/O wrapper). The extension adds:
+  - `tests::response_format_object_shape` — given an
+    `--output-schema` input, the constructed request body
+    has `response_format.type == "json_schema"` and the
+    schema is nested under `response_format.json_schema.schema`.
+  - `tests::tool_call_fallback_object_shape` — the
+    constructed request body has `tools[0].function.parameters
+    == schema` and `tool_choice.function.name ==
+    "emit_output"`.
+  - `tests::generation_knobs_forwarded` — `--temperature`
+    / `--top-p` / `--max-completion-tokens` / `--stop`
+    land in the request body at the top level.
+  - `tests::capture_request_writes_pretty_json` —
+    `--capture-request /tmp/x.json` produces valid JSON
+    that round-trips through `serde_json::from_str`.
+
+### Out of scope for the extension
+
+- Streaming responses (keep one-shot).
+- Sibling xtask for `/v1/responses` (OpenAI's newer
+  endpoint). Per Yuka 2026-04-24: "create a sibling to
+  cover the new endpoint (not chat completions) for newer
+  models, with more options" — flagged as future work;
+  `llm_openai_compat` per doc 08 targets `/chat/completions`,
+  so the Responses-API sibling isn't needed for Phase 6
+  Task 2. Phase 7 (other LLM impls) or a future 0.2.0 of
+  this impl may revisit.
+
+---
+
+Next step (in order):
+1. **Claude**: extend `xtask/src/bin/openai-chat.rs` per the
+   precursor scope above. Land as its own commit.
+2. **Yuka**: run the capture commands, commit the resulting
+   fixtures under `docs/upstream-fixtures/openai-chat/`.
+3. **Claude**: archive a Codex prompt under
+   `docs/codex-prompts/YYYY-MM-DD-NNNN-phase-6-llm-openai-compat.md`
+   that inlines this spec (with the now-committed fixtures
+   referenced by path) and spawn the Codex session per the
+   `codex-prompt-archive` skill.
