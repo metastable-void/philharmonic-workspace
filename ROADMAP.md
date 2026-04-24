@@ -1250,20 +1250,51 @@ subsection.
 
 ### Phase 7 — Additional implementations (parallel-safe)
 
-**Goal**: Ship the remaining implementations. These can be worked
-on in any order since they don't block each other.
+**Goal**: Ship the remaining implementations. They're
+crate-level independent and don't block each other
+technically, but we work them in the priority tiers below —
+driven by product need, not by technical dependency.
 
 **Reference**: `08-connector-architecture.md` for each
 implementation's wire protocol.
 
-**Crates touched** (one crate each):
-- `philharmonic-connector-impl-llm-anthropic`
-- `philharmonic-connector-impl-llm-gemini`
-- `philharmonic-connector-impl-sql-postgres`
-- `philharmonic-connector-impl-sql-mysql`
-- `philharmonic-connector-impl-email-smtp`
-- `philharmonic-connector-impl-embed`
-- `philharmonic-connector-impl-vector-search`
+**Priority ordering** (2026-04-24, captured from Yuka):
+
+- **Tier 1 — data-layer connectors** (do first):
+  - `philharmonic-connector-impl-sql-postgres`
+  - `philharmonic-connector-impl-sql-mysql`
+  - `philharmonic-connector-impl-vector-search`
+  - `philharmonic-connector-impl-embed`
+
+  SQL + vector + embed together unblock the data-access
+  shape of real workflows. `sqlx` handles both SQL
+  drivers; embed + vector-search share enough shape that
+  landing them in the same window keeps the mental context
+  loaded. Tier 1 is the active Phase-7 focus.
+
+- **Tier 2 — SMTP** (do after Tier 1):
+  - `philharmonic-connector-impl-email-smtp`
+
+  Single connector, discrete scope, `lettre`-based. Falls
+  naturally into the gap between Tier 1 completion and the
+  Tier 3 restart window.
+
+- **Tier 3 — additional LLM providers** (deferred until
+  after Japan's Golden Week holidays; restart **on or after
+  2026-05-07 (木)**):
+  - `philharmonic-connector-impl-llm-anthropic`
+  - `philharmonic-connector-impl-llm-gemini`
+
+  `llm_openai_compat` 0.1.0 (Phase 6 Task 2) already
+  covers OpenAI + vLLM + any OpenAI-chat-compatible server
+  (Together, Groq, OpenRouter), so Anthropic + Gemini are
+  the remaining first-class providers. Deferral rationale:
+  Golden Week 2026 runs 2026-04-29 (昭和の日) through
+  2026-05-06 (振替休日); treating the window as a
+  pause/reset before a second substantive LLM-provider
+  sprint avoids cramming a complex dialect-translation
+  task into the last few working days before the holiday
+  block. Pick back up on 2026-05-07 or later.
 
 **Per-implementation pattern**:
 1. Define config deserialization (serde struct for the
