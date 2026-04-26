@@ -219,13 +219,24 @@ for history browsing; the prohibition is on state changes.
   `core.hooksPath` pointing at `.githooks/` (relative path in
   submodules, computed via `scripts/lib/relpath.sh`),
   `commit.gpgsign=true`, `tag.gpgsign=true`, and
-  `rebase.gpgsign=true`; warns if Rust isn't on PATH.
+  `rebase.gpgsign=true`; then attaches each submodule's HEAD to
+  its tracked branch (`branch = ...` field in `.gitmodules`,
+  default `main`) via `scripts/lib/attach-submodule-branch.sh`,
+  because `git submodule update --init` checks out the recorded
+  SHA as a raw commit and would otherwise leave every submodule
+  detached on a fresh clone — which trips `check-detached.sh`
+  and `commit-all.sh` on first contributor edit. Off-branch pins
+  and unsafe attaches (would require dropping local commits) are
+  warned and left detached. Warns if Rust isn't on PATH.
 - `status.sh` — working-tree status of the parent + every
   submodule (clean submodules are hidden).
 - `pull-all.sh` — rebase-pull the parent and update each
-  submodule to the tip of its tracked remote branch. Does *not*
-  commit bumped pointers. See §4.4 for the rebase-on-pull
-  exception.
+  submodule to the tip of its tracked remote branch, then re-run
+  the same `attach-submodule-branch` pass `setup.sh` uses
+  (`git submodule update --remote --rebase` silently degrades
+  to a plain checkout when HEAD was already detached, so it does
+  not re-attach on its own). Does *not* commit bumped pointers.
+  See §4.4 for the rebase-on-pull exception.
 - `commit-all.sh [--anonymize] [--parent-only] [message]` —
   commit pending changes. Walks each dirty submodule first
   (committing with `-s -S`), then the parent. Default message

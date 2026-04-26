@@ -55,6 +55,25 @@ git submodule update --remote --rebase --recursive
 # semver-checks flow.
 git submodule foreach --quiet 'git fetch --tags --quiet origin'
 
+# `git submodule update --remote --rebase` silently degrades to a
+# plain checkout when HEAD was already detached (e.g. after a fresh
+# `setup.sh` that hit an off-branch case, or after a previous
+# version of these scripts that didn't attach). Re-attach now so
+# the next contributor edit doesn't trip `commit-all.sh`'s
+# detached-HEAD guard. Helper is idempotent and only attaches when
+# safe (no unique commits dropped); see lib/attach-submodule-branch.sh.
+REPO_ROOT=$(pwd -P)
+export REPO_ROOT
+git submodule foreach --recursive '
+set -eu
+if [ -z "$REPO_ROOT" ] || [ ! -d "$REPO_ROOT" ] ; then
+    echo "Could not find REPO_ROOT, aborting." >&2
+    exit 211
+fi
+. "${REPO_ROOT}/scripts/lib/attach-submodule-branch.sh"
+attach_submodule_branch
+'
+
 # Show resulting state. Parent may now be dirty due to bumped
 # submodule pointers; that's the signal to commit. We're already
 # at the workspace toplevel, so a relative path is unambiguous.

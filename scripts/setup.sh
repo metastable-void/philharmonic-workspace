@@ -84,6 +84,24 @@ git config --local tag.gpgsign true
 git config --local rebase.gpgsign true
 '
 
+# `git submodule update --init` checks out the SHA recorded in the
+# parent — a raw commit, not a ref — so HEAD ends up detached even
+# though `.gitmodules` has `branch = main` for every submodule.
+# Re-attach now so `commit-all.sh`'s detached-HEAD guard does not
+# fire on first contributor edit. The helper only attaches when it
+# can be done safely (HEAD already at a branch tip, no unique
+# commits dropped); off-branch pins are warned and left detached.
+ok "Attaching submodule HEADs to tracked branches"
+git submodule foreach --recursive '
+set -eu
+if [ -z "$REPO_ROOT" ] || [ ! -d "$REPO_ROOT" ] ; then
+    echo "Could not find REPO_ROOT, aborting." >&2
+    exit 211
+fi
+. "${REPO_ROOT}/scripts/lib/attach-submodule-branch.sh"
+attach_submodule_branch
+'
+
 chmod +x ./scripts/*.sh ./.githooks/*
 
 ok "Submodule status"
