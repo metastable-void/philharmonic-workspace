@@ -1260,21 +1260,22 @@ implementation's wire protocol.
 
 **Priority ordering** (2026-04-24, captured from Yuka):
 
-- **Tier 1 — data-layer connectors** (in progress):
-  - `philharmonic-connector-impl-sql-postgres` — 0.1.0
-    implementation landed 2026-04-24 (Codex round 01 +
-    Claude housekeeping fixes: Oid type, drop `timetz`
-    arm, `postgresql://` scheme alias, `tests/common/mod.rs`
-    layout, Docker-serialized integration tests). Ready
-    to publish.
-  - `philharmonic-connector-impl-sql-mysql` — 0.1.0
-    implementation landed 2026-04-24 (Codex round 01,
-    reviewer-approved). Docker-serialized integration
-    tests. Ready to publish.
-  - `philharmonic-connector-impl-vector-search` — 0.1.0
-    implementation landed 2026-04-24 (Codex round 01,
-    stateless in-memory cosine kNN per the spec). 34
-    tests passing, no external deps. Ready to publish.
+- **Tier 1 — data-layer connectors** (3 of 4 published;
+  embed remaining):
+  - `philharmonic-connector-impl-sql-postgres` — **0.1.0
+    published 2026-04-27** (impl landed 2026-04-24 from
+    Codex round 01 + Claude housekeeping fixes: Oid type,
+    drop `timetz` arm, `postgresql://` scheme alias,
+    `tests/common/mod.rs` layout, Docker-serialized
+    integration tests).
+  - `philharmonic-connector-impl-sql-mysql` — **0.1.0
+    published 2026-04-27** (impl landed 2026-04-24 from
+    Codex round 01, reviewer-approved; Docker-serialized
+    integration tests).
+  - `philharmonic-connector-impl-vector-search` — **0.1.0
+    published 2026-04-27** (impl landed 2026-04-24 from
+    Codex round 01, stateless in-memory cosine kNN per
+    the spec; 34 tests passing, no external deps).
   - `philharmonic-connector-impl-embed` — round 01
     (fastembed + ort) **reverted as a library choice**
     after the glibc-only ort-download-binaries link
@@ -1286,12 +1287,14 @@ implementation's wire protocol.
     (not published); tract-based round-02 Codex dispatch
     is the next embed-scoped action.
 
-  Three of four Tier 1 crates are compile-clean, green, and
-  publish-ready at 0.1.0. Publishing postponed this session
-  awaiting alignment + possibly co-landing with the tract-
-  based embed once it's in. Docker-backed integration tests
-  in both SQL crates use `serial_test`'s `#[file_serial(docker)]`
-  to prevent containers from piling up and OOMing the host.
+  Wave 1 (the three publish-ready crates) shipped on
+  2026-04-27 rather than co-landing with the embed
+  rewrite, per Yuka's call to publish what didn't need
+  more attention. Wave 2 ships embed once the tract
+  rewrite lands. Docker-backed integration tests in both
+  SQL crates use `serial_test`'s
+  `#[file_serial(docker)]` to prevent containers from
+  piling up and OOMing the host.
 
 - **Tier 2 — SMTP** (do after Tier 1):
   - `philharmonic-connector-impl-email-smtp`

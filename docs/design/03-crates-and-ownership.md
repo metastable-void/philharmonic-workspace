@@ -86,37 +86,44 @@
   all with `strict: true` token-level schema enforcement.
   Published as `0.1.0` on 2026-04-24 (Phase 6 Task 2).
 
-## Published as 0.0.0 placeholders (Phase 7+ and beyond)
+## Phase 7 Tier 1 — published 2026-04-27 (wave 1)
 
-- **`philharmonic`** — meta-crate placeholder.
+- **`philharmonic-connector-impl-sql-postgres`** — sqlx-
+  postgres-backed `sql_query` capability. Published as
+  `0.1.0` on 2026-04-27 (Phase 7 Tier 1 wave 1).
+- **`philharmonic-connector-impl-sql-mysql`** — sqlx-mysql-
+  backed `sql_query` capability. Published as `0.1.0` on
+  2026-04-27 (Phase 7 Tier 1 wave 1).
+- **`philharmonic-connector-impl-vector-search`** —
+  stateless in-memory cosine kNN `vector_search`
+  capability; corpus-per-request, hundreds-to-thousands
+  scale, strings-only id payload, no persistent state.
+  Published as `0.1.0` on 2026-04-27 (Phase 7 Tier 1
+  wave 1).
+
+## Pending publish (Phase 7+ and beyond)
+
+Crates with no crates.io presence yet (no `0.0.0`
+placeholders were reserved for these names):
+
+- **`philharmonic`** — meta-crate. No publish window yet.
 - **`philharmonic-api`** — public HTTP API (Phase 8+).
-- Per-implementation crates pending for Phase 7. Crates.io
-  still shows the `0.0.0` placeholders, but local
-  implementation state varies:
-  - **Tier 1 implementations exist locally at 0.1.0 but are
-    not yet published**:
-    - `philharmonic-connector-impl-sql-postgres` —
-      compile-clean, green.
-    - `philharmonic-connector-impl-sql-mysql` — compile-
-      clean, green.
-    - `philharmonic-connector-impl-vector-search` —
-      compile-clean, green.
-    - `philharmonic-connector-impl-embed` — round-01
-      `fastembed` + `ort` code committed as a checkpoint
-      but rejected as a library choice (glibc-only ort
-      prebuilts vs. our musl deployment targets); rewrite
-      with `tract` + `tokenizers` is the next embed
-      Codex dispatch (plan at
-      [`docs/notes-to-humans/2026-04-24-0008-phase-7-embed-tract-pivot-plan.md`](../notes-to-humans/2026-04-24-0008-phase-7-embed-tract-pivot-plan.md)).
-
-    Tier 1 publishes as a coherent set once the embed
-    tract rewrite lands.
-  - **Tier 2** (deferred until Tier 1 closes):
-    - `philharmonic-connector-impl-email-smtp`.
-  - **Tier 3** (deferred until on or after 2026-05-07,
-    post-Golden-Week 2026):
-    - `philharmonic-connector-impl-llm-anthropic`.
-    - `philharmonic-connector-impl-llm-gemini`.
+- **Tier 1 wave 2** (one crate; ships once the rewrite
+  lands):
+  - `philharmonic-connector-impl-embed` — round-01
+    `fastembed` + `ort` code committed as a checkpoint
+    but rejected as a library choice (glibc-only ort
+    prebuilts vs. our musl deployment targets); rewrite
+    with `tract` + `tokenizers` is the next embed
+    Codex dispatch (plan at
+    [`docs/notes-to-humans/2026-04-24-0008-phase-7-embed-tract-pivot-plan.md`](../notes-to-humans/2026-04-24-0008-phase-7-embed-tract-pivot-plan.md)).
+- **Tier 2** (deferred until after Phase 8 + Phase 9
+  prototype per the macro sequence):
+  - `philharmonic-connector-impl-email-smtp`.
+- **Tier 3** (deferred until on or after 2026-05-07,
+  post-Golden-Week 2026):
+  - `philharmonic-connector-impl-llm-anthropic`.
+  - `philharmonic-connector-impl-llm-gemini`.
 
 The single `philharmonic-connector` crate in the earlier sketch
 has been split into four (common / client / router / service)

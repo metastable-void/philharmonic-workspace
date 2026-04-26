@@ -55,8 +55,7 @@ Settled since the previous draft:
   `columns` populated even on empty results, `UpstreamError
   { status: 500 }` sentinel for DB-side errors, no
   connector-level retries. Phase 7 Tier 1 `sql-postgres` +
-  `sql-mysql` 0.1.0 (locally ready 2026-04-24; publish held
-  pending embed pivot).
+  `sql-mysql` 0.1.0 published 2026-04-27.
 - **`embed` vs `vector_search`** — split into two capabilities
   (two crates).
 - **`embed`** — local in-process inference with a
@@ -72,8 +71,7 @@ Settled since the previous draft:
 - **`vector_search`** — stateless in-memory cosine kNN,
   corpus-per-request (no persistent state), hundreds-to-
   thousands scale, strings-only id payload. Phase 7 Tier 1
-  `vector-search` 0.1.0 (locally ready 2026-04-24; publish
-  held with the rest of Tier 1).
+  `vector-search` 0.1.0 published 2026-04-27.
 
 ## Non-blocking for v1 but important
 

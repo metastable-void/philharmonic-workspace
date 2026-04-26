@@ -133,21 +133,22 @@ Design is substantially settled; implementation is in active progress.
 The connector triangle + foundational crates are published with
 substantive content; **Phase 6 is complete end-to-end** — all
 three of its crates (impl-api, http_forward, llm_openai_compat)
-shipped 0.1.0 on crates.io on 2026-04-24. The remaining
-`philharmonic-connector-impl-*` crates stay at `0.0.0`
-placeholders on crates.io until their respective phases land
-(Phase 7+).
+shipped 0.1.0 on crates.io on 2026-04-24. Phase 7 Tier 1 wave 1
+(`sql-postgres`, `sql-mysql`, `vector-search`) shipped 0.1.0
+on 2026-04-27. The unpublished `philharmonic-connector-impl-*`
+crates land in their respective phase tiers; until then they
+have no crates.io presence (no 0.0.0 placeholders were
+reserved).
 
-**Phase 7 Tier 1 is in progress** (2026-04-24). Three of four
-Tier 1 data-layer connectors — `sql-postgres`, `sql-mysql`, and
-`vector-search` — are compile-clean, green, and locally ready
-at 0.1.0; publish is held until the fourth lands so Tier 1 can
-ship as a coherent set. The fourth, `embed`, is mid-pivot from
-`fastembed` + `ort` to pure-Rust `tract` + `tokenizers` after
-the glibc-only ort-download-binaries link constraint was
-surfaced (the deployment targets include musl); the round-01
-fastembed code is committed as a checkpoint and the tract
-rewrite plan is at
+**Phase 7 Tier 1 is in progress.** Three of four Tier 1
+data-layer connectors — `sql-postgres`, `sql-mysql`, and
+`vector-search` — shipped 0.1.0 to crates.io on 2026-04-27
+(wave 1). The fourth, `embed`, was held back: it is
+mid-pivot from `fastembed` + `ort` to pure-Rust `tract` +
+`tokenizers` after the glibc-only ort-download-binaries link
+constraint was surfaced (the deployment targets include
+musl); the round-01 fastembed code is committed as a
+checkpoint and the tract rewrite plan is at
 [`docs/notes-to-humans/2026-04-24-0008-phase-7-embed-tract-pivot-plan.md`](docs/notes-to-humans/2026-04-24-0008-phase-7-embed-tract-pivot-plan.md).
 Docker-backed integration tests in the SQL crates are
 serialized across test binaries via
@@ -167,7 +168,10 @@ Already published with substantive content:
 `philharmonic-connector-router` (0.1.0, 2026-04-23),
 `philharmonic-connector-impl-api` (0.1.0, 2026-04-24),
 `philharmonic-connector-impl-http-forward` (0.1.0, 2026-04-24),
-`philharmonic-connector-impl-llm-openai-compat` (0.1.0, 2026-04-24).
+`philharmonic-connector-impl-llm-openai-compat` (0.1.0, 2026-04-24),
+`philharmonic-connector-impl-sql-postgres` (0.1.0, 2026-04-27),
+`philharmonic-connector-impl-sql-mysql` (0.1.0, 2026-04-27),
+`philharmonic-connector-impl-vector-search` (0.1.0, 2026-04-27).
 
 ## Prerequisites
 

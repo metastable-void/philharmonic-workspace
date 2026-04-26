@@ -1131,9 +1131,8 @@ crates.
   per-request (no persistent state), hundreds-to-thousands
   scale, strings-only id payload —
   `philharmonic-connector-impl-vector-search` 0.1.0
-  (compile-clean locally; publish held with the rest of
-  Tier 1). Stateful backends (e.g. an external vector
-  store) are shape-compatible additions.
+  published 2026-04-27. Stateful backends (e.g. an
+  external vector store) are shape-compatible additions.
 
 At least one implementation of each ships in v1. Splitting
 keeps the two concerns independent: an embedding change

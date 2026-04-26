@@ -188,12 +188,13 @@ into the crates.
   0.1.0 + `philharmonic-connector-impl-http-forward` 0.1.0 +
   `philharmonic-connector-impl-llm-openai-compat` 0.1.0 all
   published 2026-04-24 (Phase 6 complete). Phase 7 Tier 1
-  is in progress: `sql-postgres`, `sql-mysql`, and
-  `vector-search` are compile-clean at 0.1.0 locally;
-  `embed` is mid-pivot from `fastembed` + `ort` to
-  `tract` + `tokenizers` for musl-native pure-Rust
-  inference; Tier 1 publishes as a coherent set once embed
-  lands. Tier 2 (`email-smtp`) and Tier 3 (`llm-anthropic`,
+  wave 1 (`sql-postgres`, `sql-mysql`, `vector-search`) all
+  published 0.1.0 on 2026-04-27. Wave 2 (`embed` alone)
+  pending the tract pivot rewrite (round-01 fastembed code
+  committed as a checkpoint; pure-Rust `tract` +
+  `tokenizers` rewrite is the next embed-scoped action).
+  Tier 2 (`email-smtp`) and Tier 3 (`llm-anthropic`,
   `llm-gemini`, deferred until on or after 2026-05-07
-  post-Golden-Week) follow.
+  post-Golden-Week) follow Phase 8 + Phase 9 prototype per
+  the macro sequence.
 - API layer: designed; not yet implemented (Phase 8+).
