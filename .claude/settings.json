@@ -28,7 +28,8 @@
       "Bash(./scripts/pre-landing.sh)",
       "Bash(./scripts/xtask.sh calendar-jp *)",
       "Bash(./scripts/xtask.sh codex-fmt *)",
-      "Bash(./scripts/pre-landing.sh philharmonic-connector-impl-sql-postgres *)"
+      "Bash(./scripts/pre-landing.sh philharmonic-connector-impl-sql-postgres *)",
+      "Bash(./scripts/push-all.sh)"
     ],
     "additionalDirectories": [
       "/tmp"
@@ -36,5 +37,13 @@
   },
   "enabledPlugins": {
     "codex@openai-codex": true
+  },
+  "extraKnownMarketplaces": {
+    "openai-codex": {
+      "source": {
+        "source": "github",
+        "repo": "openai/codex-plugin-cc"
+      }
+    }
   }
 }
