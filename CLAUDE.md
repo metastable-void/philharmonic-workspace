@@ -132,11 +132,22 @@ full in `CONTRIBUTING.md`. Read the full section before acting
   unsigned-rollback and `pull-all.sh`'s `--rebase`. Mistakes
   ship as new fix-forward commits only.
   ([§4.4](CONTRIBUTING.md#44-no-history-modification))
-- **Push early, push often.** Mid-work pushes on `main` are
-  encouraged — in an append-only world, unpushed commits can't
-  be recovered if the local clone is lost. Hooks + GitHub
-  ruleset accept WIP as long as it's signed, signed-off, and
-  not force-pushed. ([§4.4](CONTRIBUTING.md#44-no-history-modification))
+- **Push early, push often — every sensible-sized step.**
+  Mid-work pushes on `main` are not just allowed but expected:
+  after each discrete unit of work (a doc reconciliation, a
+  script fix, one cohesive refactor), `commit-all.sh` then
+  `push-all.sh`, then start the next unit. Do not batch
+  unrelated topics into one commit, do not let pushes queue up
+  locally between steps, and do not save it all for end-of-
+  session — a session that crashes mid-flight should leave a
+  clean origin trail of completed steps, not a pile of
+  unpushed work. Narrow exceptions: a sequence whose
+  intermediate states wouldn't compile / pass `pre-landing.sh`
+  (land the sequence as one commit), and edits the user is
+  actively iterating on (wait for closure before committing).
+  When in doubt, ask. Hooks + GitHub ruleset accept WIP as
+  long as it's signed, signed-off, and not force-pushed.
+  ([§4.4](CONTRIBUTING.md#44-no-history-modification))
 - **Prefer `scripts/*.sh` wrappers over raw `cargo`.** The
   wrappers encode flag choices, auto-install, workspace-cd,
   POSIX-compat guards. Read-only queries (`cargo tree`,

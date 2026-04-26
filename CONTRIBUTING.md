@@ -375,7 +375,7 @@ exceptions get introduced.
 - Every commit carries an `Audit-Info:` trailer recording the
   environment that produced it. Amend would rewrite the trailer
   in place; the whole point is that it cannot be.
-- Force-pushing a rewritten history through ~23 submodules
+- Force-pushing a rewritten history through ~24 submodules
   means every other clone has to untangle itself; the cost is
   not yours alone.
 - Mistakes ship as **new commits** via fix-forward — a new
@@ -424,6 +424,27 @@ takes unique work with it. Push the imperfect commit, push the
 fix-forward on top, push the next fix-forward. The log tells the
 honest story and origin is the backup; that's the whole
 contract.
+
+**Per-step commit-and-push for AI agents.** Claude Code's
+default cadence is: finish a discrete unit of work →
+`./scripts/commit-all.sh "..."` → `./scripts/push-all.sh` →
+start the next unit. Every sensible-sized step lands as its
+own commit-and-push, not at the end of the session. "Sensible
+size" is small enough that a reader can take it in at one
+sitting (a doc reconciliation, a script fix, one cohesive
+refactor) without being so small that a single coherent change
+splinters across three commits. Do not batch unrelated topics
+into one commit and do not let pushes queue up locally between
+steps — a session that crashes mid-flight should leave a
+clean origin trail of completed steps, not a pile of unpushed
+work. The two narrow exceptions: (a) a sequence whose
+intermediate states wouldn't compile or pass `pre-landing.sh`
+— land the whole sequence as one commit; and (b) edits the
+user is actively iterating on in conversation, where the next
+turn might revise them — wait for the user to say "looks
+good" or otherwise signal closure on that step before
+committing. When in doubt, ask the user if a piece of work is
+its own step or part of a larger one.
 
 ### 4.5 Tracked Git hooks
 

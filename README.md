@@ -257,6 +257,16 @@ local Git state in the parent repo and every submodule:
   land unsigned commits that the `post-commit` hook then rolls
   back mid-rebase.
 
+It also attaches each submodule's HEAD to its tracked branch
+(`branch = ...` in `.gitmodules`, default `main`) via
+`scripts/lib/attach-submodule-branch.sh`, because
+`git submodule update --init` checks out the parent-recorded
+SHA as a raw commit and would otherwise leave every submodule
+detached on a fresh clone — which trips `check-detached.sh`
+and `commit-all.sh` on first contributor edit. Off-branch pins
+and unsafe attaches (would require dropping local commits) are
+warned and left detached.
+
 It's idempotent — re-run any time.
 
 If you already cloned without `--recurse-submodules`, just run
@@ -328,7 +338,7 @@ cross-crate navigation, refactoring, and type hints exactly as they
 would for a single-repo workspace.
 
 **Git state changes go through the workspace scripts, never through
-raw `git`.** The repository has ~23 submodules; the scripts encode
+raw `git`.** The repository has ~24 submodules; the scripts encode
 submodule-first commit/push ordering, mandatory `-s` signoff, and
 detached-HEAD guards that raw `git commit`/`git push` skip. They're
 the only supported path — not a convenience layer. This applies to
@@ -374,13 +384,22 @@ Invoke by path (`./scripts/foo.sh`), not via `bash`.
   `push.recurseSubmodules=check`, `core.hooksPath=.githooks`
   (relative in submodules), `commit.gpgsign=true`,
   `tag.gpgsign=true`, and `rebase.gpgsign=true` on the parent
-  and every submodule; warns if Rust isn't on PATH. Idempotent.
+  and every submodule; attaches each submodule's HEAD to its
+  tracked branch via `scripts/lib/attach-submodule-branch.sh`
+  (otherwise `git submodule update --init` leaves the SHA
+  checked out detached, tripping the detached-HEAD guards on
+  first contributor edit); warns if Rust isn't on PATH.
+  Idempotent.
 - `./scripts/status.sh` — working-tree status of the parent and
   every submodule (clean submodules are hidden). Run at the
   start of a session.
 - `./scripts/pull-all.sh` — rebase-pull the parent and update
-  each submodule to the tip of its tracked remote branch. Does
-  *not* commit the bumped submodule pointers.
+  each submodule to the tip of its tracked remote branch, then
+  re-run the same `attach-submodule-branch` pass `setup.sh`
+  uses (`git submodule update --remote --rebase` silently
+  degrades to a plain checkout when HEAD was already detached,
+  so it does not re-attach on its own). Does *not* commit the
+  bumped submodule pointers.
 - `./scripts/commit-all.sh [--anonymize] [--parent-only] [message]` —
   commit pending changes. Walks each dirty submodule first
   (committing with `-s -S`), then the parent. Every commit gets

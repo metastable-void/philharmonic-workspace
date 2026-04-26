@@ -127,7 +127,7 @@ repo containing:
   normal versioned deps so they remain independently
   buildable/publishable; the patch table rewrites them to local
   paths when building from the workspace.
-- 23 submodule directories, one per crate, each being a separate
+- 24 submodule directories, one per crate, each being a separate
   Git repo at `github.com/metastable-void/<crate-name>`.
 - `scripts/` — helper scripts (`status.sh`, `pull-all.sh`,
   `push-all.sh`, `commit-all.sh`).
@@ -442,7 +442,7 @@ file inventory):
   against the previous crates.io release before any new release.
 
 **Acceptance criteria**:
-- `git submodule status` shows all 23 submodules at a clean
+- `git submodule status` shows all 24 submodules at a clean
   commit. ✓
 - `cargo check --workspace` succeeds. ✓
 - `./scripts/status.sh` runs without error. ✓
