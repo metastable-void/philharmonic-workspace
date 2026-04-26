@@ -33,29 +33,47 @@ someone later has a concrete need.
 
 ### Per-implementation wire-protocol details
 
-For each v1 implementation still to be shaped, the exact
-request and response JSON shape:
+Only one v1 capability still has its wire shape pending:
 
-- **`llm_generate`** — covered in `08-connector-architecture.md`;
-  final structured-output dialect selector field names to
-  confirm when writing the OpenAI-compat impl.
-- **`sql_query`** — parameter binding syntax, row timeout,
-  row shape for response, error surface.
-- **`email_send`** — SMTP submission shape.
-- **`embed`** and **`vector_search`** — output vector format;
-  nearest-neighbor result shape. (Split-vs-unified settled:
-  split.)
+- **`email_send`** — SMTP submission shape. Tier 2; deferred
+  to after Tier 1 closes (i.e., after the embed tract pivot
+  lands and Tier 1 publishes as a coherent set). Sketch
+  against `lettre`'s submission API when the impl crate
+  starts.
 
 Settled since the previous draft:
 
 - **`http_forward`** — reuses `mechanics_config::HttpEndpoint`
   verbatim; full spec in `08-connector-architecture.md`
-  §Generic HTTP.
+  §Generic HTTP. Phase 6 Task 1 0.1.0 (2026-04-24).
+- **`llm_generate`** — three dialects
+  (`openai_native` / `vllm_native` / `tool_call_fallback`)
+  with `strict: true` token-level schema enforcement.
+  Phase 6 Task 2 `llm_openai_compat` 0.1.0 (2026-04-24).
+- **`sql_query`** — driver-native placeholder syntax (`?`
+  for MySQL, `$1` for Postgres), dict-per-row response with
+  `columns` populated even on empty results, `UpstreamError
+  { status: 500 }` sentinel for DB-side errors, no
+  connector-level retries. Phase 7 Tier 1 `sql-postgres` +
+  `sql-mysql` 0.1.0 (locally ready 2026-04-24; publish held
+  pending embed pivot).
 - **`embed` vs `vector_search`** — split into two capabilities
   (two crates).
-
-Mostly low-stakes shaping for what remains; sketch against the
-first impl and iterate.
+- **`embed`** — local in-process inference with a
+  binary-bundled ONNX model (no HuggingFace runtime fetch);
+  `EmbedConfig` carries `model_id`; `EmbedRequest` /
+  `EmbedResponse` per the spec at
+  [`docs/notes-to-humans/2026-04-24-0005-phase-7-tier-1-embed-and-vector-search-spec.md`](../notes-to-humans/2026-04-24-0005-phase-7-tier-1-embed-and-vector-search-spec.md).
+  Wire shape locked even though the implementation crate is
+  mid-pivot from `fastembed` + `ort` to `tract` +
+  `tokenizers` for musl-native pure-Rust inference; pivot
+  plan at
+  [`docs/notes-to-humans/2026-04-24-0008-phase-7-embed-tract-pivot-plan.md`](../notes-to-humans/2026-04-24-0008-phase-7-embed-tract-pivot-plan.md).
+- **`vector_search`** — stateless in-memory cosine kNN,
+  corpus-per-request (no persistent state), hundreds-to-
+  thousands scale, strings-only id payload. Phase 7 Tier 1
+  `vector-search` 0.1.0 (locally ready 2026-04-24; publish
+  held with the rest of Tier 1).
 
 ## Non-blocking for v1 but important
 

@@ -1117,9 +1117,23 @@ backed configs, not distinct email implementations.
 crates.
 
 - **`embed`** — text in, vector out. Implementations: local
-  embedding model, hosted APIs, provider-bundled.
+  in-process inference with a binary-bundled ONNX model is
+  the v1 reference; hosted APIs and provider-bundled
+  variants are shape-compatible if a deployment wants them.
+  The reference impl
+  (`philharmonic-connector-impl-embed`) is mid-pivot from
+  `fastembed` + `ort` to pure-Rust `tract` + `tokenizers`
+  for musl-native deployments; pivot plan at
+  [`docs/notes-to-humans/2026-04-24-0008-phase-7-embed-tract-pivot-plan.md`](../notes-to-humans/2026-04-24-0008-phase-7-embed-tract-pivot-plan.md).
+  Wire shape is locked.
 - **`vector_search`** — vector in, nearest neighbors out.
-  Implementations: Qdrant; possibly others.
+  V1 reference: stateless in-memory cosine kNN, corpus-
+  per-request (no persistent state), hundreds-to-thousands
+  scale, strings-only id payload —
+  `philharmonic-connector-impl-vector-search` 0.1.0
+  (compile-clean locally; publish held with the rest of
+  Tier 1). Stateful backends (e.g. an external vector
+  store) are shape-compatible additions.
 
 At least one implementation of each ships in v1. Splitting
 keeps the two concerns independent: an embedding change
@@ -1186,10 +1200,13 @@ later as an additive feature without rearchitecture.
 
 Narrow and specific:
 
-- **Embedding and `vector_search` split versus unified
-  capability.**
-- **Per-implementation wire-protocol details** — exact request
-  and response JSON shapes for SQL row data, HTTP templating
-  syntax, embedding output format.
+- **`email_send` wire shape.** Tier 2; the SMTP submission
+  shape (lettre-driven) is the only v1 capability still
+  pending detailed wire-protocol shaping. Sketch when the
+  impl crate starts.
 
-Everything else in this area is settled.
+Everything else in this area is settled. SQL row data,
+HTTP templating syntax, embedding output format, and
+vector-search nearest-neighbor result shape were all
+locked in the Phase 6 / Phase 7 Tier 1 implementations
+that landed 2026-04-24.
