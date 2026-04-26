@@ -200,6 +200,19 @@ full in `CONTRIBUTING.md`. Read the full section before acting
   `docs/notes-to-humans/YYYY-MM-DD-NNNN-<slug>.md` and commit
   via `./scripts/commit-all.sh --parent-only`. Session-only
   output isn't enough. ([§15.1](CONTRIBUTING.md#151-notes-to-humans))
+- **Project status reports at milestones.** At sensible
+  inflection points — phase / sub-phase landed, major
+  refactor or doc reconciliation finished, before a long
+  break (Golden Week etc.), or on explicit user request —
+  run `./scripts/project-status.sh` to generate a
+  point-in-time LLM summary into
+  `docs/project-status-reports/YYYY-MM-DD-hh-mm-ss.md`,
+  read it (model output can hallucinate SHAs / invent
+  roadmap items), then commit it parent-only with a
+  one-sentence "what milestone" message. Don't run it after
+  every commit or speculatively — the value is in the
+  milestone shape, not in a dense archive.
+  ([§15.4](CONTRIBUTING.md#154-project-status-reports))
 - **Archive every Codex prompt** *before* spawning — write to
   `docs/codex-prompts/YYYY-MM-DD-NNNN-<slug>.md` and commit.
   See the `codex-prompt-archive` skill. ([§15.2](CONTRIBUTING.md#152-codex-prompt-archive))

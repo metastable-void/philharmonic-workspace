@@ -1833,8 +1833,16 @@ Journal directories currently governed by this format:
 - `docs/codex-reports/` — §15.3.
 - `docs/notes-to-humans/` — §15.1.
 
-Any future journal directory adopts the same format by default.
-Don't invent a variant.
+`docs/project-status-reports/` (§15.4) is a journal-like
+directory but uses a **different** filename shape
+(`YYYY-MM-DD-hh-mm-ss.md`) because the reports are full-text
+snapshots without a per-topic slug; see §15.4 for the
+rationale and cadence.
+
+Any future journal directory adopts the
+`YYYY-MM-DD-NNNN-<slug>[-NN].md` shape by default unless
+there's a §15.4-style reason to deviate. Don't invent a
+variant casually.
 
 ### 15.1 Notes to humans
 
@@ -1962,6 +1970,69 @@ alongside the implementation diff.
 **Codex does not commit.** Leave the working tree dirty.
 Mention the report path in the final summary so Claude picks
 it up on review.
+
+### 15.4 Project status reports
+
+[`docs/project-status-reports/`](docs/project-status-reports/)
+holds LLM-generated point-in-time summaries of the workspace's
+development history and current status, produced by
+[`./scripts/project-status.sh`](scripts/project-status.sh).
+Editorial policy for the directory itself is in its
+[README](docs/project-status-reports/README.md); the rule
+*here* is about cadence — when Claude runs the script and
+commits the artifact.
+
+**Filename shape (different from §15).** Reports here use
+`YYYY-MM-DD-hh-mm-ss.md` (local-time wall clock to the
+second), **not** the `YYYY-MM-DD-NNNN-<slug>[-NN].md` shape
+used by the other journal directories. That's because the
+reports are full-text snapshots, not per-topic notes — there
+is no slug, and the second-precision timestamp gives a
+natural total order without a per-day counter. The script
+refuses to overwrite an existing file, so collisions surface
+loudly.
+
+**When Claude should run it (sensible timings).** Run
+`./scripts/project-status.sh` at any of the following, then
+commit the resulting file via
+`./scripts/commit-all.sh --parent-only`:
+
+- **End of a milestone.** A phase or sub-phase landed
+  (e.g. Phase 6 done, Phase 7 Tier 1 wave 1 published, a
+  tract-pivot Codex round merged).
+- **End of a major refactor or doc reconciliation.** A
+  workspace-wide doc sweep, a script-layer overhaul, a
+  significant CONTRIBUTING.md restructuring.
+- **Before a long break.** If Yuka's about to step away for
+  a holiday window (e.g. Golden Week 2026), or a session is
+  ending with the next session unlikely to start within a
+  day or two, capture a snapshot for the next pickup.
+- **On user request.** "Run a status report" / "snapshot
+  where we are" / etc.
+
+**When *not* to run it.** Don't run it after every commit, or
+in the middle of an in-flight feature, or speculatively to
+"have one on file" — the value is in the *milestone* shape,
+and over-running clutters the archive (and burns API
+budget). Routine per-step commits don't trigger a status
+report; the per-step commit-and-push rule (§4.4) is the
+working-tree discipline, not a status-report trigger.
+
+**Commit cadence.** The output file is part of the parent
+repo. Read the report (per
+[`docs/project-status-reports/README.md`](docs/project-status-reports/README.md) —
+"do not commit reports without reading them first" —
+hallucinated SHAs or invented roadmap items are worth
+catching), then commit it parent-only. The commit message
+should be one short sentence describing what the milestone
+*was* (e.g. *"docs: project-status snapshot at Phase 7
+Tier 1 wave 1 publish"*) so the archive is browsable from
+`git log` without opening every file.
+
+**Don't edit committed reports.** They're archived model
+output — see the directory's own README. If a report misses
+something or got something wrong, generate a new one
+(at the next sensible timing) rather than mutating the old.
 
 ---
 
