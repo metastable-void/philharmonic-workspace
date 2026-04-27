@@ -57,6 +57,7 @@
 //!        (copied from workspace root)
 //!      - `CHANGELOG.md` (Unreleased + 0.0.0 reservation)
 //!      - `.gitignore` (workspace-standard ignores)
+//!
 //!    Under `--adopt-existing`, the bin instead requires that
 //!    the cloned submodule already contains a `Cargo.toml`
 //!    (any other layout fails preflight).
