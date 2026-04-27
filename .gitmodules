@@ -93,3 +93,6 @@
 [submodule "philharmonic-connector-impl-api"]
 	path = philharmonic-connector-impl-api
 	url = https://github.com/metastable-void/philharmonic-connector-impl-api.git
+[submodule "inline-blob"]
+	path = inline-blob
+	url = https://github.com/metastable-void/inline-blob.git
