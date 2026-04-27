@@ -1,7 +1,9 @@
 //! new-submodule — scaffold a new workspace submodule crate,
-//! correctly and repeatably.
+//! correctly and repeatably; or adopt an existing remote crate
+//! as a submodule via `--adopt-existing`.
 //!
-//! Usage:
+//! ## Usage — scaffolding (default mode)
+//!
 //!   ./scripts/new-submodule.sh \
 //!     --name <crate-name> \
 //!     --description "<one-line description>" \
@@ -12,6 +14,20 @@
 //!     --description "Trait-only API crate …" \
 //!     --remote-url https://github.com/metastable-void/philharmonic-connector-impl-api.git \
 //!     --before philharmonic-connector-impl-http-forward
+//!
+//! ## Usage — adopting an existing crate (`--adopt-existing`)
+//!
+//! Use when the remote already has a real `Cargo.toml` + source
+//! that you want to keep — e.g. an upstream-developed helper
+//! crate being pulled into the workspace as a submodule. The
+//! scaffolding step is skipped so the remote's existing files
+//! are not clobbered. `--description` is not required in this
+//! mode (the existing `Cargo.toml`'s description stands).
+//!
+//!   ./scripts/new-submodule.sh \
+//!     --name inline-blob \
+//!     --remote-url https://github.com/metastable-void/inline-blob.git \
+//!     --adopt-existing
 //!
 //! ## What this bin does
 //!
@@ -29,8 +45,10 @@
 //!    `commit.gpgsign=true`, `tag.gpgsign=true`,
 //!    `rebase.gpgsign=true`. Same configuration
 //!    `scripts/setup.sh` applies to existing submodules.
-//! 4. Scaffolds the crate's placeholder files (overwrites
-//!    whatever the initial README from the remote had):
+//! 4. **Scaffolding step (default mode only).** Skipped under
+//!    `--adopt-existing`. Otherwise overwrites whatever the
+//!    initial README from the remote had with the workspace
+//!    placeholder set:
 //!      - `Cargo.toml` (workspace-standard shape,
 //!        version `0.0.0`)
 //!      - `src/lib.rs` (one-line placeholder)
@@ -39,6 +57,9 @@
 //!        (copied from workspace root)
 //!      - `CHANGELOG.md` (Unreleased + 0.0.0 reservation)
 //!      - `.gitignore` (workspace-standard ignores)
+//!    Under `--adopt-existing`, the bin instead requires that
+//!    the cloned submodule already contains a `Cargo.toml`
+//!    (any other layout fails preflight).
 //! 5. Inserts the new crate into the workspace root
 //!    `Cargo.toml`:
 //!      - `[workspace].members` entry (before `--before
@@ -97,8 +118,11 @@ struct Args {
     /// One-line crate description. Goes in `Cargo.toml`
     /// `description` and in the README sub-title. Keep it
     /// under 200 chars, no surrounding quotes.
+    /// Required in scaffold mode; ignored under
+    /// `--adopt-existing` (the existing `Cargo.toml`'s
+    /// description stands).
     #[arg(long)]
-    description: String,
+    description: Option<String>,
 
     /// Remote URL of the (already-created) git repository,
     /// e.g. `https://github.com/metastable-void/<name>.git`.
@@ -117,6 +141,16 @@ struct Args {
     /// submodules that aren't workspace members.
     #[arg(long)]
     skip_workspace_member: bool,
+
+    /// Adopt an existing remote crate as a submodule rather
+    /// than scaffolding placeholders. Skips the file-overwrite
+    /// step (`Cargo.toml`, `src/lib.rs`, `README.md`,
+    /// `LICENSE-*`, `CHANGELOG.md`, `.gitignore`) so the
+    /// remote's contents survive intact. The remote must
+    /// already carry a `Cargo.toml` for the new submodule to
+    /// be a workable workspace member.
+    #[arg(long)]
+    adopt_existing: bool,
 
     /// Print the plan and exit without executing any step.
     #[arg(long)]
@@ -162,6 +196,12 @@ impl std::fmt::Display for Error {
 fn run(args: &Args) -> Result<(), Error> {
     // 1. Preflight.
     validate_name(&args.name)?;
+    if !args.adopt_existing && args.description.is_none() {
+        return Err(Error::Preflight(
+            "--description is required in scaffold mode; pass it or use --adopt-existing"
+                .to_owned(),
+        ));
+    }
     let workspace_root = find_workspace_root()?;
     let submodule_dir = workspace_root.join(&args.name);
     let cargo_toml_path = workspace_root.join("Cargo.toml");
@@ -195,13 +235,16 @@ fn run(args: &Args) -> Result<(), Error> {
     // 4. Configure submodule's git.
     configure_submodule_git(&workspace_root, &submodule_dir)?;
 
-    // 5. Scaffold files.
-    scaffold_files(
-        &workspace_root,
-        &submodule_dir,
-        &args.name,
-        &args.description,
-    )?;
+    // 5. Scaffold files (skipped when adopting).
+    if args.adopt_existing {
+        require_existing_cargo_toml(&submodule_dir)?;
+    } else {
+        let description = args
+            .description
+            .as_deref()
+            .expect("description presence checked above");
+        scaffold_files(&workspace_root, &submodule_dir, &args.name, description)?;
+    }
 
     // 6. Insert into root Cargo.toml unless skipped.
     if !args.skip_workspace_member {
@@ -211,19 +254,42 @@ fn run(args: &Args) -> Result<(), Error> {
 
     // 7. Next-step hints.
     println!();
-    println!("=== scaffold complete");
+    if args.adopt_existing {
+        println!("=== adoption complete");
+    } else {
+        println!("=== scaffold complete");
+    }
     println!();
     println!("Next steps (nothing has been committed or pushed yet):");
     println!();
-    println!(
-        "  ./scripts/commit-all.sh \"add {} submodule — placeholder scaffolding\"",
-        args.name
-    );
+    let commit_blurb = if args.adopt_existing {
+        format!("add {} submodule — adopted existing crate", args.name)
+    } else {
+        format!("add {} submodule — placeholder scaffolding", args.name)
+    };
+    println!("  ./scripts/commit-all.sh {commit_blurb:?}");
     println!("  ./scripts/push-all.sh");
     println!();
     println!("commit-all.sh will walk the new submodule and the parent in one");
     println!("pass; push-all.sh pushes both (submodule first, then the parent");
     println!("pointer).");
+    Ok(())
+}
+
+/// In `--adopt-existing` mode we trust the remote's contents,
+/// but the absolute minimum for a workspace member is that the
+/// cloned submodule has a `Cargo.toml` at its root. Anything
+/// else (multi-crate workspace inside the submodule, missing
+/// manifest, etc.) is out of scope here — surface it so the
+/// caller can decide.
+fn require_existing_cargo_toml(submodule_dir: &Path) -> Result<(), Error> {
+    let cargo_toml = submodule_dir.join("Cargo.toml");
+    if !cargo_toml.exists() {
+        return Err(Error::Preflight(format!(
+            "--adopt-existing: cloned submodule {submodule_dir:?} has no Cargo.toml at its root; \
+             cannot register as a workspace member"
+        )));
+    }
     Ok(())
 }
 
@@ -392,7 +458,22 @@ fn print_plan(args: &Args, workspace_root: &Path) {
     eprintln!("=== new-submodule plan");
     eprintln!("  workspace root:   {}", workspace_root.display());
     eprintln!("  crate name:       {}", args.name);
-    eprintln!("  description:      {}", args.description);
+    eprintln!(
+        "  mode:             {}",
+        if args.adopt_existing {
+            "adopt-existing (skip scaffolding; require remote Cargo.toml)"
+        } else {
+            "scaffold (overwrite remote files with placeholders)"
+        }
+    );
+    if args.adopt_existing {
+        eprintln!("  description:      (ignored in adopt mode)");
+    } else {
+        eprintln!(
+            "  description:      {}",
+            args.description.as_deref().unwrap_or("(missing)")
+        );
+    }
     eprintln!("  remote URL:       {}", args.remote_url);
     eprintln!("  path under root:  {}/", args.name);
     if args.skip_workspace_member {
