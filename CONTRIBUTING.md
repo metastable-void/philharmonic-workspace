@@ -713,6 +713,56 @@ tasks and doesn't typically make extraction decisions — but if
 Codex notices a pattern in its prompts that warrants a script,
 flag it in the final summary so Claude can extract.
 
+### 5.3 Crate-version cooldown
+
+The workspace's [`/.cargo/config.toml`](.cargo/config.toml)
+points the resolver at a **3-day cooldown mirror** —
+`https://index.crates.menhera.org/3d/` — so a brand-new
+crates.io release isn't pickable as a dependency until it has
+aged 3 days. The rationale is the standard one: defend against
+fast-yanked releases, post-publish typos, and zero-day
+supply-chain compromises by never being in the first wave of
+consumers.
+
+Effects:
+
+- **Adding or bumping a third-party dep** must pick a version
+  that's already past the 3-day window. Before committing the
+  `Cargo.toml` change, sanity-check via `./scripts/xtask.sh
+  crates-io-versions -- <crate>`; the tool prints a stderr
+  warning of the form `!! crates-io-versions: <version> is
+  <Nd|Nh> old (< 3d threshold)` for any version inside the
+  window. If the latest is in-window, pin to the prior version
+  or wait.
+- **Publishing through `./scripts/publish-crate.sh` deliberately
+  bypasses the cooldown** for its own verify-build step — it
+  uses the `cargo pub-fresh` alias, which redirects the
+  source-replacement to the same Menhera proxy's `/0d/`
+  no-cooldown endpoint. This is what makes a same-day cascade
+  possible (e.g., publishing crate B that depends on a
+  workspace-internal crate A's brand-new version, on the same
+  day A was published). Normal builds — including consumers
+  who pull our just-published crates from crates.io — still go
+  through the `/3d/` endpoint, so the 3-day window protects
+  downstream while not blocking workspace cascades.
+
+**First-party exception**: the 3-day cooldown does not apply
+to crates *authored within this workspace*. The cooldown's
+threat model is defending against unknown-third-party releases;
+for our own workspace-internal crates (every member crate of
+this `Cargo.toml`), the source is in-tree, the publishing flow
+is the workspace's own `publish-crate.sh`, and there's no
+"unknown surprise" risk to defend against. Pinning embed to a
+2-hour-old `inline-blob 0.1.0` is fine when both crates are
+ours; the same pin against a third-party crate isn't.
+
+The `crates-io-versions` warning still fires for first-party
+crates inside the 3-day window — that's correct (the tool
+doesn't and shouldn't know which crates we authored). Treat
+the warning as **informational, not blocking** for our own
+crates; document the exception in the relevant prompt's
+Outcome section so the deviation is durable.
+
 ---
 
 ## 6. Shell script rules (POSIX sh)
