@@ -1153,4 +1153,118 @@ git -C . status --short
 
 ## Outcome
 
-Pending — will be updated after Codex run.
+Round 02 — **stopped at the Phase 1 gate** as instructed.
+Codex session `019dcd66-2f22-7182-9490-0e5303ead606`, ran
+2026-04-27 14:24→14:28 JST (3m 46s).
+
+### What happened
+
+bge-m3's ONNX export at HF revision
+`5617a9f61b028005a4858fdac845db406aefb181` is **not a single
+self-contained byte blob**: the on-disk format is
+`onnx/model.onnx` (~724KB metadata) plus
+`onnx/model.onnx_data` (~2.27GB external-weights file). The
+prompt's "single `include_bytes!(model.onnx)`" architecture
+cannot resolve the external-data reference because
+`tract_onnx::onnx().model_for_read(&mut &bytes[..])` has no
+path context for the sibling file.
+
+Codex's probe failed *before* reaching tract op-coverage
+verification — the model didn't even load. Error: `no model
+path was specified in the parsing context, yet external data
+was detected. aborting`.
+
+Codex stopped per the Phase 1 stop rule and the prompt's
+instruction "Codex does not unilaterally pick a different
+default — the production-default architecture hangs on bge-m3
+working, so a different default needs Yuka's say-so." This
+reopens Yuka's call B.
+
+### Bundle metadata measured
+
+| File | bge-m3 | paraphrase-multilingual-MiniLM-L12-v2 |
+|---|---|---|
+| `onnx/model.onnx` | 724,923 B | 470,301,610 B |
+| `onnx/model.onnx_data` | 2,266,820,608 B | (n/a, single file) |
+| `tokenizer.json` (root) | 17,098,108 B | 9,081,518 B |
+| `hidden_size` | 1024 | 384 |
+| `max_position_embeddings` | 8194 | 512 |
+
+bge-m3 also has an `onnx/tokenizer.json` variant (17,082,821 B,
+slightly different from the root copy).
+
+### Dep cooldown findings
+
+- `philharmonic-connector-impl-api 0.1.0` flagged
+  `2d23h old (< 3d threshold)`. This is the same version
+  the wave-1 crates published against today; the 3-day
+  threshold clears within hours of the Codex run.
+- `tract-onnx 0.22.1` pulls `ndarray 0.16.1` transitively;
+  workspace `crates-io-versions` direct lookup reported
+  `0.17.2` as latest. The pivot plan already pinned `0.16`,
+  so this matches expectation — the direct dep must pin
+  `0.16` to share the type universe with tract.
+- All other deps pass cooldown: `tract-onnx 0.22.1`,
+  `tokenizers 0.22.2`, `tokio 1.52.1`,
+  `philharmonic-connector-common 0.2.0`, `ureq 3.3.0`,
+  `sha2 0.11.0`, `dirs 6.0.0`, `serde_json 1.0.149`,
+  `approx 0.5.1`.
+
+### Small test model pinned
+
+If round-03 keeps the small-model override env vars,
+Codex pinned
+`sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2`
+at revision `e8f8c211226b894fcb81acc59f3b34ba3efd5f42`.
+
+### Git state at stop
+
+Workspace + submodule both clean. No tracked files were
+modified — Codex stopped before any rewrite work.
+
+### Files written outside the working tree (now stale)
+
+- `target/probe-bge-m3-model.onnx`
+- `/tmp/probe-tract/*`
+- `/tmp/bge-*.json`, `/tmp/minilm*.json`
+
+These are scratch artifacts; the workspace `.gitignore`
+covers `target/` and `/tmp` is ephemeral. Safe to leave
+or `rm -rf`.
+
+### Decision needed (Yuka call — reopens B)
+
+The default-bundled-model architecture as specified does
+not work for bge-m3 directly. Three resolution paths, all
+requiring a Yuka call before round 03:
+
+1. **Pick a different default** with a self-contained ONNX
+   export. `paraphrase-multilingual-MiniLM-L12-v2` (~470MB
+   single-file, 384-dim, the small test model Codex
+   already pinned) is the obvious fallback;
+   `intfloat/multilingual-e5-large` (~2.2GB, 1024-dim) and
+   other multilingual options may also be self-contained
+   — needs verification. Smallest architectural change;
+   loses bge-m3's quality.
+2. **Extend the public API to accept external-data bytes**:
+   `new_from_bytes(model_id, onnx_bytes, onnx_external_data:
+   Option<&[u8]>, tokenizer_json_bytes, dimensions,
+   max_seq_length)`. The default-bundled path `include_bytes!`s
+   both files. `xtask hf-fetch-embed-model` gets a small
+   extension to fetch `model.onnx_data` when present.
+   Bytes-only contract preserved; bge-m3 stays as default.
+3. **Asymmetric load**: `new_from_bytes` stays bytes-only
+   (single-file ONNX only, errors loudly on external-data);
+   `new_default` internally uses tract's path-based load
+   from the build.rs cache dir. Mixed contract; ugly but
+   avoids public-API churn.
+
+**Claude's recommendation**: Option 2. Cleanest
+representation of what ONNX-with-external-data actually is,
+keeps the bytes-only architecture intact, no change of
+default model. The xtask extension is ~10 lines.
+
+A round-03 prompt would adjust §"Default-bundled model
+architecture" → §"Public surface" + §"build.rs HTTP stack"
++ §"Cache layout" to add the external-data file, and a
+small follow-up commit extends the xtask.
