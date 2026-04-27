@@ -44,12 +44,17 @@
 # Requires git >= 2.32 (uses `valueonly=true` and `separator=%x1f`
 # on `%(trailers:key=...)`, added in 2.32). POSIX sh — see
 # CONTRIBUTING.md §6.
+#
+# Colors: ANSI sequences are emitted only when stdout is a TTY and
+# the de-facto-standard `NO_COLOR` env var is unset. Pass
+# `--no-color` to force plain output regardless. See
+# scripts/lib/colors.sh for the shared TTY/NO_COLOR gate.
 
 set -eu
 
 usage() {
     cat <<'EOF'
-Usage: git-log.sh [-n <N> | --count <N>] [<submodule-path>] [-h|--help]
+Usage: git-log.sh [-n <N> | --count <N>] [--no-color] [<submodule-path>] [-h|--help]
 
 Pretty-print workspace git log with DCO sign-off + GPG/SSH
 signature status per commit.
@@ -77,6 +82,8 @@ Sign-off label:
 Options:
   -n <N>, --count <N>  Show the last N commits (default 500). N must be
                        a positive integer.
+  --no-color           Disable ANSI color output. By default colors are
+                       on when stdout is a TTY and NO_COLOR is unset.
   -h, --help           Show this help and exit.
 
 Examples:
@@ -84,11 +91,13 @@ Examples:
   ./scripts/git-log.sh -n 50
   ./scripts/git-log.sh mechanics-core
   ./scripts/git-log.sh -n 200 philharmonic-types
+  ./scripts/git-log.sh --no-color | grep -E '\[(N|NOT signed-off)\]'
 EOF
 }
 
 count=500
 target=""
+no_color=0
 
 # Positive-integer validation (no leading zero, no sign, non-empty).
 is_positive_int() {
@@ -116,6 +125,9 @@ while [ $# -gt 0 ]; do
             fi
             count="$2"
             shift 2 ;;
+        --no-color)
+            no_color=1
+            shift ;;
         --)
             shift; break ;;
         -*)
@@ -143,6 +155,15 @@ if [ $# -gt 0 ]; then
     target="$1"
 fi
 
+# `--no-color` forces colors off via the shared `NO_COLOR` gate in
+# lib/colors.sh; otherwise the helper auto-detects (TTY + unset
+# NO_COLOR). The helper exports empty strings when off, so awk can
+# concatenate the C_* vars unconditionally.
+if [ "$no_color" -eq 1 ]; then
+    NO_COLOR=1
+    export NO_COLOR
+fi
+. "$(dirname -- "$0")/lib/colors.sh"
 . "$(dirname -- "$0")/lib/workspace-cd.sh"
 
 # Validate and resolve the optional submodule path. `git -C` takes
@@ -172,13 +193,16 @@ fi
 
 git -C "${target:-.}" log -n "$count" --date=short \
   --pretty=tformat:'%h%x09%ad%x09%G?%x09%(trailers:key=Signed-off-by,valueonly=true,separator=%x1f)%x09%ae%x09%an <%ae>%x09%s' \
-  | awk -F '\t' '
+  | awk -F '\t' \
+        -v ok="$C_OK" -v warn="$C_WARN" -v err="$C_ERR" \
+        -v note="$C_NOTE" -v hdr="$C_HEADER" -v reset="$C_RESET" '
     {
         hash = $1; date = $2; sig = $3; sob_raw = $4
         author_email = $5; author = $6; subject = $7
 
         if (sob_raw == "") {
             sob_label = "[NOT signed-off]"
+            sob_color = err
         } else {
             n = split(sob_raw, sobs, "\037")
             matched = 0
@@ -188,8 +212,30 @@ git -C "${target:-.}" log -n "$count" --date=short \
                     break
                 }
             }
-            sob_label = matched ? "[signed-off]" : "[unknown sign-off]"
+            sob_label = matched ? "[signed-off]"        : "[unknown sign-off]"
+            sob_color = matched ? ok                    : warn
         }
 
-        printf "%s %s [%s] %s %s | %s\n", hash, date, sig, sob_label, author, subject
+        # Signature status colors:
+        #   G                       → ok    (green)
+        #   U / X / Y               → warn  (yellow — valid-but-suspect)
+        #   B / R / E / N / other   → err   (red)
+        if      (sig == "G")                              sig_color = ok
+        else if (sig == "U" || sig == "X" || sig == "Y") sig_color = warn
+        else                                              sig_color = err
+
+        # Color choices per column:
+        #   short SHA    → header (blue, mirrors `git log` default-ish)
+        #   date         → ok     (green, mirrors `git log` default)
+        #   author       → note   (cyan)
+        #   subject      → default
+        # When colors are off, all C_* vars are empty strings and the
+        # output collapses to the original plain-text form.
+        printf "%s%s%s %s%s%s %s[%s]%s %s%s%s %s%s%s | %s\n", \
+            hdr, hash, reset, \
+            ok, date, reset, \
+            sig_color, sig, reset, \
+            sob_color, sob_label, reset, \
+            note, author, reset, \
+            subject
     }'
