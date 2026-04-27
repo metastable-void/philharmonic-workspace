@@ -63,11 +63,12 @@ Settled since the previous draft:
   `EmbedConfig` carries `model_id`; `EmbedRequest` /
   `EmbedResponse` per the spec at
   [`docs/notes-to-humans/2026-04-24-0005-phase-7-tier-1-embed-and-vector-search-spec.md`](../notes-to-humans/2026-04-24-0005-phase-7-tier-1-embed-and-vector-search-spec.md).
-  Wire shape locked even though the implementation crate is
-  mid-pivot from `fastembed` + `ort` to `tract` +
-  `tokenizers` for musl-native pure-Rust inference; pivot
-  plan at
-  [`docs/notes-to-humans/2026-04-24-0008-phase-7-embed-tract-pivot-plan.md`](../notes-to-humans/2026-04-24-0008-phase-7-embed-tract-pivot-plan.md).
+  Phase 7 Tier 1 `embed` 0.1.0 published 2026-04-27 (wave 2)
+  on the pure-Rust `tract` + `tokenizers` stack with default-
+  bundled bge-m3 model (`bundled-default-model` Cargo
+  feature, default-on); build-time HF fetch with env-var
+  knobs and `--no-default-features` opt-out; large-blob
+  embedding via the workspace's `inline-blob` proc-macro.
 - **`vector_search`** — stateless in-memory cosine kNN,
   corpus-per-request (no persistent state), hundreds-to-
   thousands scale, strings-only id payload. Phase 7 Tier 1

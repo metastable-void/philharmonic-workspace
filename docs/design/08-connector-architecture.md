@@ -1120,12 +1120,20 @@ crates.
   in-process inference with a binary-bundled ONNX model is
   the v1 reference; hosted APIs and provider-bundled
   variants are shape-compatible if a deployment wants them.
-  The reference impl
-  (`philharmonic-connector-impl-embed`) is mid-pivot from
-  `fastembed` + `ort` to pure-Rust `tract` + `tokenizers`
-  for musl-native deployments; pivot plan at
-  [`docs/notes-to-humans/2026-04-24-0008-phase-7-embed-tract-pivot-plan.md`](../notes-to-humans/2026-04-24-0008-phase-7-embed-tract-pivot-plan.md).
-  Wire shape is locked.
+  Reference impl
+  `philharmonic-connector-impl-embed` 0.1.0 published
+  2026-04-27 — pure-Rust `tract` + `tokenizers` stack for
+  musl-native deployments. Default-bundled model is
+  `BAAI/bge-m3` via the `bundled-default-model` Cargo
+  feature; build-time HuggingFace fetch with cache, env-var
+  knobs (`PHILHARMONIC_EMBED_DEFAULT_MODEL`,
+  `PHILHARMONIC_EMBED_DEFAULT_REVISION`), and
+  `--no-default-features` opt-out for offline / packaging.
+  Multi-gigabyte ONNX bundles are placed in `.lrodata.*`
+  ELF sections via the
+  [`inline-blob`](../../inline-blob/README.md) workspace
+  proc-macro to avoid rust-lld's small-code-model
+  32-bit-relocation overflow. Wire shape is locked.
 - **`vector_search`** — vector in, nearest neighbors out.
   V1 reference: stateless in-memory cosine kNN, corpus-
   per-request (no persistent state), hundreds-to-thousands

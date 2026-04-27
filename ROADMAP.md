@@ -1260,8 +1260,7 @@ implementation's wire protocol.
 
 **Priority ordering** (2026-04-24, captured from Yuka):
 
-- **Tier 1 — data-layer connectors** (3 of 4 published;
-  embed remaining):
+- **Tier 1 — data-layer connectors** ✓ _(done 2026-04-27)_:
   - `philharmonic-connector-impl-sql-postgres` — **0.1.0
     published 2026-04-27** (impl landed 2026-04-24 from
     Codex round 01 + Claude housekeeping fixes: Oid type,
@@ -1276,25 +1275,56 @@ implementation's wire protocol.
     published 2026-04-27** (impl landed 2026-04-24 from
     Codex round 01, stateless in-memory cosine kNN per
     the spec; 34 tests passing, no external deps).
-  - `philharmonic-connector-impl-embed` — round 01
-    (fastembed + ort) **reverted as a library choice**
-    after the glibc-only ort-download-binaries link
-    constraint was surfaced 2026-04-24; Yuka picked
-    `tract` + `tokenizers` for musl-native pure-Rust
-    inference. Rewrite plan in
-    [`docs/notes-to-humans/2026-04-24-0008-phase-7-embed-tract-pivot-plan.md`](docs/notes-to-humans/2026-04-24-0008-phase-7-embed-tract-pivot-plan.md).
-    Round-01 fastembed code committed as a checkpoint
-    (not published); tract-based round-02 Codex dispatch
-    is the next embed-scoped action.
+  - `philharmonic-connector-impl-embed` — **0.1.0
+    published 2026-04-27** evening (wave 2). Round-01
+    `fastembed` + `ort` was reverted as a library choice
+    after the glibc-only `ort-download-binaries` link
+    constraint was surfaced 2026-04-24 (deployment
+    target includes musl); Yuka picked pure-Rust
+    `tract` + `tokenizers` instead. Round 02
+    rewrite landed via Codex, then needed three Claude
+    follow-ups to ship: (1) `inline-blob` proc-macro
+    crate (Yuka-authored same day, adopted as
+    workspace submodule) to place bge-m3's 2.27 GB
+    bundled bytes in `.lrodata.*` sections (`include_bytes!`
+    of >2 GB in regular `.rodata` overflows rust-lld's
+    32-bit PC-relative relocation range with small code
+    model); (2) prefer
+    `sentence_bert_config.json`'s canonical
+    `max_seq_length` over `config.json`'s
+    `max_position_embeddings` so XLM-RoBERTa-class models
+    like bge-m3 don't trip tract's gather op via
+    position-index-out-of-range; (3) switch tokenizer to
+    `PaddingStrategy::BatchLongest` so a short query
+    isn't padded to 8192 positions for inference.
+    Default-bundled model is `BAAI/bge-m3`; the
+    `bundled-default-model` Cargo feature
+    (default-on) gates the build-time HuggingFace fetch,
+    overridable via `PHILHARMONIC_EMBED_DEFAULT_MODEL`
+    + `PHILHARMONIC_EMBED_DEFAULT_REVISION` env vars and
+    by `--no-default-features` for offline / packaging
+    builds. Round-03 prompt at
+    [`docs/codex-prompts/2026-04-27-0001-phase-7-embed-tract-03.md`](docs/codex-prompts/2026-04-27-0001-phase-7-embed-tract-03.md);
+    architecture-decision note at
+    [`docs/notes-to-humans/2026-04-27-0002-phase-7-embed-default-bundled-model-architecture.md`](docs/notes-to-humans/2026-04-27-0002-phase-7-embed-default-bundled-model-architecture.md).
 
   Wave 1 (the three publish-ready crates) shipped on
-  2026-04-27 rather than co-landing with the embed
+  2026-04-27 morning rather than co-landing with the embed
   rewrite, per Yuka's call to publish what didn't need
-  more attention. Wave 2 ships embed once the tract
-  rewrite lands. Docker-backed integration tests in both
-  SQL crates use `serial_test`'s
-  `#[file_serial(docker)]` to prevent containers from
-  piling up and OOMing the host.
+  more attention. Wave 2 (`embed`) shipped 2026-04-27
+  evening after the tract rewrite + inline-blob landed.
+  Docker-backed integration tests in both SQL crates use
+  `serial_test`'s `#[file_serial(docker)]` to prevent
+  containers from piling up and OOMing the host.
+
+  **Workspace-internal `inline-blob 0.1.0`** also
+  shipped 2026-04-27 — Yuka-authored proc-macro that
+  emits `static [u8; N]` items into `.lrodata.<name>`
+  (SysV-ABI large-rodata) with an anchor in
+  `.lbss.<name>`. Intended for any future ELF-target
+  workspace member that needs to embed multi-GB blobs;
+  consumed today only by `philharmonic-connector-impl-embed`.
+  See [`inline-blob/README.md`](inline-blob/README.md).
 
 - **Tier 2 — SMTP** (do after Tier 1):
   - `philharmonic-connector-impl-email-smtp`

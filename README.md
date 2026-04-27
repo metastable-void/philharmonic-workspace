@@ -133,27 +133,29 @@ Design is substantially settled; implementation is in active progress.
 The connector triangle + foundational crates are published with
 substantive content; **Phase 6 is complete end-to-end** — all
 three of its crates (impl-api, http_forward, llm_openai_compat)
-shipped 0.1.0 on crates.io on 2026-04-24. Phase 7 Tier 1 wave 1
-(`sql-postgres`, `sql-mysql`, `vector-search`) shipped 0.1.0
-on 2026-04-27. The unpublished `philharmonic-connector-impl-*`
-crates land in their respective phase tiers; until then they
-have no crates.io presence (no 0.0.0 placeholders were
-reserved).
+shipped 0.1.0 on crates.io on 2026-04-24. **Phase 7 Tier 1 is
+complete end-to-end** — wave 1 (`sql-postgres`, `sql-mysql`,
+`vector-search`) shipped 0.1.0 on 2026-04-27 morning; wave 2
+(`embed`) shipped 0.1.0 on 2026-04-27 evening, completing the
+data-layer connector set. The unpublished
+`philharmonic-connector-impl-*` crates land in their respective
+phase tiers; until then they have no crates.io presence (no
+0.0.0 placeholders were reserved).
 
-**Phase 7 Tier 1 is in progress.** Three of four Tier 1
-data-layer connectors — `sql-postgres`, `sql-mysql`, and
-`vector-search` — shipped 0.1.0 to crates.io on 2026-04-27
-(wave 1). The fourth, `embed`, was held back: it is
-mid-pivot from `fastembed` + `ort` to pure-Rust `tract` +
-`tokenizers` after the glibc-only ort-download-binaries link
-constraint was surfaced (the deployment targets include
-musl); the round-01 fastembed code is committed as a
-checkpoint and the tract rewrite plan is at
-[`docs/notes-to-humans/2026-04-24-0008-phase-7-embed-tract-pivot-plan.md`](docs/notes-to-humans/2026-04-24-0008-phase-7-embed-tract-pivot-plan.md).
-Docker-backed integration tests in the SQL crates are
-serialized across test binaries via
-`serial_test`'s `#[file_serial(docker)]` to keep containers
-from piling up and OOMing the host. See [`ROADMAP.md` §Phase 7](ROADMAP.md#phase-7--additional-implementations-parallel-safe)
+**Phase 7 Tier 1 — done 2026-04-27.** The pivot to pure-Rust
+`tract` + `tokenizers` for `embed` (replacing the round-01
+`fastembed` + `ort` stack, which was glibc-only via
+`ort-download-binaries` and didn't fit our musl deployment
+target) landed cleanly. The default-bundled bge-m3 path uses
+the in-tree [`inline-blob`](inline-blob) proc-macro (also
+shipped this session) to place the 2.27 GB ONNX +
+external-data bytes in `.lrodata.*` ELF sections, working
+around rust-lld's small-code-model 32-bit-relocation overflow
+when including weights of that scale. Docker-backed
+integration tests in the SQL crates are serialized across
+test binaries via `serial_test`'s `#[file_serial(docker)]`
+to keep containers from piling up and OOMing the host. See
+[`ROADMAP.md` §Phase 7](ROADMAP.md#phase-7--additional-implementations-parallel-safe)
 for the full tier breakdown and the Golden Week 2026 deferral
 of Tier 3.
 
@@ -171,7 +173,9 @@ Already published with substantive content:
 `philharmonic-connector-impl-llm-openai-compat` (0.1.0, 2026-04-24),
 `philharmonic-connector-impl-sql-postgres` (0.1.0, 2026-04-27),
 `philharmonic-connector-impl-sql-mysql` (0.1.0, 2026-04-27),
-`philharmonic-connector-impl-vector-search` (0.1.0, 2026-04-27).
+`philharmonic-connector-impl-vector-search` (0.1.0, 2026-04-27),
+`philharmonic-connector-impl-embed` (0.1.0, 2026-04-27),
+`inline-blob` (0.1.0, 2026-04-27).
 
 ## Prerequisites
 

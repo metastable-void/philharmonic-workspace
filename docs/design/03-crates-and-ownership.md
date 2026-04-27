@@ -100,6 +100,27 @@
   scale, strings-only id payload, no persistent state.
   Published as `0.1.0` on 2026-04-27 (Phase 7 Tier 1
   wave 1).
+- **`philharmonic-connector-impl-embed`** — pure-Rust
+  `tract` + `tokenizers` `embed` capability with a
+  default-bundled bge-m3 ONNX model gated behind the
+  default-on `bundled-default-model` Cargo feature.
+  Build-time HuggingFace fetch with cache, env-var
+  override knobs, `--no-default-features` opt-out for
+  offline / packaging builds. Published as `0.1.0` on
+  2026-04-27 (Phase 7 Tier 1 wave 2). Replaces the
+  earlier round-01 `fastembed` + `ort` design that was
+  rejected for incompatibility with musl deployment
+  targets.
+- **`inline-blob`** — workspace-internal proc-macro
+  crate that emits `static [u8; N]` items into
+  `.lrodata.<name>` ELF sections (with anchor in
+  `.lbss.<name>`) so multi-gigabyte blobs can be
+  `include_bytes!`-d into ELF binaries without
+  triggering rust-lld's small-code-model 32-bit
+  relocation overflow. Published as `0.1.0` on
+  2026-04-27. Consumed today by
+  `philharmonic-connector-impl-embed`; available for
+  any future workspace member that needs the same.
 
 ## Pending publish (Phase 7+ and beyond)
 
@@ -108,15 +129,6 @@ placeholders were reserved for these names):
 
 - **`philharmonic`** — meta-crate. No publish window yet.
 - **`philharmonic-api`** — public HTTP API (Phase 8+).
-- **Tier 1 wave 2** (one crate; ships once the rewrite
-  lands):
-  - `philharmonic-connector-impl-embed` — round-01
-    `fastembed` + `ort` code committed as a checkpoint
-    but rejected as a library choice (glibc-only ort
-    prebuilts vs. our musl deployment targets); rewrite
-    with `tract` + `tokenizers` is the next embed
-    Codex dispatch (plan at
-    [`docs/notes-to-humans/2026-04-24-0008-phase-7-embed-tract-pivot-plan.md`](../notes-to-humans/2026-04-24-0008-phase-7-embed-tract-pivot-plan.md)).
 - **Tier 2** (deferred until after Phase 8 + Phase 9
   prototype per the macro sequence):
   - `philharmonic-connector-impl-email-smtp`.
