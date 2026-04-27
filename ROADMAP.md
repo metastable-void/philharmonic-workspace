@@ -1014,9 +1014,12 @@ Wave A's token so that `payload_hash` binds real ciphertext.
      h. Mint the Wave-A COSE_Sign1 token over claims
         `{iss, exp, kid, realm, tenant, inst, step, config_uuid,
         payload_hash}`.
-     i. Assemble the `MechanicsConfig` entry: POST to
-        `<realm>.connector.our-domain.tld`, `Authorization:
-        Bearer <COSE_Sign1 bytes, base64url>`,
+     i. Assemble the `MechanicsConfig` entry: POST to the
+        deployment-supplied connector URL for the realm
+        (e.g. `<realm>.connector.<deployment-domain>` if the
+        deployment uses subdomain-per-realm; the framework
+        treats the URL as deployment-supplied configuration),
+        `Authorization: Bearer <COSE_Sign1 bytes, base64url>`,
         `X-Encrypted-Payload: <COSE_Encrypt0 bytes, base64url>`.
 
 2. **Service-side decrypt (in `philharmonic-connector-service`)**:
@@ -1033,9 +1036,12 @@ Wave A's token so that `payload_hash` binds real ciphertext.
      variants to appropriate HTTP status codes.
 
 3. **`philharmonic-connector-router` (pure dispatcher)**:
-   - Minimal HTTP server that terminates TLS for
-     `<realm>.connector.our-domain.tld` and forwards to
-     connector service instances in the realm.
+   - Minimal HTTP server that fronts the connector services
+     for one realm, configured by the deployment to listen on
+     whichever URL the deployment chose (subdomain-per-realm,
+     path-prefix-per-realm, host-header dispatch, etc. — the
+     router doesn't prescribe a shape). Forwards to connector
+     service instances in the realm.
    - No token verification, no decryption, no rate limiting.
    - Round-robin or least-connections load balancing is fine;
      pick whatever's simple.
@@ -1398,11 +1404,18 @@ limiting.
 
 1. HTTP framework: use `axum` (aligns with Tokio ecosystem).
 
-2. Subdomain routing:
-   - `<tenant>.api.our-domain.tld/v1/...` for tenant endpoints.
-   - `admin.our-domain.tld/v1/...` for operator endpoints.
-   - Middleware resolves `<tenant>` from the Host header and
-     attaches it to request context.
+2. Tenant + scope resolution as a deployment-supplied input:
+   - The crate exposes a trait (e.g. `RequestScope`) that the
+     deployment implements to map a request to either
+     `Tenant(tenant_id)` or `Operator`. The implementation can
+     read a subdomain, a path prefix, a TLS client-cert
+     SAN/CN, a fixed-tenant constant, or anything else — the
+     framework is agnostic. Doc 10 §"Request routing"
+     enumerates the shapes deployments commonly pick.
+   - Middleware calls the resolver, attaches the resulting
+     `RequestScope` to the request context, and rejects
+     requests the resolver can't classify with a structured
+     error.
 
 3. Authentication middleware:
    - Parse `Authorization: Bearer <token>` header.
@@ -1417,6 +1430,11 @@ limiting.
    - For `Ephemeral`: check `permissions` claim directly.
    - For instance-scoped `Ephemeral`: verify instance ID in URL
      matches `instance` claim.
+   - For `Operator` scope: route to the operator endpoint set;
+     reject tenant endpoints. The framework defines the operator
+     surface as a separate router; how the deployment exposes
+     it (separate ingress, separate binary, separate port) is
+     a deployment choice.
 
 5. Endpoint implementation — follow the full surface in doc 10:
    - Workflow management (templates, instances, steps).
@@ -1426,7 +1444,8 @@ limiting.
    - Token minting endpoint.
    - Tenant settings.
    - Audit log.
-   - Operator endpoints on `admin.` subdomain.
+   - Operator endpoints (deployment routes them to the operator
+     surface via the `RequestScope` resolver).
 
 6. Rate limiting: single-node token buckets per tenant per
    endpoint family. Use `governor` or similar.
@@ -1442,6 +1461,14 @@ limiting.
 
 10. Observability middleware: correlation ID propagation,
     request logging, Prometheus metrics.
+
+The crate ships as a library that exposes an `axum::Router`
+(or equivalent constructor) plus the trait surfaces it needs
+plugged in (`RequestScope`, store, executor client, lowerer,
+signing keys, etc.). Whether a deployment runs it as one
+process, splits it across many, or embeds it in-process for a
+single user is the deployment's choice; the framework does not
+prescribe.
 
 **Acceptance criteria**:
 - Every endpoint in doc 10 implemented with correct permission
@@ -1463,28 +1490,48 @@ limiting.
 
 1. End-to-end integration test suite:
    - `testcontainers` for MySQL.
-   - Compose up: API + mechanics worker + connector router +
-     connector service (single-realm config bundling all impls).
+   - Wire up an in-test process layout exercising every crate
+     end-to-end. One reasonable shape: API host + mechanics
+     worker + connector router + connector service
+     (single-realm config bundling all impls). Other process
+     splits or collapses are equally valid for testing — the
+     framework doesn't prescribe.
    - Test flows: tenant admin creates endpoint config; tenant
      admin creates workflow template; tenant caller executes
      steps; instance reaches terminal state; audit log records
      all of it.
-   - Chat-app flow: minting authority mints instance-scoped
-     ephemeral token; browser-equivalent caller executes steps
-     with the ephemeral token; subject identity appears in step
-     records.
+   - Ephemeral-token flow (one example application is the
+     chat-app pattern, where a tenant backend mints an
+     instance-scoped token and a browser-resident client
+     executes steps under it): minting authority mints
+     instance-scoped ephemeral token; client executes steps
+     with the ephemeral token; subject identity appears in
+     step records. Non-browser callers exercise the same
+     mechanism.
 
-2. Reference deployment on the developer's infrastructure:
+2. Reference deployment on the developer's infrastructure
+   (one example shape; chosen for end-to-end exercise of the
+   crates, not as a prescription):
    - Deploy the binaries to the developer's on-prem or IaaS.
-   - TLS certificates for `*.api.our-domain.tld`,
-     `admin.our-domain.tld`, `*.connector.our-domain.tld`.
+   - TLS certificates for whatever URL shape the reference
+     deployment picks (e.g. wildcard certs for
+     `*.api.<deployment-domain>` /
+     `admin.<deployment-domain>` /
+     `*.connector.<deployment-domain>` if subdomain-per-tenant
+     and subdomain-per-realm; a single cert if a flatter
+     path-based shape is chosen).
    - Actual realm KEM keypairs generated and deployed to realm
      connector service binaries; public keys deployed to the
      lowerer.
    - Actual SCK deployed.
    - At least one tenant provisioned (the developer itself).
-   - At least one working workflow (probably the chat-app
-     end-to-end).
+   - At least one working workflow exercised end-to-end (one
+     LLM-driven flow for the agent-style use case — chosen
+     because it stresses ephemeral tokens, instance-scope
+     permission enforcement, and per-step credential
+     decryption — but the framework is general-purpose
+     workflow orchestration; non-LLM workflows are equally
+     supported).
 
 3. Documentation reconciliation:
    - For every case where implementation revealed a design doc

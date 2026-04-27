@@ -326,21 +326,23 @@ and in connector service memory (steps 8–10).
 ### Where keys live
 
 - **Lowerer signing key** (connector tokens): deployment
-  secret storage. Loaded by processes that run the lowerer
-  (API processes in v1).
+  secret storage. Loaded by whichever process hosts the
+  lowerer (the same process that hosts the API crate, in
+  the typical deployment shape that co-locates them).
 - **Lowerer public key**: distributed to connector services
   via deployment configuration.
 - **API layer signing key** (ephemeral tokens): deployment
-  secret storage. Loaded by API processes. Used for signing
-  and self-verification.
+  secret storage. Loaded by whichever process hosts the API
+  crate. Used for signing and self-verification.
 - **Realm KEM public keys**: deployment configuration of the
   lowerer.
 - **Realm KEM private keys**: deployment secret storage.
   Loaded by connector service binaries for the realm at
   startup.
 - **Substrate credential key (SCK)**: deployment secret
-  storage. Loaded by API processes (which host both the API
-  layer and the lowerer in v1).
+  storage. Loaded by whichever process hosts the lowerer
+  (the same process that hosts the API crate when the two
+  are co-located, which is the typical shape).
 
 No key material is committed to source control.
 

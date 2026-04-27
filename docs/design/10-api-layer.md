@@ -472,32 +472,49 @@ Breaking changes get a new major version. Additive changes within
 a version are fine and don't require a version bump (new
 endpoints, new optional request fields, new response fields).
 
-## Co-location with workflow engine
+## Hosting the workflow engine
 
-The API layer holds the `WorkflowEngine` instance. API handlers
-call into the engine directly. This means:
+The API crate embeds the `WorkflowEngine` and calls into it
+directly — the engine is not reached over HTTP from the API.
+This is a *crate boundary* statement, not a deployment-shape
+statement: whatever process hosts `philharmonic-api` also
+holds the engine.
 
-- API processes need a substrate connection (via
-  `philharmonic-store-sqlx-mysql` with pooled connections).
-- API processes need lowerer configuration — the lowerer's
-  signing key, realm KEM public keys (indexed by `kid`), and
-  the substrate credential key (SCK) for decrypting
-  `TenantEndpointConfig` entries. The lowerer is plugged into
-  the engine as the `ConfigLowerer` implementation.
-- API processes need an executor endpoint — typically the load
-  balancer URL pointing at the mechanics fleet. An HTTP
-  `StepExecutor` implementation wraps the mechanics HTTP
-  service.
-- API processes hold the API signing key for ephemeral tokens.
+Whatever runs the API crate needs:
 
-This is one process type with several responsibilities rather
-than separate microservices. Horizontally scalable; stateless
-except for the per-request authentication lookup (no cache in
-v1) and the minting-authority-epoch read (also uncached in v1).
+- A substrate connection (via `philharmonic-store-sqlx-mysql`
+  with pooled connections, or any other store-trait
+  implementation).
+- Lowerer configuration — the lowerer's signing key, realm
+  KEM public keys (indexed by `kid`), and the substrate
+  credential key (SCK) for decrypting `TenantEndpointConfig`
+  entries. The lowerer is plugged into the engine as the
+  `ConfigLowerer` implementation.
+- An executor endpoint — typically a load-balancer URL or
+  in-process handle pointing at a mechanics worker (or fleet).
+  An HTTP `StepExecutor` wraps the mechanics HTTP service;
+  in-process executor wirings are equally supported by the
+  trait.
+- The API signing key for ephemeral tokens.
 
-Splitting the API layer from the workflow engine (running them
-as separate services) adds a network hop without immediate
-benefit. Deferred.
+The crate is stateless beyond the per-request authentication
+lookup (no cache in v1) and the minting-authority-epoch read
+(also uncached in v1), so consumers are free to scale it
+horizontally.
+
+**Whether to run the API crate as one process type, split it
+across many, embed it in-process for a single user, or run it
+inside another binary entirely is a deployment choice the
+crate does not prescribe.** The natural shape for many
+multi-tenant deployments is one binary that hosts the API +
+engine + lowerer together; that minimizes network hops but
+isn't required.
+
+Splitting the API surface from the workflow engine across
+process boundaries (running them as separate services) is
+possible — the trait surfaces are network-pluggable — but
+adds a network hop without immediate benefit for the common
+deployment shape. Not designed against in v1.
 
 ## What's explicitly out of scope for v1
 
