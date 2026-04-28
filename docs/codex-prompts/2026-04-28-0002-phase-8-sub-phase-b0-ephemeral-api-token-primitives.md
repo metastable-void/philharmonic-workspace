@@ -371,4 +371,80 @@ Working tree: dirty. Do not commit.
 
 ## Outcome
 
-Pending — will be updated after Codex run.
+**Status:** Landed clean on 2026-04-28 (Tue) JST midday.
+Awaiting human Gate-2 review.
+**Codex job:** `task-moi1ft52-gmwowo`, elapsed ~52 min.
+**Claude code review:** PASSES — see
+[`docs/notes-to-humans/2026-04-28-0004-b0-claude-code-review.md`](../notes-to-humans/2026-04-28-0004-b0-claude-code-review.md).
+
+### Files landed
+
+In `philharmonic-policy/` (submodule):
+
+Modified:
+- `Cargo.toml` — version `0.2.0`; deps added: `coset 0.4`,
+  `ciborium 0.2`, `ed25519-dalek 2`; dev-dep: `proptest 1`.
+- `CHANGELOG.md` — `[Unreleased]` entry.
+- `src/lib.rs` — `mod api_token` + re-exports.
+
+Added:
+- `src/api_token.rs` — 870-line module: full public surface
+  per proposal r2 (6 constants, 7 types, 3 functions, 3 error
+  enums), 14-step verify order, manual redacted `Debug` for
+  `ApiSigningKey`, `CanonicalJson` claims encoding, checked
+  arithmetic in lifetime checks, kid profile validation shared
+  by mint/verify/registry-insert.
+- `tests/api_token_vectors.rs` — 6 integration tests:
+  2 positive KATs, 1 parametric (19 negative vectors),
+  1 round-trip, 2 proptests.
+- `tests/vectors/api_token/` — 27 files: keypair.json,
+  2 claim-set JSONs, 2 claim-CBOR hex, 2 signed-token hex,
+  19 negative-vector hex, negative_cases.json manifest.
+
+### Verification
+
+- `pre-landing.sh philharmonic-policy`: green (lint + test
+  + 12 MySQL testcontainer tests).
+- `cargo test -p philharmonic-policy --all-targets`: 16 unit
+  + 6 integration (incl. 2 proptest) + 12 MySQL (ignored in
+  default, ran via --ignored) = 34 green.
+- `cargo doc -p philharmonic-policy --no-deps`: clean.
+
+### Proposal r2 alignment
+
+All 14 verify steps present in correct order. All 6
+constants pinned at specified values. All error variants
+match. `ApiSigningKey` does not derive `Debug` (manual
+redacted impl confirmed). `VerifyLimits::clamped()` uses
+`min(caller, default)`. `mint_ephemeral_api_token` takes
+`now: UnixMillis` and validates kid-profile + claims-size +
+lifetime invariants before signing. 19 negative vectors each
+trigger the named `ApiTokenVerifyError` variant.
+
+### No deviations from proposal
+
+No architectural surprises. The implementation is a faithful
+translation of the r2 proposal. Minor implementation choices
+within the proposal's latitude (e.g., `raw_injected_claims_text`
+uses a second CBOR parse to extract the wire-level `claims`
+text for the re-canonicalization check; `ApiSignedToken::to_bytes`
+clones the inner `CoseSign1` because `coset` doesn't offer
+`to_vec` on `&self`) are noted in the Claude review note and
+are not security concerns.
+
+### Git state
+
+`git -C philharmonic-policy status --short`:
+```
+ M CHANGELOG.md
+ M Cargo.toml
+ M src/lib.rs
+?? src/api_token.rs
+?? tests/api_token_vectors.rs
+?? tests/vectors/
+```
+
+`git -C . status --short`:
+```
+ m philharmonic-policy
+```
