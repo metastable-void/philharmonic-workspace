@@ -41,7 +41,12 @@ fi
 export git_color
 
 printf '%s=== parent ===%s\n' "$C_HEADER" "$C_RESET"
-git -c color.status="$git_color" status -s
+parent_dirty=$(git -c color.status="$git_color" status -s)
+if [ -n "$parent_dirty" ]; then
+    printf '%s\n' "$parent_dirty"
+else
+    printf '  %s(clean)%s\n' "$C_OK" "$C_RESET"
+fi
 status=$(git status --porcelain=v2 --branch 2>/dev/null | grep "^# branch\.ab" || true)
 if [ -n "$status" ]; then
     ahead=$(echo "$status" | cut -d" " -f3)
