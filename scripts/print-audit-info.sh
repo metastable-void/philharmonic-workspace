@@ -73,4 +73,11 @@ fi
 
 wdir=$(cd -- "$_here/.." && pwd)
 
-echo t="${t}" d="${wdir}" h="${host}" u="${user}/${uid}" g="${grp}/${gid}" 4="${v4}" 6="${v6}" k="${kern}/${krel}" a="${arch}" o="${os}" r="${rust}"
+# CPU thread count + available/total memory from the xtask
+# helper. Falls back to empty if xtask isn't built yet (fresh
+# clone before first `cargo build`).
+sysres=$("$_here/xtask.sh" system-resources 2>/dev/null || echo "")
+cpus=$(printf '%s' "$sysres" | cut -f1)
+mem=$(printf '%s' "$sysres" | cut -f2)
+
+echo t="${t}" d="${wdir}" h="${host}" u="${user}/${uid}" g="${grp}/${gid}" 4="${v4}" 6="${v6}" k="${kern}/${krel}" a="${arch}" o="${os}" r="${rust}" c="${cpus}" m="${mem}"
