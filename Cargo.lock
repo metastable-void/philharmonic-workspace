@@ -3483,8 +3483,10 @@ version = "0.0.0"
 dependencies = [
  "async-trait",
  "axum",
+ "base64 0.22.1",
  "http",
- "philharmonic-policy 0.1.0",
+ "philharmonic-policy 0.2.0",
+ "philharmonic-store",
  "philharmonic-types",
  "serde",
  "serde_json",
@@ -3495,6 +3497,7 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "uuid",
+ "zeroize",
 ]
 
 [[package]]
