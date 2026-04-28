@@ -187,4 +187,13 @@ Working tree: dirty. Do not commit.
 
 ## Outcome
 
-Pending — will be updated after Codex run.
+**Status:** Landed clean 2026-04-28. Awaiting Yuka crypto
+call-site review.
+**Claude review:** PASSES — see
+[`docs/notes-to-humans/2026-04-28-0011-e-claude-code-review.md`](../notes-to-humans/2026-04-28-0011-e-claude-code-review.md).
+
+Files: `src/routes/endpoints.rs` (624 lines, 6 handlers),
+`src/routes/mod.rs`, `src/lib.rs` (builder gains sck +
+key_version), `tests/endpoint_config.rs` (8 tests).
+
+59 tests green. Clippy clean.

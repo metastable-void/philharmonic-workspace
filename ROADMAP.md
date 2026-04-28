@@ -1542,8 +1542,11 @@ fires before each is merged. Approach gate already approved
   stub executor/lowerer, instance-scope enforcement.
   5 integration tests.
 - **E — Endpoint config management. Crypto-touching.**
-  Doc 10 §270 full surface; SCK encrypt/decrypt of
-  `TenantEndpointConfig`. Code-review gate fires.
+  ✅ Done 2026-04-28 (awaiting Yuka crypto call-site review).
+  6 handlers per doc 10 §270: create (SCK encrypt), list,
+  read metadata, read decrypted (SCK decrypt), rotate, retire.
+  No plaintext/ciphertext in logs or metadata reads. 8
+  integration tests.
 - **F — Principal + role + minting-authority CRUD.**
   Doc 10 §309-§354. Long-lived token generation
   (returns once, only the SHA-256 hash persists).
