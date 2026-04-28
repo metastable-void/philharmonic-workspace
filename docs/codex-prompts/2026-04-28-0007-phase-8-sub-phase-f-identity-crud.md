@@ -181,4 +181,19 @@ Working tree: dirty. Do not commit.
 
 ## Outcome
 
-Pending — will be updated after Codex run.
+**Status:** Landed clean 2026-04-28.
+**Claude review:** PASSES. No security issues. Token
+plaintext handled via `Zeroizing<String>` borrow into
+response structs, dropped after handler returns. Zero
+`tracing` calls in any identity route module — no risk
+of logging token material. No panics on library paths.
+
+Files: `src/routes/principals.rs` (300 lines, 4 handlers),
+`src/routes/roles.rs` (303 lines, 4 handlers),
+`src/routes/memberships.rs` (251 lines, 2 handlers),
+`src/routes/authorities.rs` (490 lines, 6 handlers),
+`src/routes/identity.rs` (298 lines, shared helpers),
+`src/routes/mod.rs`, `src/lib.rs`,
+`tests/identity_crud.rs` (683 lines, 7 tests).
+
+66 tests green. Clippy clean. Non-crypto; no Gate-2 required.

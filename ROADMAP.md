@@ -1549,12 +1549,13 @@ fires before each is merged. Approach gate already approved
   `require_sck` gate on all 6 handlers. 8 integration
   tests. Codex audit finding (incomplete SCK gate) fixed.
 - **F — Principal + role + minting-authority CRUD.**
-  Doc 10 §309-§354. 16 handlers: principal (create +
-  list + rotate + retire), role (create + list + modify +
-  retire), membership (assign + remove), minting authority
-  (create + list + rotate + bump-epoch + retire + modify).
-  Long-lived token generation (returned once; only
-  SHA-256 hash persists).
+  ✅ Done 2026-04-28. 16 handlers across 5 route modules:
+  principal (create + list + rotate + retire), role (create
+  + list + modify + retire), membership (assign + remove),
+  minting authority (create + list + rotate + bump-epoch +
+  retire + modify). Long-lived `pht_` token generation
+  (returned once; only SHA-256 hash persists; no token in
+  logs). 7 integration tests.
 - **G — Token minting endpoint. Crypto-touching.**
   Doc 10 §355. Permission-clipping, `authority_epoch`
   binding, audit-record (subject + authority only).
