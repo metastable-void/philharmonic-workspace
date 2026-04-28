@@ -29,7 +29,8 @@
       "Bash(./scripts/xtask.sh calendar-jp *)",
       "Bash(./scripts/xtask.sh codex-fmt *)",
       "Bash(./scripts/pre-landing.sh philharmonic-connector-impl-sql-postgres *)",
-      "Bash(./scripts/push-all.sh)"
+      "Bash(./scripts/push-all.sh)",
+      "Bash(./scripts/status.sh)"
     ],
     "additionalDirectories": [
       "/tmp"

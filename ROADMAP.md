@@ -1394,6 +1394,16 @@ implementation's wire protocol.
 
 **Goal**: Implement the public HTTP API.
 
+**Target**: Phase 8 done end-to-end (sub-phases A→I) by
+**Sat 2026-05-02**, alongside Phase 9 task 2 (test WebUI +
+binary targets) so end-to-end exercise is in shape before
+Yuka returns from Golden Week. See
+[`docs/notes-to-humans/2026-04-28-0002-pre-gw-target-may-2-end-to-end.md`](docs/notes-to-humans/2026-04-28-0002-pre-gw-target-may-2-end-to-end.md)
+for the working calendar, what gets cut first if the
+target slips, and what stays in regardless (the three
+crypto-review gates B/E/G; the 0.1.0 publish; the
+testcontainers happy path).
+
 **Reference**: `10-api-layer.md` exhaustively for the endpoint
 surface, permission mapping, authentication flows, rate
 limiting.
@@ -1542,6 +1552,14 @@ fires before each is merged. Approach gate already approved
 ### Phase 9 — Integration and reference deployment
 
 **Goal**: A running deployment serving real workflows.
+
+**Target**: Test WebUI + binary targets (task 2 below) plus
+the testcontainers end-to-end happy path (task 1 below) in
+shape by **Sat 2026-05-02**, alongside Phase 8's
+sub-phases. The chat-app-shaped ephemeral-token flow can
+slip past 5/2 if scope pressure forces a cut. See
+[`docs/notes-to-humans/2026-04-28-0002-pre-gw-target-may-2-end-to-end.md`](docs/notes-to-humans/2026-04-28-0002-pre-gw-target-may-2-end-to-end.md)
+for the cut-order if 5/2 slips.
 
 **Tasks**:
 
