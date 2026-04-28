@@ -42,8 +42,11 @@ jobs:
       - name: Workspace setup
         run: ./scripts/setup.sh
       
-      # continue-on-error: Slack/OpenAI outages must not fail CI.
-      # if: push only — PRs (especially from forks) lack secrets.
+      # Slack runs before pre-landing so that cancel-in-progress
+      # (which kills long lint+test runs when a new commit lands)
+      # doesn't suppress the summary. continue-on-error keeps
+      # Slack/OpenAI outages from failing CI. push-only because
+      # fork PRs lack secrets.
       - name: Slack webhook
         if: github.event_name == 'push'
         continue-on-error: true
