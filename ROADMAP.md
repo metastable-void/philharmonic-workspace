@@ -1404,18 +1404,33 @@ limiting.
 
 1. HTTP framework: use `axum` (aligns with Tokio ecosystem).
 
-2. Tenant + scope resolution as a deployment-supplied input:
-   - The crate exposes a trait (e.g. `RequestScope`) that the
-     deployment implements to map a request to either
-     `Tenant(tenant_id)` or `Operator`. The implementation can
-     read a subdomain, a path prefix, a TLS client-cert
-     SAN/CN, a fixed-tenant constant, or anything else — the
-     framework is agnostic. Doc 10 §"Request routing"
-     enumerates the shapes deployments commonly pick.
-   - Middleware calls the resolver, attaches the resulting
-     `RequestScope` to the request context, and rejects
-     requests the resolver can't classify with a structured
-     error.
+2. Tenant + scope resolution as a deployment-supplied input.
+   The crate exposes a `RequestScopeResolver` trait with one
+   async method that returns a `RequestScope` enum:
+   ```rust
+   #[async_trait]
+   pub trait RequestScopeResolver: Send + Sync + 'static {
+       async fn resolve(
+           &self,
+           parts: &http::request::Parts,
+       ) -> Result<RequestScope, ResolverError>;
+   }
+
+   pub enum RequestScope {
+       Tenant(EntityId<Tenant>),
+       Operator,
+   }
+   ```
+   Plugged in at app construction via
+   `Arc<dyn RequestScopeResolver>`. The implementation can
+   read a subdomain, a path prefix, a TLS client-cert
+   SAN/CN, a fixed-tenant constant, or anything else — the
+   framework is agnostic. Doc 10 §"Request routing"
+   enumerates the shapes deployments commonly pick.
+   Middleware calls the resolver, attaches the resulting
+   `RequestScope` to the request context, and rejects
+   requests the resolver can't classify with a structured
+   error.
 
 3. Authentication middleware:
    - Parse `Authorization: Bearer <token>` header.
@@ -1464,11 +1479,53 @@ limiting.
 
 The crate ships as a library that exposes an `axum::Router`
 (or equivalent constructor) plus the trait surfaces it needs
-plugged in (`RequestScope`, store, executor client, lowerer,
-signing keys, etc.). Whether a deployment runs it as one
-process, splits it across many, or embeds it in-process for a
-single user is the deployment's choice; the framework does not
-prescribe.
+plugged in (`RequestScopeResolver`, store, executor client,
+lowerer, signing keys, etc.). Whether a deployment runs it as
+one process, splits it across many, or embeds it in-process
+for a single user is the deployment's choice; the framework
+does not prescribe.
+
+**Sub-phase plan** (A→I; see
+[`docs/notes-to-humans/2026-04-27-0003-phase-8-design-and-decisions.md`](docs/notes-to-humans/2026-04-27-0003-phase-8-design-and-decisions.md)
+for the rationale). Each sub-phase is one Codex round (or
+Claude housekeeping for I) with pre-landing-green at each
+cut. Sub-phases B/E/G are crypto-touching — code-level
+crypto review (per
+[`crypto-review-protocol`](.claude/skills/crypto-review-protocol/SKILL.md))
+fires before each is merged. Approach gate already approved
+2026-04-28 (recorded in
+[`docs/notes-to-humans/2026-04-28-0001-phase-8-decisions-confirmed.md`](docs/notes-to-humans/2026-04-28-0001-phase-8-decisions-confirmed.md)).
+
+- **A — Skeleton.** axum app, `RequestScopeResolver` trait
+  + middleware, request context type, error envelope shape,
+  observability middleware (correlation ID, structured
+  logging), placeholder auth/authz layers. Crate at 0.0.0;
+  not publishable yet.
+- **B — Auth (long-lived + ephemeral). Crypto-touching.**
+  Bearer parsing, `pht_` lookup against the store,
+  COSE_Sign1 verification, `AuthContext` enum, kid resolver
+  wiring. Code-review gate fires.
+- **C — Authz + tenant scope.** Permission-atom evaluation
+  against `AuthContext`, instance-scope check for
+  ephemeral, tenant-match against `RequestScope`.
+- **D — Workflow management endpoints.** Doc 10 §228 full
+  surface. Wires `WorkflowEngine` into handlers.
+- **E — Endpoint config management. Crypto-touching.**
+  Doc 10 §270 full surface; SCK encrypt/decrypt of
+  `TenantEndpointConfig`. Code-review gate fires.
+- **F — Principal + role + minting-authority CRUD.**
+  Doc 10 §309-§354. Long-lived token generation
+  (returns once, only the SHA-256 hash persists).
+- **G — Token minting endpoint. Crypto-touching.**
+  Doc 10 §355. Permission-clipping, `authority_epoch`
+  binding, audit-record (subject + authority only).
+  Code-review gate fires.
+- **H — Audit + rate limit + tenant-admin + operator
+  endpoints.** Doc 10 §418, §430, §436. Operator-endpoint
+  v1 minimum: tenant create / suspend / unsuspend.
+- **I — Publish.** `0.1.0` to crates.io via
+  `./scripts/publish-crate.sh`. Doc reconciliation, ROADMAP
+  marks Phase 8 done.
 
 **Acceptance criteria**:
 - Every endpoint in doc 10 implemented with correct permission
@@ -1509,7 +1566,31 @@ prescribe.
      step records. Non-browser callers exercise the same
      mechanism.
 
-2. Reference deployment on the developer's infrastructure
+2. **Test WebUI + binary targets** (in-tree, non-published).
+   Mirrors the `xtask/` pattern: workspace-internal crates
+   that are never published to crates.io, used to exercise
+   the framework end-to-end and to give future consumers a
+   worked example of one possible deployment shape.
+   Concretely (sub-layout TBD when we get here):
+   - One or more **bin crates** that wire the framework
+     library crates into runnable processes — at minimum an
+     API host, a mechanics worker, a connector router, and
+     a connector service. These let testcontainers /
+     reference-deployment scenarios spin up real binaries
+     instead of in-test process objects.
+   - A **small WebUI** that drives the API for end-to-end
+     test scenarios — login (via long-lived API token),
+     workflow-template creation, instance creation,
+     step execution, audit-log inspection. Browser-shaped
+     so the ephemeral-token flow can be exercised against a
+     real browser, not just an HTTP client.
+   - These artifacts are *test/demo* deliverables, not part
+     of the published-crate surface. They're examples of
+     how a deployment might wire the framework together —
+     not prescriptions. The framework crates remain shape-
+     agnostic.
+
+3. Reference deployment on the developer's infrastructure
    (one example shape; chosen for end-to-end exercise of the
    crates, not as a prescription):
    - Deploy the binaries to the developer's on-prem or IaaS.
@@ -1533,7 +1614,7 @@ prescribe.
      workflow orchestration; non-LLM workflows are equally
      supported).
 
-3. Documentation reconciliation:
+4. Documentation reconciliation:
    - For every case where implementation revealed a design doc
      was wrong or incomplete, update the doc.
    - Pass through docs 01, 08, 09, 10, 11, 15 at minimum; others
