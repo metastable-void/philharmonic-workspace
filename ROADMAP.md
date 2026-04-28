@@ -1568,9 +1568,10 @@ fires before each is merged. Approach gate already approved
   in-memory token-bucket rate limiting per tenant per
   endpoint family (429 + Retry-After), operator tenant
   create/suspend/unsuspend. 9 integration tests.
-- **I — Publish.** `0.1.0` to crates.io via
-  `./scripts/publish-crate.sh`. Doc reconciliation, ROADMAP
-  marks Phase 8 done.
+- **I — Publish.** `philharmonic-policy` 0.2.0 +
+  `philharmonic-api` 0.1.0 to crates.io via
+  `./scripts/publish-crate.sh`. CHANGELOGs finalized, doc
+  reconciliation, ROADMAP marks Phase 8 done.
 
 **Acceptance criteria**:
 - Every endpoint in doc 10 implemented with correct permission
