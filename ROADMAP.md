@@ -1506,15 +1506,26 @@ fires before each is merged. Approach gate already approved
 2026-04-28 (recorded in
 [`docs/notes-to-humans/2026-04-28-0001-phase-8-decisions-confirmed.md`](docs/notes-to-humans/2026-04-28-0001-phase-8-decisions-confirmed.md)).
 
-- **A — Skeleton.** axum app, `RequestScopeResolver` trait
-  + middleware, request context type, error envelope shape,
-  observability middleware (correlation ID, structured
-  logging), placeholder auth/authz layers. Crate at 0.0.0;
-  not publishable yet.
-- **B — Auth (long-lived + ephemeral). Crypto-touching.**
+- **A — Skeleton.** ✅ Done 2026-04-28. axum app,
+  `RequestScopeResolver` trait + middleware, request context
+  type, error envelope shape, observability middleware
+  (correlation ID, structured logging), placeholder
+  auth/authz layers. Crate at 0.0.0.
+- **B0 — Ephemeral-token primitives. Crypto-touching.**
+  ✅ Done 2026-04-28 (Gate-1 + Gate-2 approved).
+  `EphemeralApiTokenClaims` + `ApiSigningKey` +
+  `mint_ephemeral_api_token` + 14-step
+  `verify_ephemeral_api_token` + `ApiVerifyingKeyRegistry`
+  in `philharmonic-policy 0.2.0` (not yet published;
+  `[patch.crates-io]` bridges). 2 positive KATs + 19
+  negative vectors + proptest fuzz. Codex audit findings
+  (trailing bytes + unknown fields) fixed inline.
+- **B1 — Auth middleware. Crypto-touching (consumer).**
   Bearer parsing, `pht_` lookup against the store,
-  COSE_Sign1 verification, `AuthContext` enum, kid resolver
-  wiring. Code-review gate fires.
+  COSE_Sign1 verification via B0 primitives, `AuthContext`
+  population, authority-tenant binding, authority-epoch
+  enforcement, generic external-error collapsing. Code-review
+  gate fires on B1 because it touches the verify call path.
 - **C — Authz + tenant scope.** Permission-atom evaluation
   against `AuthContext`, instance-scope check for
   ephemeral, tenant-match against `RequestScope`.
