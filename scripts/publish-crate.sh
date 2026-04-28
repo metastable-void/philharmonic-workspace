@@ -33,9 +33,11 @@ set -eu
 . "$(dirname -- "$0")/lib/workspace-cd.sh"
 
 dry_run=0
+no_verify=0
 while [ $# -gt 0 ]; do
     case "$1" in
-        --dry-run) dry_run=1; shift ;;
+        --dry-run)   dry_run=1; shift ;;
+        --no-verify) no_verify=1; shift ;;
         --) shift; break ;;
         -*) printf 'unknown flag: %s\n' "$1" >&2; exit 2 ;;
         *) break ;;
@@ -43,7 +45,7 @@ while [ $# -gt 0 ]; do
 done
 
 if [ $# -ne 1 ]; then
-    echo "Usage: $0 [--dry-run] <crate-name>" >&2
+    echo "Usage: $0 [--dry-run] [--no-verify] <crate-name>" >&2
     exit 2
 fi
 
@@ -152,19 +154,27 @@ printf '%s=== %s %s ===%s\n' "$C_HEADER" "$crate" "$tag" "$C_RESET"
 CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-target-publish}"
 export CARGO_TARGET_DIR
 
-# Sanity: always run --dry-run first. Catches missing README,
-# unsatisfied dep versions, oversized tarballs, etc. before the real
-# publish.
-printf '%s=== cargo pub-fresh --dry-run -p %s ===%s\n' "$C_HEADER" "$crate" "$C_RESET"
-cargo pub-fresh --dry-run -p "$crate"
+verify_flag=""
+if [ "$no_verify" -eq 1 ]; then
+    verify_flag="--no-verify"
+    printf '%s=== --no-verify: skipping verify-build (proxy index may be stale) ===%s\n' "$C_WARN" "$C_RESET"
+fi
+
+# Sanity: always run --dry-run first (unless --no-verify skips it).
+if [ "$no_verify" -eq 0 ]; then
+    printf '%s=== cargo pub-fresh --dry-run -p %s ===%s\n' "$C_HEADER" "$crate" "$C_RESET"
+    cargo pub-fresh --dry-run -p "$crate"
+fi
 
 if [ "$dry_run" -eq 1 ]; then
     printf '%s=== --dry-run: stopping; no real publish, no tag ===%s\n' "$C_WARN" "$C_RESET"
     exit 0
 fi
 
-printf '%s=== cargo pub-fresh -p %s ===%s\n' "$C_HEADER" "$crate" "$C_RESET"
-cargo pub-fresh -p "$crate"
+# shellcheck disable=SC2086
+printf '%s=== cargo pub-fresh %s -p %s ===%s\n' "$C_HEADER" "$verify_flag" "$crate" "$C_RESET"
+# shellcheck disable=SC2086
+cargo pub-fresh $verify_flag -p "$crate"
 
 # Tag inside the submodule's own repo. Signed annotated tag matches
 # the workspace commit-signing rule.
