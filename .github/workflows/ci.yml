@@ -41,16 +41,7 @@ jobs:
 
       - name: Workspace setup
         run: ./scripts/setup.sh
-
-      # Single driver for the full pre-landing flow. CI has a clean
-      # checkout (no dirty submodules) so pre-landing.sh skips the
-      # per-crate --ignored phase — contributor behavior matches
-      # exactly, ensuring no CI/local drift.
-      - name: Pre-landing checks (lint + workspace test)
-        run: ./scripts/pre-landing.sh
-
-      # Slack notification runs after pre-landing so lint+test
-      # failures are never masked by a webhook issue.
+      
       # continue-on-error: Slack/OpenAI outages must not fail CI.
       # if: push only — PRs (especially from forks) lack secrets.
       - name: Slack webhook
@@ -60,3 +51,11 @@ jobs:
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+
+      # Single driver for the full pre-landing flow. CI has a clean
+      # checkout (no dirty submodules) so pre-landing.sh skips the
+      # per-crate --ignored phase — contributor behavior matches
+      # exactly, ensuring no CI/local drift.
+      - name: Pre-landing checks (lint + workspace test)
+        run: ./scripts/pre-landing.sh
+
