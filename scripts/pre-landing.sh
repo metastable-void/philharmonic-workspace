@@ -37,6 +37,7 @@
 set -eu
 . "$(dirname -- "$0")/lib/colors.sh"
 . "$(dirname -- "$0")/lib/workspace-cd.sh"
+. "$(dirname -- "$0")/lib/cargo-target-dir.sh"
 
 no_ignored=0
 while [ $# -gt 0 ]; do

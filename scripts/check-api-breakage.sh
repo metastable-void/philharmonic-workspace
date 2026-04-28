@@ -43,6 +43,7 @@
 set -eu
 
 . "$(dirname -- "$0")/lib/workspace-cd.sh"
+. "$(dirname -- "$0")/lib/cargo-target-dir.sh"
 
 if [ $# -lt 1 ] || [ $# -gt 2 ] || [ -z "$1" ]; then
     echo "Usage: $0 <crate> [<baseline-version>]" >&2

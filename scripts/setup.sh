@@ -16,6 +16,7 @@ set -eu
 
 script_dir="$(cd -- "$(dirname -- "$0")" && pwd)"
 workspace_root="$(cd -- "$script_dir/.." && pwd)"
+. "$script_dir/lib/cargo-target-dir.sh"
 
 if ! git -C "$workspace_root" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
     printf 'setup.sh: unable to locate workspace Git repository from script path: %s\n' "$workspace_root" >&2

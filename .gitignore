@@ -8,6 +8,7 @@ target/
 # duration of the competing build.
 target-xtask/
 target-publish/
+target-main/
 **/*.rs.bk
 .DS_Store
 .vscode/settings.json

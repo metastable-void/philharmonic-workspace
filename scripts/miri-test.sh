@@ -52,6 +52,7 @@
 
 set -eu
 . "$(dirname -- "$0")/lib/workspace-cd.sh"
+. "$(dirname -- "$0")/lib/cargo-target-dir.sh"
 
 if [ $# -eq 0 ]; then
     cat <<EOF >&2
