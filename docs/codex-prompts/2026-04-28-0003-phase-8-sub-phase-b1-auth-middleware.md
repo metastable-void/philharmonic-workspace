@@ -447,4 +447,56 @@ commit.
 
 ## Outcome
 
-Pending — will be updated after Codex run.
+**Status:** Landed clean on 2026-04-28 (Tue) JST afternoon.
+Awaiting human review (crypto-touching call-site).
+**Codex job:** `task-moi5ay26-k0fwf2`, elapsed ~16 min.
+**Claude code review:** PASSES — see
+[`docs/notes-to-humans/2026-04-28-0007-b1-claude-code-review.md`](../notes-to-humans/2026-04-28-0007-b1-claude-code-review.md).
+
+### Files landed
+
+`philharmonic-store/`:
+- `src/entity.rs` — `find_by_content` trait method (default
+  fatal-error impl).
+
+`philharmonic-store-sqlx-mysql/`:
+- `src/entity.rs` — MySQL `find_by_content` impl.
+- `src/schema.rs` — `ix_attr_content_hash` index on
+  `attribute_content(attribute_name, content_hash)`.
+
+`philharmonic-api/`:
+- Modified: `Cargo.toml` (added `philharmonic-store`,
+  `philharmonic-policy`, `base64`), `src/lib.rs` (builder
+  gains `store` + `api_verifying_key_registry`; middleware
+  chain reordered), `src/auth.rs` (convenience methods +
+  `from_ephemeral_claims`), `src/error.rs`
+  (`Unauthenticated` variant), `src/middleware/mod.rs`
+  (auth replaces auth_placeholder).
+- Added: `src/middleware/auth.rs` (351-line module: full
+  auth flow), `tests/auth_middleware.rs` (15 integration
+  tests), `tests/common/mod.rs` (shared mock store +
+  builder helpers).
+- Removed: `src/middleware/auth_placeholder.rs`.
+- Refactored: `tests/correlation_id.rs`,
+  `tests/error_envelope.rs`, `tests/middleware_chain.rs`
+  (use `common::basic_builder()`).
+
+### Verification
+
+- 22 `philharmonic-api` tests green (15 auth + 7 existing).
+- 22 `philharmonic-store` tests green.
+- Clippy clean (both crates).
+- No `.unwrap()` / `.expect()` / `panic!` on reachable
+  library paths.
+
+### B1 handoff contract compliance
+
+Every item from the B0 proposal's B1 handoff contract is
+implemented with its required test:
+- Authority-tenant binding: ✅ (line 182 + test line 453)
+- Authority-epoch enforcement: ✅ (line 187-190 + tests
+  482/496)
+- Negative-epoch fail-closed: ✅ (`u64::try_from` + test 496)
+- Generic 401 collapsing: ✅ (all 13 negative tests assert
+  the `assert_unauthenticated` helper which checks no
+  kid/sig/expiry/epoch in response body)
