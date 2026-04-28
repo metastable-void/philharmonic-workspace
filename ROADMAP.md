@@ -1563,8 +1563,11 @@ fires before each is merged. Approach gate already approved
   `MAX_TOKEN_BYTES` guard, permission-atom validation against
   `ALL_ATOMS`, duplicate dedup. 9 integration tests.
 - **H — Audit + rate limit + tenant-admin + operator
-  endpoints.** Doc 10 §418, §430, §436. Operator-endpoint
-  v1 minimum: tenant create / suspend / unsuspend.
+  endpoints.** ✅ Done 2026-04-28. Tenant settings
+  read/update, audit-event list (paginated + filterable),
+  in-memory token-bucket rate limiting per tenant per
+  endpoint family (429 + Retry-After), operator tenant
+  create/suspend/unsuspend. 9 integration tests.
 - **I — Publish.** `0.1.0` to crates.io via
   `./scripts/publish-crate.sh`. Doc reconciliation, ROADMAP
   marks Phase 8 done.

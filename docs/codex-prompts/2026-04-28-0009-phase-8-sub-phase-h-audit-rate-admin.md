@@ -174,4 +174,17 @@ Working tree: dirty. Do not commit.
 
 ## Outcome
 
-Pending — will be updated after Codex run.
+**Status:** Landed clean 2026-04-28.
+**Claude review:** PASSES. Hand-rolled token bucket (no
+governor dep), `tokio::sync::Mutex` keyed by
+`(tenant_id, family)`. Operator endpoints require
+`RequestScope::Operator`. Audit events filterable by type,
+time range, principal. No panics on library paths. No
+sensitive data in logs.
+
+Files: `src/routes/tenant.rs` (168), `src/routes/audit.rs`
+(237), `src/routes/operator.rs` (191),
+`src/middleware/rate_limit.rs` (277), `src/error.rs`,
+`src/lib.rs`, `tests/audit_rate_admin.rs` (542, 9 tests).
+
+86 tests green. Clippy clean. Non-crypto; no Gate-2 required.
