@@ -5,7 +5,7 @@
 **Phase:** 8 (`philharmonic-api`), sub-phase B0 (primitives only;
 B1 is the consumer middleware in `philharmonic-api`)
 **Author:** Claude Code (on Yuka's review queue)
-**Status:** **Awaiting Gate-1 sign-off (r2)**
+**Status:** **Gate-1 approved 2026-04-28** — implementation unblocked
 **Approval record:** `docs/design/crypto-approvals/2026-04-28-phase-8-ephemeral-api-token-primitives.md` (will be created on sign-off)
 **Blocker note that triggered this:** [`docs/notes-to-humans/2026-04-28-0003-ephemeral-token-primitives-gap.md`](../../notes-to-humans/2026-04-28-0003-ephemeral-token-primitives-gap.md)
 **Codex security review:** [`docs/codex-reports/2026-04-28-0001-phase-8-b0-ephemeral-api-token-primitives-security-review.md`](../../codex-reports/2026-04-28-0001-phase-8-b0-ephemeral-api-token-primitives-security-review.md)
