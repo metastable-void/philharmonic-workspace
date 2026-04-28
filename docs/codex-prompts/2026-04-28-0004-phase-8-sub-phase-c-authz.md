@@ -237,4 +237,15 @@ Working tree: dirty. Do not commit.
 
 ## Outcome
 
-Pending — will be updated after Codex run.
+**Status:** Landed clean 2026-04-28.
+**Claude review:** PASSES — see
+[`docs/notes-to-humans/2026-04-28-0009-c-claude-code-review.md`](../notes-to-humans/2026-04-28-0009-c-claude-code-review.md).
+
+Files: `src/middleware/authz.rs` (new), `src/store.rs` (new),
+`src/lib.rs` (builder + exports), `src/error.rs` (Forbidden),
+`tests/authz_middleware.rs` (11 tests), `tests/common/mod.rs`
+(ContentStore impl on MockStore). Removed
+`src/middleware/authz_placeholder.rs`.
+
+42 tests green (9 unit + 15 auth + 11 authz + 2+2+3 existing).
+Clippy clean. Non-crypto; no Gate-2 required.

@@ -1528,9 +1528,14 @@ fires before each is merged. Approach gate already approved
   collapsing. 15 integration tests. Codex audit findings
   (oversize bearer pre-check + MySQL index migration +
   doc drift) fixed inline.
-- **C — Authz + tenant scope.** Permission-atom evaluation
-  against `AuthContext`, instance-scope check for
-  ephemeral, tenant-match against `RequestScope`.
+- **C — Authz + tenant scope.** ✅ Done 2026-04-28.
+  Permission-atom evaluation (role-based for Principal via
+  `evaluate_permission`, claim-list for Ephemeral),
+  tenant-scope enforcement, instance-scope infrastructure
+  (ready for D to plug in URL extraction).
+  `RequiredPermission` extension pattern for per-route
+  atom declaration. `ApiStore` trait introduced. 11
+  integration tests.
 - **D — Workflow management endpoints.** Doc 10 §228 full
   surface. Wires `WorkflowEngine` into handlers.
 - **E — Endpoint config management. Crypto-touching.**
