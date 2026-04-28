@@ -205,6 +205,17 @@ Read the full section when in doubt.
   runs without them.
 - **Comments.** Default to *no* comments. Write one when the
   *why* is non-obvious. Don't narrate *what* — names do that.
+- **Always use `scripts/*.sh` for cargo operations.** The
+  wrappers set `CARGO_TARGET_DIR=target-main` so builds don't
+  fight `rust-analyzer`'s `target/` for the build-directory
+  lock. `xtask.sh` uses `target-xtask/`; `publish-crate.sh`
+  uses `target-publish/`. If you must run cargo directly,
+  prefix with `CARGO_TARGET_DIR=target-main`.
+- **Track volume regularly.** After finishing a sub-phase or
+  a significant batch of edits, run
+  `./scripts/check-md-bloat.sh` and `./scripts/tokei.sh`.
+  Note the output in your final summary — it helps Claude
+  and Yuka gauge growth.
 
 ## Shell scripts — short form
 

@@ -148,15 +148,33 @@ full in `CONTRIBUTING.md`. Read the full section before acting
   When in doubt, ask. Hooks + GitHub ruleset accept WIP as
   long as it's signed, signed-off, and not force-pushed.
   ([§4.4](CONTRIBUTING.md#44-no-history-modification))
-- **Prefer `scripts/*.sh` wrappers over raw `cargo`.** The
-  wrappers encode flag choices, auto-install, workspace-cd,
-  POSIX-compat guards. Read-only queries (`cargo tree`,
-  `cargo metadata`) are fine raw. If no wrapper covers your
-  case, extend one. ([§5](CONTRIBUTING.md#5-script-wrappers-over-raw-cargo))
+- **Always use `scripts/*.sh` wrappers for cargo operations.**
+  The wrappers set `CARGO_TARGET_DIR=target-main` (via
+  `lib/cargo-target-dir.sh`) so CLI and Codex builds use
+  `target-main/` instead of the default `target/`.
+  `rust-analyzer` uses `target/`, so this avoids lock
+  contention, build-cache corruption, and "Blocking waiting
+  for file lock" stalls. `xtask.sh` uses `target-xtask/`;
+  `publish-crate.sh` uses `target-publish/`. **Never run raw
+  `cargo build/test/check/clippy` without setting
+  `CARGO_TARGET_DIR` first** — if you must go raw, prefix
+  with `CARGO_TARGET_DIR=target-main`. Read-only queries
+  (`cargo tree`, `cargo metadata`) are fine raw. If no
+  wrapper covers your case, extend one.
+  ([§5](CONTRIBUTING.md#5-script-wrappers-over-raw-cargo))
 - **Run `./scripts/pre-landing.sh` before every commit that
   touches Rust.** fmt + check + clippy (`-D warnings`) + test,
   auto-detecting modified crates. CI runs the same script.
   ([§11](CONTRIBUTING.md#11-pre-landing-checks))
+- **Track doc/code volume regularly.** Run
+  `./scripts/check-md-bloat.sh` (reports Markdown file sizes
+  and flags bloated docs) and `./scripts/tokei.sh` (lines of
+  code by language/crate) after completing a sub-phase,
+  landing a doc reconciliation, or any session where
+  significant volume was added. The output helps Yuka gauge
+  whether the workspace is growing proportionally or drifting
+  toward doc-heavy / code-light (or vice versa). Not a gate
+  — just a hygiene check. Run both and note any surprises.
 - **Never recall a crate version from memory.** Always look up
   with `./scripts/xtask.sh crates-io-versions -- <crate>`. Local
   "what we're about to publish" comes from

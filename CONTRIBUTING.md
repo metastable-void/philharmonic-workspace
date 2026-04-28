@@ -620,6 +620,18 @@ The inventory:
 | `./scripts/xtask.sh <tool> -- <args>` | wrapper for in-tree Rust bins | Canonical invocation for any `xtask/` bin; mandatory `--` separates wrapper-level flags from bin args. |
 | `./scripts/check-toolchain.sh [--update]` | `rustup check` / `rustup update` + version print | Step 0 of `pre-landing.sh`. |
 
+**Target-dir split**: every cargo-touching wrapper sources
+`scripts/lib/cargo-target-dir.sh`, which sets
+`CARGO_TARGET_DIR=target-main` unless the caller already set
+it. This keeps CLI / CI / Codex builds in `target-main/`,
+separate from `rust-analyzer`'s default `target/`.
+`xtask.sh` uses `target-xtask/`; `publish-crate.sh` uses
+`target-publish/`. The split eliminates the "Blocking waiting
+for file lock on build directory" stall that occurs when two
+cargo processes share `target/`. **If you must run cargo
+outside a wrapper, prefix the command with
+`CARGO_TARGET_DIR=target-main`.**
+
 **Exempt**: read-only cargo queries have no wrapper and don't
 need one — `cargo tree`, `cargo metadata`, `cargo --version`,
 `cargo search` are fine to run raw.
