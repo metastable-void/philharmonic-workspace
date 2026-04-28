@@ -680,4 +680,155 @@ git -C . status --short
 
 ## Outcome
 
-Pending — will be updated after Codex run.
+**Status:** Landed clean on 2026-04-28 (Tue) JST morning.
+**Codex job:** `task-mohy75pe-mu7b3a`,
+session `019dd1b4-6308-7443-ada0-216d0d27a918`,
+elapsed 24m 58s (01:29:12Z → 01:54:09Z).
+**Subagent:** `codex:codex-rescue` (default model/effort).
+
+### Files landed
+
+In `philharmonic-api/` (submodule):
+
+Modified:
+- `Cargo.toml` — deps added (axum 0.8.9, tower 0.5.3,
+  tower-http 0.6.8, tokio 1.52.1, tracing 0.1.44,
+  tracing-subscriber 0.3.23, serde 1.0.228, serde_json 1.0.149,
+  thiserror 2.0.18, async-trait 0.1.89, http 1.4.0, uuid 1.23.1,
+  philharmonic-types 0.3, philharmonic-policy 0.1).
+- `CHANGELOG.md` — `[Unreleased]` entry describes sub-phase A scope.
+- `README.md` — refreshed to one-paragraph intro + builder note.
+- `src/lib.rs` — public surface: `PhilharmonicApiBuilder`,
+  `PhilharmonicApi`, `BuilderError`, re-exports from sibling
+  modules, full crate-root rustdoc with worked example.
+
+Added:
+- `src/auth.rs` — `AuthContext` enum (Principal | Ephemeral).
+- `src/context.rs` — `RequestContext` (correlation_id +
+  started_at + scope + auth) plus a private
+  `CorrelationContext` carrier for the early middleware chain.
+- `src/error.rs` — `ApiError`, `ErrorEnvelope`, `ErrorBody`,
+  `ErrorCode`, `IntoResponse` impl, plus
+  `into_response_with_correlation_id` for middleware paths
+  that already have the request's correlation ID and an
+  internal `envelope_response` helper for the not-found
+  fallback.
+- `src/scope.rs` — `RequestScope` enum, `RequestScopeResolver`
+  async trait, `ResolverError`. Re-exports
+  `philharmonic_policy::Tenant` and `philharmonic_types::EntityId`.
+- `src/middleware/{mod,correlation_id,request_logging,
+  scope,auth_placeholder,authz_placeholder}.rs` —
+  middleware chain wired through axum's
+  `from_fn` / `from_fn_with_state` adapters.
+- `src/routes/{mod,meta}.rs` — `/v1/_meta/version`,
+  `/v1/_meta/health`, plus a fallback handler that returns
+  the structured `NotFound` envelope.
+- `tests/middleware_chain.rs`,
+  `tests/error_envelope.rs`,
+  `tests/correlation_id.rs` —
+  three integration suites exercising scope dispatch, error
+  envelope shape, and correlation-id round-trip.
+
+In workspace root:
+- `Cargo.lock` — regenerated.
+
+### Verification
+
+- `./scripts/rust-test.sh philharmonic-api` — green:
+  9 unit + 7 integration + 1 doctest. Re-confirmed
+  post-Codex by Claude.
+- `./scripts/pre-landing.sh philharmonic-api` — green
+  (Codex run + Claude re-confirm).
+- `cargo doc -p philharmonic-api --no-deps` — clean (no
+  rustdoc warnings or broken intra-doc links).
+
+### Mid-run adaptations Codex made
+
+Two during the run:
+
+1. **`builder_reports_missing_scope_resolver` test
+   construction.** The first lint pass surfaced
+   `unwrap_err()` requiring `Debug` on the success type
+   (`PhilharmonicApi` doesn't derive `Debug`). Codex chose
+   pattern-matching the `Result` rather than adding a
+   public `Debug` impl. Reasonable judgment; that path
+   keeps the public surface minimal.
+2. **Layered-router routing detail.** The first
+   integration-test attempt failed because routes added
+   *after* `Router::layer` don't inherit the layer.
+   Codex's fix: extended the builder with an
+   `extra_routes(Router) -> Self` hook so callers
+   (sub-phase A integration tests, sub-phases B–H endpoint
+   families) can merge routes *before* the middleware
+   chain is applied. This is a small surface addition
+   beyond the prompt's spec but is the right shape — it's
+   the same pattern axum users hit in production code.
+
+### Decisions Codex made within bounded discretion
+
+- `AuthContext::Ephemeral::instance_scope` typed as
+  `Option<Uuid>` rather than `Option<EntityId<WorkflowInstance>>`
+  because `WorkflowInstance` is not exposed by
+  `philharmonic-policy 0.1.0`. Marked with a
+  `TODO(sub-phase D)` so it's greppable when sub-phase D
+  brings the entity in.
+- `ApiError::IntoResponse` (the trait impl path) cannot
+  read request extensions, so it falls back to a fresh
+  uuid + a `tracing::warn!`. Middleware paths use the
+  explicit `into_response_with_correlation_id` helper and
+  always preserve the real ID. Good seam.
+
+### Residual TODOs (greppable)
+
+- `TODO(sub-phase B):` — auth_placeholder.
+- `TODO(sub-phase C):` — authz_placeholder.
+- `TODO(sub-phase D):` — `instance_scope` Uuid → EntityId.
+
+### Dep cooldown status
+
+All external deps cleared the 3-day cooldown via
+`./scripts/xtask.sh crates-io-versions`. Workspace-internal
+deps (`philharmonic-types`, `philharmonic-policy`) are
+exempt per CONTRIBUTING.md §5.3.
+
+### Out-of-scope items kept correctly out
+
+No real auth, no real authz, no substrate, no workflow
+engine, no token mint, no audit, no rate limit, no crypto,
+no new endpoint handlers beyond `/v1/_meta/{version,health}`,
+no `cargo publish`, no `version` bump from 0.0.0,
+no workspace-root `Cargo.toml` edits.
+
+### Pre-existing warnings (not caused by this round)
+
+`philharmonic-api/Cargo.toml` carries a `[profile.release]`
+block from the scaffolder template that Cargo ignores
+because profiles must live at workspace root. The same
+block exists in every other Tier-1 sibling crate; the
+warning is workspace-wide and predates this round.
+
+### Git state at end of run
+
+`git -C philharmonic-api status --short`:
+```
+ M CHANGELOG.md
+ M Cargo.toml
+ M README.md
+ M src/lib.rs
+?? src/auth.rs
+?? src/context.rs
+?? src/error.rs
+?? src/middleware/
+?? src/routes/
+?? src/scope.rs
+?? tests/
+```
+
+`git -C . status --short`:
+```
+ M Cargo.lock
+ m philharmonic-api
+```
+
+Working tree dirty as instructed; commit + push happen
+post-review via `commit-all.sh`.
