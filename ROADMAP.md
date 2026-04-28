@@ -1557,9 +1557,13 @@ fires before each is merged. Approach gate already approved
   (returned once; only SHA-256 hash persists; no token in
   logs). 7 integration tests.
 - **G — Token minting endpoint. Crypto-touching.**
-  Doc 10 §355. Permission-clipping, `authority_epoch`
-  binding, audit-record (subject + authority only).
-  Code-review gate fires.
+  ✅ Done 2026-04-28 (awaiting Yuka crypto call-site review).
+  `POST /v1/tokens/mint` per doc 10 §355: permission
+  clipping against authority envelope, 4 KiB claims cap,
+  `authority_epoch` binding, lifetime validation (≤ authority
+  max ≤ 24h system max), instance-scope validation, audit
+  record (subject + authority only; no injected claims or
+  token bytes logged). 9 integration tests.
 - **H — Audit + rate limit + tenant-admin + operator
   endpoints.** Doc 10 §418, §430, §436. Operator-endpoint
   v1 minimum: tenant create / suspend / unsuspend.

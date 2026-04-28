@@ -202,4 +202,19 @@ Working tree: dirty. Do not commit.
 
 ## Outcome
 
-Pending — will be updated after Codex run.
+**Status:** Landed clean 2026-04-28. Awaiting Yuka crypto
+call-site review.
+**Claude review:** PASSES. `mint_ephemeral_api_token` call
+site correct: signing key + claims + iat passed, error →
+generic 500. Permission clipping, 4 KiB claims cap, lifetime
+validation, instance-scope validation, authority-tenant
+binding, retired check all present. Audit logging records
+subject + authority only — no injected claims or token bytes.
+No panics on library paths. No token material in logs.
+
+Files: `src/routes/mint.rs` (424 lines), `src/routes/mod.rs`,
+`src/lib.rs` (builder gains `api_signing_key` + `issuer`),
+`src/middleware/auth.rs` (minor), `tests/common/mod.rs`,
+`tests/token_mint.rs` (9 tests).
+
+77 tests green. Clippy clean.
