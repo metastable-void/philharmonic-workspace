@@ -1521,11 +1521,13 @@ fires before each is merged. Approach gate already approved
   negative vectors + proptest fuzz. Codex audit findings
   (trailing bytes + unknown fields) fixed inline.
 - **B1 — Auth middleware. Crypto-touching (consumer).**
-  Bearer parsing, `pht_` lookup against the store,
-  COSE_Sign1 verification via B0 primitives, `AuthContext`
-  population, authority-tenant binding, authority-epoch
-  enforcement, generic external-error collapsing. Code-review
-  gate fires on B1 because it touches the verify call path.
+  ✅ Done 2026-04-28 (Gate-2 approved). Bearer parsing,
+  `pht_` lookup via `find_by_content`, COSE_Sign1
+  verification via B0 primitives, `AuthContext` population,
+  authority-tenant binding, epoch enforcement, generic 401
+  collapsing. 15 integration tests. Codex audit findings
+  (oversize bearer pre-check + MySQL index migration +
+  doc drift) fixed inline.
 - **C — Authz + tenant scope.** Permission-atom evaluation
   against `AuthContext`, instance-scope check for
   ephemeral, tenant-match against `RequestScope`.
