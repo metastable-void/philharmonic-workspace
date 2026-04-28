@@ -10,6 +10,9 @@ target-xtask/
 target-publish/
 target-main/
 **/*.rs.bk
+*.swp
+*.swo
+*~
 .DS_Store
 .vscode/settings.json
 ._*
