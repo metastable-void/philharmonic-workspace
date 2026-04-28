@@ -187,8 +187,7 @@ Working tree: dirty. Do not commit.
 
 ## Outcome
 
-**Status:** Landed clean 2026-04-28. Awaiting Yuka crypto
-call-site review.
+**Status:** Landed clean 2026-04-28. Gate-2 approved.
 **Claude review:** PASSES — see
 [`docs/notes-to-humans/2026-04-28-0011-e-claude-code-review.md`](../notes-to-humans/2026-04-28-0011-e-claude-code-review.md).
 

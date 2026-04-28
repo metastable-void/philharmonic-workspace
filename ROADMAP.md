@@ -1542,14 +1542,19 @@ fires before each is merged. Approach gate already approved
   stub executor/lowerer, instance-scope enforcement.
   5 integration tests.
 - **E — Endpoint config management. Crypto-touching.**
-  ✅ Done 2026-04-28 (awaiting Yuka crypto call-site review).
-  6 handlers per doc 10 §270: create (SCK encrypt), list,
-  read metadata, read decrypted (SCK decrypt), rotate, retire.
-  No plaintext/ciphertext in logs or metadata reads. 8
-  integration tests.
+  ✅ Done 2026-04-28 (Gate-2 approved). 6 handlers per
+  doc 10 §270: create (SCK encrypt), list, read metadata,
+  read decrypted (SCK decrypt), rotate, retire. No
+  plaintext/ciphertext in logs or metadata reads.
+  `require_sck` gate on all 6 handlers. 8 integration
+  tests. Codex audit finding (incomplete SCK gate) fixed.
 - **F — Principal + role + minting-authority CRUD.**
-  Doc 10 §309-§354. Long-lived token generation
-  (returns once, only the SHA-256 hash persists).
+  Doc 10 §309-§354. 16 handlers: principal (create +
+  list + rotate + retire), role (create + list + modify +
+  retire), membership (assign + remove), minting authority
+  (create + list + rotate + bump-epoch + retire + modify).
+  Long-lived token generation (returned once; only
+  SHA-256 hash persists).
 - **G — Token minting endpoint. Crypto-touching.**
   Doc 10 §355. Permission-clipping, `authority_epoch`
   binding, audit-record (subject + authority only).
