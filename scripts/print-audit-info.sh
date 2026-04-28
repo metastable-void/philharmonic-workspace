@@ -71,4 +71,6 @@ if command -v rustc > /dev/null 2>&1 ; then
     rust=$(rustc --version 2>/dev/null | awk '{print $2}')
 fi
 
-echo t="${t}" h="${host}" u="${user}/${uid}" g="${grp}/${gid}" 4="${v4}" 6="${v6}" k="${kern}/${krel}" a="${arch}" o="${os}" r="${rust}"
+wdir=$(cd -- "$_here/.." && pwd)
+
+echo t="${t}" d="${wdir}" h="${host}" u="${user}/${uid}" g="${grp}/${gid}" 4="${v4}" 6="${v6}" k="${kern}/${krel}" a="${arch}" o="${os}" r="${rust}"
