@@ -22,4 +22,4 @@ set -eu
 
 . "$(dirname -- "$0")/lib/workspace-cd.sh"
 
-find . -type d -name target -prune -o -type f -name '*.[mM][dD]' -exec wc -l {} +
+find . -type d -name target -prune -o -type f -name '*.[mM][dD]' -exec wc -l {} + | sort -nr
