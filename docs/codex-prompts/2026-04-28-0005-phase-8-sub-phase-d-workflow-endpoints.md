@@ -246,4 +246,14 @@ Working tree: dirty. Do not commit.
 
 ## Outcome
 
-Pending — will be updated after Codex run.
+**Status:** Landed clean 2026-04-28.
+**Codex job:** `task-moi87860-kr8zyz`, elapsed ~10 min.
+**Claude review:** PASSES — see
+[`docs/notes-to-humans/2026-04-28-0010-d-claude-code-review.md`](../notes-to-humans/2026-04-28-0010-d-claude-code-review.md).
+
+Files: `src/routes/workflows.rs` (1180 lines, 13 handlers),
+`src/pagination.rs`, `src/workflow.rs`,
+`src/lib.rs` (builder + engine wiring), `src/error.rs`
+(new variants), `tests/workflow_endpoints.rs` (5 tests).
+
+51 tests green. Clippy clean. Non-crypto; no Gate-2 required.

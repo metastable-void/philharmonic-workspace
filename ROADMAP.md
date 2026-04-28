@@ -1536,8 +1536,11 @@ fires before each is merged. Approach gate already approved
   `RequiredPermission` extension pattern for per-route
   atom declaration. `ApiStore` trait introduced. 11
   integration tests.
-- **D — Workflow management endpoints.** Doc 10 §228 full
-  surface. Wires `WorkflowEngine` into handlers.
+- **D — Workflow management endpoints.** ✅ Done 2026-04-28.
+  All 13 endpoints per doc 10 §228-268 (5 template + 8
+  instance). Cursor pagination, WorkflowEngine integration,
+  stub executor/lowerer, instance-scope enforcement.
+  5 integration tests.
 - **E — Endpoint config management. Crypto-touching.**
   Doc 10 §270 full surface; SCK encrypt/decrypt of
   `TenantEndpointConfig`. Code-review gate fires.
