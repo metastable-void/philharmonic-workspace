@@ -54,7 +54,10 @@ approval_policy = "on-request"
 # --- Reasoning & verbosity ---
 # Medium effort is the right default for crate-sized tasks;
 # bump to high via --effort for genuinely hard algorithm work.
+service_tier = "fast"
+model = "gpt-5.5"
 model_reasoning_effort = "medium"
+fast_mode = true
 # Concise output matches the workspace's terse review style;
 # Claude-side review prefers diffs over long narrations.
 model_verbosity = "concise"

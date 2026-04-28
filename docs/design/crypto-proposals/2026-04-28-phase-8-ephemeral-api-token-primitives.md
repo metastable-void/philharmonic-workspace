@@ -1,13 +1,16 @@
 # Gate-1 proposal — Phase 8 sub-phase B0: ephemeral API token primitives
 
 **Date:** 2026-04-28 (Tue)
-**Revision:** 1 (first draft)
+**Revision:** 2 (post Codex security review)
 **Phase:** 8 (`philharmonic-api`), sub-phase B0 (primitives only;
 B1 is the consumer middleware in `philharmonic-api`)
 **Author:** Claude Code (on Yuka's review queue)
-**Status:** **Awaiting Gate-1 sign-off**
+**Status:** **Awaiting Gate-1 sign-off (r2)**
 **Approval record:** `docs/design/crypto-approvals/2026-04-28-phase-8-ephemeral-api-token-primitives.md` (will be created on sign-off)
 **Blocker note that triggered this:** [`docs/notes-to-humans/2026-04-28-0003-ephemeral-token-primitives-gap.md`](../../notes-to-humans/2026-04-28-0003-ephemeral-token-primitives-gap.md)
+**Codex security review:** [`docs/codex-reports/2026-04-28-0001-phase-8-b0-ephemeral-api-token-primitives-security-review.md`](../../codex-reports/2026-04-28-0001-phase-8-b0-ephemeral-api-token-primitives-security-review.md)
+  — eleven findings; resolutions summarized in §"Codex security
+  review resolutions". The body below is the r2 incarnation.
 **Yuka's Tue-morning calls** (recorded against `2026-04-28-0003`'s D1/D2/D3/D4):
   - **D1 = (a)** — primitives live in **`philharmonic-policy`**
     (next to `Sck`, `sck_encrypt`, `sck_decrypt`,
@@ -19,6 +22,42 @@ B1 is the consumer middleware in `philharmonic-api`)
     cut-list in
     [`2026-04-28-0002-pre-gw-target-may-2-end-to-end.md`](../../notes-to-humans/2026-04-28-0002-pre-gw-target-may-2-end-to-end.md)
     moves up if proposal sign-off slips.
+
+## Revisions
+
+- **r1** (2026-04-28 morning): first draft. Closely modeled on
+  Phase 5 Wave A's COSE_Sign1 proposal.
+- **r2** (2026-04-28 midday, post Codex security review): eleven
+  findings landed as inline fixes. Highlights:
+  - Added `iss` binding to the verifying-key registry entry
+    (Finding 2). Verify rejects `claims.iss != entry.issuer`.
+  - Added `iat` claim + `MAX_TOKEN_LIFETIME_MILLIS` ceiling
+    (Finding 3). Verify enforces `iat ≤ now + skew`,
+    `exp > iat`, `exp − iat ≤ MAX_TOKEN_LIFETIME_MILLIS`.
+  - `ApiSigningKey` does **not** derive `Debug`; carries a
+    redacted manual `fmt::Debug` impl (Finding 4).
+  - Replaced `claims: serde_json::Value` with `claims:
+    CanonicalJson` (RFC 8785 JCS via
+    `philharmonic_types::CanonicalJson`) for deterministic
+    on-the-wire bytes (Finding 5). 4 KiB cap enforced at both
+    mint and verify (Finding 6).
+  - Replay threat-model section rewritten to acknowledge
+    bearer-token exfiltration as a real risk separate from
+    minting compromise (Finding 7).
+  - Added strict COSE-header profile (only `alg` + `kid`
+    protected; unprotected empty; `crit` rejects) (Finding 9).
+  - Added `kid` length/character profile
+    (`[A-Za-z0-9._:-]`, 1..=128 bytes) checked before registry
+    lookup (Finding 10).
+  - `authority_epoch` wire type stays `u64`; B1 substrate
+    conversion rule pinned to `u64::try_from` with
+    fail-closed on negative/out-of-range (Finding 11).
+  - B1 handoff contract gained two normative items:
+    `authority.tenant == claims.tenant` (Finding 1) and
+    generic external-error collapsing for verify failures
+    (Finding 8).
+  - Open questions Q2 (CBOR determinism) and Q5 (max-lifetime
+    in primitive) resolved by the above. Q1/Q3/Q4/Q6 stand.
 
 ## Why this proposal exists
 
@@ -102,28 +141,91 @@ the published 0.1.0 surface.
 
 ### Out of scope (sub-phase B0)
 
-These belong to later sub-phases or to deployment:
+These belong to later sub-phases or to deployment. Every
+B1/G/H handoff item below is a **normative requirement** on
+the consumer — B0 cannot enforce it, but the next sub-phase
+must. The B1 / G / H Codex prompts will pin each item with
+explicit tests.
 
-- **The auth middleware itself** — sub-phase B1, in
-  `philharmonic-api`. B1 calls `verify_ephemeral_api_token`
-  and the existing `parse_api_token` (for `pht_`), populates
-  `RequestContext.auth`.
-- **Authority lookup, authority-epoch enforcement,
-  authority-retired check, tenant-suspended check** — B1 +
-  later. These are substrate-state checks; they belong with
-  the consumer that holds the substrate handle.
-- **Tenant-scope enforcement** (claim's `tenant` matches the
-  request's `RequestScope::Tenant(...)`) — sub-phase C
-  (authz).
-- **Instance-scope enforcement** (claim's `instance` vs the
-  URL's instance) — sub-phase C / D.
-- **Token minting endpoint** — sub-phase G. G uses the
-  `mint_ephemeral_api_token` primitive.
-- **Permission-clipping logic** at mint time — sub-phase G.
-  The B0 mint primitive trusts its caller's claim values; the
-  G consumer is responsible for clipping `permissions` to the
-  authority's envelope and capping `claims` at 4 KB before
-  calling the primitive.
+#### B1 (auth middleware in `philharmonic-api`) handoff contract
+
+These are substrate-state checks B0 cannot perform — the
+primitive is substrate-free by design. They are required for
+correctness of the auth flow and must land in B1 with tests.
+
+- **Authority lookup.** Look up `claims.authority` in the
+  substrate. Reject if not found, retired, or its tenant is
+  suspended.
+- **Authority-epoch enforcement.** Reject if the authority's
+  current `epoch` does not equal `claims.authority_epoch`.
+  (Doc 11 §"Ephemeral API tokens".)
+- **Authority-tenant binding.** **Reject if
+  `authority.tenant != claims.tenant`.** This is the check
+  that prevents a token signed under tenant B's authority
+  from being accepted as a tenant A scope. Without it, the
+  deployment-wide signing key would let any authority's mint
+  pass any tenant's verify when `RequestScope::Tenant`
+  matches `claims.tenant` only. Place this check
+  **immediately after authority lookup, before epoch
+  acceptance**. Negative test required: authority belongs to
+  tenant B, claims.tenant = A, request scope = A, signature
+  valid → reject.
+- **Tenant-scope match against `RequestScope`.** Sub-phase C
+  (authz) cross-checks `claims.tenant` against the
+  request's `RequestScope::Tenant(...)`. (Mismatch → reject.)
+- **Instance-scope match against URL.** If `claims.instance`
+  is `Some(_)`, sub-phase C / D verifies that any instance
+  ID in the request URL equals it.
+- **Generic external auth-failure response.** Verify failures
+  (whether from the B0 primitive's typed
+  `ApiTokenVerifyError` variants or from any of the B1
+  substrate checks above) MUST collapse to a single external
+  shape: HTTP `401`, body
+  `{"error":{"code":"unauthenticated","message":"invalid
+  token","correlation_id":"..."}}`. **No leaking of `kid`,
+  validity-window, signature, expiry, or which substrate
+  check failed.** Internal logs may keep typed variants;
+  external responses MUST NOT. This protects against
+  attackers probing the verify decision tree.
+  (Codex review Finding 8; pattern from Wave B's
+  service-side handling.)
+- **`authority_epoch` width conversion.** Substrate stores
+  `MintingAuthority.epoch` as `i64` per doc 09; the wire claim
+  is `u64`. Conversion: `u64::try_from(stored_i64)`. Negative
+  or out-of-range stored epoch fails closed at the lookup
+  step (treated like a substrate corruption — auth rejected,
+  internal log records the issue). Negative test required.
+
+#### G (minting endpoint) handoff contract
+
+- **Permission clipping at mint.** G clips requested
+  `permissions` to the authority's envelope before calling
+  `mint_ephemeral_api_token`. Out-of-envelope atoms are
+  silently stripped and audited (per doc 09).
+- **`claims` size cap.** G enforces the 4 KiB cap on the
+  caller-supplied injected claims **before** canonicalizing
+  via `CanonicalJson`, returning an explicit error to the
+  minting caller if exceeded. Defense-in-depth: B0's
+  `mint_ephemeral_api_token` *also* enforces the cap on the
+  resulting `CanonicalJson` size, but G should fail early.
+- **`iat` set to mint time.** G sets `claims.iat` to
+  `UnixMillis::now()` and `claims.exp` to whatever the
+  per-authority lifetime configuration dictates, capped at
+  the system maximum. Both populated correctly is a G
+  requirement; B0's verify will reject if `exp - iat` exceeds
+  the system maximum but that's a defense, not a substitute
+  for G doing it right.
+- **`authority_epoch` from substrate.** G reads the
+  authority's current `epoch` and writes it into
+  `claims.authority_epoch`. Same `i64 → u64` conversion rule
+  as the verify path (see B1 contract).
+- **Audit record content.** G writes an `AuditEvent` with
+  subject + authority + tenant + instance — but NOT the full
+  `claims` (especially not the `injected_claims` JSON),
+  matching doc 09's audit guidance.
+
+#### Out of scope for both B0 and the immediate B1/G follow-up
+
 - **Signing-key file I/O / KMS integration / startup loading**
   — deployment / bin concern. The B0 library accepts seed
   bytes; the deployment binary reads the file (or KMS, or env
@@ -136,28 +238,71 @@ These belong to later sub-phases or to deployment:
 
 ### Replay threat model
 
-Same as Wave A's Phase 5 replay decision (
-[§"Replay threat model" in the Wave A proposal](2026-04-22-phase-5-wave-a-cose-sign1-tokens.md#replay-threat-model)):
-the verify primitive is deliberately stateless. No `jti`, no
-server-side replay cache. Mitigation rests on:
+The verify primitive is deliberately stateless. No `jti`, no
+server-side replay cache. Mitigation rests on a layered
+defense, not on Wave A's "if a token leaks then minting is
+also compromised" framing — which is **wrong** for browser-
+resident or partner-system bearer tokens. Ephemeral API tokens
+travel over many channels Wave A's connector tokens don't:
+browser localStorage, server logs, crash reports, debug
+proxies, copy-paste, referrer headers, third-party SDK
+internals. Any of those exfiltrate the bearer without
+exfiltrating the API signing key.
 
-- **TLS** between the client and the API — assumed by
-  deployment.
-- **Tight `exp`** — ephemeral API tokens have at-most-24h
-  natural expiry per
-  [doc 11 §"Ephemeral API tokens"](../11-security-and-cryptography.md#ephemeral-api-tokens),
-  often much shorter (per-minting-authority configurable).
-- **Authority epoch bump** — for compromise response, not
-  per-token replay defense, but it caps the blast radius.
+**Threat:** a leaked ephemeral API token is replayable, by
+whoever holds the bytes, against any API endpoint covered by
+the token's `permissions` and `instance` scope, until `exp`
+or until an authority-epoch bump invalidates outstanding
+tokens.
 
-The threat model carries through unchanged from Wave A. If a
-token leaks to an attacker who has TLS-piercing access, they
-also have the ability to mint new tokens. The sole new
-realistic-replay window vs Wave A is "same token, different
-endpoint within `exp`" — that's fine because the API enforces
-permissions and instance-scope per-call. A leaked ephemeral
-token replayed against an endpoint within its permission
-envelope is doing exactly what the token was authorized to do.
+This is the standard bearer-token tradeoff. We take it
+deliberately for v1. Mitigations layered against it:
+
+- **Short `exp`.** The system maximum is 24h per
+  [doc 11 §"Ephemeral API tokens"](../11-security-and-cryptography.md#ephemeral-api-tokens);
+  per-authority configuration goes shorter. The verify
+  primitive enforces `exp - iat ≤ MAX_TOKEN_LIFETIME_MILLIS`
+  (24h) so even a buggy mint can't issue longer-lived tokens.
+- **Instance scope as the recommended browser default.**
+  Doc 09 §"Instance-scoped ephemeral tokens" makes this the
+  norm: token + browser session ↔ one workflow instance. A
+  leaked token can only call `execute_step` on its single
+  instance.
+- **Permission clipping.** Each token's `permissions` list
+  was clipped at mint to the minting authority's envelope.
+  Even with the token, an attacker can only do what that
+  envelope allowed.
+- **Authority epoch bump.** If a leak is detected, bumping
+  `MintingAuthority.epoch` invalidates all outstanding tokens
+  under that authority within the verify path's epoch check
+  (B1 / sub-phase C).
+- **Rate limiting on auth-failure churn.** Sub-phase H rate
+  limits per tenant per endpoint. Generic external auth
+  failures (Finding 8 below) prevent attackers from
+  efficiently probing whether a stolen token is still valid.
+- **Deployment guidance.** Browser tokens must not persist
+  past the session that needs them; server-side stores must
+  not log bearer bytes. Documented in B1's deployment notes.
+
+What we explicitly do **not** do, and why:
+
+- **No `jti` + replay cache.** Same Wave A reasoning, with
+  bearer-token framing now made explicit. The defenses above
+  cap blast radius without requiring a distributed cache.
+  Trade-off documented; revisit if a deployment with stricter
+  replay requirements surfaces.
+- **No TLS-piercing assumption.** Wave A's connector tokens
+  travel an internal lowerer→service path where TLS
+  termination + internal-network assumptions are realistic.
+  Ephemeral API tokens travel arbitrarily far through tenant
+  systems; we cannot assume TLS protects them once minted.
+  The verify primitive's correctness must not depend on
+  channel security after mint.
+
+This section exists so the threat-model decision is explicit
+and re-reviewable. If the deployment model adds e.g. a
+zero-trust browser-token replay store, this section needs an
+update.
 
 ## Primitives and library versions
 
@@ -211,12 +356,14 @@ unaffected; B0 is sign-only, parallel to Wave A.)
 ### Token shape
 
 The COSE_Sign1 payload is a CBOR encoding of
-`EphemeralApiTokenClaims`. Field set per
-[`docs/design/09-policy-and-tenancy.md` §"Ephemeral token claims"](../09-policy-and-tenancy.md#ephemeral-token-claims):
+`EphemeralApiTokenClaims`. Field set adapted from
+[`docs/design/09-policy-and-tenancy.md` §"Ephemeral token claims"](../09-policy-and-tenancy.md#ephemeral-token-claims),
+with the additions tagged below:
 
 ```rust
 pub struct EphemeralApiTokenClaims {
     pub iss: String,
+    pub iat: UnixMillis,            // r2 / Finding 3
     pub exp: UnixMillis,
     pub sub: String,
     pub tenant: Uuid,
@@ -225,38 +372,81 @@ pub struct EphemeralApiTokenClaims {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub instance: Option<Uuid>,
     pub permissions: Vec<String>,
-    pub claims: serde_json::Value,
+    pub claims: CanonicalJson,      // r2 / Finding 5
     pub kid: String,
 }
 ```
 
-CBOR encoding conventions match Wave A:
+The two r2 changes vs r1:
+
+- **`iat` added.** Required for the verify primitive to
+  enforce `exp - iat ≤ MAX_TOKEN_LIFETIME_MILLIS` (doc 11's
+  24h system maximum). Without it, B0 cannot bound token
+  lifetime independently — the lifetime invariant would have
+  to live in G, and a buggy G could mint validly-signed
+  tokens with arbitrary far-future `exp`. Added as a
+  precondition for B0 owning the lifetime invariant.
+  (Codex review Finding 3.)
+- **`claims: CanonicalJson` (was `serde_json::Value`).**
+  The injected-claims field carries RFC 8785 (JCS)
+  canonical JSON bytes via
+  [`philharmonic_types::CanonicalJson`](../../../philharmonic-types/src/canonical.rs).
+  `CanonicalJson` already exists in the workspace at
+  `philharmonic-types 0.3.x` with stable serde
+  Serialize/Deserialize that round-trips through
+  canonicalization. Rationale: `serde_json::Value::Object`
+  CBOR encoding via ciborium does not pin map insertion
+  order, so identical JSON content can produce different
+  CBOR bytes — and once those bytes are signed, two
+  semantically-identical tokens would have different
+  signature bytes, breaking known-answer vectors and
+  forensic comparisons. JCS sorts keys
+  lexicographically and pins a canonical numeric/string
+  representation, fixing the determinism cleanly.
+  (Codex review Finding 5; resolves Q2 from r1.)
+
+The wire encoding of `claims` is then a single CBOR text
+string carrying the canonical JSON bytes (as
+`CanonicalJson` serializes to a UTF-8 string of canonical
+JSON). The whole token claim is signed; the
+canonicalization is performed at mint time by the caller (G)
+and re-canonicalized at verify time only as a
+defense-in-depth check. Verify-side handling:
+
+- Compute `serde_jcs::to_vec(serde_json::from_str(claims.as_str())?)`
+  as a normalization step.
+- Compare the recanonicalized bytes against the wire bytes.
+  Mismatch → reject as `ApiTokenVerifyError::ClaimsNotCanonical`.
+  This catches a non-canonical-JCS mint at the verify
+  boundary, but normal G should always produce canonical
+  bytes so this is a safety net.
+
+CBOR encoding of the **outer struct** matches Wave A
+conventions:
 - `Uuid` (`tenant`, `authority`, `instance`) → 16-byte CBOR
   byte string.
-- `UnixMillis` (`exp`) → CBOR unsigned integer for positive
-  values (always positive post-epoch).
+- `UnixMillis` (`iat`, `exp`) → CBOR unsigned integer for
+  positive values (always positive post-epoch).
 - `u64` (`authority_epoch`) → CBOR unsigned integer.
 - `String` (`iss`, `sub`, `kid`, each entry of `permissions`)
   → CBOR text string.
 - `Vec<String>` (`permissions`) → CBOR array of text strings.
-- `serde_json::Value` (`claims`) → CBOR using `ciborium`'s
-  serde integration. The encoder maps:
-  `null → null`, `bool → bool`, `i64 / u64 → CBOR integer`,
-  `f64 → CBOR float`, `String → text`, `Array → array`,
-  `Object → map`. **No CBOR tags** are emitted (ciborium's
-  default behavior). No binary-blob support — JSON-shape only,
-  matching the doc 09 spec ("free-form, tenant-defined").
+- `CanonicalJson` (`claims`) → CBOR text string (see above).
+- `Option<Uuid>` (`instance`) → either omitted (skip-if-none)
+  or 16-byte CBOR byte string.
 
 `#[serde(skip_serializing_if = "Option::is_none")]` on
 `instance` keeps absent-instance tokens compact and matches
 the doc 09 spec that the field is optional. The verify side
 deserializes either shape.
 
-The CBOR encoding is canonical per RFC 8949 §4.2 deterministic
-encoding — `ciborium` produces deterministic output for
-struct types built from the basic Rust types above. Open
-question Q2 confirms that this is true for
-`serde_json::Value` round-trips through ciborium.
+The struct's CBOR encoding is canonical per RFC 8949 §4.2
+deterministic encoding for the field types above (no
+recursive maps inside the struct itself; only fixed-shape
+fields). The previous r1 concern about `serde_json::Value`
+ordering is moot — that field is now a string of canonical
+JSON, and CBOR text-string encoding is unique per byte
+sequence.
 
 ### Protected headers
 
@@ -301,72 +491,157 @@ the first failure. Ordering is deliberate, mirroring Wave A's
 sign-side discipline: algorithm and key-level checks fail
 before expensive crypto, signature verification fails before
 any untrusted payload content is trusted, all content-level
-checks run over verified claim bytes.
+checks run over verified claim bytes. r2 expands the order
+from r1's eight steps to thirteen, addressing Codex review
+Findings 2, 3, 6, 9, 10.
 
-1. **Parse** the COSE_Sign1 bytes via
+1. **Token-byte ceiling.** Reject if `cose_bytes.len() >
+   MAX_TOKEN_BYTES` (default 16 KiB).
+   `ApiTokenVerifyError::TokenTooLarge`. Bounds parse / SHA /
+   allocation work before any expensive operation.
+
+2. **Parse** the COSE_Sign1 bytes via
    `coset::CoseSign1::from_slice`. Malformed → reject
    (`ApiTokenVerifyError::Malformed`).
 
-2. **Pin algorithm.** Read `alg` from the protected header;
+3. **Strict header profile.** *(r2 / Finding 9.)*
+   - Protected header MUST contain exactly `alg` and `kid`
+     and nothing else; any unknown protected header label,
+     and any `crit` header, → reject
+     (`ApiTokenVerifyError::HeaderProfileViolation`).
+   - Unprotected header MUST be empty (no labels, no
+     values). Non-empty unprotected → reject (same error
+     variant).
+   This closes a forensic / future-maintenance hole where an
+   attacker adds misleading metadata in the unprotected
+   bucket that later code might accidentally inspect. Add
+   negative vectors covering both shapes.
+
+4. **Pin algorithm.** Read `alg` from the protected header;
    require `alg == -8` (EdDSA per RFC 9053 §2.2). Any other
    value → `ApiTokenVerifyError::AlgorithmNotAllowed`.
 
-3. **Kid lookup.** Extract `kid` from the protected header;
-   look up the verifier key in the
+5. **Kid format profile.** *(r2 / Finding 10.)* Extract the
+   raw `kid` bytes from the protected header. Reject unless:
+   - bytes are valid UTF-8;
+   - length is between 1 and 128 inclusive;
+   - every byte is in `[A-Za-z0-9._:-]`.
+   Failures → `ApiTokenVerifyError::KidProfileViolation`. Cap
+   keeps logs tidy and operator-config typos easy to spot;
+   character profile rejects visually-confusable Unicode
+   `kid`s before they reach the registry. Negative vectors
+   for over-length, control-char, and non-ASCII `kid`s.
+
+6. **Kid lookup.** Look up the verifier key in the
    `ApiVerifyingKeyRegistry`. Unknown kid →
    `ApiTokenVerifyError::UnknownKid`.
 
-4. **Key validity window.** The registry entry carries
+7. **Key validity window.** The registry entry carries
    `not_before` / `not_after` (`UnixMillis`). Reject if `now <
    not_before` or `now >= not_after`
    (`ApiTokenVerifyError::KeyOutOfWindow`).
 
-5. **Signature verification.** Use
+8. **Signature verification.** Use
    `coset::CoseSign1::verify_signature` with the Ed25519
-   verifying key from step 3. Bad signature →
+   verifying key from step 6. Bad signature →
    `ApiTokenVerifyError::BadSignature`. **No claim content is
    trusted before this step passes.**
 
-6. **Claim payload decode.** Decode the claim payload from
-   CBOR into `EphemeralApiTokenClaims`. Malformed → treat as
+9. **Claim payload decode.** Decode the claim payload from
+   CBOR into `EphemeralApiTokenClaims` (with `claims:
+   CanonicalJson`). Malformed → treat as
    `ApiTokenVerifyError::Malformed`.
 
-7. **Kid consistency.** Require `claims.kid ==
-   protected.kid`. Both are signature-covered, but duplication
-   invites drift. Mismatch →
-   `ApiTokenVerifyError::KidInconsistent`.
+10. **Canonicalization re-check.** *(r2 / Finding 5.)* Take
+    the decoded `claims: CanonicalJson` value, parse it as
+    JSON, re-canonicalize via JCS, compare byte-for-byte with
+    the wire bytes. Mismatch →
+    `ApiTokenVerifyError::ClaimsNotCanonical`. Defense-
+    in-depth — ensures a non-canonical mint can't slip
+    through and produce divergent audit hashes. Constant-time
+    not required (claims are signature-validated by step 8).
 
-8. **Expiry.** Check `claims.exp > now`. Expired →
-   `ApiTokenVerifyError::Expired { exp, now }`.
+11. **Issuer binding.** *(r2 / Finding 2.)* Require
+    `claims.iss == registry_entry.issuer`. Mismatch →
+    `ApiTokenVerifyError::IssuerMismatch`. The registry entry
+    declares which issuer string the deployment is willing to
+    accept tokens for under this kid; without this check, a
+    leaked verifying key trusted in the registry would
+    accept any `iss`. Negative vector required.
 
-Only after all eight pass is `Ok(EphemeralApiTokenClaims)`
-returned.
+12. **Kid consistency.** Require `claims.kid ==
+    protected.kid`. Both are signature-covered, but
+    duplication invites drift. Mismatch →
+    `ApiTokenVerifyError::KidInconsistent`.
+
+13. **Lifetime invariants.** *(r2 / Finding 3.)* All using
+    checked arithmetic; any overflow / underflow rejects
+    with `ApiTokenVerifyError::LifetimeInvariantViolation`:
+    - `claims.iat <= now + ALLOWED_CLOCK_SKEW_MILLIS`
+      (default 60 000 ms / 60 s) — token not minted in the
+      future.
+    - `claims.exp > now` — not expired.
+      `ApiTokenVerifyError::Expired { exp, now }`.
+    - `claims.exp > claims.iat` — well-formed lifetime.
+    - `claims.exp - claims.iat <= MAX_TOKEN_LIFETIME_MILLIS`
+      (default 24 h, doc 11 §"Ephemeral API tokens") —
+      ephemeral means ephemeral. A primitive-level ceiling
+      makes a buggy G unable to mint long-lived tokens.
+
+14. **Injected-claims size cap.** *(r2 / Finding 6.)* Require
+    `claims.bytes().len() <= MAX_INJECTED_CLAIMS_BYTES`
+    (default 4 096 = 4 KiB, doc 09 §"Ephemeral token
+    claims"). Oversize →
+    `ApiTokenVerifyError::ClaimsTooLarge { limit, actual }`.
+    G enforces this at mint too; B0 enforces at verify as a
+    defense against a bypassed G or a hand-crafted token
+    that signed valid bytes but exceeded the cap.
+
+Only after all fourteen pass is
+`Ok(EphemeralApiTokenClaims)` returned.
+
+**Constants — pinned defaults:**
+
+```rust
+pub const MAX_TOKEN_BYTES: usize = 16 * 1024;            // 16 KiB
+pub const MAX_INJECTED_CLAIMS_BYTES: usize = 4 * 1024;   //  4 KiB
+pub const MAX_TOKEN_LIFETIME_MILLIS: i64 = 24 * 60 * 60 * 1000; // 24 h
+pub const ALLOWED_CLOCK_SKEW_MILLIS: i64 = 60_000;       // 60 s
+pub const KID_MIN_LEN: usize = 1;
+pub const KID_MAX_LEN: usize = 128;
+```
+
+A `verify_ephemeral_api_token_with_limits` variant accepts
+caller-supplied lifetime / size / skew limits for deployments
+that want stricter values; the default
+`verify_ephemeral_api_token` wraps it with the constants
+above. A deployment **cannot** loosen the constants past the
+pinned defaults — `with_limits` clamps to `min(default,
+caller_supplied)` and treats a caller value greater than the
+default as a configuration error.
 
 **Notably absent vs Wave A:**
 
-- No `MAX_PAYLOAD_BYTES` ceiling. There is no auxiliary
-  payload — only the COSE_Sign1 itself. We **do** add a
-  ceiling on the COSE bytes themselves
-  (`MAX_TOKEN_BYTES`, default 16 KiB) at step 0 before the
-  parse to keep the SHA / parse work bounded, matching Wave
-  A's defense-in-depth posture. Step 0 → `TokenTooLarge`.
-- No `payload_hash` check. Wave A binds the encrypted payload
+- No `payload_hash` check. Wave A binds an encrypted payload
   via `payload_hash`; ephemeral API tokens have no auxiliary
   payload, so there's nothing to bind beyond the claim CBOR
-  itself (which is signature-covered).
-- No `realm` / audience binding. Ephemeral API tokens are
-  scoped by `tenant` (and optionally `instance`), not by realm
-  / service-side audience. Tenant-match enforcement happens at
-  the consumer (sub-phase C) where the request's
-  `RequestScope` is known.
-- No authority-epoch / authority-retired / tenant-suspended
-  enforcement. These are substrate-state checks done by the
-  B1 consumer; the verify primitive returns the claims and
-  lets B1 cross-check.
+  itself (signature-covered).
+- No `realm` binding. The role realm played in Wave A
+  (service-side audience) is taken here by `iss` binding
+  against the registry entry (step 11) plus, at the
+  consumer, tenant-scope match against `RequestScope`.
+- No authority lookup, authority-epoch enforcement, or
+  authority-tenant binding. These are substrate-state
+  checks done by the B1 consumer (see "B1 handoff
+  contract" in §"Out of scope (sub-phase B0)" above); the
+  verify primitive returns the claims and lets B1
+  cross-check.
+- No instance-scope-vs-URL match. That's a sub-phase C / D
+  concern.
 
-So the verify primitive is **pure**: only
-signature-and-CBOR-and-time concerns. State concerns belong
-to the consumer.
+So the verify primitive is **pure**:
+signature-and-CBOR-and-time concerns plus the kid/iss
+binding. Substrate state concerns belong to the consumer.
 
 ## Key management
 
@@ -382,6 +657,17 @@ fetch, env var, etc.) and constructs `ApiSigningKey`.
 pub struct ApiSigningKey {
     seed: Zeroizing<[u8; 32]>,
     kid: String,
+}
+
+// r2 / Finding 4: explicitly NOT derive Debug. Manual redacted
+// impl prints the kid and a marker for the seed.
+impl std::fmt::Debug for ApiSigningKey {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ApiSigningKey")
+            .field("kid", &self.kid)
+            .field("seed", &"<redacted; 32 bytes>")
+            .finish()
+    }
 }
 
 impl ApiSigningKey {
@@ -400,25 +686,57 @@ The mint function:
   `ApiTokenMintError::KidMismatch` on disagreement (catches a
   bug class where the caller forgot to set the claim's kid to
   match the signing key).
-- Serializes the claims to CBOR via `ciborium`.
+- Validates the same `kid` profile as the verify side
+  (`[A-Za-z0-9._:-]`, length 1..=128). Out-of-profile kid in
+  the signing key OR in the claims →
+  `ApiTokenMintError::KidProfileViolation`.
+- Validates `claims.claims.bytes().len() <=
+  MAX_INJECTED_CLAIMS_BYTES` (4 KiB). Oversize →
+  `ApiTokenMintError::ClaimsTooLarge`. Defense-in-depth — G
+  is supposed to enforce this earlier but B0 fails closed if
+  G missed.
+- Validates the lifetime invariants: `claims.iat <=
+  now + ALLOWED_CLOCK_SKEW_MILLIS` (the mint caller's
+  responsibility to set `iat` correctly, but B0 sanity-checks
+  using a `now: UnixMillis` parameter), `claims.exp >
+  claims.iat`, `claims.exp - claims.iat <=
+  MAX_TOKEN_LIFETIME_MILLIS`. Violations →
+  `ApiTokenMintError::LifetimeInvariantViolation`. The mint
+  signature gains the `now` parameter:
+  ```rust
+  pub fn mint_ephemeral_api_token(
+      signing_key: &ApiSigningKey,
+      claims: &EphemeralApiTokenClaims,
+      now: UnixMillis,                      // r2
+  ) -> Result<ApiSignedToken, ApiTokenMintError>;
+  ```
+- Serializes the claims to CBOR via `ciborium`. Because
+  `claims.claims: CanonicalJson` is already canonical, the
+  outer CBOR encoding is the only ordering concern, and
+  ciborium's struct serialization is field-order-stable.
 - Builds the COSE_Sign1 with `alg = -8` and `kid =
-  claims.kid` in the protected header.
+  claims.kid` in the protected header. Unprotected header
+  empty.
 - Signs by reconstructing a transient
   `ed25519_dalek::SigningKey::from_bytes(&seed)` per call (Q1
   resolution from Wave A; carries through here).
 
 The minting primitive does **not** enforce permission
-envelopes or `claims` size caps. Sub-phase G (the minting
-endpoint) is responsible for clipping `permissions` to the
-authority's envelope and capping `claims` at 4 KB before
-calling this primitive. Letting the primitive enforce those
-would couple it to authority/tenant state it doesn't have.
+envelopes or per-authority lifetime configuration. Sub-phase
+G (the minting endpoint) is responsible for clipping
+`permissions` to the authority's envelope and computing the
+final `exp` from the per-authority lifetime configuration
+before calling this primitive. The primitive enforces only
+the **system maximum** lifetime (24 h, doc 11) — letting it
+also carry per-authority state would couple it to
+substrate-loaded data it doesn't have.
 
 ### Verifying side
 
 ```rust
 pub struct ApiVerifyingKeyEntry {
     pub vk: ed25519_dalek::VerifyingKey,
+    pub issuer: String,                    // r2 / Finding 2
     pub not_before: UnixMillis,
     pub not_after: UnixMillis,
 }
@@ -429,7 +747,8 @@ pub struct ApiVerifyingKeyRegistry {
 
 impl ApiVerifyingKeyRegistry {
     pub fn new() -> Self;
-    pub fn insert(&mut self, kid: String, entry: ApiVerifyingKeyEntry);
+    pub fn insert(&mut self, kid: String, entry: ApiVerifyingKeyEntry)
+        -> Result<(), RegistryInsertError>;
     pub fn lookup(&self, kid: &str) -> Option<&ApiVerifyingKeyEntry>;
 }
 
@@ -438,7 +757,36 @@ pub fn verify_ephemeral_api_token(
     registry: &ApiVerifyingKeyRegistry,
     now: UnixMillis,
 ) -> Result<EphemeralApiTokenClaims, ApiTokenVerifyError>;
+
+pub fn verify_ephemeral_api_token_with_limits(
+    cose_bytes: &[u8],
+    registry: &ApiVerifyingKeyRegistry,
+    now: UnixMillis,
+    limits: &VerifyLimits,
+) -> Result<EphemeralApiTokenClaims, ApiTokenVerifyError>;
+
+pub struct VerifyLimits {
+    pub max_token_bytes: usize,            // clamped <= MAX_TOKEN_BYTES
+    pub max_injected_claims_bytes: usize,  // clamped <= MAX_INJECTED_CLAIMS_BYTES
+    pub max_token_lifetime_millis: i64,    // clamped <= MAX_TOKEN_LIFETIME_MILLIS
+    pub allowed_clock_skew_millis: i64,    // clamped <= ALLOWED_CLOCK_SKEW_MILLIS
+}
 ```
+
+`ApiVerifyingKeyEntry::issuer` declares which `iss` value
+this kid is permitted to sign for. Verify step 11 enforces
+`claims.iss == entry.issuer`. Without this, any verifying key
+in the registry would be effectively trusted to mint for any
+issuer string — a problem for staging/prod sharing keys, for
+multi-issuer future deployments, and for audit hygiene.
+(Codex review Finding 2.)
+
+`ApiVerifyingKeyRegistry::insert` returns
+`Result<(), RegistryInsertError>`. The insert validates the
+`kid` against the format profile (same constraints as the
+verify side) and rejects duplicate-kid inserts. Bin code
+that catches the error fails closed at startup rather than
+silently accepting a malformed registry.
 
 Public keys aren't sensitive; no zeroization. The library
 ships no `load_from_file`, `load_from_toml`, etc. The
@@ -450,16 +798,34 @@ discipline as Wave A.
 Rotation is additive: a new kid → new registry entry; old
 kids stay registered until tokens issued under them have
 expired. `not_before` / `not_after` are **enforced** at
-verify step 4 — they're not advisory. Matches doc 11
+verify step 7 — they're not advisory. Matches doc 11
 §"Ephemeral API token signing key rotation" exactly.
 
 ### `kid` encoding
 
-Free-form UTF-8 string, signed as part of the protected
-header. Suggested format: `<api-issuer-slug>-<utc-date>-<rand-hex-8>`
-(e.g. `api.tenant-2026-04-28-a1b2c3d4`). Not pinned as a wire
-format — registry uses exact-string equality. Same pattern as
-Wave A.
+*(r2 / Finding 10. Tightened from r1's free-form Wave-A
+parity.)*
+
+`kid` is signed as part of the protected header. To bound
+log/operator-config pollution and to reject visually-
+confusable Unicode in operator-supplied identifiers, we pin
+a strict character profile:
+
+- ASCII only (UTF-8 valid, all bytes in `[A-Za-z0-9._:-]`).
+- Length 1..=128 bytes (`KID_MIN_LEN..=KID_MAX_LEN`).
+
+Suggested format remains
+`<api-issuer-slug>-<utc-date>-<rand-hex-8>`
+(e.g. `api.tenant-2026-04-28-a1b2c3d4`). Registry uses
+exact-string equality on already-validated kids.
+
+Both the mint and verify primitives validate the profile
+before any further processing: mint at construction time
+(both for `signing_key.kid` and `claims.kid`), verify at
+step 5 before registry lookup. `ApiVerifyingKeyRegistry::insert`
+also validates incoming kids and rejects out-of-profile
+entries at startup, so an operator typo never reaches a
+verify path.
 
 ## Zeroization points
 
@@ -569,32 +935,70 @@ pycose 2.x. Committed as
 
 One vector per rejection reason in the verify order. Each
 must fail with the specific `ApiTokenVerifyError` variant
-named.
+named. r2 expands the list from r1's eight to fifteen,
+covering the new steps.
 
 - `api_token_too_large.hex` — COSE_Sign1 of `MAX_TOKEN_BYTES
   + 1` bytes (constructed by padding with garbage trailing
   bytes that still serialize as a valid CBOR major type).
-  Step 0, `TokenTooLarge`.
+  Step 1, `TokenTooLarge`.
+- `api_unprotected_nonempty.hex` — *(r2 / Finding 9)* same
+  claims + key, but the unprotected header carries
+  `kid = "decoy"`. Step 3, `HeaderProfileViolation`.
+- `api_protected_unknown_label.hex` — *(r2 / Finding 9)*
+  protected header carries an extra unknown label besides
+  `alg` + `kid`. Step 3, `HeaderProfileViolation`.
+- `api_protected_crit.hex` — *(r2 / Finding 9)* protected
+  header carries a `crit` label. Step 3,
+  `HeaderProfileViolation`.
 - `api_bad_alg.hex` — same claims + key, protected header
-  re-encoded with `alg = -7` (ES256). Step 2,
+  re-encoded with `alg = -7` (ES256). Step 4,
   `AlgorithmNotAllowed`.
-- `api_unknown_kid.hex` — `kid` in the protected header
-  replaced with a kid not in the registry. Step 3,
-  `UnknownKid`.
+- `api_kid_too_long.hex` — *(r2 / Finding 10)* protected
+  header `kid` of 129 bytes. Step 5, `KidProfileViolation`.
+- `api_kid_invalid_chars.hex` — *(r2 / Finding 10)* protected
+  header `kid` containing a slash or space (out of profile).
+  Step 5, `KidProfileViolation`.
+- `api_unknown_kid.hex` — `kid` in profile but not in the
+  registry. Step 6, `UnknownKid`.
 - `api_key_out_of_window.hex` — valid token, registry entry
-  has `not_after` in the past. Step 4, `KeyOutOfWindow`.
+  has `not_after` in the past. Step 7, `KeyOutOfWindow`.
 - `api_tampered_sig.hex` — last byte of the signature
-  flipped. Step 5, `BadSignature`.
+  flipped. Step 8, `BadSignature`.
 - `api_tampered_payload.hex` — one byte of the claim payload
-  flipped. Step 5, `BadSignature`.
+  flipped. Step 8, `BadSignature`.
+- `api_claims_not_canonical.hex` — *(r2 / Finding 5)* mint
+  signs an `EphemeralApiTokenClaims` whose `claims:
+  CanonicalJson` byte payload is non-canonical (e.g.,
+  reverse-ordered keys); verify re-canonicalizes and
+  byte-mismatches. Step 10, `ClaimsNotCanonical`.
+- `api_issuer_mismatch.hex` — *(r2 / Finding 2)* registry
+  entry `issuer = "philharmonic-api.example"`; token's
+  `claims.iss = "philharmonic-api.attacker"`. Step 11,
+  `IssuerMismatch`.
 - `api_kid_inconsistent.hex` — protected header `kid` and
-  `claims.kid` differ. Step 7, `KidInconsistent`.
+  `claims.kid` differ. Step 12, `KidInconsistent`.
+- `api_iat_in_future.hex` — *(r2 / Finding 3)* `iat` set
+  120 s in the future of `now`, beyond the 60 s default
+  skew window. Step 13, `LifetimeInvariantViolation`.
+- `api_exp_before_iat.hex` — *(r2 / Finding 3)* `iat` ahead
+  of `exp`. Step 13, `LifetimeInvariantViolation`.
+- `api_lifetime_too_long.hex` — *(r2 / Finding 3)* `exp -
+  iat` set to 25 h (one hour past the 24 h system maximum).
+  Step 13, `LifetimeInvariantViolation`.
 - `api_expired.hex` — `exp` set to 1 (long in the past).
-  Step 8, `Expired`.
+  Step 13, `Expired`.
+- `api_claims_too_large.hex` — *(r2 / Finding 6)* signed
+  token whose `claims` injected-JSON bytes exceed 4 KiB
+  (constructed by signing a 4 KiB + 1 canonical JSON
+  payload). Step 14, `ClaimsTooLarge`.
 
-Eight negative vectors. (No `payload_hash_mismatch` or
-`realm_mismatch` — those checks don't exist in this
-construction.)
+Nineteen negative vectors total. Each is paired with a
+matching unit test asserting the specific
+`ApiTokenVerifyError` variant. The integration test that
+runs the whole vector suite asserts that **every** non-
+trivial verify error path is covered (no rejection step
+without an associated negative vector).
 
 ### Round-trip + property tests (in addition)
 
@@ -603,9 +1007,13 @@ construction.)
 - A property-test loop over arbitrary `EphemeralApiTokenClaims`
   values (using `proptest` if Yuka approves the dep —
   otherwise a hand-written generator over a few dozen
-  shapes): mint then verify must round-trip. This catches
-  CBOR-encoding drift on `serde_json::Value` shapes the hand-
-  written vectors don't exercise.
+  shapes): mint then verify must round-trip. With `claims:
+  CanonicalJson`, the JCS canonicalization step is the
+  primary thing being fuzzed — random JSON input through
+  the canonicalize-then-sign-then-verify-then-recanonicalize
+  loop should always succeed when properly canonicalized
+  upstream and always reject (`ClaimsNotCanonical`) when
+  given hand-crafted non-canonical bytes.
 
 `proptest` would be a new dev-dep on `philharmonic-policy`.
 Open question Q4 below.
@@ -636,42 +1044,50 @@ Open question Q4 below.
    verification gates everything — no claim field is trusted
    before signature passes, standard COSE / JWT discipline.
 
-5. **`serde_json::Value` for `claims`** is the one design
-   choice that's *not* identical to Wave A. Justification:
-   (a) doc 09 explicitly says `claims` is "free-form,
-   tenant-defined"; (b) `philharmonic-api/src/auth.rs:31`
-   already types the runtime field as `serde_json::Value`,
-   so matching the surface keeps the mint→sign→verify
-   round-trip JSON-shape-stable; (c) ciborium's serde
-   integration handles `serde_json::Value` shapes correctly
-   without CBOR tag emission. The 4 KB cap is enforced by
-   sub-phase G's minting endpoint, not by the primitive (per
-   §"Out of scope").
+5. **`claims: CanonicalJson` for the injected-claims
+   field** *(updated in r2)*. Justification: (a) doc 09
+   says `claims` is "free-form, tenant-defined" JSON, and
+   `philharmonic_types::CanonicalJson` carries that shape
+   with RFC 8785 / JCS canonicalization built in; (b) the
+   canonical bytes are stable per JCS, eliminating the
+   CBOR-map-ordering ambiguity that r1's `serde_json::Value`
+   had; (c) the wire encoding is a single CBOR text string,
+   the simplest possible binding shape; (d) the verify path
+   re-canonicalizes and byte-compares, so a non-canonical
+   mint cannot produce divergent audit bytes (verify step
+   10). The 4 KiB injected-claims cap is enforced at both
+   mint and verify (steps 6 / 14 respectively); the
+   per-authority `permissions` envelope is enforced at sub-
+   phase G's mint endpoint.
+
+6. **No new crypto.** Same primitives, library versions, and
+   construction shape as Wave A's already-reviewed surface
+   (Ed25519 + COSE_Sign1 via coset). The only structurally-new
+   bit vs Wave A is `CanonicalJson` for the injected-claims
+   field — and that's a serialization layer, not a crypto
+   primitive.
 
 ## Open questions
 
-Tagged for Yuka's call at sign-off.
+Tagged for Yuka's call at sign-off. r2 has resolved Q2 and
+Q5 inline (see §"Revisions"); Q1, Q3, Q4, Q6 remain as
+posed in r1, and r2 adds Q7 / Q8.
 
 **Q1.** Use `subtle = "2"` for the kid-equality check at
-verify step 7? Wave A used `subtle` for the payload-hash
+verify step 12? Wave A used `subtle` for the payload-hash
 compare specifically because that compares
-attacker-controlled bytes against
-trusted bytes; here, both kids come from the same
-signature-validated payload, so timing-side-channel risk is
-nil. My recommendation: **plain `==`**, document the
-reasoning in a code comment. Yuka's call.
+attacker-controlled bytes against trusted bytes; here, both
+kids come from the same signature-validated payload, so
+timing-side-channel risk is nil. My recommendation:
+**plain `==`**, document the reasoning in a code comment.
+Yuka's call.
 
-**Q2.** Confirm `serde_json::Value`'s round-trip through
-ciborium is deterministic for the JSON-equivalent shapes we
-expect. The ciborium docs say "Yes for primitive types and
-small structs"; for `serde_json::Value::Object` the field
-order on serialization matters because CBOR maps preserve
-insertion order while JSON objects don't. **My
-recommendation: pin the on-the-wire ordering by serializing
-through a sorted-key intermediate** (a small canonicalization
-step in the mint primitive). Yuka's call on whether to do
-this in B0 or defer to B1 / G when it matters for audit
-binding.
+**Q2 (RESOLVED in r2).** ~~CBOR determinism for
+`serde_json::Value`~~ → resolved by replacing
+`claims: serde_json::Value` with `claims: CanonicalJson`
+(RFC 8785 / JCS). On the wire, `claims` is a CBOR text
+string holding canonical JSON; map-ordering ambiguity is
+gone.
 
 **Q3.** pycose 2.x cross-check, same as Wave A's Q2? My
 recommendation: **yes** — at minimum for the two positive
@@ -681,18 +1097,17 @@ vector generator (the workspace has experience with it).
 **Q4.** `proptest` as a new dev-dep on
 `philharmonic-policy`? Cooldown-checked, RustCrypto-style
 code (it's QuickCheck-shaped, not crypto). **My
-recommendation: yes** — it's the only practical way to
-catch CBOR-shape edge cases in `serde_json::Value` (e.g.
-deeply nested objects, negative integers in arrays, etc.).
+recommendation: yes** — useful for fuzz-shape coverage of
+the verify path (random byte inputs around the parser
+boundaries, random JSON inputs through the
+re-canonicalization check) even though `claims` is now
+JCS-pinned.
 
-**Q5.** Should the verify primitive also enforce a maximum
-`exp - now` window? E.g., reject any token whose remaining
-lifetime exceeds 24 h, on the principle that ephemeral
-tokens shouldn't ever be that long-lived. My recommendation:
-**no — leave the lifetime ceiling to sub-phase G's mint
-endpoint** (it knows the per-authority configured max).
-Adding the check at verify time would couple the primitive
-to the deployment-configured policy. Yuka's call.
+**Q5 (RESOLVED in r2).** ~~Should the verify primitive
+enforce a maximum `exp - now` window?~~ → yes, B0 owns the
+24 h system-maximum invariant via `iat` + checked
+arithmetic. G owns the per-authority finer-grained
+ceiling. See verify step 13.
 
 **Q6.** The B0 round produces no `cargo publish` — fine,
 matches Wave A. But the B1 consumer in `philharmonic-api`
@@ -711,29 +1126,74 @@ My recommendation: **(b) — patch.crates-io**, publish at
 Phase 8 close. Matches the "publish at the end of the
 phase" rhythm we've used for connector impls.
 
+**Q7 (new in r2).** `ALLOWED_CLOCK_SKEW_MILLIS` default of
+60 000 ms (60 s) reasonable? The verify primitive checks
+`claims.iat <= now + ALLOWED_CLOCK_SKEW_MILLIS` — too
+tight and benign clock drift between mint and verify hosts
+causes spurious rejects; too loose and a "minted in the
+future" attack window opens. 60 s matches conservative TLS
+/ JWT defaults. Alternative defaults considered: 30 s
+(tighter), 5 min (looser; rejected as too generous for an
+ephemeral-token system). Yuka's call.
+
+**Q8 (new in r2).** Should the proposal also recommend
+opening a separate Wave A follow-up to remove
+`#[derive(Debug)]` from `LowererSigningKey`? The Codex
+reviewer flagged this as out-of-scope-for-B0-but-worth-doing.
+My recommendation: **yes — open a separate notes-to-humans
+issue** so it's tracked, but do not roll it into B0's scope
+(B0 ships `philharmonic-policy 0.2.0`; the connector-client
+fix would be a separate crate revision). The follow-up
+note can land in the same commit as B0's Gate-1 sign-off
+record.
+
 ## What lands (sub-phase B0)
 
 Library source files (no code written yet):
 
 - `philharmonic-policy/src/api_token.rs` — module containing
-  `EphemeralApiTokenClaims`, `ApiSigningKey`,
-  `ApiSignedToken`, `ApiVerifyingKeyEntry`,
-  `ApiVerifyingKeyRegistry`,
-  `mint_ephemeral_api_token`, `verify_ephemeral_api_token`,
-  `ApiTokenMintError`, `ApiTokenVerifyError`,
-  `MAX_TOKEN_BYTES`.
+  the full B0 surface:
+  - Types: `EphemeralApiTokenClaims` (with `iat` +
+    `claims: CanonicalJson`), `ApiSigningKey` (no derived
+    `Debug`, manual redacted impl), `ApiSignedToken`,
+    `ApiVerifyingKeyEntry` (with `issuer`),
+    `ApiVerifyingKeyRegistry`, `VerifyLimits`.
+  - Functions: `mint_ephemeral_api_token`,
+    `verify_ephemeral_api_token`,
+    `verify_ephemeral_api_token_with_limits`.
+  - Errors: `ApiTokenMintError` (variants
+    `KidMismatch`, `KidProfileViolation`, `ClaimsTooLarge`,
+    `LifetimeInvariantViolation`, `SerializationFailure`,
+    `SigningFailure`), `ApiTokenVerifyError` (variants
+    `TokenTooLarge`, `Malformed`, `HeaderProfileViolation`,
+    `AlgorithmNotAllowed`, `KidProfileViolation`,
+    `UnknownKid`, `KeyOutOfWindow`, `BadSignature`,
+    `ClaimsNotCanonical`, `IssuerMismatch`,
+    `KidInconsistent`, `LifetimeInvariantViolation`,
+    `Expired`, `ClaimsTooLarge`), `RegistryInsertError`
+    (variants `KidProfileViolation`, `DuplicateKid`).
+  - Constants: `MAX_TOKEN_BYTES = 16 * 1024`,
+    `MAX_INJECTED_CLAIMS_BYTES = 4 * 1024`,
+    `MAX_TOKEN_LIFETIME_MILLIS = 24 * 60 * 60 * 1000`,
+    `ALLOWED_CLOCK_SKEW_MILLIS = 60_000`,
+    `KID_MIN_LEN = 1`, `KID_MAX_LEN = 128`.
 - `philharmonic-policy/src/lib.rs` — re-export the new public
   surface from the new module.
 - `philharmonic-policy/Cargo.toml` — version bump
   `0.1.0 → 0.2.0`, dep additions for `coset`, `ciborium`,
-  `ed25519-dalek` (already transitive but now direct), and
-  optionally `proptest` as a dev-dep.
+  `ed25519-dalek` (already transitive but now direct).
+  `philharmonic-types ≥ 0.3.x` for `CanonicalJson`. Optional
+  `proptest` as a dev-dep (Q4).
 - `philharmonic-policy/CHANGELOG.md` — `[Unreleased]` entry
-  describing the addition.
+  describing the addition (the B0 module surface).
 - `philharmonic-policy/tests/api_token_vectors.rs` — known-
-  answer + negative vectors per §"Test-vector plan".
+  answer + 19 negative vectors per §"Test-vector plan".
 - `philharmonic-policy/tests/vectors/api_token/*.hex /
   *.json` — committed reference vectors.
+- `docs/notes-to-humans/<date>-<NNNN>-lowerer-signing-key-debug-derive-followup.md`
+  — short Wave-A follow-up note opening the
+  `LowererSigningKey: Debug` redaction work as a separate
+  task. (Q8.)
 
 What does **not** land in B0:
 
@@ -744,25 +1204,42 @@ What does **not** land in B0:
 - `cargo publish` — Gate-2 review first; per Q6 the actual
   publish defers to Phase 8 close.
 
-## Codex security review (optional, recommended)
+## Codex security review resolutions
 
-Wave A ran an independent Codex security review of r1 of the
-proposal before Yuka's Gate-1 sign-off; seven findings
-surfaced and six landed inline as r2 fixes. The pattern
-worked well there. **Recommendation:** run the same kind of
-review on this proposal (r1) before sign-off, archived under
-`docs/codex-reports/2026-04-28-NNNN-phase-8-b0-ephemeral-api-token-primitives-security-review.md`.
+Codex ran an independent design-level security review of r1
+of this proposal. The full report is at
+[`docs/codex-reports/2026-04-28-0001-phase-8-b0-ephemeral-api-token-primitives-security-review.md`](../../codex-reports/2026-04-28-0001-phase-8-b0-ephemeral-api-token-primitives-security-review.md).
+Eleven findings; Claude's evaluation and the r2 resolution
+per finding:
 
-The proposal text above is small enough that a focused review
-should add ≤ ~30 minutes of Codex time + Yuka's review of
-the report. Catches things like: "did I miss algorithm
-pinning in step N", "should I require min-`exp` window?",
-"does the kid registry need `not_before` semantics that
-match Wave A?", etc.
+| #  | Finding | Severity | r2 resolution |
+|----|---------|----------|---------------|
+| 1  | B1 handoff omits the `authority.tenant == claims.tenant` binding; cross-tenant accept possible | HIGH | **Fixed.** §"Out of scope" §"B1 handoff contract" now lists this as a normative B1 check, placed immediately after authority lookup and before epoch acceptance. Required negative test enumerated. |
+| 2  | No issuer/audience/key binding; `iss` is signed but unused | HIGH | **Fixed.** `ApiVerifyingKeyEntry` gains `issuer: String`. Verify step 11 enforces `claims.iss == entry.issuer`. New negative vector `api_issuer_mismatch.hex`. Audience claim deferred to v2; the registry being deployment-scoped acts as implicit deployment audience for v1. |
+| 3  | Verifier accepts arbitrary far-future `exp`; no `iat` or max-age invariant | HIGH | **Fixed.** Added `iat: UnixMillis` to claims. Verify step 13 enforces `iat ≤ now + ALLOWED_CLOCK_SKEW_MILLIS`, `exp > now`, `exp > iat`, `exp - iat ≤ MAX_TOKEN_LIFETIME_MILLIS` (24 h, doc 11). Three new negative vectors: `api_iat_in_future.hex`, `api_exp_before_iat.hex`, `api_lifetime_too_long.hex`. |
+| 4  | `ApiSigningKey` must not derive `Debug` | MEDIUM-HIGH | **Fixed.** Manual redacted `fmt::Debug` impl pinned in §"Minting side". Gate-2 will check this directly. Wave-A's existing `LowererSigningKey` derive is captured as a separate follow-up note (Q8). |
+| 5  | CBOR determinism / `serde_json::Value` not pinned tightly enough | MEDIUM-HIGH | **Fixed.** `claims` field's type changes from `serde_json::Value` to `philharmonic_types::CanonicalJson` (RFC 8785 / JCS). Verify step 10 re-canonicalizes and byte-compares (`ClaimsNotCanonical`). New negative vector `api_claims_not_canonical.hex`. r1's Q2 collapses. |
+| 6  | B0 verify should enforce the 4 KiB injected-claims size cap | MEDIUM | **Fixed.** Verify step 14 enforces `claims.bytes().len() ≤ MAX_INJECTED_CLAIMS_BYTES = 4096`. Mint also enforces (defense-in-depth). New negative vector `api_claims_too_large.hex`. `verify_ephemeral_api_token_with_limits` allows tighter (not looser) deployment overrides. |
+| 7  | Replay threat model overstates what token leakage implies | MEDIUM | **Fixed.** §"Replay threat model" rewritten. The leaked-token replay risk for browser/partner systems is now named directly; mitigations are tied to short `exp`, instance-scope-as-default, permission clipping, authority-epoch bump, rate limiting, and deployment guidance. The "TLS-piercing access ⇔ minting compromise" claim is removed. |
+| 8  | External auth error behavior unspecified | MEDIUM | **Fixed.** §"Out of scope" §"B1 handoff contract" now requires that all verify failures (B0 typed errors AND B1 substrate-state failures) collapse to a single external `401` with a generic `unauthenticated` body — no `kid`/window/signature/expiry leakage to external responses. Internal logs preserve typed variants. |
+| 9  | Verify should reject non-empty unprotected and unexpected protected headers | LOW-MEDIUM | **Fixed.** New verify step 3 (strict header profile): protected may contain only `alg` + `kid`; unprotected must be empty; any `crit` or unknown protected header rejects. Three new negative vectors: `api_unprotected_nonempty.hex`, `api_protected_unknown_label.hex`, `api_protected_crit.hex`. |
+| 10 | `kid` needs a length/character profile | LOW-MEDIUM | **Fixed.** `kid` profile pinned to `[A-Za-z0-9._:-]`, length 1..=128. Verify step 5 validates before registry lookup. Mint and `ApiVerifyingKeyRegistry::insert` also validate. Two new negative vectors: `api_kid_too_long.hex`, `api_kid_invalid_chars.hex`. |
+| 11 | `authority_epoch` u64 wire vs i64 substrate; conversion undefined | LOW | **Fixed.** §"Out of scope" §"B1 handoff contract" pins the conversion: `u64::try_from(stored_i64)`; negative or out-of-range fails closed at lookup; B1 negative test required for negative substrate epoch. The wire type stays `u64` (avoids signing-side sign-extension footguns); B1 owns the boundary conversion. |
 
-If Yuka prefers to skip and sign off directly on r1, that's
-also fine — the proposal is closely modeled on Wave A's
-already-reviewed structure.
+Eleven findings, eleven inline fixes. Five new constants
+introduced (`MAX_TOKEN_BYTES`, `MAX_INJECTED_CLAIMS_BYTES`,
+`MAX_TOKEN_LIFETIME_MILLIS`, `ALLOWED_CLOCK_SKEW_MILLIS`,
+`KID_*_LEN`); six new error variants
+(`HeaderProfileViolation`, `KidProfileViolation`,
+`ClaimsNotCanonical`, `IssuerMismatch`,
+`LifetimeInvariantViolation`, `ClaimsTooLarge`); eleven
+additional negative vectors. Verify-order step count grew
+from eight to fourteen.
+
+The reviewer's "positive notes" (signature-first ordering,
+protected-header `alg`/`kid`, library/bin split,
+`MAX_TOKEN_BYTES` shape, vector planning) all carry through
+into r2 unchanged.
 
 ## Next steps after Gate-1 sign-off
 
@@ -773,16 +1250,27 @@ already-reviewed structure.
    the source files + tests + vectors per §"What lands".
 3. **Gate-2 code review** on the returned code before any
    merge into main. Code-line-level review of:
-   - The mint and verify functions vs the proposal.
-   - Each negative-vector test asserts the named
-     `ApiTokenVerifyError` variant.
+   - The mint and verify functions vs the r2 proposal text.
+   - Each negative-vector test (19 of them) asserts the
+     specific named `ApiTokenVerifyError` variant.
    - Zeroization wrappers appear at the seed and only at the
-     seed.
+     seed; `ApiSigningKey` does not derive `Debug`; manual
+     redacted impl prints only `kid` + a marker.
+   - `claims: CanonicalJson` round-trips byte-stably; the
+     re-canonicalization check at verify step 10 actually
+     fires on a non-canonical input.
+   - `iat`-aware lifetime checks use checked arithmetic; no
+     `as` casts on the `i64`s.
    - No `unsafe` / `unwrap` / `expect` on reachable paths.
-   - The CBOR serialization for `serde_json::Value` produces
-     the canonical shape we expected (re-confirm Q2's
-     resolution against the actual hex bytes).
-4. Sub-phase B1 prompt drafted, archived, dispatched.
+   - Strict header profile (verify step 3) rejects all three
+     "extra metadata" shapes.
+   - `kid` profile validator is consistent across mint, verify,
+     and `ApiVerifyingKeyRegistry::insert`.
+4. Sub-phase B1 prompt drafted, archived, dispatched. The B1
+   prompt explicitly references the "B1 handoff contract" in
+   this proposal and pins each item with tests (especially
+   the authority-tenant binding negative test and the
+   external-error-collapsing test).
 5. (Optional, end of Phase 8) publish `philharmonic-policy
    0.2.0` and `philharmonic-api 0.1.0` together at sub-phase
    I.
