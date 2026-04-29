@@ -131,13 +131,14 @@ files tracked directly in the parent repo):
 
 Design is substantially settled; implementation is in active progress.
 The connector triangle + foundational crates are published with
-substantive content; **Phase 6 is complete end-to-end** — all
-three of its crates (impl-api, http_forward, llm_openai_compat)
-shipped 0.1.0 on crates.io on 2026-04-24. **Phase 7 Tier 1 is
-complete end-to-end** — wave 1 (`sql-postgres`, `sql-mysql`,
-`vector-search`) shipped 0.1.0 on 2026-04-27 morning; wave 2
-(`embed`) shipped 0.1.0 on 2026-04-27 evening, completing the
-data-layer connector set. The unpublished
+substantive content; **Phase 8 is complete end-to-end** —
+`philharmonic-api` 0.1.0 and `philharmonic-policy` 0.2.0
+published to crates.io on 2026-04-28. All nine sub-phases
+(skeleton → auth → authz → workflow → endpoint-config →
+identity CRUD → token minting → audit/rate-limit/admin →
+publish) landed in a single day with three crypto-review gate
+cycles passed. Phase 6 and Phase 7 Tier 1 were completed
+previously (2026-04-24 / 2026-04-27). The unpublished
 `philharmonic-connector-impl-*` crates land in their respective
 phase tiers; until then they have no crates.io presence (no
 0.0.0 placeholders were reserved).
@@ -175,7 +176,9 @@ Already published with substantive content:
 `philharmonic-connector-impl-sql-mysql` (0.1.0, 2026-04-27),
 `philharmonic-connector-impl-vector-search` (0.1.0, 2026-04-27),
 `philharmonic-connector-impl-embed` (0.1.0, 2026-04-27),
-`inline-blob` (0.1.0, 2026-04-27).
+`inline-blob` (0.1.0, 2026-04-27),
+`philharmonic-policy` (0.2.0, 2026-04-28),
+`philharmonic-api` (0.1.0, 2026-04-28).
 
 ## Prerequisites
 

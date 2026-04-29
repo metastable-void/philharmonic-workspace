@@ -1568,20 +1568,28 @@ fires before each is merged. Approach gate already approved
   in-memory token-bucket rate limiting per tenant per
   endpoint family (429 + Retry-After), operator tenant
   create/suspend/unsuspend. 9 integration tests.
-- **I — Publish.** `philharmonic-policy` 0.2.0 +
-  `philharmonic-api` 0.1.0 to crates.io via
-  `./scripts/publish-crate.sh`. CHANGELOGs finalized, doc
-  reconciliation, ROADMAP marks Phase 8 done.
+- **I — Publish.** ✅ Done 2026-04-28. `philharmonic-policy`
+  0.2.0 + `philharmonic-api` 0.1.0 published to crates.io.
+  CHANGELOGs finalized. Tags `v0.2.0` / `v0.1.0` in
+  respective submodules.
 
-**Acceptance criteria**:
-- Every endpoint in doc 10 implemented with correct permission
-  enforcement.
-- Every endpoint has integration tests covering happy path and
-  at least one auth/permission failure path.
-- Rate limiting observable in tests (request bursts return 429
-  with `Retry-After`).
-- Audit events appear in the substrate for relevant operations.
-- `philharmonic-api` publishes as `0.1.0`.
+**Phase 8 status: COMPLETE** (2026-04-28). All nine
+sub-phases (A→I) landed in a single day. Three crypto-review
+cycles (B0, E, G) passed both gates. Five Codex audit rounds
+with inline fixes. 86 integration tests across the API crate.
+`philharmonic-api 0.1.0` and `philharmonic-policy 0.2.0`
+published.
+
+**Acceptance criteria** (met):
+- ✅ Every endpoint in doc 10 implemented with correct
+  permission enforcement.
+- ✅ Every endpoint has integration tests covering happy path
+  and at least one auth/permission failure path.
+- ✅ Rate limiting observable in tests (request bursts return
+  429 with `Retry-After`).
+- ✅ Audit events appear in the substrate for relevant
+  operations.
+- ✅ `philharmonic-api` published as `0.1.0`.
 
 ---
 
@@ -1591,9 +1599,10 @@ fires before each is merged. Approach gate already approved
 
 **Target**: Test WebUI + binary targets (task 2 below) plus
 the testcontainers end-to-end happy path (task 1 below) in
-shape by **Sat 2026-05-02**, alongside Phase 8's
-sub-phases. The chat-app-shaped ephemeral-token flow can
-slip past 5/2 if scope pressure forces a cut. See
+shape by **Sat 2026-05-02**. Phase 8 completed 2026-04-28;
+the remaining window is for Phase 9 work only. The
+chat-app-shaped ephemeral-token flow can slip past 5/2 if
+scope pressure forces a cut. See
 [`docs/notes-to-humans/2026-04-28-0002-pre-gw-target-may-2-end-to-end.md`](docs/notes-to-humans/2026-04-28-0002-pre-gw-target-may-2-end-to-end.md)
 for the cut-order if 5/2 slips.
 
