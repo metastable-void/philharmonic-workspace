@@ -1750,9 +1750,14 @@ step execution, audit log.
      systemd unit, creates config dirs, `systemctl enable`.
    - Idempotent. Prints setup instructions at the end.
 
-8. **musl cross-compilation** (can slip past 5/2):
+8. **musl target build** (can slip past 5/2):
    - Verify `x86_64-unknown-linux-musl` for all three bins.
-   - CI cross-compile target.
+     This is a standard rustup target, not a hard cross-compile
+     — the crate family is pure Rust + vendored C (aws-lc-rs
+     via `cc`), no system libraries, no OpenSSL. Should work
+     with `rustup target add x86_64-unknown-linux-musl` +
+     `cargo build --target x86_64-unknown-linux-musl`.
+   - CI target.
 
 9. **Reference deployment** on the developer's infrastructure
    (can slip past 5/2):
