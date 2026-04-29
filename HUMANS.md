@@ -34,10 +34,11 @@ and it should be fine. Sending SIGHUPs to the running services
 should let them reload the configs, and refresh HTTPS certs
 from the disk.
 
-Bin targets are only opionated towards our recommended split
+Bin targets are only opinionated towards our recommended split
 among the bins, and configurable otherwise.
 
-Let's extend `mechanics` HTTP server crate to that shape first.
+Let's extend `mechanics` HTTP server crate (the JS worker)
+to that shape first.
 
 Let's export each crate at the `philharmonic` meta-crate
 at its top level. the meta crate by default exports all the
@@ -58,13 +59,13 @@ the meta crate, to enable our first deployment:
 - `src/bin/mechanics-worker/main.rs`: a bit better HTTP server
   wrapper supporting Clap CLI and `/etc/philharmonic/mechanics.toml`
   + `/etc/philharmonic/mechanics.toml.d/*.toml` (configurable
-  location) config files, for `mechanics`.
+  location) config files, for `mechanics` (JS executor).
 - `src/bin/philharmonic-api/main.rs`: the API server, integrating
   various things needed for it to work. Reads the config files at
   `/etc/philharmonic/api.toml` + `/etc/philharmonic/api.toml.d/*.toml`
   and accepts Clap CLI flags. API server also integrates the Connector
   proxy feature into itself. This is what is usually deployed with
-  HTTPS at port 443. For that reason, it also contain the Web UI.
+  HTTPS at port 443. For that reason, it also contains the Web UI.
   The static assets are embedded into the Rust binary.
 - `src/bin/philharmonic-connector/main.rs`: the Connector Service.
   ships everything supported at the moment by default (one can
