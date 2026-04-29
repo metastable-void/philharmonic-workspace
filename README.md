@@ -884,12 +884,18 @@ history and easier review.
 
 ## Building and testing
 
-From the workspace root:
+From the workspace root, use the script wrappers (they set
+`CARGO_TARGET_DIR=target-main` to avoid lock contention with
+`rust-analyzer`'s default `target/`):
 
 ```bash
-cargo check --workspace          # fast type-check everything
-cargo build --workspace          # build everything
+./scripts/pre-landing.sh         # fmt + check + clippy + test (the full gate)
+./scripts/rust-lint.sh           # fmt + check + clippy only
+./scripts/rust-test.sh           # test only
 ```
+
+For read-only queries that don't write build artifacts, raw
+`cargo` is fine (`cargo tree`, `cargo metadata`, etc.).
 
 ### Pre-landing checks (mandatory)
 
@@ -921,7 +927,8 @@ applies equally to humans and AI agents.
   argument to scope to one crate. No crate-scope
   `#![allow(...)]`; only narrow-scope `#[allow(clippy::<lint>)]`
   with a one-line justification. If fmt-check fails, run
-  `cargo fmt --all` to apply and re-run.
+  `CARGO_TARGET_DIR=target-main cargo fmt --all` to apply and
+  re-run.
 - `./scripts/rust-test.sh` runs `cargo test`. Default skips
   `#[ignore]`-gated tests (the fast path). Flags:
   `--ignored` (only ignored), `--include-ignored` (all). Pass a
@@ -932,10 +939,11 @@ applies equally to humans and AI agents.
   `--ignored` run exercises them for crates you actually
   changed.
 
-**Do not run raw `cargo fmt/check/clippy/test`** when the
-scripts cover the case. Bespoke cargo invocations (e.g.
-`cargo test some_test` for focused debugging) remain fine for
-exceptional cases.
+**Prefer the script wrappers over raw `cargo`** — they set
+`CARGO_TARGET_DIR=target-main` and encode the mandatory flag
+sets. Bespoke cargo invocations (e.g.
+`CARGO_TARGET_DIR=target-main cargo test some_test` for
+focused debugging) remain fine for exceptional cases.
 
 Doc-only / script-only / config-only commits may skip these.
 Anything that could affect a `.rs` file's compilation or test

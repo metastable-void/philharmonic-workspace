@@ -1614,7 +1614,8 @@ for the full integration sketch and open questions.
 **Architecture** (per HUMANS.md §Integration):
 
 Three bin targets live inside the `philharmonic` meta-crate
-(`philharmonic/src/bin/`). Each is an HTTP server with an
+(`philharmonic/src/bin/`), per HUMANS.md §Integration
+(confirmed 2026-04-29). Each is an HTTP server with an
 optional `https` Cargo feature (rustls TLS + HTTP/2). SIGHUP
 reloads config and refreshes TLS certs. TOML config at
 `/etc/philharmonic/<name>.toml` with a
@@ -1624,19 +1625,23 @@ reloads config and refreshes TLS certs. TOML config at
 creates config dirs + `systemctl enable`). All three must
 compile for `x86_64-unknown-linux-musl`.
 
-- `philharmonic-api` — faces the internet (HTTPS at 443).
-  Wires `philharmonic-api` library + store backend + policy +
-  SCK + signing keys. Embeds the WebUI as static assets (SPA
-  routing for non-API paths). Integrates the connector proxy
-  feature.
-- `mechanics-worker` — wraps the `mechanics` HTTP service
-  with the shared server infrastructure. Config-file driven.
-  HUMANS.md says "extend mechanics to that shape first" — this
-  bin is the first consumer that proves the pattern.
+- `mechanics-worker` — wraps the `mechanics` HTTP service.
+  The `mechanics` crate itself must be extended first with an
+  `https` feature flag (rustls TLS support), then this bin
+  wraps it with the shared server infra (Clap + config).
+  **First bin to build** — simplest scope, proves the pattern
+  (confirmed 2026-04-29).
 - `philharmonic-connector` — wraps
   `philharmonic-connector-service` + all shipped impl crates.
   Feature-gated connector selection (all default-on). Run one
   per realm.
+- `philharmonic-api` — faces the internet (HTTPS at 443).
+  Wires `philharmonic-api` library + store backend + policy +
+  SCK + signing keys. Embeds the WebUI as static assets (SPA
+  routing for non-API paths). Integrates the connector proxy
+  as an **embedded router** (the API binary also acts as a
+  connector router for single-machine deployments; confirmed
+  2026-04-29).
 
 The `philharmonic` meta-crate also re-exports every library
 crate at its top level and feature-gates connector impls
@@ -1654,14 +1659,15 @@ similar — exact location TBD):
   merged in lexicographic order, location overridable via CLI).
 - Clap CLI skeleton shared across bins.
 
-**WebUI**: Redux + React + Webpack. Build artifacts committed
-to Git (`index.html`, `main.js`, `main.css`, `icon.svg` from
-`common-assets/d-icon.svg`). No Node.js needed at Rust build
-time — the JS build is a separate human-triggered step. The
-Rust binary embeds the committed artifacts. Minimum viable
-surface: login (paste `pht_` token), workflow-template CRUD,
-instance lifecycle, step execution, audit log. This is a
-test/demo artifact, not the product.
+**WebUI**: Redux + React + Webpack (confirmed 2026-04-29 —
+this powers the first deployment and must be extensible).
+Build artifacts committed to Git (`index.html`, `main.js`,
+`main.css`, `icon.svg` from `common-assets/d-icon.svg`). No
+Node.js needed at Rust build time — the JS build is a
+separate human-triggered step. The Rust binary embeds the
+committed artifacts. Minimum viable surface: login (paste
+`pht_` token), workflow-template CRUD, instance lifecycle,
+step execution, audit log.
 
 **Tasks**:
 
@@ -1672,26 +1678,34 @@ test/demo artifact, not the product.
    - Feature-gate connector impls.
    - Bump to `0.1.0` and publish.
 
-2. **Shared server infrastructure**:
-   - TLS listener, SIGHUP handler, TOML config loader, Clap
-     skeleton — as a module inside `philharmonic`.
-   - HUMANS.md: "extend mechanics to that shape first."
-     `mechanics-worker` is the first bin consumer.
+2. **Extend `mechanics` crate with `https` feature**:
+   - Add an `https` Cargo feature to the `mechanics` crate
+     (rustls TLS + HTTP/2 via axum/hyper). The `mechanics`
+     HTTP service must support TLS natively before the
+     `mechanics-worker` bin can wrap it.
+   - This is the prerequisite for step 3.
 
-3. **Binary targets** (three bins in
+3. **Shared server infrastructure**:
+   - SIGHUP handler, TOML config loader, Clap skeleton — as
+     a module inside `philharmonic`.
+   - `mechanics-worker` is the first bin consumer.
+
+4. **Binary targets** (three bins in
    `philharmonic/src/bin/`):
-   - `mechanics-worker` — simplest, proves the pattern.
+   - `mechanics-worker` — first (simplest, proves the
+     pattern).
    - `philharmonic-connector` — feature-gated impls.
    - `philharmonic-api` — most complex (store wiring, SCK,
-     signing keys, WebUI embedding, connector proxy).
+     signing keys, WebUI embedding, embedded connector
+     router).
 
-4. **WebUI**:
+5. **WebUI**:
    - Redux + React + Webpack build.
    - Committed artifacts, embedded by `philharmonic-api` bin.
    - Minimum: login, workflow-template CRUD, instance
      lifecycle, step execution, audit log.
 
-5. **End-to-end integration test suite**:
+6. **End-to-end integration test suite**:
    - `testcontainers` for MySQL.
    - Spawn all three bins (in-process or child processes).
    - Test flows: tenant admin creates endpoint config; creates
@@ -1701,16 +1715,16 @@ test/demo artifact, not the product.
      instance-scoped token; client executes steps with it;
      subject identity appears in step records.
 
-6. **`install` subcommand** (can slip past 5/2):
+7. **`install` subcommand** (can slip past 5/2):
    - Per-bin: copies binary to `/usr/local/bin/`, writes
      systemd unit, creates config dirs, `systemctl enable`.
    - Idempotent. Prints setup instructions at the end.
 
-7. **musl cross-compilation** (can slip past 5/2):
+8. **musl cross-compilation** (can slip past 5/2):
    - Verify `x86_64-unknown-linux-musl` for all three bins.
    - CI cross-compile target.
 
-8. **Reference deployment** on the developer's infrastructure
+9. **Reference deployment** on the developer's infrastructure
    (can slip past 5/2):
    - Deploy the three binaries to on-prem or IaaS.
    - TLS certificates for the chosen URL shape.
@@ -1720,22 +1734,23 @@ test/demo artifact, not the product.
      traffic (LLM-driven flow preferred — stresses ephemeral
      tokens, instance-scope, per-step decryption).
 
-9. **Docker compose** (optional, post-5/2):
-   - Minimal Alpine images, no `install` subcommand inside
-     containers.
-   - Local override files for HTTPS certs, hostnames.
+10. **Docker compose** (optional, post-5/2):
+    - Minimal Alpine images, no `install` subcommand inside
+      containers.
+    - Local override files for HTTPS certs, hostnames.
 
-10. **Documentation reconciliation**:
+11. **Documentation reconciliation**:
     - Update design docs where implementation diverged.
     - Pass through docs 01, 08, 09, 10, 11, 15 at minimum.
     - Resolve "still open" items in doc 14 that were settled.
 
 **Cut order for 5/2** (must → should → can-slip):
 
-- **Must**: tasks 1, 2, 3 (at least one bin), 5 (happy path).
-- **Should**: task 3 (all three bins), task 4 (WebUI skeleton).
-- **Can slip**: tasks 6–9 (install, musl, deployment, Docker).
-- **Always last**: task 10 (doc reconciliation after code
+- **Must**: tasks 1–3 (meta-crate + mechanics HTTPS + shared
+  infra), task 4 (at least one bin), task 6 (e2e happy path).
+- **Should**: task 4 (all three bins), task 5 (WebUI skeleton).
+- **Can slip**: tasks 7–10 (install, musl, deployment, Docker).
+- **Always last**: task 11 (doc reconciliation after code
   settles).
 
 **Acceptance criteria**:

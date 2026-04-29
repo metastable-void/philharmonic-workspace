@@ -195,34 +195,23 @@ that window. Suggested cut order if time pressure forces it:
 10. Reference deployment on real infrastructure (ROADMAP
     Phase 9 task 3).
 
-## Open questions for Yuka
+## Decisions confirmed (2026-04-29)
 
-1. **Bin target home**: HUMANS.md says `philharmonic`
-   meta-crate. ROADMAP Phase 9 task 2 says "in-tree,
-   non-published, mirrors xtask pattern." These are at odds.
-   My recommendation: put the bins in `philharmonic` (the
-   meta-crate) since that's what ships. The "test/demo"
-   qualifier still applies — these bins are examples of one
-   deployment shape, not prescriptions. Alternatively, a
-   separate in-tree `philharmonic-bins/` crate (never
-   published) could hold them, keeping the meta-crate as
-   pure re-exports.
+All four open questions were answered by Yuka on 2026-04-29:
 
-2. **WebUI toolchain**: HUMANS.md says Redux + React + Webpack.
-   Is this firm, or would a lighter alternative (e.g. Preact +
-   esbuild, or even a pure vanilla-JS SPA) be acceptable for
-   the test/demo scope? The committed-artifacts pattern works
-   either way.
+1. **Bin target home**: `philharmonic` meta-crate, as stated
+   in HUMANS.md. The bins are published with the meta-crate.
 
-3. **Which bin first**: HUMANS.md says "extend mechanics first."
-   But the API bin is the most integration-heavy and the one
-   that faces the internet. If time is tight, should we start
-   with the API bin (highest integration value) or the
-   mechanics-worker bin (simplest, proves the pattern)?
+2. **WebUI toolchain**: Redux + React + Webpack — firm. This
+   powers the first deployment and must be extensible beyond
+   test/demo scope.
 
-4. **Connector proxy in the API bin**: HUMANS.md says the API
-   server "integrates the Connector proxy feature into itself."
-   This means the API binary also acts as a connector router?
-   Or does it forward to a separate connector router process?
-   The former is simpler for single-machine deployments; the
-   latter matches the crate architecture better.
+3. **Which bin first**: `mechanics-worker` first — but the
+   `mechanics` crate itself must be extended first with an
+   `https` Cargo feature flag (rustls TLS support). That
+   extension is the prerequisite before the bin can wrap it.
+
+4. **Connector proxy in the API bin**: Embedded router. The
+   API binary acts as a connector router directly, not
+   forwarding to a separate process. Simpler for
+   single-machine deployments.
