@@ -138,6 +138,20 @@ if command -v rustup >/dev/null 2>&1; then
     rustup toolchain install nightly --profile minimal
     ok "Ensuring miri is installed on nightly"
     rustup component add miri --toolchain nightly
+
+    # Add the musl target on x86_64 Linux hosts. The bin targets
+    # (mechanics-worker, philharmonic-connector, philharmonic-api)
+    # must compile for x86_64-unknown-linux-musl. The crate family
+    # is pure Rust + vendored C (aws-lc-rs via cc), no system
+    # libraries, so this is a standard rustup target — not a hard
+    # cross-compile.
+    _arch=$(uname -m 2>/dev/null || true)
+    _os=$(uname -s 2>/dev/null || true)
+    if [ "$_arch" = "x86_64" ] && [ "$_os" = "Linux" ]; then
+        ok "Adding x86_64-unknown-linux-musl target"
+        rustup target add x86_64-unknown-linux-musl
+    fi
+    unset _arch _os
 else
     echo
     warn "rustup not on PATH — skipping toolchain install."
