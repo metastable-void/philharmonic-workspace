@@ -10,7 +10,6 @@ this file, but never edit this file.
 ## Short-term TODOs
 
 - make sure we always make docs/roadmaps up-to-date.
-- Note: I'll work on 29 April 2026.
 - not blocking for this project: we should refactor all
   the best practices for AI coding brewed inside this
   workspace repo into a reusable template/Rust crate/etc.
@@ -46,7 +45,7 @@ connector impls but one can use `default-features = false` and
 manually specify which impls to use.
 
 We build a default WebUI with Redux+React+Webpack, build it,
-and commit all the resulting artifact (only `index.html` and
+and commit all the resulting artifacts (only `index.html` and
 `main.js` and `main.css`, in addition to `icon.svg`) to Git
 to enable building without Node.JS. We ship the common default
 icon to use at `common-assets/d-icon.svg`. On everything not
