@@ -4,6 +4,6 @@
  <g id="layer1">
   <path id="rect1-6" d="m161.83 96c-17.728 0-32 14.272-32 32v192l-64 112 96-16h256c17.728 0 32-14.272 32-32v-256c0-17.728-14.272-32-32-32z" fill="none" stroke="#fff" stroke-width="32"/>
   <path id="rect1" d="m161.34 96c-17.728 0-32 14.272-32 32v192l-64 112 96-16h256c17.728 0 32-14.272 32-32v-256c0-17.728-14.272-32-32-32z" fill="#134f95" stroke="#23415c" stroke-width="8"/>
-  <text id="text1" x="195.29401" y="350.33594" fill="#134f95" font-size="256px" stroke-width="0" xml:space="preserve"><tspan id="tspan1" x="195.29401" y="350.33594" fill="#ffffff" font-family="'Noto Sans JP'" font-size="256px" font-weight="bold" stroke-width="0">D</tspan></text>
+  <path id="text1" d="m218.59 350.34v-189.7h51.968q29.184 0 49.92 10.24 20.992 10.24 32.256 30.976 11.52 20.736 11.52 52.736t-11.264 53.248-31.744 32q-20.48 10.496-48.64 10.496zm37.888-30.72h11.52q17.92 0 30.72-6.4 13.056-6.656 19.968-20.992 6.912-14.592 6.912-37.632t-6.912-36.864q-6.912-14.08-19.968-20.224-12.8-6.4-30.72-6.4h-11.52z" fill="#fff" stroke-width="0" aria-label="D"/>
  </g>
 </svg>
