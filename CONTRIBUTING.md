@@ -902,6 +902,18 @@ it.** Don't reach around to raw `curl -fsSL` / `mktemp
 other non-baseline scripting language from workspace tooling.
 If you're tempted, write a Rust bin in `xtask/` instead.**
 
+**One narrow exception: `./scripts/webui-build.sh`** invokes
+Node.js (via `npx webpack`) to produce the four committed
+WebUI artifacts (`index.html`, `main.js`, `main.css`,
+`icon.svg`) inside `philharmonic/webui/dist/`. This is the
+**only** script that touches Node.js, and it exists solely to
+generate committed build artifacts reproducibly — the Webpack
+build cache is removed before every run so identical source
+always produces identical output. The Rust binary embeds the
+committed artifacts at compile time; no Node.js is needed to
+build or run any Rust crate. General Node.js usage remains
+forbidden in workspace tooling outside this script.
+
 Well-written POSIX shell (with `awk`, `sed`, `grep`, `cut`,
 `tr`, standard text pipelines) stays where it is — shell is
 right for orchestration, git workflow, cargo wrappers,

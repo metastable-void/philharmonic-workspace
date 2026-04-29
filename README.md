@@ -629,6 +629,17 @@ Invoke by path (`./scripts/foo.sh`), not via `bash`.
   on HTTP 4xx/5xx; use `./scripts/web-fetch.sh ... || :` at the
   call site if you want to tolerate HTTP errors. Never call
   `curl`/`wget` directly from a workspace script.
+- `./scripts/webui-build.sh [--production]` — build the WebUI
+  artifacts for embedding into the `philharmonic-api` binary.
+  Invokes Webpack via `npx` inside `philharmonic/webui/`.
+  **This is the only script that uses Node.js** — an explicit
+  narrow exception to the no-Node.js rule
+  ([`CONTRIBUTING.md §8`](CONTRIBUTING.md#8-in-tree-workspace-tooling-xtask)).
+  The Webpack build cache is removed before every run for
+  reproducibility. Output (`index.html`, `main.js`, `main.css`,
+  `icon.svg`) goes to `philharmonic/webui/dist/` and is
+  committed to Git; no Node.js is needed to build the Rust
+  crate.
 
 See [`CONTRIBUTING.md §6`](CONTRIBUTING.md#6-shell-script-rules-posix-sh)
 for the POSIX-sh conventions the scripts follow and explicit

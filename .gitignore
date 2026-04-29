@@ -31,5 +31,10 @@ target-main/
 .claude/.cache/
 .claude/scheduled_tasks.lock
 
+# WebUI build intermediates (the committed artifacts live in
+# philharmonic/webui/dist/ and are tracked; everything else is
+# transient).
+node_modules/
+
 # .env files
 .env
