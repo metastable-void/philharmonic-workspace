@@ -1704,8 +1704,11 @@ step execution, audit log.
 
 4. **Binary targets** (three bins in
    `philharmonic/src/bin/`):
-   - `mechanics-worker` — first (simplest, proves the
-     pattern).
+   - ✅ `mechanics-worker` (landed 2026-04-29): Clap CLI +
+     TOML config (with drop-in overlays) + SIGHUP reload
+     (token replacement via `replace_tokens`) + optional
+     TLS (`--features https`). Default config fallback when
+     no config file exists.
    - `philharmonic-connector` — feature-gated impls.
    - `philharmonic-api` — most complex (store wiring, SCK,
      signing keys, WebUI embedding, embedded connector

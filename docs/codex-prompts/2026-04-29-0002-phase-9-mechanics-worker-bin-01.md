@@ -189,7 +189,33 @@ tokio = { version = "1", features = ["full"] }
 
 ## Outcome
 
-Pending — will be updated after Codex run.
+Completed after one gap-and-resume cycle:
+
+1. First dispatch hit `<missing_context_gating>`:
+   `MechanicsServer` had no `replace_tokens()` API for SIGHUP
+   reload. Claude added `replace_tokens(impl IntoIterator<Item
+   = String>)` to `mechanics/src/lib.rs` (mechanics `3536985`).
+2. Second dispatch completed cleanly. Files created:
+   - `philharmonic/src/bin/mechanics_worker/config.rs` —
+     `MechanicsWorkerConfig`, `PoolConfig`, `TlsFileConfig`
+     with serde defaults.
+   - `philharmonic/src/bin/mechanics_worker/main.rs` — full
+     Clap CLI, TOML config loading with graceful fallback,
+     `MechanicsServer` wiring, SIGHUP reload loop with
+     `replace_tokens`, optional TLS via `#[cfg(feature =
+     "https")]`.
+   - `philharmonic/Cargo.toml` — `[[bin]]` section + tokio
+     upgraded to `features = ["full"]`.
+
+Verification (Codex ran): build, build --features https,
+version, --help, rust-lint, rust-test, rust-test --ignored
+all passed. `pre-landing.sh` failed only on fmt drift in
+`mechanics/` (outside Codex's write scope); Claude ran
+`cargo fmt -p mechanics` and re-ran pre-landing (passed).
+
+Committed as mechanics `aaf342c`, philharmonic `46d20cf`,
+parent `e738bac`. Did NOT run push-all.sh (Claude pushed
+after review).
 
 ---
 
