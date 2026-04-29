@@ -1695,10 +1695,12 @@ step execution, audit log.
    `hyper_util::server::conn::auto::Builder`. Vendored crypto
    backend (aws-lc-rs), no system OpenSSL headers.
 
-3. **Shared server infrastructure**:
-   - SIGHUP handler, TOML config loader, Clap skeleton — as
-     a module inside `philharmonic`.
-   - `mechanics-worker` is the first bin consumer.
+3. ✅ **Shared server infrastructure** (landed 2026-04-29):
+   `philharmonic/src/server/` module with `cli` (Clap
+   `BaseArgs` + `BaseCommand` + `resolve_config_paths`),
+   `config` (generic `load_config<T>` with TOML drop-in
+   overlay merge), `reload` (`ReloadHandle` with SIGHUP +
+   generation counter + `Notify` fan-out). 10 tests.
 
 4. **Binary targets** (three bins in
    `philharmonic/src/bin/`):

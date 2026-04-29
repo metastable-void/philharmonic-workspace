@@ -208,7 +208,29 @@ must be declared direct since we use them in our own code.
 
 ## Outcome
 
-Pending — will be updated after Codex run.
+Completed cleanly. Codex produced all four files matching the
+spec:
+
+- `philharmonic/src/server/mod.rs` — re-exports.
+- `philharmonic/src/server/cli.rs` — `BaseArgs` (clap::Args),
+  `BaseCommand` (Subcommand), `resolve_config_paths`. 4 tests.
+- `philharmonic/src/server/config.rs` — `load_config<T>`,
+  `ConfigError` with Io/Parse/Merge, `read_table`, drop-in
+  overlay merge. 5 tests.
+- `philharmonic/src/server/reload.rs` — `ReloadHandle` with
+  `Arc<Weak>` shutdown, `AtomicU64` generation counter,
+  `Notify` fan-out. 1 test (`#[ignore]`, sends real SIGHUP).
+
+Also added `clap 4 (derive)`, `toml 0.8`, `serde 1 (derive)`,
+`tokio 1 (signal, sync, rt)` to `philharmonic/Cargo.toml` and
+`pub mod server;` to `lib.rs`.
+
+Claude review: no issues. All 9 non-ignored tests pass; clippy
+clean; compiles with `--features https` and
+`--no-default-features`.
+
+Committed as philharmonic `8f5262d`, parent `c39da59`.
+Did NOT run push-all.sh (Claude pushed after review).
 
 ---
 
