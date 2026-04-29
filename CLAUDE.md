@@ -207,7 +207,11 @@ full in `CONTRIBUTING.md`. Read the full section before acting
   `wget` in workspace tooling.** Shell for orchestration; Rust
   bins under `xtask/` for anything non-baseline. Use the
   `./scripts/mktemp.sh` and `./scripts/web-fetch.sh` wrappers
-  for temp files and HTTP. ([§7](CONTRIBUTING.md#7-external-tool-wrappers),
+  for temp files and HTTP. **One narrow exception:**
+  `./scripts/webui-build.sh` invokes Node.js (via `npx
+  webpack`) solely to generate committed WebUI artifacts;
+  general Node.js remains forbidden.
+  ([§7](CONTRIBUTING.md#7-external-tool-wrappers),
   [§8](CONTRIBUTING.md#8-in-tree-workspace-tooling-xtask))
 - **Every stable UUID (`KIND` consts, algorithm IDs) via
   `./scripts/xtask.sh gen-uuid -- --v4`.** Not `uuidgen`, not

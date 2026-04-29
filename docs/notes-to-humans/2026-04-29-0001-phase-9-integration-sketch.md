@@ -215,3 +215,20 @@ All four open questions were answered by Yuka on 2026-04-29:
    API binary acts as a connector router directly, not
    forwarding to a separate process. Simpler for
    single-machine deployments.
+
+5. **TLS crypto backend**: Vendored / pure-Rust-ish only
+   (e.g. `aws-lc-rs`, `ring`). **No system OpenSSL headers**
+   — no `libssl-dev` / `openssl-devel` packages required.
+   The build must succeed with only a Rust toolchain + a C
+   compiler (for the vendored C in aws-lc-rs / ring). This
+   is consistent with the existing rustls-only rule in
+   CONTRIBUTING.md §10.9, now made explicit for the HTTPS
+   feature in the bin targets. Confirmed 2026-04-29.
+
+6. **Node.js exception for WebUI**: `./scripts/webui-build.sh`
+   is the sole Node.js touchpoint. Webpack build cache is
+   removed before every run for reproducibility. Artifacts
+   (`index.html`, `main.js`, `main.css`, `icon.svg`) are
+   committed to Git and embedded by the Rust binary at
+   compile time — no Node.js at Rust build time. General
+   Node.js remains forbidden. Confirmed 2026-04-29.

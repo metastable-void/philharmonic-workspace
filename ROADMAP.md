@@ -1653,7 +1653,13 @@ until their 0.1.0 lands.
 similar — exact location TBD):
 
 - Optional-TLS listener (rustls + tokio-rustls, gated behind
-  `https` feature).
+  `https` feature). The crypto backend must be vendored /
+  pure-Rust-ish (aws-lc-rs or ring) — **no system OpenSSL
+  headers**, no `libssl-dev` / `openssl-devel` packages.
+  The build must succeed with only a Rust toolchain + a C
+  compiler (for the vendored C in aws-lc-rs / ring). See
+  [`CONTRIBUTING.md §10.9`](CONTRIBUTING.md#109-http-client-runtime-stack-vs-tooling-stack)
+  for the full TLS-stack rule.
 - SIGHUP signal handler (re-read config + refresh certs).
 - TOML config loader (primary file + `.d/*.toml` overlay,
   merged in lexicographic order, location overridable via CLI).

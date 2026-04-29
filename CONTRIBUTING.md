@@ -1411,11 +1411,21 @@ Hard rules:
 - **No third HTTP client.** `isahc`, `surf`, `curl`-the-crate,
   etc. are not approved. A new runtime HTTP dependency needs
   an explicit scoping discussion before landing.
-- **Single TLS stack.** Both reqwest (with the `rustls-tls`
-  feature) and ureq (with the `rustls` feature) use rustls —
-  not native-tls, not OpenSSL, not system TLS. Keeps
-  statically-linkable musl builds simple, keeps the C-library
-  dep surface at zero, keeps the Windows-build story clean.
+- **Single TLS stack, no system crypto headers.** Both reqwest
+  (with the `rustls-tls` feature) and ureq (with the `rustls`
+  feature) use **rustls** — not native-tls, not OpenSSL, not
+  system TLS. The underlying cryptographic provider must be
+  vendored / pure-Rust-ish (e.g. `aws-lc-rs`, which vendors
+  AWS-LC's C source and builds it via `cc`; or `ring`, which
+  does the same). **Never depend on system-installed OpenSSL
+  headers or `libssl-dev` / `openssl-devel` packages** — the
+  build must succeed on a clean checkout with only a Rust
+  toolchain (+ a C compiler for the vendored C portions of
+  aws-lc-rs / ring). This keeps statically-linkable musl
+  builds simple, keeps the system-library dep surface at zero,
+  and keeps cross-compilation (including
+  `x86_64-unknown-linux-musl` for the Phase 9 bin targets)
+  clean.
 - **tokio stays on the runtime side.** `xtask/` bins must
   not pull tokio just to make one HTTP call — `ureq` (sync) is
   the point.
