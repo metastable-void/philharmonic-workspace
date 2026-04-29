@@ -54,12 +54,39 @@ set -eu
 . "$(dirname -- "$0")/lib/workspace-cd.sh"
 . "$(dirname -- "$0")/lib/cargo-target-dir.sh"
 
+no_isolation=0
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --no-isolation)
+            no_isolation=1
+            shift
+            ;;
+        --)
+            shift
+            break
+            ;;
+        -*)
+            # Not our flag — might be --workspace; stop parsing
+            break
+            ;;
+        *)
+            break
+            ;;
+    esac
+done
+
 if [ $# -eq 0 ]; then
     cat <<EOF >&2
-Usage: $0 --workspace | <crate> [<test>...]
+Usage: $0 [--no-isolation] --workspace | <crate> [<test>...]
+
+Options:
+  --no-isolation   set MIRIFLAGS=-Zmiri-disable-isolation so tests
+                   that need filesystem/env access (e.g. reading
+                   test vector files) can run under miri.
 
 Examples:
   $0 philharmonic-policy                               # all non-ignored tests in the crate
+  $0 --no-isolation philharmonic-policy                # same, with isolation disabled
   $0 philharmonic-policy sck_decrypt                   # tests matching "sck_decrypt"
   $0 philharmonic-policy sck_ pht_                     # tests matching either substring
   $0 --workspace                                       # entire workspace (usually fails on FFI crates)
@@ -68,8 +95,15 @@ Test-name args are libtest substring filters, forwarded to
 \`cargo test\` after \`--\`. Miri is slow; narrow the scope.
 
 Env: MIRIFLAGS forwarded (e.g. -Zmiri-disable-isolation).
+The --no-isolation flag is a convenience shortcut that sets
+MIRIFLAGS for you.
 EOF
     exit 2
+fi
+
+if [ "$no_isolation" -eq 1 ]; then
+    MIRIFLAGS="${MIRIFLAGS:+$MIRIFLAGS }-Zmiri-disable-isolation"
+    export MIRIFLAGS
 fi
 
 # Verify nightly toolchain is installed.
