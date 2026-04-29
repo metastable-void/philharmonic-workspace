@@ -3506,6 +3506,31 @@ dependencies = [
 [[package]]
 name = "philharmonic"
 version = "0.0.0"
+dependencies = [
+ "mechanics",
+ "mechanics-config",
+ "mechanics-core",
+ "philharmonic-api",
+ "philharmonic-connector-client",
+ "philharmonic-connector-common",
+ "philharmonic-connector-impl-api",
+ "philharmonic-connector-impl-email-smtp",
+ "philharmonic-connector-impl-embed",
+ "philharmonic-connector-impl-http-forward",
+ "philharmonic-connector-impl-llm-anthropic",
+ "philharmonic-connector-impl-llm-gemini",
+ "philharmonic-connector-impl-llm-openai-compat",
+ "philharmonic-connector-impl-sql-mysql",
+ "philharmonic-connector-impl-sql-postgres",
+ "philharmonic-connector-impl-vector-search",
+ "philharmonic-connector-router",
+ "philharmonic-connector-service",
+ "philharmonic-policy 0.2.0",
+ "philharmonic-store",
+ "philharmonic-store-sqlx-mysql",
+ "philharmonic-types",
+ "philharmonic-workflow",
+]
 
 [[package]]
 name = "philharmonic-api"

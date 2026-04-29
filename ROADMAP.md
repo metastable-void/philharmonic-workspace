@@ -1678,18 +1678,22 @@ step execution, audit log.
 **Tasks**:
 
 1. **Meta-crate wiring** (step 1 in the sketch):
-   - Add all published library crate deps to
+   ✅ Add all published library crate deps to
      `philharmonic/Cargo.toml`.
-   - Re-export each at top level.
-   - Feature-gate connector impls.
-   - Bump to `0.1.0` and publish.
+   ✅ Re-export each at top level.
+   ✅ Feature-gate connector impls.
+   - Bump to `0.1.0` and publish. **Pre-req**: publish the
+     three unshipped connector impl placeholders
+     (`llm-anthropic`, `llm-gemini`, `email-smtp`) to
+     crates.io first — `cargo publish` resolves all deps
+     (including optional) against the registry.
 
-2. **Extend `mechanics` crate with `https` feature**:
-   - Add an `https` Cargo feature to the `mechanics` crate
-     (rustls TLS + HTTP/2 via axum/hyper). The `mechanics`
-     HTTP service must support TLS natively before the
-     `mechanics-worker` bin can wrap it.
-   - This is the prerequisite for step 3.
+2. ✅ **Extend `mechanics` crate with `https` feature**
+   (landed 2026-04-29):
+   `TlsConfig::from_pem` + `MechanicsServer::run_tls` with
+   rustls TLS + HTTP/1.1 / HTTP/2 ALPN via `tokio-rustls` +
+   `hyper_util::server::conn::auto::Builder`. Vendored crypto
+   backend (aws-lc-rs), no system OpenSSL headers.
 
 3. **Shared server infrastructure**:
    - SIGHUP handler, TOML config loader, Clap skeleton — as

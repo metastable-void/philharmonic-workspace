@@ -83,6 +83,16 @@ Codex is the implementation partner for substantive coding.
 Rule of thumb: "what should this look like?" → Claude. "Now
 write the thing" → Codex, unless it's plumbing/housekeeping.
 
+**The Codex gate is mandatory for auditability, not optional
+for convenience.** Any new module, feature implementation, or
+file with non-trivial logic (roughly: more than mechanical
+`pub use` / `Cargo.toml` / config / doc changes) goes through
+Codex with a prompt archived beforehand. Borderline cases
+(~50–100 lines of new logic) should default to Codex — the
+archival overhead is low and the audit trail is valuable.
+Claude doing substantial coding directly bypasses the
+design-then-implement split that makes history reviewable.
+
 ## Executive summary of the rules you'll trip over most
 
 Every item here is the short form of something documented in
