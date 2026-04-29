@@ -240,3 +240,16 @@ All four open questions were answered by Yuka on 2026-04-29:
    DevTools debugging without a live Node.js dev server. No
    Node.js at Rust build time.
    General Node.js remains forbidden. Confirmed 2026-04-29.
+
+7. **Connector bin vs. router clarification** (corrected
+   2026-04-29): The `philharmonic-connector` bin is the
+   connector **service** entry point — it receives forwarded
+   requests, verifies COSE_Sign1 tokens, decrypts hybrid-KEM
+   payloads, and dispatches to `Implementation` trait objects.
+   It is NOT the connector router. The connector **router**
+   (`philharmonic-connector-router`) lives inside the
+   `philharmonic-api` binary as an embedded component — the
+   API binary dispatches connector requests to upstream
+   connector-service instances. The initial implementation
+   incorrectly wired the bin as a router; this was caught
+   and flagged for rework in the same session.

@@ -1631,17 +1631,24 @@ compile for `x86_64-unknown-linux-musl`.
   wraps it with the shared server infra (Clap + config).
   **First bin to build** — simplest scope, proves the pattern
   (confirmed 2026-04-29).
-- `philharmonic-connector` — wraps
-  `philharmonic-connector-service` + all shipped impl crates.
-  Feature-gated connector selection (all default-on). Run one
-  per realm.
+- `philharmonic-connector` — the **connector service**
+  entry point. Wraps `philharmonic-connector-service` + all
+  shipped `Implementation` trait impls. Receives forwarded
+  requests (from the connector router), verifies COSE_Sign1
+  tokens via `MintingKeyRegistry`, decrypts hybrid-KEM
+  payloads via `RealmPrivateKeyRegistry`, and dispatches to
+  the appropriate `Implementation`. Feature-gated connector
+  selection (all default-on). Run one per realm. **This is
+  NOT the connector router** — the router lives in the API
+  binary (see below).
 - `philharmonic-api` — faces the internet (HTTPS at 443).
   Wires `philharmonic-api` library + store backend + policy +
   SCK + signing keys. Embeds the WebUI as static assets (SPA
-  routing for non-API paths). Integrates the connector proxy
-  as an **embedded router** (the API binary also acts as a
-  connector router for single-machine deployments; confirmed
-  2026-04-29).
+  routing for non-API paths). Integrates the **connector
+  router** (`philharmonic-connector-router`) as an embedded
+  component — the API binary dispatches connector requests
+  to upstream `philharmonic-connector` service instances
+  (confirmed 2026-04-29).
 
 The `philharmonic` meta-crate also re-exports every library
 crate at its top level and feature-gates connector impls
@@ -1709,11 +1716,15 @@ step execution, audit log.
      (token replacement via `replace_tokens`) + optional
      TLS (`--features https`). Default config fallback when
      no config file exists.
-   - ✅ `philharmonic-connector` (landed 2026-04-29):
-     Connector router + service wrapper with
-     `MintingKeyRegistry`, `RealmPrivateKeyRegistry`,
-     reloadable `DispatchConfig` via `Arc<RwLock>`,
-     hex/raw key file loading, optional TLS.
+   - ⚠️ `philharmonic-connector` — **rework in progress**.
+     The 2026-04-29 initial implementation incorrectly
+     wired the bin as a connector *router* (dispatch to
+     upstream URLs) instead of a connector *service*
+     (token verify + payload decrypt + `Implementation`
+     dispatch). The router belongs in `philharmonic-api`.
+     Rework: delete the router wiring, replace with
+     `connector-service` verify-and-decrypt pipeline +
+     `Implementation` trait object registry.
    - `philharmonic-api` — most complex (store wiring, SCK,
      signing keys, WebUI embedding, embedded connector
      router).
