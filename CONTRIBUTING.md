@@ -1523,6 +1523,33 @@ highest-value miri targets — AES / SHA-2 implementations in
 the `aes-gcm` / `sha2` crates use `unsafe` for SIMD intrinsics,
 and miri exercises the slow no-SIMD reference paths.
 
+**Mandatory cadence.** Miri must be run on the crypto-touching
+crates at each of these checkpoints — no exceptions:
+
+1. **Before publishing** any crate that contains or transitively
+   depends on crypto code.
+2. **After completing a phase or sub-phase** that touched crypto
+   paths (SCK, COSE_Sign1, COSE_Encrypt0, hybrid KEM, `pht_`
+   tokens, ephemeral API tokens).
+3. **Weekly** during active development, even if no crypto paths
+   changed — dependency updates can introduce UB silently.
+4. **Before a milestone** (Golden Week break, reference
+   deployment, etc.).
+
+The mandatory crate list (run all five at each checkpoint):
+
+```sh
+./scripts/miri-test.sh philharmonic-policy
+./scripts/miri-test.sh philharmonic-connector-client
+./scripts/miri-test.sh philharmonic-connector-service
+./scripts/miri-test.sh philharmonic-connector-common
+./scripts/miri-test.sh philharmonic-types
+```
+
+Additional crates may be added as the workspace grows. Agents
+(Claude Code and Codex) must track when the last miri run
+happened and flag when a checkpoint has been missed.
+
 ---
 
 ## 11. Pre-landing checks

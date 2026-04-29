@@ -176,6 +176,16 @@ full in `CONTRIBUTING.md`. Read the full section before acting
   touches Rust.** fmt + check + clippy (`-D warnings`) + test,
   auto-detecting modified crates. CI runs the same script.
   ([§11](CONTRIBUTING.md#11-pre-landing-checks))
+- **Run `./scripts/miri-test.sh` on the crypto crate set at
+  every checkpoint** — before publishing crypto-touching
+  crates, after completing a phase/sub-phase with crypto
+  changes, weekly during active development, and before
+  milestones. The mandatory five:
+  `philharmonic-policy`, `philharmonic-connector-client`,
+  `philharmonic-connector-service`,
+  `philharmonic-connector-common`, `philharmonic-types`.
+  Track when the last run happened; flag missed checkpoints.
+  ([§10.11](CONTRIBUTING.md#1011-miri))
 - **Track doc/code volume regularly.** Run
   `./scripts/check-md-bloat.sh` (reports Markdown file sizes
   and flags bloated docs) and `./scripts/tokei.sh` (lines of

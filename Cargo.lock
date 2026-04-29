@@ -3507,7 +3507,10 @@ dependencies = [
 name = "philharmonic"
 version = "0.0.0"
 dependencies = [
+ "axum",
  "clap",
+ "hex",
+ "hyper-util",
  "mechanics",
  "mechanics-config",
  "mechanics-core",
@@ -3531,9 +3534,13 @@ dependencies = [
  "philharmonic-store-sqlx-mysql",
  "philharmonic-types",
  "philharmonic-workflow",
+ "rustls-pemfile",
  "serde",
  "tokio",
+ "tokio-rustls",
  "toml",
+ "x25519-dalek",
+ "zeroize",
 ]
 
 [[package]]
