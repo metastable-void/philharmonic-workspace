@@ -226,9 +226,14 @@ All four open questions were answered by Yuka on 2026-04-29:
    feature in the bin targets. Confirmed 2026-04-29.
 
 6. **Node.js exception for WebUI**: `./scripts/webui-build.sh`
-   is the sole Node.js touchpoint. Webpack build cache is
-   removed before every run for reproducibility. Artifacts
-   (`index.html`, `main.js`, `main.css`, `icon.svg`) are
-   committed to Git and embedded by the Rust binary at
-   compile time — no Node.js at Rust build time. General
-   Node.js remains forbidden. Confirmed 2026-04-29.
+   is the sole Node.js touchpoint. Reproducibility has two
+   layers: the script removes the Webpack build cache before
+   every run, and `webpack.config.js` must use deterministic
+   settings (`optimization.moduleIds = 'deterministic'`,
+   `optimization.chunkIds = 'deterministic'`, contenthash-
+   based output filenames, `cache: false`). Both layers
+   together guarantee identical source → byte-identical
+   output. Artifacts (`index.html`, `main.js`, `main.css`,
+   `icon.svg`) are committed to Git and embedded by the Rust
+   binary at compile time — no Node.js at Rust build time.
+   General Node.js remains forbidden. Confirmed 2026-04-29.

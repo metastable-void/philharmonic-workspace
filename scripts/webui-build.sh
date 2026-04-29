@@ -12,14 +12,30 @@
 # icon.svg) that the Rust binary embeds at compile time. General
 # Node.js usage remains forbidden in workspace tooling — see §7.
 #
-# Reproducibility:
+# Reproducibility (two layers):
+#
+# Layer 1 — this script:
 # - The Webpack build cache is removed before every run so that
-#   builds are fully deterministic from source. Stale cache is
-#   the #1 cause of "it built differently on my machine."
-# - Output goes to a fixed directory (philharmonic/webui/dist/)
-#   that is committed to Git. The Rust binary includes these
-#   files via include_bytes! or rust-embed at compile time, so
-#   no Node.js is needed to build the Rust crate.
+#   stale cache state never influences the output.
+#
+# Layer 2 — webpack.config.js (MUST be configured by whoever
+#   creates the WebUI source tree):
+# - optimization.moduleIds = 'deterministic'
+# - optimization.chunkIds  = 'deterministic'
+# - output.filename uses [contenthash], not [hash] or [id]
+# - cache: false (or type: 'filesystem' pointed at a path
+#   this script deletes — but cache:false is simplest)
+#
+# Both layers together guarantee that identical source always
+# produces byte-identical output regardless of build machine
+# or prior state. If webpack.config.js is missing any of
+# the Layer 2 settings, builds may differ across machines
+# even with a clean cache.
+#
+# Output goes to a fixed directory (philharmonic/webui/dist/)
+# that is committed to Git. The Rust binary includes these
+# files via include_bytes! or rust-embed at compile time, so
+# no Node.js is needed to build the Rust crate.
 #
 # Prerequisites:
 # - Node.js (LTS) on PATH.
