@@ -172,7 +172,33 @@ re-export vs. what you need to import directly.
 
 ## Outcome
 
-Pending — will be updated after Codex run.
+Completed. Codex attempted to commit (blocked by the new
+codex-guard.sh — process-tree check worked as designed).
+Files created:
+
+- `philharmonic/src/bin/philharmonic_connector/config.rs` —
+  `ConnectorConfig` with serde defaults, `MintingKeyConfig`,
+  `RealmKeyConfig` (ML-KEM + X25519 split/combined key
+  loading), `UpstreamConfig` (single/many untagged enum),
+  `TlsFileConfig`.
+- `philharmonic/src/bin/philharmonic_connector/main.rs` —
+  full Clap CLI, registry building (minting + realm keys
+  from raw/hex files), `DispatchConfig` from config table,
+  `ReloadableRouterState` with `Arc<RwLock<RouterState>>`
+  for hot SIGHUP dispatch-table reload, axum fallback
+  handler delegating to `dispatch_request`, TLS via
+  `hyper_util::server::conn::auto::Builder` with ALPN.
+- `philharmonic/Cargo.toml` — `[[bin]]` section + new deps
+  (`axum 0.8`, `hex 0.4`, `hyper-util`, `x25519-dalek`,
+  `zeroize`, `rustls-pemfile`/`tokio-rustls` optional for
+  `https` feature).
+
+Verification: build, build --features https, version, --help,
+clippy all passed. Pre-landing not re-run (Codex ran it but
+failed on commit; Claude verified build + clippy separately).
+
+Committed as philharmonic `cc17c18`, parent `89d0617`.
+Did NOT run push-all.sh (Claude pushed after review).
 
 ---
 

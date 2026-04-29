@@ -1709,7 +1709,11 @@ step execution, audit log.
      (token replacement via `replace_tokens`) + optional
      TLS (`--features https`). Default config fallback when
      no config file exists.
-   - `philharmonic-connector` — feature-gated impls.
+   - ✅ `philharmonic-connector` (landed 2026-04-29):
+     Connector router + service wrapper with
+     `MintingKeyRegistry`, `RealmPrivateKeyRegistry`,
+     reloadable `DispatchConfig` via `Arc<RwLock>`,
+     hex/raw key file loading, optional TLS.
    - `philharmonic-api` — most complex (store wiring, SCK,
      signing keys, WebUI embedding, embedded connector
      router).
