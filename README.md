@@ -143,6 +143,22 @@ previously (2026-04-24 / 2026-04-27). The unpublished
 phase tiers; until then they have no crates.io presence (no
 0.0.0 placeholders were reserved).
 
+**Phase 9 — Integration** is the current focus (started
+2026-04-29). The `philharmonic` meta-crate gains re-exports
+of every library crate plus three bin targets
+(`philharmonic-api`, `mechanics-worker`,
+`philharmonic-connector`) with optional TLS, SIGHUP config
+reload, TOML config files, and Clap CLI. A Redux + React
+WebUI (committed build artifacts, no Node.js at Rust build
+time) is embedded into the API binary. End-to-end
+testcontainers exercise the full stack. Target: core bins +
+e2e happy path by **Sat 2026-05-02**; reference deployment,
+`install` subcommand, musl cross-compilation, and Docker
+compose can follow. See
+[`ROADMAP.md` §Phase 9](ROADMAP.md#phase-9--integration-and-reference-deployment)
+and the integration sketch at
+[`docs/notes-to-humans/2026-04-29-0001-phase-9-integration-sketch.md`](docs/notes-to-humans/2026-04-29-0001-phase-9-integration-sketch.md).
+
 **Phase 7 Tier 1 — done 2026-04-27.** The pivot to pure-Rust
 `tract` + `tokenizers` for `embed` (replacing the round-01
 `fastembed` + `ort` stack, which was glibc-only via

@@ -1595,95 +1595,148 @@ published.
 
 ### Phase 9 — Integration and reference deployment
 
-**Goal**: A running deployment serving real workflows.
+**Goal**: A running deployment serving real workflows. Turn
+the published library crates into executable processes with
+TLS, config-file loading, and a minimal WebUI — then prove
+them end-to-end.
 
-**Target**: Test WebUI + binary targets (task 2 below) plus
-the testcontainers end-to-end happy path (task 1 below) in
-shape by **Sat 2026-05-02**. Phase 8 completed 2026-04-28;
-the remaining window is for Phase 9 work only. The
-chat-app-shaped ephemeral-token flow can slip past 5/2 if
-scope pressure forces a cut. See
+**Target**: Meta-crate wiring + at least one running bin
+target + testcontainers e2e happy path by **Sat 2026-05-02**.
+Phase 8 completed 2026-04-28; the remaining window is for
+Phase 9 work only. The chat-app-shaped ephemeral-token flow,
+the `install` subcommand, musl cross-compilation, and Docker
+compose can slip past 5/2 if scope pressure forces a cut. See
 [`docs/notes-to-humans/2026-04-28-0002-pre-gw-target-may-2-end-to-end.md`](docs/notes-to-humans/2026-04-28-0002-pre-gw-target-may-2-end-to-end.md)
-for the cut-order if 5/2 slips.
+for the earlier cut-order and
+[`docs/notes-to-humans/2026-04-29-0001-phase-9-integration-sketch.md`](docs/notes-to-humans/2026-04-29-0001-phase-9-integration-sketch.md)
+for the full integration sketch and open questions.
+
+**Architecture** (per HUMANS.md §Integration):
+
+Three bin targets live inside the `philharmonic` meta-crate
+(`philharmonic/src/bin/`). Each is an HTTP server with an
+optional `https` Cargo feature (rustls TLS + HTTP/2). SIGHUP
+reloads config and refreshes TLS certs. TOML config at
+`/etc/philharmonic/<name>.toml` with a
+`<name>.toml.d/*.toml` drop-in overlay. Clap CLI with
+`serve`/`version`/`help` subcommands plus a root-only
+`install` subcommand (copies binary + writes systemd unit +
+creates config dirs + `systemctl enable`). All three must
+compile for `x86_64-unknown-linux-musl`.
+
+- `philharmonic-api` — faces the internet (HTTPS at 443).
+  Wires `philharmonic-api` library + store backend + policy +
+  SCK + signing keys. Embeds the WebUI as static assets (SPA
+  routing for non-API paths). Integrates the connector proxy
+  feature.
+- `mechanics-worker` — wraps the `mechanics` HTTP service
+  with the shared server infrastructure. Config-file driven.
+  HUMANS.md says "extend mechanics to that shape first" — this
+  bin is the first consumer that proves the pattern.
+- `philharmonic-connector` — wraps
+  `philharmonic-connector-service` + all shipped impl crates.
+  Feature-gated connector selection (all default-on). Run one
+  per realm.
+
+The `philharmonic` meta-crate also re-exports every library
+crate at its top level and feature-gates connector impls
+(`default-features = false` to pick individually). Unshipped
+impls (Anthropic, Gemini, SMTP) get off-by-default features
+until their 0.1.0 lands.
+
+**Shared server module** (`philharmonic/src/server/` or
+similar — exact location TBD):
+
+- Optional-TLS listener (rustls + tokio-rustls, gated behind
+  `https` feature).
+- SIGHUP signal handler (re-read config + refresh certs).
+- TOML config loader (primary file + `.d/*.toml` overlay,
+  merged in lexicographic order, location overridable via CLI).
+- Clap CLI skeleton shared across bins.
+
+**WebUI**: Redux + React + Webpack. Build artifacts committed
+to Git (`index.html`, `main.js`, `main.css`, `icon.svg` from
+`common-assets/d-icon.svg`). No Node.js needed at Rust build
+time — the JS build is a separate human-triggered step. The
+Rust binary embeds the committed artifacts. Minimum viable
+surface: login (paste `pht_` token), workflow-template CRUD,
+instance lifecycle, step execution, audit log. This is a
+test/demo artifact, not the product.
 
 **Tasks**:
 
-1. End-to-end integration test suite:
+1. **Meta-crate wiring** (step 1 in the sketch):
+   - Add all published library crate deps to
+     `philharmonic/Cargo.toml`.
+   - Re-export each at top level.
+   - Feature-gate connector impls.
+   - Bump to `0.1.0` and publish.
+
+2. **Shared server infrastructure**:
+   - TLS listener, SIGHUP handler, TOML config loader, Clap
+     skeleton — as a module inside `philharmonic`.
+   - HUMANS.md: "extend mechanics to that shape first."
+     `mechanics-worker` is the first bin consumer.
+
+3. **Binary targets** (three bins in
+   `philharmonic/src/bin/`):
+   - `mechanics-worker` — simplest, proves the pattern.
+   - `philharmonic-connector` — feature-gated impls.
+   - `philharmonic-api` — most complex (store wiring, SCK,
+     signing keys, WebUI embedding, connector proxy).
+
+4. **WebUI**:
+   - Redux + React + Webpack build.
+   - Committed artifacts, embedded by `philharmonic-api` bin.
+   - Minimum: login, workflow-template CRUD, instance
+     lifecycle, step execution, audit log.
+
+5. **End-to-end integration test suite**:
    - `testcontainers` for MySQL.
-   - Wire up an in-test process layout exercising every crate
-     end-to-end. One reasonable shape: API host + mechanics
-     worker + connector router + connector service
-     (single-realm config bundling all impls). Other process
-     splits or collapses are equally valid for testing — the
-     framework doesn't prescribe.
-   - Test flows: tenant admin creates endpoint config; tenant
-     admin creates workflow template; tenant caller executes
-     steps; instance reaches terminal state; audit log records
-     all of it.
-   - Ephemeral-token flow (one example application is the
-     chat-app pattern, where a tenant backend mints an
-     instance-scoped token and a browser-resident client
-     executes steps under it): minting authority mints
-     instance-scoped ephemeral token; client executes steps
-     with the ephemeral token; subject identity appears in
-     step records. Non-browser callers exercise the same
-     mechanism.
+   - Spawn all three bins (in-process or child processes).
+   - Test flows: tenant admin creates endpoint config; creates
+     workflow template; caller executes steps; instance reaches
+     terminal state; audit log records all of it.
+   - Ephemeral-token flow: minting authority mints
+     instance-scoped token; client executes steps with it;
+     subject identity appears in step records.
 
-2. **Test WebUI + binary targets** (in-tree, non-published).
-   Mirrors the `xtask/` pattern: workspace-internal crates
-   that are never published to crates.io, used to exercise
-   the framework end-to-end and to give future consumers a
-   worked example of one possible deployment shape.
-   Concretely (sub-layout TBD when we get here):
-   - One or more **bin crates** that wire the framework
-     library crates into runnable processes — at minimum an
-     API host, a mechanics worker, a connector router, and
-     a connector service. These let testcontainers /
-     reference-deployment scenarios spin up real binaries
-     instead of in-test process objects.
-   - A **small WebUI** that drives the API for end-to-end
-     test scenarios — login (via long-lived API token),
-     workflow-template creation, instance creation,
-     step execution, audit-log inspection. Browser-shaped
-     so the ephemeral-token flow can be exercised against a
-     real browser, not just an HTTP client.
-   - These artifacts are *test/demo* deliverables, not part
-     of the published-crate surface. They're examples of
-     how a deployment might wire the framework together —
-     not prescriptions. The framework crates remain shape-
-     agnostic.
+6. **`install` subcommand** (can slip past 5/2):
+   - Per-bin: copies binary to `/usr/local/bin/`, writes
+     systemd unit, creates config dirs, `systemctl enable`.
+   - Idempotent. Prints setup instructions at the end.
 
-3. Reference deployment on the developer's infrastructure
-   (one example shape; chosen for end-to-end exercise of the
-   crates, not as a prescription):
-   - Deploy the binaries to the developer's on-prem or IaaS.
-   - TLS certificates for whatever URL shape the reference
-     deployment picks (e.g. wildcard certs for
-     `*.api.<deployment-domain>` /
-     `admin.<deployment-domain>` /
-     `*.connector.<deployment-domain>` if subdomain-per-tenant
-     and subdomain-per-realm; a single cert if a flatter
-     path-based shape is chosen).
-   - Actual realm KEM keypairs generated and deployed to realm
-     connector service binaries; public keys deployed to the
-     lowerer.
-   - Actual SCK deployed.
-   - At least one tenant provisioned (the developer itself).
-   - At least one working workflow exercised end-to-end (one
-     LLM-driven flow for the agent-style use case — chosen
-     because it stresses ephemeral tokens, instance-scope
-     permission enforcement, and per-step credential
-     decryption — but the framework is general-purpose
-     workflow orchestration; non-LLM workflows are equally
-     supported).
+7. **musl cross-compilation** (can slip past 5/2):
+   - Verify `x86_64-unknown-linux-musl` for all three bins.
+   - CI cross-compile target.
 
-4. Documentation reconciliation:
-   - For every case where implementation revealed a design doc
-     was wrong or incomplete, update the doc.
-   - Pass through docs 01, 08, 09, 10, 11, 15 at minimum; others
-     as needed.
-   - Fix the "still open" items in doc 14 that were settled
-     during implementation.
+8. **Reference deployment** on the developer's infrastructure
+   (can slip past 5/2):
+   - Deploy the three binaries to on-prem or IaaS.
+   - TLS certificates for the chosen URL shape.
+   - Realm KEM keypairs, SCK, signing keys deployed.
+   - At least one tenant provisioned (the developer).
+   - At least one workflow exercised end-to-end with real
+     traffic (LLM-driven flow preferred — stresses ephemeral
+     tokens, instance-scope, per-step decryption).
+
+9. **Docker compose** (optional, post-5/2):
+   - Minimal Alpine images, no `install` subcommand inside
+     containers.
+   - Local override files for HTTPS certs, hostnames.
+
+10. **Documentation reconciliation**:
+    - Update design docs where implementation diverged.
+    - Pass through docs 01, 08, 09, 10, 11, 15 at minimum.
+    - Resolve "still open" items in doc 14 that were settled.
+
+**Cut order for 5/2** (must → should → can-slip):
+
+- **Must**: tasks 1, 2, 3 (at least one bin), 5 (happy path).
+- **Should**: task 3 (all three bins), task 4 (WebUI skeleton).
+- **Can slip**: tasks 6–9 (install, musl, deployment, Docker).
+- **Always last**: task 10 (doc reconciliation after code
+  settles).
 
 **Acceptance criteria**:
 - End-to-end suite passes in CI.
