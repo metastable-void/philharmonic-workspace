@@ -234,6 +234,9 @@ All four open questions were answered by Yuka on 2026-04-29:
    based output filenames, `cache: false`). Both layers
    together guarantee identical source → byte-identical
    output. Artifacts (`index.html`, `main.js`, `main.css`,
-   `icon.svg`) are committed to Git and embedded by the Rust
-   binary at compile time — no Node.js at Rust build time.
+   `icon.svg`) plus source maps (`main.js.map`,
+   `main.css.map`) are committed to Git and embedded by the
+   Rust binary at compile time — source maps enable browser
+   DevTools debugging without a live Node.js dev server. No
+   Node.js at Rust build time.
    General Node.js remains forbidden. Confirmed 2026-04-29.

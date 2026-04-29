@@ -32,10 +32,19 @@
 # the Layer 2 settings, builds may differ across machines
 # even with a clean cache.
 #
+# Source maps:
+# - webpack.config.js should set devtool: 'source-map' (or
+#   another variant that produces separate .map files).
+# - The .map files are committed alongside the build artifacts
+#   and embedded into the Rust binary. This makes browser
+#   DevTools debugging work against the production bundle
+#   without needing a live Node.js dev server.
+#
 # Output goes to a fixed directory (philharmonic/webui/dist/)
 # that is committed to Git. The Rust binary includes these
-# files via include_bytes! or rust-embed at compile time, so
-# no Node.js is needed to build the Rust crate.
+# files (including .map source maps) via include_bytes! or
+# rust-embed at compile time, so no Node.js is needed to
+# build or debug the Rust-served application.
 #
 # Prerequisites:
 # - Node.js (LTS) on PATH.
@@ -115,7 +124,7 @@ printf '%s=== npx webpack --mode %s ===%s\n' "$C_HEADER" "$mode" "$C_RESET"
 
 # ── Verify expected artifacts ────────────────────────────────
 ok=1
-for f in index.html main.js main.css icon.svg; do
+for f in index.html main.js main.css icon.svg main.js.map main.css.map; do
     if [ ! -f "$dist_dir/$f" ]; then
         printf '%s!!! missing expected artifact: %s/dist/%s%s\n' \
             "$C_ERR" "philharmonic/webui" "$f" "$C_RESET" >&2
