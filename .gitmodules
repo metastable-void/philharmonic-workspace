@@ -96,3 +96,7 @@
 [submodule "inline-blob"]
 	path = inline-blob
 	url = https://github.com/metastable-void/inline-blob.git
+[submodule "docs-jp"]
+	path = docs-jp
+	url = https://github.com/metastable-void/philharmonic-docs-jp.git
+	branch = main
