@@ -162,7 +162,32 @@ Add `async-trait` if it's not already present (needed for
 
 ## Outcome
 
-Pending — will be updated after Codex run.
+Completed after a quota-interrupted run (resumed after quota
+restore). Files created:
+
+- `philharmonic/src/bin/philharmonic_connector/config.rs` —
+  `ConnectorConfig` with `bind`, `realm_id`, minting/realm
+  key entries, optional TLS.
+- `philharmonic/src/bin/philharmonic_connector/main.rs` —
+  750 lines. Full connector **service** pipeline:
+  `POST /` handler extracts COSE_Sign1 token + encrypted
+  payload from headers → `verify_and_decrypt()` →
+  `DecryptedPayload` deserialization → `Implementation`
+  registry lookup → `execute()` → JSON response.
+  `build_implementation_registry()` feature-gates each
+  shipped impl (http-forward, llm-openai-compat, sql-postgres,
+  sql-mysql, embed, vector-search). `ServiceError` with
+  typed error envelope + `ImplementationError` → HTTP status
+  mapping. Key loading supports raw bytes or hex-encoded
+  files. SIGHUP reloads key registries (impls are static).
+- `philharmonic/Cargo.toml` — `[[bin]]` section +
+  `async-trait 0.1`, `serde_json 1` added.
+
+Verification: build, build --features https, version, --help,
+clippy all passed. Codex did NOT commit or push (codex-guard
+would have blocked it anyway).
+
+Committed as philharmonic `37ab289`, parent `e258287`.
 
 ---
 

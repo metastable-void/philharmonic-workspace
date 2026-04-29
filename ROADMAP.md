@@ -1716,15 +1716,13 @@ step execution, audit log.
      (token replacement via `replace_tokens`) + optional
      TLS (`--features https`). Default config fallback when
      no config file exists.
-   - ⚠️ `philharmonic-connector` — **rework in progress**.
-     The 2026-04-29 initial implementation incorrectly
-     wired the bin as a connector *router* (dispatch to
-     upstream URLs) instead of a connector *service*
-     (token verify + payload decrypt + `Implementation`
-     dispatch). The router belongs in `philharmonic-api`.
-     Rework: delete the router wiring, replace with
-     `connector-service` verify-and-decrypt pipeline +
-     `Implementation` trait object registry.
+   - ✅ `philharmonic-connector` (reworked 2026-04-29):
+     Connector **service** (not router). `POST /` handler:
+     extract COSE_Sign1 token + encrypted payload →
+     `verify_and_decrypt()` → `Implementation` trait
+     dispatch. Six shipped impls feature-gated. Key
+     registries hot-reloadable via SIGHUP. Error envelope
+     maps `ImplementationError` variants to HTTP status.
    - `philharmonic-api` — most complex (store wiring, SCK,
      signing keys, WebUI embedding, embedded connector
      router).
