@@ -255,6 +255,13 @@ full in `CONTRIBUTING.md`. Read the full section before acting
   every commit or speculatively — the value is in the
   milestone shape, not in a dense archive.
   ([§15.4](CONTRIBUTING.md#154-project-status-reports))
+- **Update the Japanese executive summary at milestones.**
+  At the same inflection points as project status reports,
+  invoke the `docs-jp` skill to generate/update
+  `docs-jp/YYYY-MM-DD-開発サマリー.md`. This is Claude's task
+  (not Codex). Read `docs-jp/README.md` every time — it is
+  the authoritative spec for content, tone, and constraints.
+  No project names, no technical jargon, no FLOSS framing.
 - **Archive every Codex prompt** *before* spawning — write to
   `docs/codex-prompts/YYYY-MM-DD-NNNN-<slug>.md` and commit.
   See the `codex-prompt-archive` skill. ([§15.2](CONTRIBUTING.md#152-codex-prompt-archive))
