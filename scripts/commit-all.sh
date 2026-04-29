@@ -45,6 +45,7 @@ set -eu
 
 . "$(dirname -- "$0")/lib/colors.sh"
 . "$(dirname -- "$0")/lib/workspace-cd.sh"
+. "$(dirname -- "$0")/lib/codex-guard.sh"
 
 parent_only=0
 anonymize=0

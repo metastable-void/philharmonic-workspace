@@ -4,6 +4,17 @@
 
 set -eu
 
+# Block Codex from committing even if it bypasses commit-all.sh.
+# Resolve the guard relative to the repo root (hooks run from
+# the repo's working directory, which may be a submodule).
+_hook_guard="$(git rev-parse --show-superproject-working-tree 2>/dev/null || git rev-parse --show-toplevel 2>/dev/null || true)"
+if [ -n "$_hook_guard" ] && [ -f "$_hook_guard/scripts/lib/codex-guard.sh" ]; then
+    . "$_hook_guard/scripts/lib/codex-guard.sh"
+elif [ -f "scripts/lib/codex-guard.sh" ]; then
+    . scripts/lib/codex-guard.sh
+fi
+unset _hook_guard
+
 if [ "${WORKSPACE_GIT_WRAPPER:-}" = "1" ]; then
     # Called through the wrapper. Proceed.
     echo "Good: Git called through the proper wrapper." >&2
