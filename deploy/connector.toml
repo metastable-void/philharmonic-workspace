@@ -1,4 +1,36 @@
-# Example config for local development / docker compose.
-# Add real minting keys and realm keys before production use.
+# philharmonic-connector configuration
+#
+# This is an EXAMPLE. Copy to /etc/philharmonic/connector.toml
+# and customise before deploying. One connector service instance
+# runs per realm. Drop-in overrides go in
+# /etc/philharmonic/connector.toml.d/.
+
 bind = "0.0.0.0:3002"
 realm_id = "default"
+
+# --- Minting keys (Ed25519 verifying keys for token verification) ---
+# Each entry corresponds to a lowerer signing key. The connector
+# verifies COSE_Sign1 tokens using these public keys.
+#
+# [[minting_keys]]
+# kid = "lowerer-2026-05"
+# public_key_path = "/etc/philharmonic/keys/lowerer-verifying.pub"
+# not_before = 0
+# not_after = 9999999999999
+
+# --- Realm private keys (for payload decryption) ---
+# ML-KEM-768 + X25519 private keys. Either a combined file
+# (2432 bytes: 2400 ML-KEM + 32 X25519) or separate files.
+#
+# [[realm_keys]]
+# kid = "realm-prod-2026-05"
+# realm_id = "default"
+# private_key_path = "/etc/philharmonic/keys/realm-mlkem.secret"
+# x25519_private_key_path = "/etc/philharmonic/keys/realm-x25519.secret"
+# not_before = 0
+# not_after = 9999999999999
+
+# --- TLS (requires --features https at build time) ---
+# [tls]
+# cert_path = "/etc/philharmonic/tls/cert.pem"
+# key_path = "/etc/philharmonic/tls/key.pem"

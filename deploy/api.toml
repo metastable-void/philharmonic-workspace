@@ -1,5 +1,62 @@
-# Example config for local development / docker compose.
-# CHANGE all credentials before any non-local deployment.
+# philharmonic-api configuration
+#
+# This is an EXAMPLE. Copy to /etc/philharmonic/api.toml and
+# customise before deploying. CHANGE all credentials and key
+# paths. Drop-in overrides go in /etc/philharmonic/api.toml.d/.
+
 bind = "0.0.0.0:3000"
-database_url = "mysql://root:philharmonic@mysql/philharmonic"
+database_url = "mysql://philharmonic:CHANGE_ME@localhost/philharmonic"
 issuer = "philharmonic"
+
+# --- API signing key (Ed25519, for ephemeral API tokens) ---
+# Generate: philharmonic-api gen-signing-key (planned)
+# For now: 32 random bytes written to a file.
+signing_key_path = "/etc/philharmonic/keys/api-signing.key"
+signing_key_kid = "api-2026-05"
+
+# --- API verifying keys (for token verification) ---
+# Each entry verifies tokens signed by a known key.
+[[verifying_keys]]
+kid = "api-2026-05"
+public_key_path = "/etc/philharmonic/keys/api-verifying.pub"
+issuer = "philharmonic"
+# not_before = 0        # Unix millis, default 0 (always valid)
+# not_after = 9999999999999  # default far future
+
+# --- SCK (substrate confidentiality key, for endpoint-config encryption) ---
+# 32 random bytes. Generate: dd if=/dev/urandom bs=32 count=1 > sck.key
+# sck_path = "/etc/philharmonic/keys/sck.key"
+# sck_key_version = 1
+
+# --- Lowerer (connector payload encryption) ---
+# If configured, the API server can lower workflow configs
+# through the real COSE_Sign1 + COSE_Encrypt0 pipeline.
+# lowerer_signing_key_path = "/etc/philharmonic/keys/lowerer-signing.key"
+# lowerer_signing_key_kid = "lowerer-2026-05"
+# lowerer_issuer = "philharmonic"     # defaults to issuer above
+# lowerer_token_lifetime_ms = 600000  # 10 minutes
+
+# --- Realm public keys (for lowerer payload encryption) ---
+# [[realm_public_keys]]
+# kid = "realm-prod-2026-05"
+# realm_id = "prod"
+# mlkem_public_key_path = "/etc/philharmonic/keys/realm-prod-mlkem.pub"
+# x25519_public_key_path = "/etc/philharmonic/keys/realm-prod-x25519.pub"
+
+# --- Connector dispatch (embedded router) ---
+# Maps realm IDs to upstream connector-service URLs.
+# connector_domain_suffix = "connector.example.com"
+# connector_service_url = "http://127.0.0.1:3002"
+# [connector_dispatch.prod]
+# upstreams = ["http://connector-prod:3002"]
+
+# --- Rate limiting (optional overrides; sensible defaults built in) ---
+# [rate_limit]
+# [rate_limit.workflow]
+# capacity = 200
+# refill_per_second = 100
+
+# --- TLS (requires --features https at build time) ---
+# [tls]
+# cert_path = "/etc/philharmonic/tls/cert.pem"
+# key_path = "/etc/philharmonic/tls/key.pem"

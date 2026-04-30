@@ -1,4 +1,25 @@
-# Example config for local development / docker compose.
-# CHANGE the token(s) before any non-local deployment.
+# mechanics-worker configuration
+#
+# This is an EXAMPLE. Copy to /etc/philharmonic/mechanics.toml
+# and customise before deploying. CHANGE the token(s).
+# Drop-in overrides go in /etc/philharmonic/mechanics.toml.d/.
+
 bind = "0.0.0.0:3001"
-tokens = ["change-me-in-production"]
+
+# Bearer tokens for authenticating requests to the worker.
+# Each token is a string; requests must carry one in the
+# Authorization header.
+tokens = ["CHANGE-ME-in-production"]
+
+[pool]
+execution_timeout_secs = 3600
+run_timeout_secs = 3600
+default_http_timeout_ms = 300000
+max_memory = 65536
+max_stack = 65536
+max_output = 131072
+
+# --- TLS (requires --features https at build time) ---
+# [tls]
+# cert_path = "/etc/philharmonic/tls/cert.pem"
+# key_path = "/etc/philharmonic/tls/key.pem"
