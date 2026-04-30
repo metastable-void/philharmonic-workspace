@@ -15,6 +15,22 @@ elif [ -f "scripts/lib/codex-guard.sh" ]; then
 fi
 unset _hook_guard
 
+THRESHOLD=$((20 * 1024 * 1024))  # 20 MiB
+changed=0
+git diff --cached --name-only --diff-filter=A | while IFS= read -r f; do
+    [ -f "$f" ] || continue
+    size=$(wc -c < "$f")
+    if [ "$size" -gt "$THRESHOLD" ]; then
+        # Skip if already covered by an LFS pattern
+        if ! git check-attr filter -- "$f" | grep -q 'filter: lfs'; then
+            git lfs track "$f"
+            git add .gitattributes
+            git rm --cached "$f" >/dev/null
+            git add "$f"   # re-stage so it goes through the LFS filter
+        fi
+    fi
+done
+
 if [ "${WORKSPACE_GIT_WRAPPER:-}" = "1" ]; then
     # Called through the wrapper. Proceed.
     echo "Good: Git called through the proper wrapper." >&2
