@@ -103,25 +103,17 @@ catalogues what remains before declaring v1.
 
 ## Deployment blockers (for Yuka's reference deployment)
 
-17. **Ed25519 keypair generation**: No tool to generate the
-    signing key + verifying key pair for deployment. Should be
-    a subcommand of `philharmonic-api` (e.g.
-    `philharmonic-api gen-signing-key --output-dir /etc/philharmonic/keys/`)
-    so it's available on the deployment target without the
-    dev workspace.
+17. ~~**Ed25519 keypair generation**~~ **Resolved 2026-04-30.**
+    All three bins: `gen-signing-key -o <dir>`.
 
-18. **Realm KEM keypair generation**: Same — should be a
-    subcommand of `philharmonic-connector` (e.g.
-    `philharmonic-connector gen-realm-key --realm <id>
-    --output-dir /etc/philharmonic/keys/`) since the connector
-    is the service that holds realm private keys.
+18. ~~**Realm KEM keypair generation**~~ **Resolved 2026-04-30.**
+    All three bins: `gen-realm-key -r <realm> -o <dir>`.
 
-19. **SCK generation**: Should be a subcommand of
-    `philharmonic-api` (e.g. `philharmonic-api gen-sck
-    --output /etc/philharmonic/sck.key`) since the API server
-    is the one that uses the SCK for endpoint-config encryption.
+19. ~~**SCK generation**~~ **Resolved 2026-04-30.**
+    All three bins: `gen-sck -o <dir>`.
 
-20. **Example TOML configs**: The `deploy/*.toml` files are
+20. ~~**Example TOML configs**~~ **Resolved 2026-04-30.** The
+    `deploy/*.toml` files now have all fields documented. Was:
     minimal. A more complete example showing signing key paths,
     verifying key entries, realm public keys, and SCK config
     would help first-time deployment.

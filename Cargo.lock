@@ -3806,9 +3806,11 @@ version = "0.1.1"
 dependencies = [
  "axum",
  "clap",
+ "ed25519-dalek",
  "mechanics",
  "mechanics-config",
  "mechanics-core",
+ "ml-kem",
  "philharmonic-api",
  "philharmonic-connector-client",
  "philharmonic-connector-common",
@@ -3829,10 +3831,13 @@ dependencies = [
  "philharmonic-store-sqlx-mysql",
  "philharmonic-types",
  "philharmonic-workflow",
+ "rand_core 0.6.4",
  "rust-embed",
  "serde",
  "tokio",
  "toml",
+ "x25519-dalek",
+ "zeroize",
 ]
 
 [[package]]

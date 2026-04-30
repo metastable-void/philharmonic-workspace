@@ -56,6 +56,9 @@ async fn run(cli: Cli) -> Result<(), String> {
             default_config_content: DEFAULT_CONFIG.to_string(),
             args,
         }),
+        BaseCommand::GenSigningKey(args) => philharmonic::server::keygen::gen_signing_key(&args),
+        BaseCommand::GenSck(args) => philharmonic::server::keygen::gen_sck(&args),
+        BaseCommand::GenRealmKey(args) => philharmonic::server::keygen::gen_realm_key(&args),
     }
 }
 
