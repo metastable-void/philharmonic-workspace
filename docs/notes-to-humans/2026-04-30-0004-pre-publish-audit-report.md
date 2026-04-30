@@ -17,8 +17,8 @@ files, security/crypto paths
 
 | # | Finding | Location | Action |
 |---|---|---|---|
-| H1 | `philharmonic-workflow` depends on `philharmonic-policy = "0.1"` but policy is at 0.2.0 | `philharmonic-workflow/Cargo.toml` | Bump to `"0.2"`. Publishing will fail without this. |
-| H2 | `philharmonic-connector-router` missing publishing metadata (`description`, `license`, `repository`, `readme`) | `philharmonic-connector-router/Cargo.toml` | Add fields. Publishing blocker. |
+| H1 | ~~`philharmonic-workflow` depends on `philharmonic-policy = "0.1"`~~ | `philharmonic-workflow/Cargo.toml` | **RESOLVED 2026-04-30.** Bumped to `"0.2"`. |
+| H2 | ~~`philharmonic-connector-router` missing publishing metadata~~ | `philharmonic-connector-router/Cargo.toml` | **FALSE POSITIVE.** All fields (`description`, `license`, `repository`, `readme`) already present. |
 | H3 | Docker deploy configs have hardcoded passwords (`philharmonic`) | `docker-compose.yml`, `deploy/api.toml` | Acceptable for dev/example configs — add comments warning these are examples. |
 | H4 | Design doc 10 (API layer) still says "Not yet implemented" | `docs/design/10-api-layer.md` ~L538 | Update to reflect Phase 8 completion (published 0.1.0, 2026-04-28). |
 
@@ -61,9 +61,8 @@ files, security/crypto paths
 
 ## Publishing blockers (must fix before `cargo publish`)
 
-1. **H1**: `philharmonic-workflow` dep on `philharmonic-policy = "0.1"`
-   → bump to `"0.2"`.
-2. **H2**: `philharmonic-connector-router` missing Cargo.toml metadata.
+1. ~~**H1**: `philharmonic-workflow` dep on `philharmonic-policy = "0.1"`~~ — **DONE** (bumped to `"0.2"` 2026-04-30).
+2. ~~**H2**: `philharmonic-connector-router` missing metadata~~ — **FALSE POSITIVE** (all fields present).
 3. Three unshipped connector impls (`llm-anthropic`, `llm-gemini`,
    `email-smtp`) need 0.0.0 placeholder publishes before the
    meta-crate can publish (optional deps must resolve on crates.io).

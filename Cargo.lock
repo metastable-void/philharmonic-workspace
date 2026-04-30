@@ -3818,7 +3818,7 @@ dependencies = [
  "philharmonic-connector-impl-vector-search",
  "philharmonic-connector-router",
  "philharmonic-connector-service",
- "philharmonic-policy 0.2.0",
+ "philharmonic-policy",
  "philharmonic-store",
  "philharmonic-store-sqlx-mysql",
  "philharmonic-types",
@@ -3853,7 +3853,7 @@ dependencies = [
  "philharmonic-connector-impl-api",
  "philharmonic-connector-impl-vector-search",
  "philharmonic-connector-service",
- "philharmonic-policy 0.2.0",
+ "philharmonic-policy",
  "philharmonic-store",
  "philharmonic-store-sqlx-mysql",
  "philharmonic-types",
@@ -4079,25 +4079,6 @@ dependencies = [
 
 [[package]]
 name = "philharmonic-policy"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "32f4ecc98969c8df133b270c2102afbd9af10e38fca3bf6fe14dbb04d61c8c35"
-dependencies = [
- "aes-gcm",
- "base64 0.22.1",
- "philharmonic-store",
- "philharmonic-types",
- "rand 0.10.1",
- "serde",
- "serde_json",
- "sha2 0.11.0",
- "thiserror 2.0.18",
- "uuid",
- "zeroize",
-]
-
-[[package]]
-name = "philharmonic-policy"
 version = "0.2.0"
 dependencies = [
  "aes-gcm",
@@ -4168,7 +4149,7 @@ name = "philharmonic-workflow"
 version = "0.1.0"
 dependencies = [
  "async-trait",
- "philharmonic-policy 0.1.0",
+ "philharmonic-policy",
  "philharmonic-store",
  "philharmonic-store-sqlx-mysql",
  "philharmonic-types",
