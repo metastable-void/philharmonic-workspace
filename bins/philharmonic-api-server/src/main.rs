@@ -280,6 +280,15 @@ fn build_config_lowerer(config: &ApiConfig) -> Result<Arc<dyn ConfigLowerer>, St
 
     if !(has_path && has_kid && has_realm_keys) {
         eprintln!("philharmonic-api: lowerer not fully configured, using stub lowerer");
+        if !has_path {
+            eprintln!("  missing: lowerer_signing_key_path");
+        }
+        if !has_kid {
+            eprintln!("  missing: lowerer_signing_key_kid");
+        }
+        if !has_realm_keys {
+            eprintln!("  missing: [[realm_public_keys]] (need at least one entry)");
+        }
         return Ok(Arc::new(StubLowerer));
     }
 
