@@ -131,7 +131,7 @@ fi
 # --shortstat appends a blank line then a stat summary line after
 # each formatted entry. The awk below merges them.
 
-git -C "${target:-.}" log -n "$count" --date=iso-strict \
+TZ=Asia/Tokyo git -C "${target:-.}" log -n "$count" --date=iso-strict \
   --pretty=tformat:'%h%x09%ad%x09%G?%x09%(trailers:key=Signed-off-by,valueonly=true,separator=%x1f)%x09%ae%x09%an <%ae>%x09%(trailers:key=Audit-Info,valueonly=true,separator=%x1f)' \
   --shortstat \
   | awk -F '\t' \

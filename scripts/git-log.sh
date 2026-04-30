@@ -191,7 +191,7 @@ if [ -n "$target" ]; then
     fi
 fi
 
-git -C "${target:-.}" log -n "$count" --date=short \
+TZ=Asia/Tokyo git -C "${target:-.}" log -n "$count" --date=short \
   --pretty=tformat:'%h%x09%ad%x09%G?%x09%(trailers:key=Signed-off-by,valueonly=true,separator=%x1f)%x09%ae%x09%an <%ae>%x09%s' \
   | awk -F '\t' \
         -v ok="$C_OK" -v warn="$C_WARN" -v err="$C_ERR" \

@@ -102,7 +102,7 @@ done
     exit 1
 }
 
-timestamp=$(date +%Y-%m-%d-%H-%M-%S)
+timestamp=$(TZ=Asia/Tokyo date +%Y-%m-%d-%H-%M-%S)
 report_path="$reports_dir/$timestamp.md"
 
 if [ -e "$report_path" ]; then
