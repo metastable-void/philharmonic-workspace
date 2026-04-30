@@ -3511,6 +3511,7 @@ dependencies = [
  "axum",
  "clap",
  "hex",
+ "http",
  "hyper-util",
  "mechanics",
  "mechanics-config",
@@ -3541,6 +3542,7 @@ dependencies = [
  "tokio",
  "tokio-rustls",
  "toml",
+ "tower",
  "x25519-dalek",
  "zeroize",
 ]

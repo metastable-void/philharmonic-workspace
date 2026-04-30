@@ -1723,9 +1723,15 @@ step execution, audit log.
      dispatch. Six shipped impls feature-gated. Key
      registries hot-reloadable via SIGHUP. Error envelope
      maps `ImplementationError` variants to HTTP status.
-   - `philharmonic-api` — most complex (store wiring, SCK,
-     signing keys, WebUI embedding, embedded connector
-     router).
+   - ✅ `philharmonic-api` (landed 2026-04-30, without WebUI):
+     MySQL store via `SinglePool::connect` (no direct sqlx
+     dep), `ApiSigningKey` + `ApiVerifyingKeyRegistry`,
+     optional SCK, embedded connector router at `/connector/`,
+     `HeaderBasedScopeResolver` (placeholder),
+     `StubExecutor`/`StubLowerer`, configurable rate limit
+     overrides, dynamic router via `Arc<RwLock<Router>>` +
+     `tower::oneshot` for SIGHUP hot-swap. WebUI embedding
+     deferred to task 5.
 
 5. **WebUI**:
    - Redux + React + Webpack build.
