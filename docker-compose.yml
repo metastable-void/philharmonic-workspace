@@ -1,9 +1,20 @@
 # Build the binaries before running docker compose:
 #   ./scripts/musl-build.sh --release
+#
+# WARNING: This file uses placeholder credentials for local
+# development only. Before any production or internet-facing
+# deployment, you MUST:
+#   1. Change MYSQL_ROOT_PASSWORD (and the matching healthcheck
+#      and deploy/api.toml database_url password).
+#   2. Change the bearer tokens in deploy/mechanics.toml.
+#   3. Generate real signing keys, SCK, and realm keypairs.
+#   4. Use docker-compose.override.yml for TLS certs.
+# Never deploy with the defaults below.
 services:
   mysql:
     image: mysql:8
     environment:
+      # CHANGE THIS before any non-local deployment.
       MYSQL_ROOT_PASSWORD: philharmonic
       MYSQL_DATABASE: philharmonic
     volumes:
