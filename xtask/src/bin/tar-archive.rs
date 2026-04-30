@@ -96,10 +96,7 @@ fn run(args: Args) -> anyhow::Result<()> {
     Ok(())
 }
 
-fn append_files<W: Write>(
-    archive: &mut tar::Builder<W>,
-    files: &[PathBuf],
-) -> anyhow::Result<()> {
+fn append_files<W: Write>(archive: &mut tar::Builder<W>, files: &[PathBuf]) -> anyhow::Result<()> {
     for path in files {
         let name = path.file_name().unwrap().to_string_lossy();
         archive.append_path_with_name(path, name.as_ref())?;
