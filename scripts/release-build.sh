@@ -38,9 +38,9 @@ while [ $# -gt 0 ]; do
                 exit 2
             fi
             case "$2" in
-                mechanics-worker)       bin_args="$bin_args -p mechanics-worker" ;;
-                philharmonic-connector) bin_args="$bin_args -p philharmonic-connector-bin" ;;
-                philharmonic-api)       bin_args="$bin_args -p philharmonic-api-server" ;;
+                mechanics-worker)       bin_args="$bin_args mechanics-worker" ;;
+                philharmonic-connector) bin_args="$bin_args philharmonic-connector-bin" ;;
+                philharmonic-api)       bin_args="$bin_args philharmonic-api-server" ;;
                 *) printf '%sunknown bin: %s%s\n' "$C_ERR" "$2" "$C_RESET" >&2; exit 2 ;;
             esac
             shift 2
@@ -78,14 +78,20 @@ if ! command -v x86_64-linux-musl-gcc >/dev/null 2>&1; then
 fi
 
 if [ -z "$bin_args" ]; then
-    bin_args="-p mechanics-worker -p philharmonic-connector-bin -p philharmonic-api-server"
+    bin_args="mechanics-worker philharmonic-connector-bin philharmonic-api-server"
 fi
 
 printf '%s=== release build (musl) ===%s\n' "$C_HEADER" "$C_RESET"
 printf '%s    target: %s%s\n' "$C_NOTE" "$TARGET" "$C_RESET"
 
-# shellcheck disable=SC2086
-cargo build --release --target "$TARGET" $bin_args
+# Build each bin SEPARATELY so Cargo doesn't unify features
+# across crates. Building together causes philharmonic-connector-bin's
+# default features (connector-embed with 2.28 GB model weights) to
+# bleed into the other bins via the shared philharmonic dependency.
+for pkg in $bin_args; do
+    printf '%s    building %s ...%s\n' "$C_NOTE" "$pkg" "$C_RESET"
+    cargo build --release --target "$TARGET" -p "$pkg"
+done
 
 out_dir="$CARGO_TARGET_DIR/$TARGET/release"
 printf '\n%s=== release build complete ===%s\n' "$C_OK" "$C_RESET"
