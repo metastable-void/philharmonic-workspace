@@ -1,5 +1,5 @@
 # Build the binaries before running docker compose:
-#   ./scripts/musl-build.sh --release
+#   ./scripts/release-build.sh
 #
 # WARNING: This file uses placeholder credentials for local
 # development only. Before any production or internet-facing

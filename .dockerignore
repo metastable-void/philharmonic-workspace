@@ -1,11 +1,11 @@
 *
 !Dockerfile
-!target-main/
-!target-main/x86_64-unknown-linux-musl/
-!target-main/x86_64-unknown-linux-musl/release/
-!target-main/x86_64-unknown-linux-musl/release/mechanics-worker
-!target-main/x86_64-unknown-linux-musl/release/philharmonic-connector
-!target-main/x86_64-unknown-linux-musl/release/philharmonic-api
+!target-release/
+!target-release/x86_64-unknown-linux-musl/
+!target-release/x86_64-unknown-linux-musl/release/
+!target-release/x86_64-unknown-linux-musl/release/mechanics-worker
+!target-release/x86_64-unknown-linux-musl/release/philharmonic-connector
+!target-release/x86_64-unknown-linux-musl/release/philharmonic-api
 !deploy/
 !deploy/api.toml
 !deploy/connector.toml

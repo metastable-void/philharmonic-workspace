@@ -17,11 +17,7 @@ fn main() -> ExitCode {
 
     let mut rows: Vec<(String, Vec<usize>)> = Vec::new();
     for (lang_type, lang) in &langs {
-        let mut lines: Vec<usize> = lang
-            .reports
-            .iter()
-            .map(|r| r.stats.lines())
-            .collect();
+        let mut lines: Vec<usize> = lang.reports.iter().map(|r| r.stats.lines()).collect();
         if lines.is_empty() {
             continue;
         }
@@ -80,9 +76,13 @@ fn stddev(vals: &[usize], avg: f64) -> f64 {
     if vals.len() < 2 {
         return 0.0;
     }
-    let variance = vals.iter().map(|&v| {
-        let d = v as f64 - avg;
-        d * d
-    }).sum::<f64>() / (vals.len() - 1) as f64;
+    let variance = vals
+        .iter()
+        .map(|&v| {
+            let d = v as f64 - avg;
+            d * d
+        })
+        .sum::<f64>()
+        / (vals.len() - 1) as f64;
     variance.sqrt()
 }

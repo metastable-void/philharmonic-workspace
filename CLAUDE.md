@@ -114,7 +114,11 @@ full in `CONTRIBUTING.md`. Read the full section before acting
   midnight; a stale timestamp is the failure mode. The host's
   timezone and your training-data cutoff are both unreliable;
   this bin's output is authoritative for deadline reasoning
-  on this project, and it's cheap to re-run.
+  on this project, and it's cheap to re-run. **Never pipe
+  the output through `tail` or `head`** — the full output
+  is short (~15 lines) and every line matters (the grid,
+  the holiday list, the timestamp). Clipping it loses
+  context that agents need for correct deadline reasoning.
 - **Work rhythm: never refuse on time, but note out-of-hours
   sessions as commentary.** Regular hours are 10:00–19:00 JST
   Mon–Fri; extended is fine up to 21:00; nights, weekends

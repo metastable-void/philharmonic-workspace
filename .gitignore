@@ -9,6 +9,7 @@ target/
 target-xtask/
 target-publish/
 target-main/
+target-release/
 **/*.rs.bk
 *.swp
 *.swo

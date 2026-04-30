@@ -1,25 +1,21 @@
 #!/bin/sh
-# scripts/musl-build.sh — build statically-linked musl binaries
-# (DEBUG profile) for all (or selected) bin targets in the
-# philharmonic meta-crate.
-#
-# This is for debugging and quick verification only. For release
-# builds use ./scripts/release-build.sh instead.
+# scripts/release-build.sh — build release-optimised statically-linked
+# musl binaries for the philharmonic meta-crate's bin targets.
 #
 # Usage:
-#   ./scripts/musl-build.sh                          # all bins
-#   ./scripts/musl-build.sh --bin mechanics-worker   # one bin
+#   ./scripts/release-build.sh                      # all bins
+#   ./scripts/release-build.sh --bin mechanics-worker
+#   ./scripts/release-build.sh --bin philharmonic-api --bin philharmonic-connector
+#
+# This is a thin wrapper around `cargo build --release --target
+# x86_64-unknown-linux-musl -p philharmonic`. The .cargo/config.toml
+# already sets the linker + CC for the musl target.
 #
 # Prerequisites:
 #   - rustup target x86_64-unknown-linux-musl (setup.sh adds it)
 #   - musl-tools (Debian/Ubuntu: apt install musl-tools)
-#     Provides x86_64-linux-musl-gcc, needed by aws-lc-rs's
-#     vendored C compilation via cc-rs.
 #
-# The .cargo/config.toml already sets the linker and CC env var
-# for the musl target, so no manual env overrides are needed.
-#
-# Output lands in target-main/x86_64-unknown-linux-musl/debug/.
+# Output: target-release/x86_64-unknown-linux-musl/release/
 #
 # POSIX sh — see CONTRIBUTING.md §6.
 
@@ -27,7 +23,9 @@ set -eu
 
 . "$(dirname -- "$0")/lib/colors.sh"
 . "$(dirname -- "$0")/lib/workspace-cd.sh"
-. "$(dirname -- "$0")/lib/cargo-target-dir.sh"
+
+CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-target-release}"
+export CARGO_TARGET_DIR
 
 TARGET="x86_64-unknown-linux-musl"
 bin_args=""
@@ -46,18 +44,18 @@ while [ $# -gt 0 ]; do
             cat <<EOF
 Usage: $0 [--bin <name>]...
 
-Build debug musl binaries for the philharmonic meta-crate.
-For release builds use ./scripts/release-build.sh instead.
+Build release-optimised, statically-linked musl binaries for
+the philharmonic meta-crate.
 
 Options:
-  --bin <name>    Build only the named binary (repeatable)
-                  Known bins: mechanics-worker, philharmonic-connector,
-                  philharmonic-api
+  --bin <name>    Build only the named binary (repeatable).
+                  Known bins: mechanics-worker,
+                  philharmonic-connector, philharmonic-api
 
 Without --bin, all three bins are built.
 
 Prerequisites:
-  apt install musl-tools   (provides x86_64-linux-musl-gcc)
+  apt install musl-tools
   rustup target add x86_64-unknown-linux-musl
 EOF
             exit 0
@@ -69,26 +67,24 @@ EOF
     esac
 done
 
-# Guard: musl-gcc must be available
 if ! command -v x86_64-linux-musl-gcc >/dev/null 2>&1; then
     printf '%s!!! x86_64-linux-musl-gcc not found.%s\n' "$C_ERR" "$C_RESET" >&2
     printf '    Install musl-tools: apt install musl-tools\n' >&2
     exit 1
 fi
 
-# Default: all three bins
 if [ -z "$bin_args" ]; then
     bin_args="--bin mechanics-worker --bin philharmonic-connector --bin philharmonic-api"
 fi
 
-printf '%s=== musl build (debug) ===%s\n' "$C_HEADER" "$C_RESET"
+printf '%s=== release build (musl) ===%s\n' "$C_HEADER" "$C_RESET"
 printf '%s    target: %s%s\n' "$C_NOTE" "$TARGET" "$C_RESET"
 
 # shellcheck disable=SC2086
-cargo build --target "$TARGET" -p philharmonic $bin_args
+cargo build --release --target "$TARGET" -p philharmonic $bin_args
 
-out_dir="$CARGO_TARGET_DIR/$TARGET/debug"
-printf '\n%s=== musl build complete ===%s\n' "$C_OK" "$C_RESET"
+out_dir="$CARGO_TARGET_DIR/$TARGET/release"
+printf '\n%s=== release build complete ===%s\n' "$C_OK" "$C_RESET"
 printf '    Output: %s/\n' "$out_dir"
 
 for bin in mechanics-worker philharmonic-connector philharmonic-api; do
