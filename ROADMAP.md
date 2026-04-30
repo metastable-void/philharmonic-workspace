@@ -1733,11 +1733,15 @@ step execution, audit log.
      `tower::oneshot` for SIGHUP hot-swap. WebUI embedding
      deferred to task 5.
 
-5. **WebUI**:
-   - Redux + React + Webpack build.
-   - Committed artifacts, embedded by `philharmonic-api` bin.
-   - Minimum: login, workflow-template CRUD, instance
-     lifecycle, step execution, audit log.
+5. ✅ **WebUI** (landed 2026-04-30):
+   React 19 + Redux Toolkit + TypeScript + Webpack 5. 8 pages
+   (Login, Dashboard, Templates, Template Detail, Instances,
+   Instance Detail, Audit Log, Tenant Settings), cursor
+   pagination, JSON viewer, auth via `pht_` token in
+   sessionStorage. 274K JS + 6.1K CSS + source maps committed
+   in `philharmonic/webui/dist/`. Build via
+   `./scripts/webui-build.sh --production`. Not yet embedded
+   in the API binary (follow-up).
 
 6. **End-to-end integration test suite**:
    - `testcontainers` for MySQL.
