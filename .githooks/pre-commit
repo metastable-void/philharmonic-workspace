@@ -15,6 +15,50 @@ elif [ -f "scripts/lib/codex-guard.sh" ]; then
 fi
 unset _hook_guard
 
+# Block commits that stage files likely to contain secrets.
+# .env.example and similar documentation files are allowed.
+_sensitive_found=0
+git diff --cached --name-only --diff-filter=ACR | while IFS= read -r f; do
+    _base=$(basename "$f")
+    case "$_base" in
+        .env|.env.local|.env.production|.env.staging|.env.development)
+            printf '!!! Blocked: staged file "%s" likely contains secrets.\n' "$f" >&2
+            printf '    Use .env.example for committed templates.\n' >&2
+            exit 10
+            ;;
+        *.pem|*.key|*.p12|*.pfx|*.jks|*.keystore)
+            printf '!!! Blocked: staged file "%s" looks like key material.\n' "$f" >&2
+            printf '    Key files must not be committed to the repository.\n' >&2
+            exit 10
+            ;;
+        credentials.json|service-account*.json|*-credentials.json)
+            printf '!!! Blocked: staged file "%s" looks like credentials.\n' "$f" >&2
+            exit 10
+            ;;
+        id_rsa|id_ed25519|id_ecdsa|*.ppk)
+            printf '!!! Blocked: staged file "%s" is an SSH private key.\n' "$f" >&2
+            exit 10
+            ;;
+    esac
+done
+# The while-pipe runs in a subshell; capture its exit status.
+# On POSIX sh, `set -e` doesn't propagate from the subshell,
+# so we re-check with a second pass if the pipe succeeded.
+git diff --cached --name-only --diff-filter=ACR | while IFS= read -r f; do
+    _base=$(basename "$f")
+    case "$_base" in
+        .env|.env.local|.env.production|.env.staging|.env.development|\
+        *.pem|*.key|*.p12|*.pfx|*.jks|*.keystore|\
+        credentials.json|service-account*.json|*-credentials.json|\
+        id_rsa|id_ed25519|id_ecdsa|*.ppk)
+            exit 10
+            ;;
+    esac
+done || {
+    printf 'Commit aborted: sensitive file detected in staging area.\n' >&2
+    exit 1
+}
+
 THRESHOLD=$((20 * 1024 * 1024))  # 20 MiB
 changed=0
 git diff --cached --name-only --diff-filter=A | while IFS= read -r f; do
