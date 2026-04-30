@@ -212,6 +212,10 @@ Already published with substantive content:
 - A MySQL-family database (MySQL 8, MariaDB 10.5+, or TiDB) for
   running storage backend tests. Containerized setups via Docker
   or Podman work well.
+- For static musl builds: `musl-tools` (Debian/Ubuntu:
+  `apt install musl-tools`). Provides `x86_64-linux-musl-gcc`
+  needed by the vendored C in aws-lc-rs. Build with
+  `./scripts/musl-build.sh [--release]`.
 
 ## Supported development environments
 

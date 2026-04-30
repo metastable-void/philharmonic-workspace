@@ -116,6 +116,9 @@ if command -v cargo >/dev/null 2>&1 && command -v rustc >/dev/null 2>&1; then
     ok "Rust toolchain found"
     printf '  rustc: %s\n' "$rustc_version"
     printf '  cargo: %s\n' "$cargo_version"
+
+    ok "Installing cargo-audit"
+    cargo install cargo-audit
 else
     warn "Rust toolchain not found on PATH."
     warn "Install rustup from https://rustup.rs/ and ensure"
@@ -150,6 +153,10 @@ if command -v rustup >/dev/null 2>&1; then
     if [ "$_arch" = "x86_64" ] && [ "$_os" = "Linux" ]; then
         ok "Adding x86_64-unknown-linux-musl target"
         rustup target add x86_64-unknown-linux-musl
+        if ! command -v x86_64-linux-musl-gcc >/dev/null 2>&1; then
+            warn "x86_64-linux-musl-gcc not found."
+            warn "Install musl-tools for static builds: apt install musl-tools"
+        fi
     fi
     unset _arch _os
 else
