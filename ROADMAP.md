@@ -1755,7 +1755,7 @@ step execution, audit log.
      instance-scoped token; client executes steps with it;
      subject identity appears in step records.
 
-7. **Real `ConfigLowerer` implementation**:
+7. ✅ **Real `ConfigLowerer` implementation** (landed 2026-04-30):
    Replace `StubLowerer` with a real implementation that
    wraps `philharmonic-connector-client`. Takes abstract
    endpoint config + request, mints a COSE_Sign1 authorization
@@ -1765,7 +1765,7 @@ step execution, audit log.
    — triggers the crypto-review-protocol skill (Gate-1
    approach + Gate-2 code review).
 
-8. **Real `StepExecutor` implementation**:
+8. ✅ **Real `StepExecutor` implementation** (landed 2026-04-30):
    Replace `StubExecutor` with a real implementation that
    sends the lowered payload to upstream services via HTTP:
    - JS execution steps → `mechanics` worker

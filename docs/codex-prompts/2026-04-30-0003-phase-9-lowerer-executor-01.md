@@ -147,7 +147,22 @@ executor). Fall back to stubs when config fields are missing
 
 ## Outcome
 
-Pending — will be updated after Codex run.
+Completed. Codex adapted to the actual `StepExecutor` trait
+signature (`execute(&self, script, arg, config)` — the older
+three-arg shape, not the four-arg instance/subject shape
+assumed in the prompt). Trusted the library code as instructed.
+
+Files created: `lowerer.rs` (169 lines), `executor.rs` (85
+lines). Modified: `config.rs` (lowerer/executor config
+fields), `main.rs` (real/stub wiring with fallback).
+`Cargo.toml` gained `coset`, `rand_core`, `reqwest`.
+
+Used `philharmonic::types::Sha256::of` instead of adding
+`sha2` directly. Used `rand_core::OsRng` (not `rand::rngs::`)
+matching `encrypt_payload`'s `CryptoRngCore` bound.
+
+Build, clippy, version all pass. No commits by Codex.
+Committed as philharmonic `6c85fae`, parent `471b3ee`.
 
 ---
 
