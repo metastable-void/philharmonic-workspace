@@ -3,7 +3,8 @@
 # musl binaries for the philharmonic meta-crate's bin targets.
 #
 # Usage:
-#   ./scripts/release-build.sh                      # all bins
+#   ./scripts/release-build.sh                      # all bins, gzip archive
+#   ./scripts/release-build.sh --zstd               # all bins, zstd archive
 #   ./scripts/release-build.sh --bin mechanics-worker
 #   ./scripts/release-build.sh --bin philharmonic-api --bin philharmonic-connector
 #
@@ -29,6 +30,7 @@ export CARGO_TARGET_DIR
 
 TARGET="x86_64-unknown-linux-musl"
 bin_args=""
+archive_comp="gzip"
 
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -45,9 +47,17 @@ while [ $# -gt 0 ]; do
             esac
             shift 2
             ;;
+        --zstd)
+            archive_comp="zstd"
+            shift
+            ;;
+        --gzip)
+            archive_comp="gzip"
+            shift
+            ;;
         --help|-h)
             cat <<EOF
-Usage: $0 [--bin <name>]...
+Usage: $0 [--bin <name>]... [--gzip|--zstd]
 
 Build release-optimised, statically-linked musl binaries.
 
@@ -55,6 +65,9 @@ Options:
   --bin <name>    Build only the named binary (repeatable).
                   Known bins: mechanics-worker,
                   philharmonic-connector, philharmonic-api
+  --gzip          Archive with gzip (default).
+  --zstd          Archive with zstd (parallel, faster on
+                  large binaries like the 2.2 GB connector).
 
 Without --bin, all three bins are built.
 
@@ -106,31 +119,29 @@ for bin in mechanics-worker philharmonic-connector philharmonic-api; do
     fi
 done
 
-# Archive the built binaries into a gzip-compressed tarball.
-# gzip is a deviation from strict POSIX (SUSv4 specifies
-# `compress`, not `gzip`), but gzip is more widely available
-# on real systems than `compress -m gzip`. Fall back to
-# `compress -m gzip` if gzip is absent.
+# Archive the built binaries using the in-tree Rust archiver
+# (xtask tar-archive). Supports --gzip (default) and --zstd.
+# The Rust archiver uses parallel zstd via zstdmt when --zstd
+# is selected, which is significantly faster than single-
+# threaded gzip on the 2.2 GB connector binary.
 if [ -n "$bins_found" ]; then
     short_hash=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
-    archive_name="philharmonic-${short_hash}.tar.gz"
 
-    if command -v gzip >/dev/null 2>&1; then
-        gz_cmd="gzip"
-    elif compress -m gzip </dev/null >/dev/null 2>&1; then
-        gz_cmd="compress -m gzip"
-    else
-        printf '%s!!! neither gzip nor compress -m gzip found; skipping archive%s\n' \
-            "$C_WARN" "$C_RESET" >&2
-        bins_found=""
-    fi
+    case "$archive_comp" in
+        gzip) archive_name="philharmonic-${short_hash}.tar.gz"; comp_flag="--gzip" ;;
+        zstd) archive_name="philharmonic-${short_hash}.tar.zst"; comp_flag="--zstd" ;;
+        *)    printf '%s!!! unknown archive_comp: %s%s\n' "$C_ERR" "$archive_comp" "$C_RESET" >&2; exit 2 ;;
+    esac
 
-    if [ -n "$bins_found" ]; then
-        # shellcheck disable=SC2086
-        (cd "$out_dir" && tar cf - -- $bins_found | $gz_cmd > "$archive_name")
-        archive_path=$(cd "$out_dir" && pwd -P)/"$archive_name"
-        archive_size=$(ls -lh "$archive_path" | awk '{print $5}')
-        printf '\n%s=== archive ===%s\n' "$C_HEADER" "$C_RESET"
-        printf '    %s (%s)\n' "$archive_path" "$archive_size"
-    fi
+    archive_path="$out_dir/$archive_name"
+
+    # Build file-path arguments from the found bins.
+    file_args=""
+    for bin in $bins_found; do
+        file_args="$file_args $out_dir/$bin"
+    done
+
+    printf '\n%s=== archive (%s) ===%s\n' "$C_HEADER" "$archive_comp" "$C_RESET"
+    # shellcheck disable=SC2086
+    ./scripts/xtask.sh tar-archive -- -o "$archive_path" $comp_flag $file_args
 fi
