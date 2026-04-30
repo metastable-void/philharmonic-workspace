@@ -1755,47 +1755,78 @@ step execution, audit log.
      instance-scoped token; client executes steps with it;
      subject identity appears in step records.
 
-7. **`install` subcommand** (can slip past 5/2):
-   - Per-bin: copies binary to `/usr/local/bin/`, writes
-     systemd unit, creates config dirs, `systemctl enable`.
-   - Idempotent. Prints setup instructions at the end.
+7. **Real `ConfigLowerer` implementation**:
+   Replace `StubLowerer` with a real implementation that
+   wraps `philharmonic-connector-client`. Takes abstract
+   endpoint config + request, mints a COSE_Sign1 authorization
+   token, encrypts the payload via COSE_Encrypt0 with the
+   realm's public KEM key, and produces the wire-format
+   payload for the connector service. **Touches crypto paths**
+   — triggers the crypto-review-protocol skill (Gate-1
+   approach + Gate-2 code review).
 
-8. **musl target build** (can slip past 5/2):
-   - Verify `x86_64-unknown-linux-musl` for all three bins.
-     This is a standard rustup target, not a hard cross-compile
-     — the crate family is pure Rust + vendored C (aws-lc-rs
-     via `cc`), no system libraries, no OpenSSL. Should work
-     with `rustup target add x86_64-unknown-linux-musl` +
-     `cargo build --target x86_64-unknown-linux-musl`.
-   - CI target.
+8. **Real `StepExecutor` implementation**:
+   Replace `StubExecutor` with a real implementation that
+   sends the lowered payload to upstream services via HTTP:
+   - JS execution steps → `mechanics` worker
+   - Connector steps → `philharmonic-connector` service
+     (via the embedded connector router or direct)
+   Uses `reqwest` + `rustls-tls` per §10.9. Needs the
+   worker/connector bind addresses from config.
 
-9. **Reference deployment** on the developer's infrastructure
-   (can slip past 5/2):
-   - Deploy the three binaries to on-prem or IaaS.
-   - TLS certificates for the chosen URL shape.
-   - Realm KEM keypairs, SCK, signing keys deployed.
-   - At least one tenant provisioned (the developer).
-   - At least one workflow exercised end-to-end with real
-     traffic (LLM-driven flow preferred — stresses ephemeral
-     tokens, instance-scope, per-step decryption).
+   Tasks 7–8 are blocking for any workflow to actually
+   execute steps end-to-end. The e2e tests (task 6) can
+   exercise CRUD and auth without them, but the "execute
+   step → terminal state" flow requires real executor +
+   lowerer.
 
-10. **Docker compose** (optional, post-5/2):
+9. **`install` subcommand** (can slip past 5/2):
+    - Per-bin: copies binary to `/usr/local/bin/`, writes
+      systemd unit, creates config dirs, `systemctl enable`.
+    - Idempotent. Prints setup instructions at the end.
+
+10. **musl target build** (can slip past 5/2):
+    - Verify `x86_64-unknown-linux-musl` for all three bins.
+      This is a standard rustup target, not a hard cross-compile
+      — the crate family is pure Rust + vendored C (aws-lc-rs
+      via `cc`), no system libraries, no OpenSSL. Should work
+      with `rustup target add x86_64-unknown-linux-musl` +
+      `cargo build --target x86_64-unknown-linux-musl`.
+    - CI target.
+
+11. **Reference deployment** on the developer's infrastructure
+    (can slip past 5/2):
+    - Deploy the three binaries to on-prem or IaaS.
+    - TLS certificates for the chosen URL shape.
+    - Realm KEM keypairs, SCK, signing keys deployed.
+    - At least one tenant provisioned (the developer).
+    - At least one workflow exercised end-to-end with real
+      traffic (LLM-driven flow preferred — stresses ephemeral
+      tokens, instance-scope, per-step decryption).
+    - **Requires tasks 7–8** (real lowerer + executor) for
+      any workflow to run real steps.
+
+12. **Docker compose** (optional, post-5/2):
     - Minimal Alpine images, no `install` subcommand inside
       containers.
     - Local override files for HTTPS certs, hostnames.
 
-11. **Documentation reconciliation**:
+13. **Documentation reconciliation**:
     - Update design docs where implementation diverged.
     - Pass through docs 01, 08, 09, 10, 11, 15 at minimum.
     - Resolve "still open" items in doc 14 that were settled.
 
 **Cut order for 5/2** (must → should → can-slip):
 
-- **Must**: tasks 1–3 (meta-crate + mechanics HTTPS + shared
-  infra), task 4 (at least one bin), task 6 (e2e happy path).
-- **Should**: task 4 (all three bins), task 5 (WebUI skeleton).
-- **Can slip**: tasks 7–10 (install, musl, deployment, Docker).
-- **Always last**: task 11 (doc reconciliation after code
+- **Done**: tasks 1–5 (meta-crate, mechanics HTTPS, shared
+  infra, all three bins, WebUI + embedding).
+- **Must**: task 6 (e2e happy path — CRUD + auth, without
+  real step execution).
+- **Should**: tasks 7–8 (real lowerer + executor — needed
+  for any workflow to run real steps).
+- **Can slip**: tasks 9–12 (install, musl, deployment,
+  Docker).
+- **Always last**: task 13 (doc reconciliation after code
   settles).
 
 **Acceptance criteria**:
