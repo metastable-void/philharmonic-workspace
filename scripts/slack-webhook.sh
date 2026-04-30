@@ -31,7 +31,7 @@ echo >> "$tmp"
 if [ -z "${OPENAI_API_KEY:-}" ]; then
 	echo "(OPENAI_API_KEY not set; skipping LLM summary)" >> "$tmp"
 else
-	mk_prompt | ./scripts/xtask.sh openai-chat -- --model gpt-5.5 --system-prompt 'Write a single-paragraph summary of the progress on the project repo in plaintext Japanese (no Markdown).' | grep -v '^[[:space:]]*$' >> "$tmp"
+	mk_prompt | ./scripts/xtask.sh openai-chat -- --model gpt-5.5 --system-prompt 'Write a single-paragraph summary of the progress on the project repo in plaintext Japanese (no Markdown). Focus on recent changes, no "published on GitHub/crates.io" wording, no OSS/FLOSS/etc. wording, to avoid confusions by decision makers.' | grep -v '^[[:space:]]*$' >> "$tmp"
 fi
 
 if [ -z "${SLACK_WEBHOOK_URL:-}" ]; then
