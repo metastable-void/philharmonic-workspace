@@ -3,16 +3,41 @@
 # This is an EXAMPLE. Copy to /etc/philharmonic/api.toml and
 # customise before deploying. CHANGE all credentials and key
 # paths. Drop-in overrides go in /etc/philharmonic/api.toml.d/.
+#
+# IMPORTANT: TOML scoping rule — bare keys (key = "value")
+# must appear BEFORE any [table] header. A bare key placed
+# after [connector_dispatch.prod] becomes a child of that
+# table and is invisible at the top level.
 
 bind = "0.0.0.0:3000"
 database_url = "mysql://philharmonic:CHANGE_ME@localhost/philharmonic"
 issuer = "philharmonic"
 
 # --- API signing key (Ed25519, for ephemeral API tokens) ---
-# Generate: philharmonic-api gen-signing-key (planned)
-# For now: 32 random bytes written to a file.
+# Generate: philharmonic-api gen-signing-key -o /etc/philharmonic/keys/
 signing_key_path = "/etc/philharmonic/keys/api-signing.key"
 signing_key_kid = "api-2026-05"
+
+# --- SCK (substrate confidentiality key, for endpoint-config encryption) ---
+# 32 random bytes. Generate: philharmonic-api gen-sck -o /etc/philharmonic/keys/
+# sck_path = "/etc/philharmonic/keys/sck.key"
+# sck_key_version = 1
+
+# --- Lowerer (connector payload encryption) ---
+# If configured, the API server can lower workflow configs
+# through the real COSE_Sign1 + COSE_Encrypt0 pipeline.
+# Generate: philharmonic-api gen-signing-key -o /etc/philharmonic/keys/
+# lowerer_signing_key_path = "/etc/philharmonic/keys/lowerer-signing.key"
+# lowerer_signing_key_kid = "lowerer-2026-05"
+# lowerer_issuer = "philharmonic"     # defaults to issuer above
+# lowerer_token_lifetime_ms = 600000  # 10 minutes
+
+# --- Executor (connector service dispatch) ---
+# URL of the connector service for step execution.
+# connector_service_url = "http://127.0.0.1:3002"
+
+# --- Connector router domain suffix ---
+# connector_domain_suffix = "connector.example.com"
 
 # --- API verifying keys (for token verification) ---
 # Each entry verifies tokens signed by a known key.
@@ -23,20 +48,8 @@ issuer = "philharmonic"
 # not_before = 0        # Unix millis, default 0 (always valid)
 # not_after = 9999999999999  # default far future
 
-# --- SCK (substrate confidentiality key, for endpoint-config encryption) ---
-# 32 random bytes. Generate: dd if=/dev/urandom bs=32 count=1 > sck.key
-# sck_path = "/etc/philharmonic/keys/sck.key"
-# sck_key_version = 1
-
-# --- Lowerer (connector payload encryption) ---
-# If configured, the API server can lower workflow configs
-# through the real COSE_Sign1 + COSE_Encrypt0 pipeline.
-# lowerer_signing_key_path = "/etc/philharmonic/keys/lowerer-signing.key"
-# lowerer_signing_key_kid = "lowerer-2026-05"
-# lowerer_issuer = "philharmonic"     # defaults to issuer above
-# lowerer_token_lifetime_ms = 600000  # 10 minutes
-
 # --- Realm public keys (for lowerer payload encryption) ---
+# Generate: philharmonic-connector gen-realm-key -r prod -o /etc/philharmonic/keys/
 # [[realm_public_keys]]
 # kid = "realm-prod-2026-05"
 # realm_id = "prod"
@@ -45,8 +58,6 @@ issuer = "philharmonic"
 
 # --- Connector dispatch (embedded router) ---
 # Maps realm IDs to upstream connector-service URLs.
-# connector_domain_suffix = "connector.example.com"
-# connector_service_url = "http://127.0.0.1:3002"
 # [connector_dispatch.prod]
 # upstreams = ["http://connector-prod:3002"]
 
