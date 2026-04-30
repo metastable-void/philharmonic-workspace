@@ -1,0 +1,19 @@
+# Copy this file to docker-compose.override.yml and adjust local paths.
+services:
+  api:
+    volumes:
+      - ./local/certs/api/fullchain.pem:/etc/philharmonic/tls/api.crt:ro
+      - ./local/certs/api/privkey.pem:/etc/philharmonic/tls/api.key:ro
+      - ./local/config/api-https.toml:/etc/philharmonic/api.toml.d/https.toml:ro
+
+  connector:
+    volumes:
+      - ./local/certs/connector/fullchain.pem:/etc/philharmonic/tls/connector.crt:ro
+      - ./local/certs/connector/privkey.pem:/etc/philharmonic/tls/connector.key:ro
+      - ./local/config/connector-https.toml:/etc/philharmonic/connector.toml.d/https.toml:ro
+
+  mechanics-worker:
+    volumes:
+      - ./local/certs/mechanics/fullchain.pem:/etc/philharmonic/tls/mechanics.crt:ro
+      - ./local/certs/mechanics/privkey.pem:/etc/philharmonic/tls/mechanics.key:ro
+      - ./local/config/mechanics-https.toml:/etc/philharmonic/mechanics.toml.d/https.toml:ro

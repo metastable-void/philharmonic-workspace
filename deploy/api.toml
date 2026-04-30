@@ -1,0 +1,3 @@
+bind = "0.0.0.0:3000"
+database_url = "mysql://root:philharmonic@mysql/philharmonic"
+issuer = "philharmonic"

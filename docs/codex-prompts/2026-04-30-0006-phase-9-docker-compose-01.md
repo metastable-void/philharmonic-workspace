@@ -141,7 +141,15 @@ Prevent copying the entire workspace into the build context.
 
 ## Outcome
 
-Pending — will be updated after Codex run.
+Completed. Created 7 files: `Dockerfile` (Alpine 3.21 +
+BINARY arg), `docker-compose.yml` (4 services: mysql,
+mechanics-worker, connector, api), `.dockerignore`,
+`docker-compose.override.yml.example` (HTTPS certs),
+`deploy/{api,connector,mechanics}.toml` example configs.
+`docker compose config` validates cleanly.
+
+Committed as parent `(pending)`. Did NOT run
+`docker compose up` (no musl release binaries built yet).
 
 ---
 

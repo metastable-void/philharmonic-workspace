@@ -1810,7 +1810,7 @@ step execution, audit log.
     - **Requires tasks 7–8** (real lowerer + executor) for
       any workflow to run real steps.
 
-12. **Docker compose** (optional, post-5/2):
+12. ✅ **Docker compose** (landed 2026-04-30):
     - Minimal Alpine images, no `install` subcommand inside
       containers.
     - Local override files for HTTPS certs, hostnames.

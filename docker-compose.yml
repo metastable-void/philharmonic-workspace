@@ -1,0 +1,55 @@
+# Build the binaries before running docker compose:
+#   ./scripts/musl-build.sh --release
+services:
+  mysql:
+    image: mysql:8
+    environment:
+      MYSQL_ROOT_PASSWORD: philharmonic
+      MYSQL_DATABASE: philharmonic
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-pphilharmonic"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  mechanics-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        BINARY: mechanics-worker
+    ports:
+      - "3001:3001"
+    volumes:
+      - ./deploy/mechanics.toml:/etc/philharmonic/mechanics.toml:ro
+
+  connector:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        BINARY: philharmonic-connector
+    ports:
+      - "3002:3002"
+    volumes:
+      - ./deploy/connector.toml:/etc/philharmonic/connector.toml:ro
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        BINARY: philharmonic-api
+    ports:
+      - "3000:3000"
+      - "443:443"
+    depends_on:
+      mysql:
+        condition: service_healthy
+    volumes:
+      - ./deploy/api.toml:/etc/philharmonic/api.toml:ro
+
+volumes:
+  mysql-data:
