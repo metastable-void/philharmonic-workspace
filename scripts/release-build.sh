@@ -37,15 +37,19 @@ while [ $# -gt 0 ]; do
                 printf '%s!!! --bin requires a value%s\n' "$C_ERR" "$C_RESET" >&2
                 exit 2
             fi
-            bin_args="$bin_args --bin $2"
+            case "$2" in
+                mechanics-worker)       bin_args="$bin_args -p mechanics-worker" ;;
+                philharmonic-connector) bin_args="$bin_args -p philharmonic-connector-bin" ;;
+                philharmonic-api)       bin_args="$bin_args -p philharmonic-api-server" ;;
+                *) printf '%sunknown bin: %s%s\n' "$C_ERR" "$2" "$C_RESET" >&2; exit 2 ;;
+            esac
             shift 2
             ;;
         --help|-h)
             cat <<EOF
 Usage: $0 [--bin <name>]...
 
-Build release-optimised, statically-linked musl binaries for
-the philharmonic meta-crate.
+Build release-optimised, statically-linked musl binaries.
 
 Options:
   --bin <name>    Build only the named binary (repeatable).
@@ -74,14 +78,14 @@ if ! command -v x86_64-linux-musl-gcc >/dev/null 2>&1; then
 fi
 
 if [ -z "$bin_args" ]; then
-    bin_args="--bin mechanics-worker --bin philharmonic-connector --bin philharmonic-api"
+    bin_args="-p mechanics-worker -p philharmonic-connector-bin -p philharmonic-api-server"
 fi
 
 printf '%s=== release build (musl) ===%s\n' "$C_HEADER" "$C_RESET"
 printf '%s    target: %s%s\n' "$C_NOTE" "$TARGET" "$C_RESET"
 
 # shellcheck disable=SC2086
-cargo build --release --target "$TARGET" -p philharmonic $bin_args
+cargo build --release --target "$TARGET" $bin_args
 
 out_dir="$CARGO_TARGET_DIR/$TARGET/release"
 printf '\n%s=== release build complete ===%s\n' "$C_OK" "$C_RESET"
