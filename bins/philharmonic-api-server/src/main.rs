@@ -35,7 +35,6 @@ mod executor;
 mod lowerer;
 mod scope;
 mod security_headers;
-mod webui;
 
 use config::ApiConfig;
 use executor::HttpStepExecutor;
@@ -455,7 +454,7 @@ async fn dispatch_dynamic(
         };
     }
 
-    webui::webui_fallback(request).await
+    philharmonic::webui::webui_fallback(request).await
 }
 
 async fn start_server(app: Router, config: &ApiConfig) -> Result<&'static str, String> {

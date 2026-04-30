@@ -108,6 +108,14 @@ is still running will silently kill it or produce broken
 state from incomplete output. This has caused repeated
 incidents.
 
+**When cargo appears stuck** (no output for minutes),
+run `./scripts/build-status.sh` — it shows which crates
+are being compiled/linked/tested, with PIDs and elapsed
+times. Use `watch -n 2 ./scripts/build-status.sh` for
+continuous monitoring. Reference it in Codex prompts to
+prevent false "build is stuck" aborts.
+([§5.1](CONTRIBUTING.md#51-build-status-monitoring))
+
 ## Executive summary of the rules you'll trip over most
 
 Every item here is the short form of something documented in

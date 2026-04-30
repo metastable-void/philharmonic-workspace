@@ -641,7 +641,26 @@ need one — `cargo tree`, `cargo metadata`, `cargo --version`,
 the new wrapper — don't fall back to raw cargo because the
 wrapper doesn't exist yet.
 
-### 5.1 Crate version lookup
+### 5.1 Build status monitoring
+
+When a cargo build, test, or clippy run appears stuck (no
+output for minutes), run `./scripts/build-status.sh` to see
+what's actually happening. It scans running processes for
+`rustc`, `rust-lld`, `clippy-driver`, `miri`, `rustfmt`, and
+`rustdoc`, and reports which crate each is processing, with
+PIDs and elapsed times.
+
+```sh
+./scripts/build-status.sh              # one-shot snapshot
+watch -n 2 ./scripts/build-status.sh   # continuous polling
+```
+
+Long silences are normal for large crates (LTO, bge-m3 model
+embedding, aws-lc-rs C compilation). `build-status.sh`
+distinguishes "still compiling" from "actually stuck" so agents
+don't abort builds prematurely.
+
+### 5.2 Crate version lookup
 
 **Rule: never recall a crate's published version from memory.**
 Every question about "what's on crates.io for crate X?" is
@@ -693,7 +712,7 @@ matches the question. Neither answer should come from memory.
 Applies to agents and humans equally. Humans forget versions
 too, and the wrapper costs the same for either.
 
-### 5.2 Extract routines into scripts
+### 5.3 Extract routines into scripts
 
 When you find yourself running the same command or command
 sequence more than once or twice — especially multi-line
@@ -725,7 +744,7 @@ tasks and doesn't typically make extraction decisions — but if
 Codex notices a pattern in its prompts that warrants a script,
 flag it in the final summary so Claude can extract.
 
-### 5.3 Crate-version cooldown
+### 5.4 Crate-version cooldown
 
 The workspace's [`/.cargo/config.toml`](.cargo/config.toml)
 points the resolver at a **3-day cooldown mirror** —

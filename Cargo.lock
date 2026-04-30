@@ -3802,8 +3802,9 @@ dependencies = [
 
 [[package]]
 name = "philharmonic"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
+ "axum",
  "clap",
  "mechanics",
  "mechanics-config",
@@ -3822,12 +3823,13 @@ dependencies = [
  "philharmonic-connector-impl-sql-postgres",
  "philharmonic-connector-impl-vector-search",
  "philharmonic-connector-router",
- "philharmonic-connector-service 0.2.0",
+ "philharmonic-connector-service",
  "philharmonic-policy",
  "philharmonic-store",
  "philharmonic-store-sqlx-mysql",
  "philharmonic-types",
  "philharmonic-workflow",
+ "rust-embed",
  "serde",
  "tokio",
  "toml",
@@ -3835,7 +3837,7 @@ dependencies = [
 
 [[package]]
 name = "philharmonic-api"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "async-trait",
  "axum",
@@ -3849,7 +3851,7 @@ dependencies = [
  "philharmonic-connector-common",
  "philharmonic-connector-impl-api",
  "philharmonic-connector-impl-vector-search",
- "philharmonic-connector-service 0.1.0",
+ "philharmonic-connector-service",
  "philharmonic-policy",
  "philharmonic-store",
  "philharmonic-store-sqlx-mysql",
@@ -3888,7 +3890,6 @@ dependencies = [
  "philharmonic",
  "rand_core 0.6.4",
  "reqwest",
- "rust-embed",
  "serde",
  "serde_json",
  "tokio",
@@ -4090,30 +4091,6 @@ dependencies = [
  "thiserror 2.0.18",
  "tokio",
  "tower",
-]
-
-[[package]]
-name = "philharmonic-connector-service"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4389e0a80efdf5ca34baca2af7e5831d317f9a43dcd1f61bc8710b2cc4a86aed"
-dependencies = [
- "aes-gcm",
- "ciborium",
- "coset",
- "ed25519-dalek",
- "hkdf 0.13.0",
- "ml-kem",
- "philharmonic-connector-common",
- "philharmonic-types",
- "secrecy",
- "serde",
- "serde_json",
- "sha2 0.11.0",
- "subtle",
- "thiserror 2.0.18",
- "x25519-dalek",
- "zeroize",
 ]
 
 [[package]]
@@ -4433,7 +4410,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "27c6023962132f4b30eb4c172c91ce92d933da334c59c23cddee82358ddafb0b"
 dependencies = [
  "anyhow",
- "itertools 0.14.0",
+ "itertools 0.11.0",
  "proc-macro2",
  "quote",
  "syn 2.0.117",

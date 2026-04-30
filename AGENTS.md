@@ -291,6 +291,12 @@ runs match CI. Raw `cargo <subcommand>` drifts.
   — individual phases.
 - `./scripts/miri-test.sh <crate>` / `--workspace` — routine UB
   checks. Not in pre-landing (too slow).
+- `./scripts/build-status.sh` — shows what `rustc`/`rust-lld`/
+  `clippy`/`miri` are currently processing. Use when cargo
+  appears stuck (no output for minutes). Long silences are
+  normal for large crates — this distinguishes "still compiling"
+  from "actually stuck." See
+  [`CONTRIBUTING.md §5.1`](CONTRIBUTING.md#51-build-status-monitoring).
 - `./scripts/cargo-audit.sh`,
   `./scripts/check-api-breakage.sh <crate> [<version>]` —
   pre-release checks.

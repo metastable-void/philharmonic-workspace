@@ -22,9 +22,11 @@
 # Usage:
 #   ./scripts/show-dirty.sh
 #
-# Output: one member path per line. Empty output if nothing is
-# dirty. Always exits 0 (the absence of dirty members isn't a
-# failure).
+# Output: one crate name per line (extracted from Cargo.toml,
+# not the filesystem path — so `bins/philharmonic-api-server`
+# emits `philharmonic-api-server`, compatible with `cargo -p`).
+# Empty output if nothing is dirty. Always exits 0 (the absence
+# of dirty members isn't a failure).
 #
 # Does not report the parent's own file-level dirtiness (docs,
 # scripts, workspace-Cargo.toml edits) — use `status.sh` for that
@@ -36,6 +38,19 @@
 set -eu
 . "$(dirname -- "$0")/lib/workspace-cd.sh"
 . "$(dirname -- "$0")/lib/workspace-members.sh"
+
+# Extract the crate name from a member's Cargo.toml.
+# Falls back to the directory basename if parsing fails.
+crate_name() {
+    if [ -f "$1/Cargo.toml" ]; then
+        _cn=$(sed -n 's/^name *= *"\([^"]*\)"/\1/p' "$1/Cargo.toml" | head -1)
+        if [ -n "$_cn" ]; then
+            echo "$_cn"
+            return
+        fi
+    fi
+    basename "$1"
+}
 
 # Buffer via `$()` so SIGPIPE from a truncating consumer
 # (`./scripts/show-dirty.sh | head -3`) doesn't abort the walk
@@ -50,14 +65,14 @@ output=$(
                     || ! git diff --cached --quiet \
                     || [ -n "$(git ls-files --others --exclude-standard)" ]
             ); then
-                echo "$member"
+                crate_name "$member"
             fi
         else
             # In-tree: parent repo sees file-level changes directly.
             if ! git diff --quiet -- "$member" \
                 || ! git diff --cached --quiet -- "$member" \
                 || [ -n "$(git ls-files --others --exclude-standard -- "$member")" ]; then
-                echo "$member"
+                crate_name "$member"
             fi
         fi
     done
