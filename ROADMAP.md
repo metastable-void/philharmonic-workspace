@@ -1613,9 +1613,10 @@ for the full integration sketch and open questions.
 
 **Architecture** (per HUMANS.md §Integration):
 
-Three bin targets live inside the `philharmonic` meta-crate
-(`philharmonic/src/bin/`), per HUMANS.md §Integration
-(confirmed 2026-04-29). Each is an HTTP server with an
+Three bin targets live in separate in-tree crates under
+`bins/` at the workspace root (split from the meta-crate
+2026-04-30 to isolate the 2.28 GB embed weights).
+Each is an HTTP server with an
 optional `https` Cargo feature (rustls TLS + HTTP/2). SIGHUP
 reloads config and refreshes TLS certs. TOML config at
 `/etc/philharmonic/<name>.toml` with a
@@ -1709,8 +1710,8 @@ step execution, audit log.
    overlay merge), `reload` (`ReloadHandle` with SIGHUP +
    generation counter + `Notify` fan-out). 10 tests.
 
-4. **Binary targets** (three bins in
-   `philharmonic/src/bin/`):
+4. **Binary targets** (three bins in `bins/` at the
+   workspace root, split from meta-crate 2026-04-30):
    - ✅ `mechanics-worker` (landed 2026-04-29): Clap CLI +
      TOML config (with drop-in overlays) + SIGHUP reload
      (token replacement via `replace_tokens`) + optional

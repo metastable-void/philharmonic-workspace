@@ -59,6 +59,10 @@ philharmonic-workspace/
 ├── philharmonic-connector-impl-*/             # submodules (one per impl)
 ├── philharmonic-api/                          # submodule
 ├── philharmonic/                              # submodule
+├── bins/                                      # in-tree bin crates
+│   ├── mechanics-worker/                      #   JS executor server
+│   ├── philharmonic-connector/                #   per-realm connector service
+│   └── philharmonic-api-server/               #   API server + WebUI
 └── docs-jp/                                   # submodule (docs only)
 ```
 
@@ -155,21 +159,19 @@ previously (2026-04-24 / 2026-04-27). The unpublished
 phase tiers; until then they have no crates.io presence (no
 0.0.0 placeholders were reserved).
 
-**Phase 9 — Integration** is the current focus (started
-2026-04-29). The `philharmonic` meta-crate gains re-exports
-of every library crate plus three bin targets
-(`philharmonic-api`, `mechanics-worker`,
-`philharmonic-connector`) with optional TLS, SIGHUP config
-reload, TOML config files, and Clap CLI. A Redux + React
-WebUI (committed build artifacts, no Node.js at Rust build
-time) is embedded into the API binary. End-to-end
-testcontainers exercise the full stack. Target: core bins +
-e2e happy path by **Sat 2026-05-02**; reference deployment,
-`install` subcommand, musl cross-compilation, and Docker
-compose can follow. See
-[`ROADMAP.md` §Phase 9](ROADMAP.md#phase-9--integration-and-reference-deployment)
-and the integration sketch at
-[`docs/notes-to-humans/2026-04-29-0001-phase-9-integration-sketch.md`](docs/notes-to-humans/2026-04-29-0001-phase-9-integration-sketch.md).
+**Phase 9 — Integration** is complete (2026-04-29 through
+2026-04-30). Three bin targets live in separate in-tree
+crates under `bins/` (`mechanics-worker` 13 MB,
+`philharmonic-api` 11 MB, `philharmonic-connector` 2.2 GB
+with bundled bge-m3 ONNX model). Each bin is built
+separately to prevent Cargo feature unification from
+bleeding the 2.28 GB embed weights into bins that don't
+need them. The `philharmonic` meta-crate (0.1.1) is a
+library-only re-export crate with a `webui` feature gate
+for embedded static assets. All 25 crates published to
+crates.io; musl static builds, Docker compose, `install`
+subcommand, security audit, and full-pipeline e2e tests
+(COSE_Sign1 + COSE_Encrypt0 round-trip) all landed.
 
 **Phase 7 Tier 1 — done 2026-04-27.** The pivot to pure-Rust
 `tract` + `tokenizers` for `embed` (replacing the round-01
