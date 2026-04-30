@@ -1730,8 +1730,9 @@ step execution, audit log.
      `HeaderBasedScopeResolver` (placeholder),
      `StubExecutor`/`StubLowerer`, configurable rate limit
      overrides, dynamic router via `Arc<RwLock<Router>>` +
-     `tower::oneshot` for SIGHUP hot-swap. WebUI embedding
-     deferred to task 5.
+     `tower::oneshot` for SIGHUP hot-swap. WebUI embedded
+     via `rust-embed` + SPA fallback routing (landed same
+     day after task 5).
 
 5. ✅ **WebUI** (landed 2026-04-30):
    React 19 + Redux Toolkit + TypeScript + Webpack 5. 8 pages
@@ -1740,8 +1741,9 @@ step execution, audit log.
    pagination, JSON viewer, auth via `pht_` token in
    sessionStorage. 274K JS + 6.1K CSS + source maps committed
    in `philharmonic/webui/dist/`. Build via
-   `./scripts/webui-build.sh --production`. Not yet embedded
-   in the API binary (follow-up).
+   `./scripts/webui-build.sh --production`. Embedded in the
+   API binary via `rust-embed` + SPA fallback routing
+   (same day).
 
 6. **End-to-end integration test suite**:
    - `testcontainers` for MySQL.

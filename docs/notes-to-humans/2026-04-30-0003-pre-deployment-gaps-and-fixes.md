@@ -25,12 +25,10 @@ what's still missing for real e2e tests and real deployments.
 
 ### Still open
 
-2. **No WebUI source tree.** `philharmonic/webui/` doesn't
-   exist yet. The API bin serves API endpoints only — no
-   browser interface. The `webui-build.sh` script and the
-   Webpack reproducibility requirements are documented and
-   ready; the React/Redux/Webpack project needs to be
-   scaffolded. Next task.
+2. ~~**No WebUI source tree.**~~ **Resolved 2026-04-30.**
+   WebUI landed: React 19 + Redux Toolkit + TypeScript SPA
+   (8 pages), built via `webui-build.sh`, embedded in the
+   API binary via `rust-embed` + SPA fallback routing.
 
 3. **No e2e testcontainers for the full API stack.** The
    `philharmonic-api` library crate's tests use `MockStore`
