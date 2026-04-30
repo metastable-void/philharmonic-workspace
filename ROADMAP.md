@@ -1745,7 +1745,7 @@ step execution, audit log.
    API binary via `rust-embed` + SPA fallback routing
    (same day).
 
-6. **End-to-end integration test suite**:
+6. ✅ **End-to-end integration test suite** (landed 2026-04-30):
    - `testcontainers` for MySQL.
    - Spawn all three bins (in-process or child processes).
    - Test flows: tenant admin creates endpoint config; creates

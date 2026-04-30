@@ -128,7 +128,21 @@ sqlx = { version = "0.8", features = ["runtime-tokio-rustls", "mysql"] }
 
 ## Outcome
 
-Pending — will be updated after Codex run.
+Completed. 647 lines of real e2e tests in
+`philharmonic-api/tests/e2e_mysql.rs`. Seven test cases:
+`health_and_version`, `workflow_template_crud`,
+`workflow_instance_lifecycle`, `principal_crud`,
+`role_and_membership`, `tenant_settings`,
+`audit_log_records_operations`. All `#[ignore]` +
+`#[serial_test::file_serial(docker)]`. Full auth seeding:
+tenant → principal with `pht_` token + role with all
+permission atoms. Real `SqlStore<SinglePool>` + MySQL
+testcontainer + schema migration. Dev-deps added:
+testcontainers, reqwest, serial_test, sqlx,
+philharmonic-store-sqlx-mysql.
+
+Codex did NOT commit or push. Claude reviewed and committed
+as philharmonic-api `cc45a1d`, parent `53cb708`.
 
 ---
 
