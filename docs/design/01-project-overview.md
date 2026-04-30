@@ -198,4 +198,7 @@ into the crates.
   `llm-gemini`, deferred until on or after 2026-05-07
   post-Golden-Week) follow Phase 8 + Phase 9 prototype per
   the macro sequence.
-- API layer: designed; not yet implemented (Phase 8+).
+- API layer: implemented. Published as `philharmonic-api` 0.1.0
+  (2026-04-28, Phase 8). Real `ConfigLowerer` and `StepExecutor`
+  added in Phase 9 (2026-04-30). Three bin targets, WebUI, e2e
+  tests, Docker compose, and `install` subcommand all landed.

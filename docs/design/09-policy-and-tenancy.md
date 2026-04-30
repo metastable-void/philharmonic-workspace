@@ -762,8 +762,8 @@ impl Entity for AuditEvent {
 
 ## Status
 
-**Not yet implemented.** Design is substantially settled. On
-the v1 critical path: the workflow crate takes `Tenant` as a
-type-level marker, the connector client consults policy to
-produce tokens, and the API layer uses policy data for
-authentication and authorization.
+**Implemented.** Published as `philharmonic-policy` 0.1.0
+(2026-04-22), bumped to 0.2.0 (2026-04-28) for ephemeral API
+token primitives (COSE_Sign1 minting + 14-step verification).
+All seven entity kinds, permission evaluation, SCK encryption,
+`pht_` token format, and audit events are shipped.

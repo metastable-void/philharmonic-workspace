@@ -1,7 +1,7 @@
 # Workflow Orchestration
 
-`philharmonic-workflow` — the orchestration layer. Not yet
-implemented; design is substantially complete. Depends on
+`philharmonic-workflow` — the orchestration layer. Published
+as `philharmonic-workflow` 0.1.0 (2026-04-22). Depends on
 `philharmonic-policy` for the `Tenant` entity marker (workflow
 templates and instances are tenant-scoped).
 
@@ -469,7 +469,7 @@ from earlier drafts:
 - `ConfigLowerer` trait takes subject context (for future
   capability implementations that may consume it).
 
-Implementation not started. Dependent on the connector layer
-design being settled (the `ConfigLowerer` contract has to be
-stable before the workflow implementation can plug in a
-concrete lowerer).
+**Implemented.** Published as `philharmonic-workflow` 0.1.0
+(2026-04-22). Real `ConfigLowerer` (COSE_Sign1 + COSE_Encrypt0)
+and `StepExecutor` (HTTP dispatch) landed in Phase 9
+(2026-04-30) inside the `philharmonic` meta-crate bin targets.
