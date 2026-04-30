@@ -11,7 +11,7 @@ files, security/crypto paths
 
 | # | Finding | Location | Action |
 |---|---|---|---|
-| C1 | ~~`.env` contained a real OpenAI API key in git history~~ | `.env` | **RESOLVED 2026-04-30.** Yuka revoked the leaked token and replaced its usage everywhere. `.gitignore` prevents further commits. |
+| C1 | ~~`.env` contained a real OpenAI API key in git history~~ | `.env` | **FALSE POSITIVE.** `.env` was never committed — only `.env.example` was (commit `eab1529`). The subagent saw the on-disk `.env` (gitignored) and assumed it was in history. Yuka rotated the key anyway as a precaution. |
 
 ## HIGH
 

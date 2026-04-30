@@ -30,12 +30,12 @@ what's still missing for real e2e tests and real deployments.
    (8 pages), built via `webui-build.sh`, embedded in the
    API binary via `rust-embed` + SPA fallback routing.
 
-3. **No e2e testcontainers for the full API stack.** The
-   `philharmonic-api` library crate's tests use `MockStore`
-   (in-memory HashMap). Individual storage crates have their
-   own testcontainers MySQL tests, but no test wires the
-   complete stack: MySQL + API builder + real store + real
-   auth. This is ROADMAP Phase 9 task 6.
+3. ~~**No e2e testcontainers for the full API stack.**~~
+   **Resolved 2026-04-30.** Two e2e test suites landed:
+   `e2e_mysql.rs` (7 tests: CRUD + auth against real MySQL)
+   and `e2e_full_pipeline.rs` (full crypto round-trip: API
+   lowerer → in-process connector service → VectorSearch
+   impl). Both use testcontainers MySQL + `serial_test`.
 
 4. **No Docker images or docker-compose.** No Dockerfile
    for any of the three bins. No orchestration for

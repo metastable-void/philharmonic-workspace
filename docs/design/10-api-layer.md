@@ -539,7 +539,10 @@ deployment shape. Not designed against in v1.
 
 ## Status
 
-**Not yet implemented.** Design is substantially settled. On the
-v1 critical path (the API is the system's main entry point);
-blocks nothing in the infrastructure below but blocks anything
-that consumes the system.
+**Implemented.** Published as `philharmonic-api 0.1.0` on
+crates.io (2026-04-28, Phase 8). All endpoint families landed:
+workflow templates/instances, endpoint configs, principals,
+roles, memberships, minting authorities, token minting, tenant
+admin, audit log, operator endpoints. 86+ integration tests.
+Real `ConfigLowerer` (COSE_Sign1 + COSE_Encrypt0) and
+`StepExecutor` (HTTP dispatch) added in Phase 9 (2026-04-30).
