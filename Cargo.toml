@@ -30,6 +30,9 @@ members = [
     # workspace dev tooling — never published, never consumed by
     # runtime crates. See `xtask/Cargo.toml` for the current home
     # of such tooling.
+    "bins/mechanics-worker",
+    "bins/philharmonic-connector",
+    "bins/philharmonic-api-server",
     "xtask",
 ]
 

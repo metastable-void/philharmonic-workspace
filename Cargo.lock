@@ -3170,6 +3170,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "mechanics-worker"
+version = "0.0.0"
+dependencies = [
+ "clap",
+ "philharmonic",
+ "serde",
+ "tokio",
+ "toml",
+]
+
+[[package]]
 name = "memchr"
 version = "2.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3793,13 +3804,7 @@ dependencies = [
 name = "philharmonic"
 version = "0.1.0"
 dependencies = [
- "async-trait",
- "axum",
  "clap",
- "coset",
- "hex",
- "http",
- "hyper-util",
  "mechanics",
  "mechanics-config",
  "mechanics-core",
@@ -3823,17 +3828,9 @@ dependencies = [
  "philharmonic-store-sqlx-mysql",
  "philharmonic-types",
  "philharmonic-workflow",
- "rand_core 0.6.4",
- "reqwest",
- "rust-embed",
  "serde",
- "serde_json",
  "tokio",
- "tokio-rustls",
  "toml",
- "tower",
- "x25519-dalek",
- "zeroize",
 ]
 
 [[package]]
@@ -3873,6 +3870,48 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "uuid",
+ "x25519-dalek",
+ "zeroize",
+]
+
+[[package]]
+name = "philharmonic-api-server"
+version = "0.0.0"
+dependencies = [
+ "async-trait",
+ "axum",
+ "clap",
+ "coset",
+ "hex",
+ "http",
+ "hyper-util",
+ "philharmonic",
+ "rand_core 0.6.4",
+ "reqwest",
+ "rust-embed",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tokio-rustls",
+ "toml",
+ "tower",
+ "zeroize",
+]
+
+[[package]]
+name = "philharmonic-connector-bin"
+version = "0.0.0"
+dependencies = [
+ "async-trait",
+ "axum",
+ "clap",
+ "hex",
+ "philharmonic",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tokio-rustls",
+ "toml",
  "x25519-dalek",
  "zeroize",
 ]

@@ -1,0 +1,28 @@
+[package]
+name = "philharmonic-connector-bin"
+version = "0.0.0"
+edition = "2024"
+rust-version = "1.88"
+publish = false
+
+[[bin]]
+name = "philharmonic-connector"
+path = "src/main.rs"
+
+[dependencies]
+philharmonic = { path = "../../philharmonic" }
+async-trait = "0.1"
+axum = "0.8"
+clap = { version = "4", features = ["derive"] }
+hex = "0.4"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["full"] }
+tokio-rustls = { version = "0.26", optional = true }
+toml = "0.8"
+x25519-dalek = { version = "2", features = ["static_secrets"] }
+zeroize = { version = "1", features = ["derive"] }
+
+[features]
+default = []
+https = ["philharmonic/https", "dep:tokio-rustls"]

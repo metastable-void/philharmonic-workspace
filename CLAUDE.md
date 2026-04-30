@@ -93,6 +93,21 @@ archival overhead is low and the audit trail is valuable.
 Claude doing substantial coding directly bypasses the
 design-then-implement split that makes history reviewable.
 
+**Never assume Codex finished.** Codex writes files
+mid-run; seeing modified files in the workspace or
+receiving a subagent return does NOT mean the Codex
+process is done. Before touching any file Codex might be
+working on, **verify completion** via both:
+1. `./scripts/codex-logs.sh --no-tool-output | grep
+   'task_complete'` — the event must be present.
+2. Process tree check (`pstree <codex-pid>`) — no child
+   processes (no `bwrap`, `cargo`, `rustfmt`, etc.).
+If neither confirms, **wait**. Running `cargo build`,
+`commit-all.sh`, or editing workspace files while Codex
+is still running will silently kill it or produce broken
+state from incomplete output. This has caused repeated
+incidents.
+
 ## Executive summary of the rules you'll trip over most
 
 Every item here is the short form of something documented in
