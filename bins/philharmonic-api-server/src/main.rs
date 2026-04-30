@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process;
 use std::sync::Arc;
 
@@ -17,13 +17,18 @@ use philharmonic::connector_router::{
     DispatchConfig, HyperForwarder, RouterState, router as connector_router,
 };
 use philharmonic::policy::{
-    ApiSigningKey, ApiVerifyingKeyEntry, ApiVerifyingKeyRegistry, Sck, VerifyingKey,
+    ApiSigningKey, ApiVerifyingKeyEntry, ApiVerifyingKeyRegistry, Principal, PrincipalKind, Sck,
+    Tenant, TenantStatus, TokenHash, VerifyingKey, generate_api_token, validate_subdomain_name,
 };
-use philharmonic::server::cli::{BaseArgs, BaseCommand, resolve_config_paths};
+use philharmonic::server::cli::{BaseArgs, BaseCommand, BootstrapArgs, resolve_config_paths};
 use philharmonic::server::config::{ConfigError, load_config};
 use philharmonic::server::install::{self, InstallPlan};
 use philharmonic::server::reload::ReloadHandle;
+use philharmonic::store::{
+    ContentStore, ContentStoreExt, EntityRefValue, EntityStoreExt, RevisionInput, StoreExt,
+};
 use philharmonic::store_sqlx_mysql::{SinglePool, SqlStore, migrate};
+use philharmonic::types::{CanonicalJson, ContentValue, Entity, JsonValue, ScalarValue, Sha256};
 use philharmonic::workflow::{ConfigLowerer, StepExecutor};
 use tokio::net::TcpListener;
 use tokio::sync::RwLock;
@@ -99,6 +104,7 @@ async fn run(cli: Cli) -> Result<(), String> {
             Ok(())
         }
         BaseCommand::Serve(args) => serve(args).await,
+        BaseCommand::Bootstrap(args) => bootstrap(args).await,
         BaseCommand::Install(args) => install::execute_install(&InstallPlan {
             service_name: "philharmonic-api".to_string(),
             binary_name: "philharmonic-api".to_string(),
@@ -113,12 +119,148 @@ async fn run(cli: Cli) -> Result<(), String> {
     }
 }
 
+async fn bootstrap(args: BootstrapArgs) -> Result<(), String> {
+    let (primary, drop_in) = resolve_bootstrap_config_paths(&args);
+    let config = load_bootstrap_config(&primary, &drop_in, &args)?;
+    validate_subdomain_name(&args.subdomain_name).map_err(|error| error.to_string())?;
+
+    let pool = SinglePool::connect(&config.database_url)
+        .await
+        .map_err(|error| format!("database connection failed: {error}"))?;
+    eprintln!("philharmonic-api: running schema migration");
+    migrate(pool.pool())
+        .await
+        .map_err(|error| format!("schema migration failed: {error}"))?;
+
+    let principal_count = count_principals(&pool).await?;
+    if principal_count > 0 {
+        return Err(
+            "bootstrap: database already has principal entities; refusing to re-bootstrap"
+                .to_string(),
+        );
+    }
+
+    let store = SqlStore::from_pool(pool.pool().clone());
+    let tenant_id = store
+        .create_entity_minting::<Tenant>()
+        .await
+        .map_err(|error| format!("tenant creation failed: {error}"))?;
+    let tenant_display_name =
+        put_json(&store, &JsonValue::String(args.tenant_name.clone())).await?;
+    let tenant_settings = put_json(
+        &store,
+        &serde_json::json!({ "subdomain_name": args.subdomain_name }),
+    )
+    .await?;
+    let tenant_revision = RevisionInput::new()
+        .with_content("display_name", tenant_display_name)
+        .with_content("settings", tenant_settings)
+        .with_scalar("status", ScalarValue::I64(TenantStatus::Active.as_i64()));
+    store
+        .append_revision_typed::<Tenant>(tenant_id, 0, &tenant_revision)
+        .await
+        .map_err(|error| format!("tenant revision append failed: {error}"))?;
+
+    let principal_id = store
+        .create_entity_minting::<Principal>()
+        .await
+        .map_err(|error| format!("principal creation failed: {error}"))?;
+    let (token, token_hash) = generate_api_token();
+    let credential_hash = put_token_hash(&store, token_hash).await?;
+    let principal_display_name =
+        put_json(&store, &JsonValue::String("Bootstrap Operator".to_string())).await?;
+    let principal_revision = RevisionInput::new()
+        .with_content("credential_hash", credential_hash)
+        .with_content("display_name", principal_display_name)
+        .with_entity(
+            "tenant",
+            EntityRefValue::pinned(tenant_id.internal().as_uuid(), 0),
+        )
+        .with_scalar("kind", ScalarValue::I64(PrincipalKind::User.as_i64()))
+        .with_scalar("epoch", ScalarValue::I64(0))
+        .with_scalar("is_retired", ScalarValue::Bool(false));
+    store
+        .append_revision_typed::<Principal>(principal_id, 0, &principal_revision)
+        .await
+        .map_err(|error| format!("principal revision append failed: {error}"))?;
+
+    println!(
+        "Bootstrap complete.\n\nTenant ID: {}\nPrincipal ID: {}\n\nAPI token (save this -- it will not be shown again):\n  {}",
+        tenant_id.public().as_uuid(),
+        principal_id.public().as_uuid(),
+        token.as_str()
+    );
+    Ok(())
+}
+
 fn default_command() -> BaseCommand {
     BaseCommand::Serve(BaseArgs {
         config: None,
         config_dir: None,
         bind: None,
     })
+}
+
+fn resolve_bootstrap_config_paths(args: &BootstrapArgs) -> (PathBuf, PathBuf) {
+    let primary = args
+        .config
+        .clone()
+        .unwrap_or_else(|| PathBuf::from("/etc/philharmonic/api.toml"));
+    let drop_in_dir = args
+        .config_dir
+        .clone()
+        .unwrap_or_else(|| PathBuf::from("/etc/philharmonic/api.toml.d"));
+    (primary, drop_in_dir)
+}
+
+fn load_bootstrap_config(
+    primary: &Path,
+    drop_in: &Path,
+    args: &BootstrapArgs,
+) -> Result<ApiConfig, String> {
+    match load_config::<ApiConfig>(primary, drop_in) {
+        Ok(config) => Ok(config),
+        Err(ConfigError::Io(error))
+            if error.kind() == std::io::ErrorKind::NotFound && args.config.is_none() =>
+        {
+            eprintln!(
+                "philharmonic-api config {} not found; using built-in defaults",
+                primary.display()
+            );
+            Ok(ApiConfig::default())
+        }
+        Err(error) => Err(error.to_string()),
+    }
+}
+
+async fn count_principals(pool: &SinglePool) -> Result<i64, String> {
+    let kind = Principal::KIND.as_bytes();
+    let (count,): (i64,) = sqlx::query_as("SELECT COUNT(*) FROM entity WHERE kind = ?")
+        .bind(kind.as_slice())
+        .fetch_one(pool.pool())
+        .await
+        .map_err(|error| format!("principal existence check failed: {error}"))?;
+    Ok(count)
+}
+
+async fn put_json(store: &SqlStore, value: &JsonValue) -> Result<Sha256, String> {
+    let canonical =
+        CanonicalJson::from_value(value).map_err(|error| format!("invalid JSON: {error}"))?;
+    let hash = store
+        .put_typed(&canonical)
+        .await
+        .map_err(|error| format!("content write failed: {error}"))?;
+    Ok(hash.as_digest())
+}
+
+async fn put_token_hash(store: &SqlStore, token_hash: TokenHash) -> Result<Sha256, String> {
+    let content = ContentValue::new(token_hash.0.to_vec());
+    let hash = content.digest();
+    store
+        .put(&content)
+        .await
+        .map_err(|error| format!("token hash write failed: {error}"))?;
+    Ok(hash)
 }
 
 async fn serve(args: BaseArgs) -> Result<(), String> {

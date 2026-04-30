@@ -119,6 +119,9 @@ async fn run(cli: Cli) -> Result<(), String> {
         BaseCommand::GenSigningKey(args) => philharmonic::server::keygen::gen_signing_key(&args),
         BaseCommand::GenSck(args) => philharmonic::server::keygen::gen_sck(&args),
         BaseCommand::GenRealmKey(args) => philharmonic::server::keygen::gen_realm_key(&args),
+        BaseCommand::Bootstrap(_) => {
+            Err("bootstrap is only supported by philharmonic-api".to_string())
+        }
     }
 }
 
