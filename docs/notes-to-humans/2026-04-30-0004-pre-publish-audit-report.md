@@ -11,7 +11,7 @@ files, security/crypto paths
 
 | # | Finding | Location | Action |
 |---|---|---|---|
-| C1 | `.env` contains a real OpenAI API key in git history | `.env` (gitignored but committed once) | **Rotate the key immediately.** History can't be rewritten (append-only rule). `.gitignore` prevents further commits. |
+| C1 | ~~`.env` contained a real OpenAI API key in git history~~ | `.env` | **RESOLVED 2026-04-30.** Yuka revoked the leaked token and replaced its usage everywhere. `.gitignore` prevents further commits. |
 
 ## HIGH
 
@@ -70,7 +70,7 @@ files, security/crypto paths
 
 ## Recommended before publish but not blocking
 
-- **C1**: Rotate OpenAI key (security, not a publish gate).
+- ~~**C1**: Rotate OpenAI key~~ — **DONE** (revoked + replaced by Yuka 2026-04-30).
 - **M1**: Standardize version constraints.
 - **L1–L2**: README completeness.
 - **H4**: Update design doc 10.
