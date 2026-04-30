@@ -134,7 +134,13 @@ Each bin handles `BaseCommand::Install(args)` by calling
 
 ## Outcome
 
-Pending — will be updated after Codex run.
+Completed. Codex created `server/install.rs` (shared
+`InstallPlan` + `execute_install`) and wired `Install` into
+all three bins. Also added LFS auto-tracking in the
+pre-commit hook for files > 20 MiB. Build passes, `--help`
+shows `install` on all three bins. Not tested with root
+(requires sudo). Committed as philharmonic `6cfb0de`,
+parent `77c10e6`.
 
 ---
 

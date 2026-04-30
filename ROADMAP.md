@@ -1780,7 +1780,7 @@ step execution, audit log.
    step → terminal state" flow requires real executor +
    lowerer.
 
-9. **`install` subcommand** (can slip past 5/2):
+9. ✅ **`install` subcommand** (landed 2026-04-30):
     - Per-bin: copies binary to `/usr/local/bin/`, writes
       systemd unit, creates config dirs, `systemctl enable`.
     - Idempotent. Prints setup instructions at the end.

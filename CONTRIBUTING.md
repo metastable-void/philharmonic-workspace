@@ -964,11 +964,19 @@ xtask/
         ├── calendar-jp.rs        # JST workweek grid + Japanese public
         │                         # holidays; agent-facing
         │                         # deadline-context anchor
-        └── new-submodule.rs      # scaffold a new workspace submodule
-                                  # crate (git submodule add + file
-                                  # templates + Cargo.toml member/patch
-                                  # insert); consumed by
-                                  # scripts/new-submodule.sh
+        ├── new-submodule.rs      # scaffold a new workspace submodule
+        │                         # crate (git submodule add + file
+        │                         # templates + Cargo.toml member/patch
+        │                         # insert); consumed by
+        │                         # scripts/new-submodule.sh
+        ├── encode-json-str.rs    # stdin → JSON string literal
+        ├── hf-fetch-embed-model.rs # fetch ONNX embedding model from
+        │                         # HuggingFace for build-time use
+        ├── system-resources.rs   # print thread count + memory stats
+        ├── web-post.rs           # HTTP POST JSON payload (ureq + rustls)
+        └── tokei-stats.rs        # per-language file-size distribution
+                                  # (N, min, Q1, Q2, Q3, max, avg,
+                                  # stddev) via the tokei library crate
 ```
 
 ### Agent usage of `calendar-jp`

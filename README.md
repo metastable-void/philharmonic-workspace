@@ -769,7 +769,10 @@ are good as-is. HTTP fetching is already a Rust bin
 (`xtask/src/bin/web-fetch.rs`), with `scripts/web-fetch.sh`
 kept as a thin shim for shell callers. See
 [`CONTRIBUTING.md §8`](CONTRIBUTING.md#8-in-tree-workspace-tooling-xtask)
-for the decision table.
+for the decision table. **`tokei` is also a Rust trigger:**
+the workspace uses the `tokei` library crate (not the CLI) in
+`xtask/src/bin/tokei-stats.rs`, so there is no `cargo install
+tokei` step.
 
 Invoke tools via the **`./scripts/xtask.sh`** wrapper — don't
 call `cargo run -p xtask --bin <tool>` directly at call sites.
@@ -856,6 +859,15 @@ Current bins:
   blocks in [`CLAUDE.md`](CLAUDE.md) and
   [`AGENTS.md`](AGENTS.md) plus
   [`CONTRIBUTING.md §8`](CONTRIBUTING.md#8-in-tree-workspace-tooling-xtask).
+- **`tokei-stats`** — per-language file-size distribution
+  statistics. Usage: `./scripts/xtask.sh tokei-stats`. For each
+  language detected in the current directory, prints file count
+  (N), min, Q1, Q2 (median), Q3, max, avg, and stddev of total
+  line counts (code + comments + blanks). Uses the `tokei`
+  library crate directly — no `cargo install tokei` needed.
+  Tokei's default exclusions apply (`target/`, `node_modules/`,
+  etc.). Replaces the former `scripts/tokei.sh` which required
+  installing the tokei CLI globally.
 
 ## AI-assisted development
 
