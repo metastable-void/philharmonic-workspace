@@ -2,6 +2,12 @@
 
 What a first shipping release includes, and what's deferred.
 
+**Phase 9 complete (2026-04-30).** All items in "Core
+infrastructure" and "API + deployment" below are shipped.
+25 crates on crates.io, three bin targets with key generation,
+musl static builds, Docker compose, full-pipeline e2e tests.
+Remaining: Tier 2 SMTP + Tier 3 LLM providers (post-Golden-Week).
+
 ## Core infrastructure
 
 ### Already complete
@@ -504,4 +510,8 @@ largely sequential.
 - Streaming.
 - Hierarchical tenancy.
 - Session + access-token authentication pattern.
-- Arbitrary deployment-operator-chosen URL layouts.
+- ~~Arbitrary deployment-operator-chosen URL layouts.~~
+  Partially in scope: the `RequestScopeResolver` trait lets
+  deployments supply custom scope resolution (subdomain,
+  header, path-based). Arbitrary API path customization
+  (changing `/v1/...` prefixes) is not supported.

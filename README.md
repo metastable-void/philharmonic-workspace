@@ -659,10 +659,20 @@ Invoke by path (`./scripts/foo.sh`), not via `bash`.
   committed to Git; no Node.js is needed to build the Rust
   crate.
 
-- `./scripts/musl-build.sh [--release] [--bin <name>]` — build
-  statically-linked musl binaries for all (or selected) bin
-  targets. Requires `musl-tools` (`apt install musl-tools`).
-  Output in `target-main/x86_64-unknown-linux-musl/{debug,release}/`.
+- `./scripts/musl-build.sh [--bin <name>]` — build debug musl
+  binaries. For release builds use `release-build.sh`.
+- `./scripts/release-build.sh [--bin <name>]` — build release-
+  optimised statically-linked musl binaries and archive them
+  into `philharmonic-<hash>.tar.gz`. Requires `musl-tools`.
+  Builds each bin separately to prevent Cargo feature
+  unification (connector's 2.28 GB embed weights stay isolated).
+- `./scripts/build-status.sh` — show what `rustc`/`rust-lld`/
+  `clippy`/`miri` are currently processing. Use when cargo
+  appears stuck. `watch -n 2 ./scripts/build-status.sh` for
+  continuous monitoring.
+- `./scripts/audit-log.sh [-n <count>] [--no-color] [<submodule>]`
+  — pretty-print the commit audit trail (`Audit-Info:` trailers)
+  with signature status, sign-off, and diffstat.
 - `./scripts/new-submodule.sh --name <N> --remote-url <URL>
   [--description <D>] [--before <M>] [--skip-workspace-member]
   [--adopt-existing] [--dry-run]` — scaffold a new submodule

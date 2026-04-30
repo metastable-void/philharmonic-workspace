@@ -1172,6 +1172,14 @@ deployment binds them to URLs.
 - Implementations bundled into each realm's service binary at
   build time. No runtime plug-ins.
 
+**Phase 9 reference shape (2026-04-30):** the connector router
+is embedded directly in the `philharmonic-api` binary via
+`extra_routes`, and each realm's connector service runs as a
+separate `philharmonic-connector` process. This collapses the
+router into the API server for single-machine deployments
+while keeping per-realm service isolation. Multi-machine
+topologies still deploy separate routers.
+
 Typical realm layout: `llm`, `sql`, `http`, `email`, `vector`,
 or combined into fewer realms as operationally convenient.
 Each realm has its own KEM keypair; realm granularity is a
