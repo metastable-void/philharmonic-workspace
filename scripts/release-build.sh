@@ -97,9 +97,40 @@ out_dir="$CARGO_TARGET_DIR/$TARGET/release"
 printf '\n%s=== release build complete ===%s\n' "$C_OK" "$C_RESET"
 printf '    Output: %s/\n' "$out_dir"
 
+bins_found=""
 for bin in mechanics-worker philharmonic-connector philharmonic-api; do
     if [ -f "$out_dir/$bin" ]; then
         size=$(ls -lh "$out_dir/$bin" | awk '{print $5}')
         printf '    %s (%s)\n' "$bin" "$size"
+        bins_found="$bins_found $bin"
     fi
 done
+
+# Archive the built binaries into a gzip-compressed tarball.
+# gzip is a deviation from strict POSIX (SUSv4 specifies
+# `compress`, not `gzip`), but gzip is more widely available
+# on real systems than `compress -m gzip`. Fall back to
+# `compress -m gzip` if gzip is absent.
+if [ -n "$bins_found" ]; then
+    short_hash=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
+    archive_name="philharmonic-${short_hash}.tar.gz"
+
+    if command -v gzip >/dev/null 2>&1; then
+        gz_cmd="gzip"
+    elif compress -m gzip </dev/null >/dev/null 2>&1; then
+        gz_cmd="compress -m gzip"
+    else
+        printf '%s!!! neither gzip nor compress -m gzip found; skipping archive%s\n' \
+            "$C_WARN" "$C_RESET" >&2
+        bins_found=""
+    fi
+
+    if [ -n "$bins_found" ]; then
+        # shellcheck disable=SC2086
+        (cd "$out_dir" && tar cf - -- $bins_found | $gz_cmd > "$archive_name")
+        archive_path=$(cd "$out_dir" && pwd -P)/"$archive_name"
+        archive_size=$(ls -lh "$archive_path" | awk '{print $5}')
+        printf '\n%s=== archive ===%s\n' "$C_HEADER" "$C_RESET"
+        printf '    %s (%s)\n' "$archive_path" "$archive_size"
+    fi
+fi

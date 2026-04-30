@@ -881,6 +881,12 @@ introduced:
   and matches what the user expects to see for process-memory
   summaries. Kept for output fidelity.
 
+- **`gzip`** (`scripts/release-build.sh`). SUSv4 specifies
+  `compress`, not `gzip`. However `gzip` is more widely
+  available on real GNU/Linux, macOS, and BSD systems than
+  `compress -m gzip` (which many systems lack). The script
+  falls back to `compress -m gzip` if `gzip` is absent.
+
 ### 6.4 Noteworthy field choices (within POSIX)
 
 - **`ps -o time=`, not `pcpu=`** (`scripts/codex-status.sh`).
