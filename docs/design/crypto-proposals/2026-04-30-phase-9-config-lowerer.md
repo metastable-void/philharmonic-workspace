@@ -2,7 +2,7 @@
 
 **Date**: 2026-04-30
 **Author**: Claude Code
-**Status**: Awaiting Yuka's Gate-1 approval
+**Status**: Gate-1 APPROVED by Yuka (2026-04-30, inline)
 
 ---
 
@@ -60,7 +60,7 @@ pub struct ConnectorConfigLowerer {
     signing_key: LowererSigningKey,
     realm_keys: HashMap<String, RealmPublicKey>,
     issuer: String,
-    token_lifetime_ms: u64,  // default 60_000 (1 min)
+    token_lifetime_ms: u64,  // default 600_000 (10 min)
 }
 ```
 
@@ -175,27 +175,21 @@ The API bin's `ApiConfig` gains:
 - `realm_public_keys: Vec<RealmPublicKeyConfig>` — kid, realm,
   mlkem public key path, x25519 public key path, validity
   window.
-- `lowerer_token_lifetime_ms: u64` — default 60_000.
+- `lowerer_token_lifetime_ms: u64` — default 600_000 (10 min).
 
-## Open questions for Yuka
+## Decisions (resolved 2026-04-30)
 
-1. **Should the lowerer signing key be the same as the API
-   signing key?** They're both Ed25519 seeds, but serve
-   different purposes (API auth vs. connector auth). Using
-   the same key simplifies deployment but couples the two
-   auth domains.
+1. **Lowerer signing key**: left to deployment — may be the
+   same or separate from the API signing key. Config accepts
+   an independent path/kid.
 
-2. **Token lifetime**: 60 seconds seems reasonable for a
-   per-step ephemeral token. Too short → clock-skew failures;
-   too long → replay window. Is 60s acceptable?
+2. **Token lifetime**: **600 seconds (10 minutes)**, not 60.
+   Yuka's rationale: dependencies on HTTP requests often block
+   longer than expected; 60s is too tight. 600s gives
+   comfortable margin for slow upstream connectors without
+   opening an unreasonable replay window.
 
-3. **Is this Gate-1 sufficient given no new crypto?** The
-   lowerer is purely a caller of existing Gate-2-approved
-   library functions. If you consider this low enough risk to
-   skip Gate-1, say so and I'll proceed directly to
-   implementation.
-
----
-
-**Waiting for Yuka's approval before proceeding to
-implementation.**
+3. **Gate-1 sufficiency**: Yuka approved inline — "trivial
+   since it's calling existing Gate-2-approved functions, no
+   new crypto." Full Gate-1 proposal + approval recorded here
+   for the audit trail; implementation proceeds immediately.
