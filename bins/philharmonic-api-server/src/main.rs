@@ -357,7 +357,9 @@ fn build_runtime(config: &ApiConfig, state: &LongLivedState) -> Result<Runtime, 
     let store = SqlStore::new(state.pool.clone());
 
     let mut builder = PhilharmonicApiBuilder::new()
-        .request_scope_resolver(Arc::new(HeaderBasedScopeResolver))
+        .request_scope_resolver(Arc::new(HeaderBasedScopeResolver::new(
+            state.pool.pool().clone(),
+        )))
         .store(Arc::new(store))
         .api_verifying_key_registry(registry)
         .api_signing_key(state.signing_key.clone())

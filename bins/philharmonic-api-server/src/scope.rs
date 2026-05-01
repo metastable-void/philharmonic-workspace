@@ -1,9 +1,24 @@
+//! Header-based request scope resolver with store-backed public ID lookup.
+
 use philharmonic::api::{RequestScope, RequestScopeResolver, ResolverError};
-use philharmonic::types::{Identity, Uuid};
+use philharmonic::store::IdentityStore;
+use philharmonic::store_sqlx_mysql::SqlStore;
+use philharmonic::types::Uuid;
+use sqlx::MySqlPool;
 
 const TENANT_ID_HEADER: &str = "x-tenant-id";
 
-pub(crate) struct HeaderBasedScopeResolver;
+pub(crate) struct HeaderBasedScopeResolver {
+    store: SqlStore,
+}
+
+impl HeaderBasedScopeResolver {
+    pub(crate) fn new(pool: MySqlPool) -> Self {
+        Self {
+            store: SqlStore::from_pool(pool),
+        }
+    }
+}
 
 #[async_trait::async_trait]
 impl RequestScopeResolver for HeaderBasedScopeResolver {
@@ -12,21 +27,16 @@ impl RequestScopeResolver for HeaderBasedScopeResolver {
             return Ok(RequestScope::Operator);
         };
         let value = value.to_str().map_err(|_| ResolverError::Unscoped)?;
-        let internal = Uuid::parse_str(value.trim()).map_err(|_| ResolverError::Unscoped)?;
-        let identity = Identity {
-            internal,
-            public: synthetic_public_uuid(internal),
-        };
+        let public_uuid = Uuid::parse_str(value.trim()).map_err(|_| ResolverError::Unscoped)?;
+        let identity = self
+            .store
+            .resolve_public(public_uuid)
+            .await
+            .map_err(|error| ResolverError::Internal(error.to_string()))?
+            .ok_or(ResolverError::Unscoped)?;
         let tenant = identity
             .typed()
             .map_err(|error| ResolverError::Internal(error.to_string()))?;
         Ok(RequestScope::Tenant(tenant))
     }
-}
-
-fn synthetic_public_uuid(internal: Uuid) -> Uuid {
-    let mut bytes = *internal.as_bytes();
-    bytes[6] = (bytes[6] & 0x0f) | 0x40;
-    bytes[8] = (bytes[8] & 0x3f) | 0x80;
-    Uuid::from_bytes(bytes)
 }
