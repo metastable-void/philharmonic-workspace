@@ -167,8 +167,6 @@ impl ConfigLowerer for ConnectorConfigLowerer {
             endpoints.insert(name.clone(), endpoint_config);
         }
 
-        let mechanics_config = json!({ "endpoints": endpoints });
-
         let realm = self
             .realm_keys
             .keys()
@@ -178,12 +176,17 @@ impl ConfigLowerer for ConnectorConfigLowerer {
             })?
             .clone();
 
+        let plaintext_payload = json!({
+            "realm": realm,
+            "endpoints": endpoints,
+        });
+
         let realm_key = &self.realm_keys[&realm];
         let inst = instance_id.internal().as_uuid();
         let kid = self.signing_key.kid();
         let config_uuid = Uuid::nil();
 
-        let plaintext = serde_json::to_vec(&mechanics_config).map_err(|error| {
+        let plaintext = serde_json::to_vec(&plaintext_payload).map_err(|error| {
             ConfigLoweringError::Backend(format!("payload serialization failed: {error}"))
         })?;
 
