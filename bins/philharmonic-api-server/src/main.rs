@@ -402,7 +402,7 @@ fn build_runtime(config: &ApiConfig, state: &LongLivedState) -> Result<Runtime, 
     let connector = build_connector_routes(config)?;
     let rate_limit = build_rate_limit_config(config.rate_limit.as_ref());
     let step_executor = build_step_executor(config)?;
-    let config_lowerer = build_config_lowerer(config)?;
+    let config_lowerer = build_config_lowerer(config, state)?;
     let store = SqlStore::new(state.pool.clone());
 
     let mut builder = PhilharmonicApiBuilder::new()
@@ -472,12 +472,16 @@ fn build_verifying_key_registry(
     Ok(registry)
 }
 
-fn build_config_lowerer(config: &ApiConfig) -> Result<Arc<dyn ConfigLowerer>, String> {
+fn build_config_lowerer(
+    config: &ApiConfig,
+    state: &LongLivedState,
+) -> Result<Arc<dyn ConfigLowerer>, String> {
     let has_path = config.lowerer_signing_key_path.is_some();
     let has_kid = config.lowerer_signing_key_kid.is_some();
     let has_realm_keys = !config.realm_public_keys.is_empty();
+    let has_sck = state.sck_bytes.is_some();
 
-    if !(has_path && has_kid && has_realm_keys) {
+    if !(has_path && has_kid && has_realm_keys && has_sck) {
         eprintln!("philharmonic-api: lowerer not fully configured, using stub lowerer");
         if !has_path {
             eprintln!("  missing: lowerer_signing_key_path");
@@ -487,6 +491,9 @@ fn build_config_lowerer(config: &ApiConfig) -> Result<Arc<dyn ConfigLowerer>, St
         }
         if !has_realm_keys {
             eprintln!("  missing: [[realm_public_keys]] (need at least one entry)");
+        }
+        if !has_sck {
+            eprintln!("  missing: sck_path (needed to decrypt endpoint configs)");
         }
         return Ok(Arc::new(StubLowerer));
     }
@@ -507,11 +514,20 @@ fn build_config_lowerer(config: &ApiConfig) -> Result<Arc<dyn ConfigLowerer>, St
         .clone()
         .unwrap_or_else(|| config.issuer.clone());
 
+    let sck_bytes = state
+        .sck_bytes
+        .as_ref()
+        .ok_or("sck_path is required for lowerer")?;
+    let sck = Arc::new(Sck::from_bytes(**sck_bytes));
+    let lowerer_store = SqlStore::from_pool(state.pool.pool().clone());
+
     Ok(Arc::new(ConnectorConfigLowerer::new(
         signing_key,
         realm_keys,
         issuer,
         config.lowerer_token_lifetime_ms,
+        lowerer_store,
+        sck,
     )))
 }
 

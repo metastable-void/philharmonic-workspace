@@ -1,9 +1,13 @@
 use std::collections::HashMap;
+use std::sync::Arc;
 
 use async_trait::async_trait;
 use coset::CborSerializable;
 use philharmonic::connector_client::{AeadAadInputs, LowererSigningKey, encrypt_payload};
 use philharmonic::connector_common::{ConnectorTokenClaims, RealmPublicKey};
+use philharmonic::policy::{Sck, TenantEndpointConfig, sck_decrypt};
+use philharmonic::store::{ContentStore, EntityStoreExt, IdentityStore};
+use philharmonic::store_sqlx_mysql::SqlStore;
 use philharmonic::types::{EntityId, JsonValue, Sha256, UnixMillis, Uuid};
 use philharmonic::workflow::{
     ConfigLowerer, ConfigLoweringError, SubjectContext, WorkflowInstance,
@@ -16,6 +20,8 @@ pub(crate) struct ConnectorConfigLowerer {
     realm_keys: HashMap<String, RealmPublicKey>,
     issuer: String,
     token_lifetime_ms: u64,
+    store: SqlStore,
+    sck: Arc<Sck>,
 }
 
 impl ConnectorConfigLowerer {
@@ -24,12 +30,16 @@ impl ConnectorConfigLowerer {
         realm_keys: HashMap<String, RealmPublicKey>,
         issuer: String,
         token_lifetime_ms: u64,
+        store: SqlStore,
+        sck: Arc<Sck>,
     ) -> Self {
         Self {
             signing_key,
             realm_keys,
             issuer,
             token_lifetime_ms,
+            store,
+            sck,
         }
     }
 }
@@ -43,39 +53,137 @@ impl ConfigLowerer for ConnectorConfigLowerer {
         step_seq: u64,
         subject: &SubjectContext,
     ) -> Result<JsonValue, ConfigLoweringError> {
-        let object = abstract_config.as_object().ok_or_else(|| {
+        let bindings = abstract_config.as_object().ok_or_else(|| {
             ConfigLoweringError::InvalidConfig("abstract config must be a JSON object".to_string())
         })?;
 
-        let realm = required_string(object, "realm")?.to_owned();
-        let config_uuid = parse_uuid(required_string(object, "config_uuid")?, "config_uuid")?;
-        let implementation = required_string(object, "impl")?.to_owned();
-        let config = object
-            .get("config")
-            .filter(|value| value.is_object())
-            .cloned()
-            .ok_or_else(|| {
-                ConfigLoweringError::InvalidConfig(
-                    "abstract config field 'config' must be a JSON object".to_string(),
-                )
+        let mut endpoints = serde_json::Map::new();
+        let tenant = subject.tenant_id;
+
+        for (name, value) in bindings {
+            let uuid_str = value.as_str().ok_or_else(|| {
+                ConfigLoweringError::InvalidConfig(format!(
+                    "abstract config value for '{name}' must be an endpoint config UUID string"
+                ))
+            })?;
+            let public_id = Uuid::parse_str(uuid_str).map_err(|error| {
+                ConfigLoweringError::InvalidConfig(format!(
+                    "invalid endpoint config UUID for '{name}': {error}"
+                ))
             })?;
 
-        let realm_key = self.realm_keys.get(&realm).ok_or_else(|| {
-            ConfigLoweringError::InvalidConfig(format!(
-                "no realm public key configured for realm '{realm}'"
-            ))
-        })?;
+            let identity = self
+                .store
+                .resolve_public(public_id)
+                .await
+                .map_err(|error| {
+                    ConfigLoweringError::Backend(format!(
+                        "endpoint config lookup failed for '{name}': {error}"
+                    ))
+                })?
+                .ok_or_else(|| {
+                    ConfigLoweringError::InvalidConfig(format!(
+                        "endpoint config '{uuid_str}' not found for '{name}'"
+                    ))
+                })?;
+            let endpoint_id: EntityId<TenantEndpointConfig> =
+                identity.typed().map_err(|error| {
+                    ConfigLoweringError::Backend(format!(
+                        "endpoint config identity type error for '{name}': {error}"
+                    ))
+                })?;
 
-        let tenant = subject.tenant_id.internal().as_uuid();
+            let latest = self
+                .store
+                .get_latest_revision_typed::<TenantEndpointConfig>(endpoint_id)
+                .await
+                .map_err(|error| {
+                    ConfigLoweringError::Backend(format!(
+                        "endpoint config revision lookup failed: {error}"
+                    ))
+                })?
+                .ok_or_else(|| {
+                    ConfigLoweringError::Backend("endpoint config has no revisions".to_string())
+                })?;
+
+            let key_version = latest
+                .scalar_attrs
+                .get("key_version")
+                .and_then(|v| match v {
+                    philharmonic::types::ScalarValue::I64(n) => Some(*n),
+                    _ => None,
+                })
+                .ok_or_else(|| {
+                    ConfigLoweringError::Backend(
+                        "endpoint config missing key_version scalar".to_string(),
+                    )
+                })?;
+
+            let encrypted_hash = latest
+                .content_attrs
+                .get("encrypted_config")
+                .copied()
+                .ok_or_else(|| {
+                    ConfigLoweringError::Backend(
+                        "endpoint config missing encrypted_config content".to_string(),
+                    )
+                })?;
+
+            let encrypted_blob = self
+                .store
+                .get(encrypted_hash)
+                .await
+                .map_err(|error| {
+                    ConfigLoweringError::Backend(format!(
+                        "encrypted config blob read failed: {error}"
+                    ))
+                })?
+                .ok_or_else(|| {
+                    ConfigLoweringError::Backend(
+                        "encrypted config content blob not found".to_string(),
+                    )
+                })?;
+
+            let plaintext = sck_decrypt(
+                &self.sck,
+                encrypted_blob.bytes(),
+                tenant.internal().as_uuid(),
+                endpoint_id.internal().as_uuid(),
+                key_version,
+            )
+            .map_err(|error| {
+                ConfigLoweringError::Backend(format!(
+                    "endpoint config decryption failed for '{name}': {error}"
+                ))
+            })?;
+
+            let endpoint_config: JsonValue =
+                serde_json::from_slice(plaintext.as_slice()).map_err(|error| {
+                    ConfigLoweringError::Backend(format!(
+                        "decrypted endpoint config is invalid JSON for '{name}': {error}"
+                    ))
+                })?;
+
+            endpoints.insert(name.clone(), endpoint_config);
+        }
+
+        let mechanics_config = json!({ "endpoints": endpoints });
+
+        let realm = self
+            .realm_keys
+            .keys()
+            .next()
+            .ok_or_else(|| {
+                ConfigLoweringError::InvalidConfig("no realm public keys configured".to_string())
+            })?
+            .clone();
+
+        let realm_key = &self.realm_keys[&realm];
         let inst = instance_id.internal().as_uuid();
         let kid = self.signing_key.kid();
+        let config_uuid = Uuid::nil();
 
-        let plaintext = serde_json::to_vec(&json!({
-            "realm": realm,
-            "impl": implementation,
-            "config": config,
-        }))
-        .map_err(|error| {
+        let plaintext = serde_json::to_vec(&mechanics_config).map_err(|error| {
             ConfigLoweringError::Backend(format!("payload serialization failed: {error}"))
         })?;
 
@@ -84,7 +192,7 @@ impl ConfigLowerer for ConnectorConfigLowerer {
             realm_key,
             AeadAadInputs {
                 realm: &realm,
-                tenant,
+                tenant: tenant.internal().as_uuid(),
                 inst,
                 step: step_seq,
                 config_uuid,
@@ -109,7 +217,7 @@ impl ConfigLowerer for ConnectorConfigLowerer {
             iat: now,
             kid: kid.to_string(),
             realm,
-            tenant,
+            tenant: tenant.internal().as_uuid(),
             inst,
             step: step_seq,
             config_uuid,
@@ -128,28 +236,6 @@ impl ConfigLowerer for ConnectorConfigLowerer {
             "encrypted_payload": hex::encode(encrypted_payload_bytes),
         }))
     }
-}
-
-fn required_string<'a>(
-    object: &'a serde_json::Map<String, JsonValue>,
-    field: &'static str,
-) -> Result<&'a str, ConfigLoweringError> {
-    object
-        .get(field)
-        .and_then(JsonValue::as_str)
-        .ok_or_else(|| {
-            ConfigLoweringError::InvalidConfig(format!(
-                "abstract config field '{field}' must be a string"
-            ))
-        })
-}
-
-fn parse_uuid(value: &str, field: &'static str) -> Result<Uuid, ConfigLoweringError> {
-    Uuid::parse_str(value).map_err(|error| {
-        ConfigLoweringError::InvalidConfig(format!(
-            "abstract config field '{field}' must be a UUID string: {error}"
-        ))
-    })
 }
 
 fn expiry(now: UnixMillis, lifetime_ms: u64) -> Result<UnixMillis, ConfigLoweringError> {
