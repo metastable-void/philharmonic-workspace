@@ -6,7 +6,7 @@ use std::process;
 use std::sync::Arc;
 
 use axum::body::Body;
-use axum::http::{Request, Response, Uri};
+use axum::http::{Request, Response, StatusCode, Uri};
 use axum::routing::any;
 use axum::{Router, extract::State};
 use clap::Parser;
@@ -683,7 +683,7 @@ async fn dispatch_dynamic(
     State(state): State<DynamicRouter>,
     request: Request<Body>,
 ) -> Response<Body> {
-    let path = request.uri().path();
+    let path = request.uri().path().to_owned();
 
     if let Some(realm) = path
         .strip_prefix("/connector/")
@@ -693,6 +693,18 @@ async fn dispatch_dynamic(
         let realm = realm.to_owned();
         let guard = state.connector_dispatch.read().await;
         if let Some(config) = guard.as_ref() {
+            let rewritten_uri = match rewrite_connector_uri(request.uri(), &realm) {
+                Ok(uri) => uri,
+                Err(_) => {
+                    return response_with_status(
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        "failed to rewrite connector request URI",
+                    );
+                }
+            };
+            let mut request = request;
+            *request.uri_mut() = rewritten_uri;
+
             return dispatch_to_realm(config, state.connector_forwarder.as_ref(), &realm, request)
                 .await;
         }
@@ -707,6 +719,32 @@ async fn dispatch_dynamic(
     }
 
     philharmonic::webui::webui_fallback(request).await
+}
+
+fn rewrite_connector_uri(uri: &Uri, realm: &str) -> Result<Uri, ()> {
+    let path_and_query = uri.path_and_query().map(|value| value.as_str()).ok_or(())?;
+    let prefix = format!("/connector/{realm}");
+    let rest = path_and_query.strip_prefix(&prefix).ok_or(())?;
+    let rewritten_path_and_query = if rest.is_empty() {
+        "/".to_string()
+    } else if rest.starts_with('/') {
+        rest.to_string()
+    } else if rest.starts_with('?') {
+        format!("/{rest}")
+    } else {
+        return Err(());
+    };
+
+    let mut parts = uri.clone().into_parts();
+    parts.path_and_query = Some(rewritten_path_and_query.parse().map_err(|_| ())?);
+    Uri::from_parts(parts).map_err(|_| ())
+}
+
+fn response_with_status(status: StatusCode, body: &'static str) -> Response<Body> {
+    Response::builder()
+        .status(status)
+        .body(Body::from(body))
+        .unwrap_or_else(|_| Response::new(Body::from(body)))
 }
 
 async fn start_server(app: Router, config: &ApiConfig) -> Result<&'static str, String> {
@@ -911,3 +949,30 @@ fn log_tls_reload_note(config: &ApiConfig) {
 
 #[cfg(not(feature = "https"))]
 fn log_tls_reload_note(_config: &ApiConfig) {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn connector_uri_rewrite_routes_realm_root_to_service_root() {
+        let uri: Uri = "/connector/prod?trace=true"
+            .parse()
+            .expect("URI should parse");
+
+        let rewritten = rewrite_connector_uri(&uri, "prod").expect("URI should rewrite");
+
+        assert_eq!(rewritten, "/?trace=true");
+    }
+
+    #[test]
+    fn connector_uri_rewrite_preserves_path_below_realm() {
+        let uri: Uri = "/connector/prod/health?trace=true"
+            .parse()
+            .expect("URI should parse");
+
+        let rewritten = rewrite_connector_uri(&uri, "prod").expect("URI should rewrite");
+
+        assert_eq!(rewritten, "/health?trace=true");
+    }
+}
