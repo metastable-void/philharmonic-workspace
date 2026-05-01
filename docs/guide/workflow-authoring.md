@@ -40,7 +40,7 @@ Content-Type: application/json
 {
   "display_name": "My LLM Service",
   "config": {
-    "method": "POST",
+    "method": "post",
     "url_template": "https://api.example.com/v1/chat/completions",
     "headers": {
       "Authorization": "Bearer sk-...",
@@ -53,24 +53,25 @@ Content-Type: application/json
 
 Response: `{ "endpoint_id": "<uuid>" }`
 
-The config value is an `HttpEndpoint` definition with these
-fields:
+The config value is an `HttpEndpoint` JSON object. Full
+TypeScript definition is in `mechanics-core/ts-types/
+mechanics-json-shapes.d.ts` (`HttpEndpointJson`). Key fields:
 
-| Field | Type | Description |
-|---|---|---|
-| `method` | `"GET"` \| `"POST"` \| `"PUT"` \| `"PATCH"` \| `"DELETE"` | HTTP method |
-| `url_template` | string | URL with optional `{param}` placeholders |
-| `url_param_specs` | `{ name: { required: bool } }` | URL parameter validation |
-| `query_specs` | array | Query string parameters |
-| `headers` | `{ name: value }` | Fixed request headers |
-| `overridable_request_headers` | `string[]` | Headers the script can override at call time |
-| `exposed_response_headers` | `string[]` | Response headers visible to the script |
-| `request_body_type` | `"json"` \| `"utf8"` \| `"bytes"` | Request body encoding |
-| `response_body_type` | `"json"` \| `"utf8"` \| `"bytes"` | Response body decoding |
-| `timeout_ms` | number | Request timeout in milliseconds |
-| `response_max_bytes` | number | Maximum response body size |
-| `allow_non_2xx_status` | boolean | If false, non-2xx throws an error |
-| `retry_policy` | object | Automatic retry configuration |
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `method` | `"get"` \| `"post"` \| `"put"` \| `"patch"` \| `"delete"` \| `"head"` \| `"options"` | required | HTTP method (lowercase) |
+| `url_template` | string | required | URL with optional `{slot}` placeholders |
+| `url_param_specs` | `{ slot: { default?, min_bytes?, max_bytes? } }` | `{}` | URL slot validation |
+| `query_specs` | `QuerySpec[]` | `[]` | Query string emission rules |
+| `headers` | `{ name: value }` | `{}` | Fixed request headers |
+| `overridable_request_headers` | `string[]` | `[]` | Headers the script can set at call time |
+| `exposed_response_headers` | `string[]` | `[]` | Response headers visible to the script |
+| `request_body_type` | `"json"` \| `"utf8"` \| `"bytes"` | none | Request body encoding |
+| `response_body_type` | `"json"` \| `"utf8"` \| `"bytes"` | `"json"` | Response body decoding |
+| `timeout_ms` | number \| null | null | Request timeout in milliseconds |
+| `response_max_bytes` | number \| null | null | Maximum response body size |
+| `allow_non_2xx_status` | boolean | `false` | If false, non-2xx is an error |
+| `retry_policy` | `EndpointRetryPolicyJson` | default | Automatic retry configuration |
 
 Endpoint configs are encrypted at rest using the SCK (substrate
 confidentiality key). The API key and other secrets in the config
@@ -194,17 +195,69 @@ The response object:
 
 ### Built-in modules
 
-Scripts have access to these built-in modules:
+Scripts have access to these built-in modules. Full TypeScript
+definitions are in `mechanics-core/ts-types/`.
 
-| Module | Exports | Description |
-|---|---|---|
-| `mechanics:endpoint` | `default(name, options?)` | Call a configured HTTP endpoint. |
-| `mechanics:base64` | `encode(bytes)`, `decode(string)` | Base64 encoding/decoding. |
-| `mechanics:hex` | `encode(bytes)`, `decode(string)` | Hexadecimal encoding/decoding. |
-| `mechanics:base32` | `encode(bytes)`, `decode(string)` | Base32 encoding/decoding. |
-| `mechanics:form-urlencoded` | `encode(obj)`, `decode(string)` | URL form encoding/decoding. |
-| `mechanics:rand` | `default(n)` | Generate `n` random bytes as `Uint8Array`. |
-| `mechanics:uuid` | `default(options?)` | Generate a UUID string. |
+#### `mechanics:endpoint`
+
+```typescript
+import endpoint from "mechanics:endpoint";
+const response = await endpoint("name", {
+  body?: unknown,          // JSON value, string, or ArrayBufferView
+  headers?: Record<string, string>,
+  urlParams?: Record<string, string>,
+  queries?: Record<string, string>,
+});
+// response: { body, headers, status: number, ok: boolean }
+```
+
+#### `mechanics:base64`
+
+```typescript
+import { encode, decode } from "mechanics:base64";
+encode(buffer: ArrayBuffer | ArrayBufferView, variant?: "base64" | "base64url"): string;
+decode(encoded: string, variant?: "base64" | "base64url"): Uint8Array;
+```
+
+#### `mechanics:hex`
+
+```typescript
+import { encode, decode } from "mechanics:hex";
+encode(buffer: ArrayBuffer | ArrayBufferView): string;
+decode(encoded: string): Uint8Array;
+```
+
+#### `mechanics:base32`
+
+```typescript
+import { encode, decode } from "mechanics:base32";
+encode(buffer: ArrayBuffer | ArrayBufferView, variant?: "base32" | "base32hex"): string;
+decode(encoded: string, variant?: "base32" | "base32hex"): Uint8Array;
+```
+
+#### `mechanics:form-urlencoded`
+
+```typescript
+import { encode, decode } from "mechanics:form-urlencoded";
+encode(record: Record<string, string>): string;  // deterministic key order
+decode(params: string): Record<string, string>;  // leading '?' accepted
+```
+
+#### `mechanics:rand`
+
+```typescript
+import fillRandom from "mechanics:rand";
+fillRandom(buffer: ArrayBuffer | ArrayBufferView): void;  // fills in-place
+```
+
+#### `mechanics:uuid`
+
+```typescript
+import uuid from "mechanics:uuid";
+uuid(variant?: "v3"|"v4"|"v5"|"v6"|"v7"|"nil"|"max",
+     options?: { namespace: string, name: string }): string;
+// v3/v5 require namespace + name; default is "v4"
+```
 
 ### Sandboxing
 
@@ -322,7 +375,7 @@ export default function(arg) {
    {
      "display_name": "Local LLM",
      "config": {
-       "method": "POST",
+       "method": "post",
        "url_template": "http://localhost:8080/v1/chat/completions",
        "headers": { "Content-Type": "application/json" },
        "response_body_type": "json"
