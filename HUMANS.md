@@ -28,10 +28,14 @@ this file, but never edit this file.
 Structure:
 
 - docs/ - something friendly but concise at top
+  - docs/ROADMAP.md <- moved from the top
   - docs/design/
   - docs/crypto/...
   - docs/codex-{prompts,reports}
   - docs/notes-to-humans
   - docs/project-status-reports
+  - docs/POSIX_CHECKLIST.md <- moved from the top
 
 Add `cargo install mdbook` at setup.sh.
+
+Update all remaining references to new ones.
