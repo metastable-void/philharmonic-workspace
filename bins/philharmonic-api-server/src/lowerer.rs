@@ -23,11 +23,9 @@ pub(crate) struct ConnectorConfigLowerer {
     store: SqlStore,
     sck: Arc<Sck>,
     connector_router_url: String,
-    connector_domain_suffix: String,
 }
 
 impl ConnectorConfigLowerer {
-    #[allow(clippy::too_many_arguments)]
     pub(crate) fn new(
         signing_key: LowererSigningKey,
         realm_keys: HashMap<String, RealmPublicKey>,
@@ -36,7 +34,6 @@ impl ConnectorConfigLowerer {
         store: SqlStore,
         sck: Arc<Sck>,
         connector_router_url: String,
-        connector_domain_suffix: String,
     ) -> Self {
         Self {
             signing_key,
@@ -46,7 +43,6 @@ impl ConnectorConfigLowerer {
             store,
             sck,
             connector_router_url,
-            connector_domain_suffix,
         }
     }
 }
@@ -279,13 +275,12 @@ impl ConfigLowerer for ConnectorConfigLowerer {
             let token_hex = hex::encode(token_bytes);
             let payload_hex = hex::encode(encrypted_payload_bytes);
 
-            let connector_host = format!("{realm}.connector.{}", self.connector_domain_suffix);
+            let endpoint_url = format!("{}/{realm}", self.connector_router_url);
 
             let http_endpoint = json!({
                 "method": "post",
-                "url_template": self.connector_router_url,
+                "url_template": endpoint_url,
                 "headers": {
-                    "Host": connector_host,
                     "Authorization": format!("Bearer {token_hex}"),
                     "X-Encrypted-Payload": payload_hex,
                     "Content-Type": "application/json"

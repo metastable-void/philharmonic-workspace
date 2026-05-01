@@ -540,7 +540,6 @@ fn build_config_lowerer(
         lowerer_store,
         sck,
         connector_router_url,
-        config.connector_domain_suffix.clone(),
     )))
 }
 
