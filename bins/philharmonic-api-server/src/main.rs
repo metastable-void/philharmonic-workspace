@@ -16,7 +16,7 @@ use philharmonic::api::{
 use philharmonic::connector_client::LowererSigningKey;
 use philharmonic::connector_common::{MLKEM768_PUBLIC_KEY_LEN, RealmId, RealmPublicKey};
 use philharmonic::connector_router::{
-    DispatchConfig, HyperForwarder, RouterState, router as connector_router,
+    DispatchConfig, Forwarder, HyperForwarder, dispatch_to_realm,
 };
 use philharmonic::policy::{
     ApiSigningKey, ApiVerifyingKeyEntry, ApiVerifyingKeyRegistry, Principal, PrincipalKind,
@@ -72,7 +72,8 @@ struct Cli {
 #[derive(Clone)]
 struct DynamicRouter {
     api: Arc<RwLock<Router>>,
-    connector: Arc<RwLock<Option<Router>>>,
+    connector_dispatch: Arc<RwLock<Option<DispatchConfig>>>,
+    connector_forwarder: Arc<dyn Forwarder>,
 }
 
 #[derive(Clone)]
@@ -90,7 +91,7 @@ struct RuntimeCounts {
 
 struct Runtime {
     api_router: Router,
-    connector_router: Option<Router>,
+    connector_dispatch: Option<DispatchConfig>,
     counts: RuntimeCounts,
 }
 
@@ -344,7 +345,8 @@ async fn serve(args: BaseArgs) -> Result<(), String> {
     let runtime = build_runtime(&config, &state)?;
     let dynamic = DynamicRouter {
         api: Arc::new(RwLock::new(runtime.api_router)),
-        connector: Arc::new(RwLock::new(runtime.connector_router)),
+        connector_dispatch: Arc::new(RwLock::new(runtime.connector_dispatch)),
+        connector_forwarder: Arc::new(HyperForwarder::new()),
     };
     let app =
         dynamic_router(dynamic.clone()).layer(axum::middleware::from_fn(security_headers::inject));
@@ -369,7 +371,7 @@ async fn serve(args: BaseArgs) -> Result<(), String> {
                     Ok(runtime) => {
                         log_tls_reload_note(&reloaded);
                         *dynamic.api.write().await = runtime.api_router;
-                        *dynamic.connector.write().await = runtime.connector_router;
+                        *dynamic.connector_dispatch.write().await = runtime.connector_dispatch;
                         log_reload(counts, runtime.counts);
                         counts = runtime.counts;
                     }
@@ -403,7 +405,7 @@ fn load_api_config(primary: &Path, drop_in: &Path, args: &BaseArgs) -> Result<Ap
 
 fn build_runtime(config: &ApiConfig, state: &LongLivedState) -> Result<Runtime, String> {
     let registry = build_verifying_key_registry(&config.verifying_keys)?;
-    let connector = build_connector_routes(config)?;
+    let connector_dispatch = build_connector_dispatch(config)?;
     let rate_limit = build_rate_limit_config(config.rate_limit.as_ref());
     let step_executor = build_step_executor(config)?;
     let config_lowerer = build_config_lowerer(config, state)?;
@@ -431,7 +433,7 @@ fn build_runtime(config: &ApiConfig, state: &LongLivedState) -> Result<Runtime, 
         .map_err(|error| format!("failed to build API router: {error}"))?;
     Ok(Runtime {
         api_router: api.into_router(),
-        connector_router: connector,
+        connector_dispatch,
         counts: RuntimeCounts {
             verifying_keys: config.verifying_keys.len(),
             connector_realms: config.connector_dispatch.len(),
@@ -593,7 +595,7 @@ fn read_realm_public_key(entry: &config::RealmPublicKeyConfig) -> Result<RealmPu
     .map_err(|error| format!("failed to build realm public key '{}': {error}", entry.kid))
 }
 
-fn build_connector_routes(config: &ApiConfig) -> Result<Option<Router>, String> {
+fn build_connector_dispatch(config: &ApiConfig) -> Result<Option<DispatchConfig>, String> {
     if config.connector_dispatch.is_empty() {
         return Ok(None);
     }
@@ -612,10 +614,7 @@ fn build_connector_routes(config: &ApiConfig) -> Result<Option<Router>, String> 
             .map_err(|error| format!("invalid connector realm '{realm}': {error}"))?;
     }
 
-    Ok(Some(Router::new().nest(
-        "/connector",
-        connector_router(RouterState::new(dispatch, Arc::new(HyperForwarder::new()))),
-    )))
+    Ok(Some(dispatch))
 }
 
 fn build_rate_limit_config(overrides: Option<&config::RateLimitOverrides>) -> RateLimitConfig {
@@ -684,18 +683,22 @@ async fn dispatch_dynamic(
     State(state): State<DynamicRouter>,
     request: Request<Body>,
 ) -> Response<Body> {
-    if request.uri().path().starts_with("/connector/") {
-        let guard = state.connector.read().await;
-        if let Some(router) = guard.clone() {
-            drop(guard);
-            return match router.oneshot(request).await {
-                Ok(response) => response,
-                Err(error) => match error {},
-            };
+    let path = request.uri().path();
+
+    if let Some(realm) = path
+        .strip_prefix("/connector/")
+        .and_then(|rest| rest.split('/').next())
+        .filter(|s| !s.is_empty())
+    {
+        let realm = realm.to_owned();
+        let guard = state.connector_dispatch.read().await;
+        if let Some(config) = guard.as_ref() {
+            return dispatch_to_realm(config, state.connector_forwarder.as_ref(), &realm, request)
+                .await;
         }
     }
 
-    if request.uri().path().starts_with("/v1/") {
+    if path.starts_with("/v1/") {
         let router = state.api.read().await.clone();
         return match router.oneshot(request).await {
             Ok(response) => response,
