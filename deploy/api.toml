@@ -41,6 +41,9 @@ signing_key_kid = "api-2026-05"
 # Base URL of the mechanics worker for step execution.
 # The executor appends /api/v1/mechanics automatically.
 # mechanics_worker_url = "http://127.0.0.1:3001"
+# Bearer token for authenticating to the mechanics worker.
+# Must match one of the tokens in the mechanics worker's config.
+# mechanics_worker_token = "CHANGE_ME"
 
 # --- Connector router URL (as seen from the mechanics worker) ---
 # The lowerer builds endpoint configs that point here. The

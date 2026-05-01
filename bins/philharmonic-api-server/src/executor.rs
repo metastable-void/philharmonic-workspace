@@ -1,16 +1,17 @@
 use async_trait::async_trait;
 use philharmonic::types::JsonValue;
 use philharmonic::workflow::{StepExecutionError, StepExecutor};
-use reqwest::header::CONTENT_TYPE;
+use reqwest::header::{AUTHORIZATION, CONTENT_TYPE};
 use serde_json::json;
 
 pub(crate) struct MechanicsWorkerExecutor {
     client: reqwest::Client,
     worker_url: String,
+    bearer_token: Option<String>,
 }
 
 impl MechanicsWorkerExecutor {
-    pub(crate) fn new(worker_url: String) -> Result<Self, String> {
+    pub(crate) fn new(worker_url: String, token: Option<String>) -> Result<Self, String> {
         let worker_url = worker_url.trim().trim_end_matches('/').to_owned();
         if worker_url.is_empty() {
             return Err("mechanics worker URL must not be empty".to_string());
@@ -20,6 +21,7 @@ impl MechanicsWorkerExecutor {
         Ok(Self {
             client: reqwest::Client::new(),
             worker_url,
+            bearer_token: token,
         })
     }
 }
@@ -39,16 +41,16 @@ impl StepExecutor for MechanicsWorkerExecutor {
         });
 
         let url = format!("{}/api/v1/mechanics", self.worker_url);
-        let response = self
+        let mut request = self
             .client
             .post(&url)
-            .header(CONTENT_TYPE, "application/json")
-            .json(&job)
-            .send()
-            .await
-            .map_err(|error| {
-                StepExecutionError::Transport(format!("mechanics worker request failed: {error}"))
-            })?;
+            .header(CONTENT_TYPE, "application/json");
+        if let Some(token) = &self.bearer_token {
+            request = request.header(AUTHORIZATION, format!("Bearer {token}"));
+        }
+        let response = request.json(&job).send().await.map_err(|error| {
+            StepExecutionError::Transport(format!("mechanics worker request failed: {error}"))
+        })?;
 
         let status = response.status();
         if !status.is_success() {

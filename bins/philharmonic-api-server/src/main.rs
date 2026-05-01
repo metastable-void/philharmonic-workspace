@@ -550,7 +550,7 @@ fn build_step_executor(config: &ApiConfig) -> Result<Arc<dyn StepExecutor>, Stri
     };
 
     Ok(Arc::new(
-        MechanicsWorkerExecutor::new(worker_url.clone())
+        MechanicsWorkerExecutor::new(worker_url.clone(), config.mechanics_worker_token.clone())
             .map_err(|error| format!("invalid mechanics_worker_url: {error}"))?,
     ))
 }
