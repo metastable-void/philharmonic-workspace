@@ -367,7 +367,8 @@ fn build_runtime(config: &ApiConfig, state: &LongLivedState) -> Result<Runtime, 
         .step_executor(step_executor)
         .config_lowerer(config_lowerer)
         .key_version(config.sck_key_version)
-        .rate_limit_config(rate_limit);
+        .rate_limit_config(rate_limit)
+        .brand_name(config.webui_brand_name.as_str());
     if let Some(sck_bytes) = &state.sck_bytes {
         builder = builder.sck(Sck::from_bytes(**sck_bytes));
     }

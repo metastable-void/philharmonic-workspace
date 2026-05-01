@@ -13,6 +13,11 @@ bind = "0.0.0.0:3000"
 database_url = "mysql://philharmonic:CHANGE_ME@localhost/philharmonic"
 issuer = "philharmonic"
 
+# --- WebUI branding ---
+# Display name shown in the WebUI sidebar and login screen.
+# The monogram icon derives from the first character.
+# webui_brand_name = "Philharmonic"
+
 # --- API signing key (Ed25519, for ephemeral API tokens) ---
 # Generate: philharmonic-api gen-signing-key -o /etc/philharmonic/keys/
 signing_key_path = "/etc/philharmonic/keys/api-signing.key"

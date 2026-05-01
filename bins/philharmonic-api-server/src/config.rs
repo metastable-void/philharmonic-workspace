@@ -25,6 +25,8 @@ pub(crate) struct ApiConfig {
     pub(crate) connector_dispatch: HashMap<String, UpstreamConfig>,
     pub(crate) connector_domain_suffix: String,
     pub(crate) rate_limit: Option<RateLimitOverrides>,
+    #[serde(default = "default_brand_name")]
+    pub(crate) webui_brand_name: String,
     #[cfg(feature = "https")]
     pub(crate) tls: Option<TlsFileConfig>,
 }
@@ -49,6 +51,7 @@ impl Default for ApiConfig {
             connector_dispatch: HashMap::new(),
             connector_domain_suffix: "localhost".to_string(),
             rate_limit: None,
+            webui_brand_name: default_brand_name(),
             #[cfg(feature = "https")]
             tls: None,
         }
@@ -115,4 +118,8 @@ const fn default_not_after() -> UnixMillis {
 
 const fn default_lowerer_token_lifetime_ms() -> u64 {
     600_000
+}
+
+fn default_brand_name() -> String {
+    "Philharmonic".to_string()
 }
