@@ -422,7 +422,7 @@ fn build_runtime(config: &ApiConfig, state: &LongLivedState) -> Result<Runtime, 
         builder = builder.sck(Sck::from_bytes(**sck_bytes));
     }
     if let Some(connector) = connector {
-        builder = builder.extra_routes(connector);
+        builder = builder.bypass_routes(connector);
     }
 
     let api = builder
