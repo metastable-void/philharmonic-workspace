@@ -11,9 +11,15 @@ consolidates what's left.
 
 ## Unpublished local changes
 
-1. **`philharmonic` meta-crate**: local is 0.1.1 on crates.io
-   but has 2 new commits (keygen module + README update). Needs
-   a 0.1.2 publish when ready.
+1. **All 17 publishable crates need a patch release.** Changes
+   since last publish: doc comments added (missing_docs gate),
+   `pub(crate)` visibility in bins, crypto-vector paths moved
+   into crate-local `tests/vectors/`, `philharmonic` meta-crate
+   gained `mechanics` feature-gate + `bootstrap` CLI + `whoami`
+   endpoint. Bump all versions by patch (`.+1`), then publish
+   in dependency order. The 3 placeholder crates (email-smtp,
+   llm-anthropic, llm-gemini) stay at `0.0.0` — their only
+   change is a one-line crate-level doc comment.
 
 ---
 
