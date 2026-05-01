@@ -77,6 +77,7 @@ msgfile="$("$(dirname "$0")"/mktemp.sh commit-msg)"
 trap 'rm -f "$msgfile"' EXIT INT HUP TERM
 printf '%s\n\n' "$msg" > "$msgfile"
 printf 'Audit-Info: %s\n' "$( "$(dirname "$0")"/print-audit-info.sh $audit_flags )" >> "$msgfile"
+printf 'Code-stats: %s\n' "$( "$(dirname "$0")"/stats.sh )" >> "$msgfile"
 export MSG_FILE="$msgfile"
 
 # Signal that we call Git through a proper wrapper.
