@@ -3125,7 +3125,7 @@ dependencies = [
 
 [[package]]
 name = "mechanics"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "http-body-util",
  "hyper",
@@ -3139,7 +3139,7 @@ dependencies = [
 
 [[package]]
 name = "mechanics-config"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "http",
  "serde",
@@ -3149,7 +3149,7 @@ dependencies = [
 
 [[package]]
 name = "mechanics-core"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "boa_engine",
  "boa_gc",
@@ -3802,7 +3802,7 @@ dependencies = [
 
 [[package]]
 name = "philharmonic"
-version = "0.1.1"
+version = "0.2.0"
 dependencies = [
  "axum",
  "clap",
@@ -3842,7 +3842,7 @@ dependencies = [
 
 [[package]]
 name = "philharmonic-api"
-version = "0.1.2"
+version = "0.1.3"
 dependencies = [
  "async-trait",
  "axum",
@@ -3925,7 +3925,7 @@ dependencies = [
 
 [[package]]
 name = "philharmonic-connector-client"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "aes-gcm",
  "ciborium",
@@ -3947,7 +3947,7 @@ dependencies = [
 
 [[package]]
 name = "philharmonic-connector-common"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "coset",
  "philharmonic-types",
@@ -3958,7 +3958,7 @@ dependencies = [
 
 [[package]]
 name = "philharmonic-connector-impl-api"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "async-trait",
  "philharmonic-connector-common",
@@ -3968,7 +3968,7 @@ dependencies = [
 
 [[package]]
 name = "philharmonic-connector-impl-email-smtp"
-version = "0.0.0"
+version = "0.0.1"
 
 [[package]]
 name = "philharmonic-connector-impl-embed"
@@ -4014,11 +4014,11 @@ dependencies = [
 
 [[package]]
 name = "philharmonic-connector-impl-llm-anthropic"
-version = "0.0.0"
+version = "0.0.1"
 
 [[package]]
 name = "philharmonic-connector-impl-llm-gemini"
-version = "0.0.0"
+version = "0.0.1"
 
 [[package]]
 name = "philharmonic-connector-impl-llm-openai-compat"
@@ -4088,7 +4088,7 @@ dependencies = [
 
 [[package]]
 name = "philharmonic-connector-router"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "axum",
  "http-body-util",
@@ -4101,7 +4101,7 @@ dependencies = [
 
 [[package]]
 name = "philharmonic-connector-service"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "aes-gcm",
  "ciborium",
@@ -4125,7 +4125,7 @@ dependencies = [
 
 [[package]]
 name = "philharmonic-policy"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "aes-gcm",
  "async-trait",
@@ -4153,7 +4153,7 @@ dependencies = [
 
 [[package]]
 name = "philharmonic-store"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "async-trait",
  "philharmonic-types",
@@ -4164,7 +4164,7 @@ dependencies = [
 
 [[package]]
 name = "philharmonic-store-sqlx-mysql"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "async-trait",
  "philharmonic-store",
@@ -4178,7 +4178,7 @@ dependencies = [
 
 [[package]]
 name = "philharmonic-types"
-version = "0.3.5"
+version = "0.3.6"
 dependencies = [
  "ciborium",
  "hex",
@@ -4192,7 +4192,7 @@ dependencies = [
 
 [[package]]
 name = "philharmonic-workflow"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "async-trait",
  "philharmonic-policy",
