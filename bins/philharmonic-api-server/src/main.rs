@@ -19,8 +19,9 @@ use philharmonic::connector_router::{
     DispatchConfig, HyperForwarder, RouterState, router as connector_router,
 };
 use philharmonic::policy::{
-    ApiSigningKey, ApiVerifyingKeyEntry, ApiVerifyingKeyRegistry, Principal, PrincipalKind, Sck,
-    Tenant, TenantStatus, TokenHash, VerifyingKey, generate_api_token, validate_subdomain_name,
+    ApiSigningKey, ApiVerifyingKeyEntry, ApiVerifyingKeyRegistry, Principal, PrincipalKind,
+    RoleDefinition, RoleMembership, Sck, Tenant, TenantStatus, TokenHash, VerifyingKey,
+    generate_api_token, validate_subdomain_name,
 };
 use philharmonic::server::cli::{BaseArgs, BaseCommand, BootstrapArgs, resolve_config_paths};
 use philharmonic::server::config::{ConfigError, load_config};
@@ -188,6 +189,54 @@ async fn bootstrap(args: BootstrapArgs) -> Result<(), String> {
         .append_revision_typed::<Principal>(principal_id, 0, &principal_revision)
         .await
         .map_err(|error| format!("principal revision append failed: {error}"))?;
+
+    let all_permissions: Vec<String> = philharmonic::policy::ALL_ATOMS
+        .iter()
+        .map(|s| (*s).to_string())
+        .collect();
+    let permissions_json = serde_json::json!(all_permissions);
+    let role_id = store
+        .create_entity_minting::<RoleDefinition>()
+        .await
+        .map_err(|error| format!("role creation failed: {error}"))?;
+    let role_display_name =
+        put_json(&store, &JsonValue::String("Bootstrap Admin".to_string())).await?;
+    let role_permissions = put_json(&store, &permissions_json).await?;
+    let role_revision = RevisionInput::new()
+        .with_content("display_name", role_display_name)
+        .with_content("permissions", role_permissions)
+        .with_entity(
+            "tenant",
+            EntityRefValue::pinned(tenant_id.internal().as_uuid(), 0),
+        )
+        .with_scalar("is_retired", ScalarValue::Bool(false));
+    store
+        .append_revision_typed::<RoleDefinition>(role_id, 0, &role_revision)
+        .await
+        .map_err(|error| format!("role revision append failed: {error}"))?;
+
+    let membership_id = store
+        .create_entity_minting::<RoleMembership>()
+        .await
+        .map_err(|error| format!("membership creation failed: {error}"))?;
+    let membership_revision = RevisionInput::new()
+        .with_entity(
+            "tenant",
+            EntityRefValue::pinned(tenant_id.internal().as_uuid(), 0),
+        )
+        .with_entity(
+            "principal",
+            EntityRefValue::pinned(principal_id.internal().as_uuid(), 0),
+        )
+        .with_entity(
+            "role",
+            EntityRefValue::pinned(role_id.internal().as_uuid(), 0),
+        )
+        .with_scalar("is_retired", ScalarValue::Bool(false));
+    store
+        .append_revision_typed::<RoleMembership>(membership_id, 0, &membership_revision)
+        .await
+        .map_err(|error| format!("membership revision append failed: {error}"))?;
 
     println!(
         "Bootstrap complete.\n\nTenant ID: {}\nPrincipal ID: {}\n\nAPI token (save this -- it will not be shown again):\n  {}",
