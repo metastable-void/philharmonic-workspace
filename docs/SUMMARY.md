@@ -22,6 +22,10 @@
 - [Open questions](design/14-open-questions.md)
 - [V1 scope](design/15-v1-scope.md)
 
+# Guide
+
+- [Workflow authoring](guide/workflow-authoring.md)
+
 # Reference
 
 - [Roadmap](ROADMAP.md)
