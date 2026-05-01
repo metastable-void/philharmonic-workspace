@@ -8,7 +8,7 @@ const X_FRAME_OPTIONS: &str = "x-frame-options";
 const REFERRER_POLICY: &str = "referrer-policy";
 const PERMISSIONS_POLICY: &str = "permissions-policy";
 
-pub async fn inject(request: axum::extract::Request, next: Next) -> Response {
+pub(crate) async fn inject(request: axum::extract::Request, next: Next) -> Response {
     let mut response = next.run(request).await;
     let headers = response.headers_mut();
 

@@ -17,10 +17,14 @@ use std::io::Read;
 
 const DEFAULT_UA: &str = "philharmonic-dev-agent/1.0";
 
+/// Errors that can occur during an HTTP request via `fetch_text` or `fetch_bytes`.
 #[derive(Debug)]
 pub enum HttpError {
     /// Upstream returned a 4xx/5xx status.
-    StatusCode { code: u16 },
+    StatusCode {
+        /// The HTTP status code returned by the server.
+        code: u16,
+    },
     /// Transport failure (DNS, TLS, connection, timeout, …).
     Transport(String),
     /// Body was received but reading/decoding it to UTF-8 failed.

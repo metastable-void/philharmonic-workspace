@@ -1,3 +1,5 @@
+//! Philharmonic API server with embedded WebUI and connector router.
+
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::process;

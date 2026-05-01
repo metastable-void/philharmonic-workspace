@@ -1,3 +1,5 @@
+//! Mechanics worker — JavaScript execution HTTP service.
+
 use std::collections::HashSet;
 use std::path::Path;
 use std::process;

@@ -5,13 +5,13 @@ use philharmonic::connector_service::UnixMillis;
 
 #[derive(Debug, serde::Deserialize)]
 #[serde(default)]
-pub struct ConnectorConfig {
-    pub bind: SocketAddr,
-    pub realm_id: String,
-    pub minting_keys: Vec<MintingKeyConfig>,
-    pub realm_keys: Vec<RealmKeyConfig>,
+pub(crate) struct ConnectorConfig {
+    pub(crate) bind: SocketAddr,
+    pub(crate) realm_id: String,
+    pub(crate) minting_keys: Vec<MintingKeyConfig>,
+    pub(crate) realm_keys: Vec<RealmKeyConfig>,
     #[cfg(feature = "https")]
-    pub tls: Option<TlsFileConfig>,
+    pub(crate) tls: Option<TlsFileConfig>,
 }
 
 impl Default for ConnectorConfig {
@@ -28,26 +28,26 @@ impl Default for ConnectorConfig {
 }
 
 #[derive(Debug, serde::Deserialize)]
-pub struct MintingKeyConfig {
-    pub kid: String,
-    pub public_key_path: PathBuf,
-    pub not_before: UnixMillis,
-    pub not_after: UnixMillis,
+pub(crate) struct MintingKeyConfig {
+    pub(crate) kid: String,
+    pub(crate) public_key_path: PathBuf,
+    pub(crate) not_before: UnixMillis,
+    pub(crate) not_after: UnixMillis,
 }
 
 #[derive(Debug, serde::Deserialize)]
-pub struct RealmKeyConfig {
-    pub kid: String,
-    pub realm_id: String,
-    pub private_key_path: PathBuf,
-    pub x25519_private_key_path: Option<PathBuf>,
-    pub not_before: UnixMillis,
-    pub not_after: UnixMillis,
+pub(crate) struct RealmKeyConfig {
+    pub(crate) kid: String,
+    pub(crate) realm_id: String,
+    pub(crate) private_key_path: PathBuf,
+    pub(crate) x25519_private_key_path: Option<PathBuf>,
+    pub(crate) not_before: UnixMillis,
+    pub(crate) not_after: UnixMillis,
 }
 
 #[cfg(feature = "https")]
 #[derive(Debug, serde::Deserialize)]
-pub struct TlsFileConfig {
-    pub cert_path: PathBuf,
-    pub key_path: PathBuf,
+pub(crate) struct TlsFileConfig {
+    pub(crate) cert_path: PathBuf,
+    pub(crate) key_path: PathBuf,
 }

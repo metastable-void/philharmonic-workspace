@@ -11,7 +11,7 @@ use philharmonic::workflow::{
 use rand_core::OsRng;
 use serde_json::json;
 
-pub struct ConnectorConfigLowerer {
+pub(crate) struct ConnectorConfigLowerer {
     signing_key: LowererSigningKey,
     realm_keys: HashMap<String, RealmPublicKey>,
     issuer: String,
@@ -19,7 +19,7 @@ pub struct ConnectorConfigLowerer {
 }
 
 impl ConnectorConfigLowerer {
-    pub fn new(
+    pub(crate) fn new(
         signing_key: LowererSigningKey,
         realm_keys: HashMap<String, RealmPublicKey>,
         issuer: String,

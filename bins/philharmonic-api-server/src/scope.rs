@@ -3,7 +3,7 @@ use philharmonic::types::{Identity, Uuid};
 
 const TENANT_ID_HEADER: &str = "x-tenant-id";
 
-pub struct HeaderBasedScopeResolver;
+pub(crate) struct HeaderBasedScopeResolver;
 
 #[async_trait::async_trait]
 impl RequestScopeResolver for HeaderBasedScopeResolver {

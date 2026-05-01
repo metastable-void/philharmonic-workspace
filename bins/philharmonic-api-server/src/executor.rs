@@ -5,13 +5,13 @@ use reqwest::header::{AUTHORIZATION, CONTENT_TYPE};
 
 const ENCRYPTED_PAYLOAD_HEADER: &str = "X-Encrypted-Payload";
 
-pub struct HttpStepExecutor {
+pub(crate) struct HttpStepExecutor {
     client: reqwest::Client,
     connector_url: String,
 }
 
 impl HttpStepExecutor {
-    pub fn new(connector_url: String) -> Result<Self, String> {
+    pub(crate) fn new(connector_url: String) -> Result<Self, String> {
         let connector_url = connector_url.trim().to_owned();
         if connector_url.is_empty() {
             return Err("connector service URL must not be empty".to_string());

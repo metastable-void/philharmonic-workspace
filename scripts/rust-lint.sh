@@ -1,6 +1,6 @@
 #!/bin/sh
-# scripts/rust-lint.sh — run the lint trio (fmt-check + check +
-# clippy with `-D warnings`) across the workspace or a single
+# scripts/rust-lint.sh — run the lint quartet (fmt-check + check +
+# clippy + rustdoc missing_docs) across the workspace or a single
 # crate.
 #
 # Usage:
@@ -11,6 +11,10 @@
 #   cargo fmt   (--all | -p <crate>) --check
 #   cargo check (--workspace | -p <crate>)
 #   cargo clippy (--workspace | -p <crate>) --all-targets -- -D warnings
+#   RUSTDOCFLAGS="-D missing_docs" cargo doc --no-deps
+#
+# The rustdoc step catches undocumented public items in all
+# workspace crates.
 #
 # Mandated for lint passes in this workspace — prefer this over
 # raw `cargo fmt/check/clippy`. Bespoke cargo invocations remain
@@ -45,6 +49,8 @@ if [ $# -eq 1 ]; then
     cargo check -p "$crate"
     printf '%s--- cargo clippy -p %s --all-targets -- -D warnings ---%s\n' "$C_DIM" "$crate" "$C_RESET"
     cargo clippy -p "$crate" --all-targets -- -D warnings
+    printf '%s--- cargo doc -p %s (missing_docs) ---%s\n' "$C_DIM" "$crate" "$C_RESET"
+    RUSTDOCFLAGS="-D missing_docs" cargo doc --no-deps -p "$crate"
 else
     printf '%s=== rust-lint scope: workspace ===%s\n' "$C_HEADER" "$C_RESET"
     printf '%s--- cargo fmt --all --check ---%s\n' "$C_DIM" "$C_RESET"
@@ -53,6 +59,8 @@ else
     cargo check --workspace
     printf '%s--- cargo clippy --workspace --all-targets -- -D warnings ---%s\n' "$C_DIM" "$C_RESET"
     cargo clippy --workspace --all-targets -- -D warnings
+    printf '%s--- cargo doc --workspace (missing_docs) ---%s\n' "$C_DIM" "$C_RESET"
+    RUSTDOCFLAGS="-D missing_docs" cargo doc --no-deps --workspace
 fi
 
 printf '%s=== rust-lint: clean ===%s\n' "$C_OK" "$C_RESET"

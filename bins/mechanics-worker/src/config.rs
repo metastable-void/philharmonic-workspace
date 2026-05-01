@@ -2,12 +2,12 @@ use std::net::SocketAddr;
 
 #[derive(Debug, serde::Deserialize)]
 #[serde(default)]
-pub struct MechanicsWorkerConfig {
-    pub bind: SocketAddr,
-    pub tokens: Vec<String>,
-    pub pool: PoolConfig,
+pub(crate) struct MechanicsWorkerConfig {
+    pub(crate) bind: SocketAddr,
+    pub(crate) tokens: Vec<String>,
+    pub(crate) pool: PoolConfig,
     #[cfg(feature = "https")]
-    pub tls: Option<TlsFileConfig>,
+    pub(crate) tls: Option<TlsFileConfig>,
 }
 
 impl Default for MechanicsWorkerConfig {
@@ -24,13 +24,13 @@ impl Default for MechanicsWorkerConfig {
 
 #[derive(Debug, serde::Deserialize)]
 #[serde(default)]
-pub struct PoolConfig {
-    pub execution_timeout_secs: u64,
-    pub run_timeout_secs: u64,
-    pub default_http_timeout_ms: u64,
-    pub max_memory: usize,
-    pub max_stack: usize,
-    pub max_output: usize,
+pub(crate) struct PoolConfig {
+    pub(crate) execution_timeout_secs: u64,
+    pub(crate) run_timeout_secs: u64,
+    pub(crate) default_http_timeout_ms: u64,
+    pub(crate) max_memory: usize,
+    pub(crate) max_stack: usize,
+    pub(crate) max_output: usize,
 }
 
 impl Default for PoolConfig {
@@ -48,7 +48,7 @@ impl Default for PoolConfig {
 
 #[cfg(feature = "https")]
 #[derive(Debug, serde::Deserialize)]
-pub struct TlsFileConfig {
-    pub cert_path: std::path::PathBuf,
-    pub key_path: std::path::PathBuf,
+pub(crate) struct TlsFileConfig {
+    pub(crate) cert_path: std::path::PathBuf,
+    pub(crate) key_path: std::path::PathBuf,
 }

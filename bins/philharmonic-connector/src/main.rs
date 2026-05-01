@@ -1,3 +1,5 @@
+//! Philharmonic connector service — per-realm connector with payload decryption.
+
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
 use std::process;
