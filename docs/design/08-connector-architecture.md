@@ -183,37 +183,33 @@ No heavy dependencies. `philharmonic-types` and
 
 ### `philharmonic-connector-client`
 
-The lowerer: produces concrete `MechanicsConfig` values from a
-workflow template's abstract config at step-execution time.
+Crypto / minting library for the connector layer's client
+side. Provides the primitive operations that a lowerer needs
+to produce connector authorization tokens and encrypted
+payloads.
 
-- Implements the `ConfigLowerer` trait defined in
-  `philharmonic-workflow`.
-- Resolves `script_name → config_uuid` from the template's
-  abstract config.
-- Consults `philharmonic-policy` to fetch
-  `TenantEndpointConfig` entities by UUID.
-- Decrypts each config's blob with the substrate credential
-  key (SCK).
-- Reads the `realm` field from the decrypted blob to pick the
-  target realm KEM key.
-- Re-encrypts the decrypted blob — byte-identical — to the
-  realm's KEM public key via COSE_Encrypt0.
-- Mints one signed token per config, binding
-  instance/step/tenant/config context to the payload hash via
-  COSE_Sign1.
-- Assembles the `MechanicsConfig` map the executor consumes.
+- `LowererSigningKey` — holds the Ed25519 signing key and
+  mints COSE_Sign1 connector authorization tokens via
+  `mint_connector_token`, binding instance/step/tenant/config
+  context to the payload hash.
+- `encrypt_payload` — encrypts an arbitrary plaintext blob to
+  a realm's hybrid KEM public key via COSE_Encrypt0 (ML-KEM-768
+  + X25519 + AES-256-GCM).
 
-Depends on `connector-common`, `philharmonic-store`,
-`philharmonic-policy`, `philharmonic-workflow`, and
-`mechanics-config`. Crucially: **no dependency on
-`mechanics-core`**. The lowerer stays Boa-free.
+Depends on `connector-common` (token claim types, realm
+model, COSE wrapper types) and crypto dependencies
+(`coset`, `ml-kem`, `x25519-dalek`, `aes-gcm`, `hkdf`,
+`ed25519-dalek`). No dependency on `philharmonic-store`,
+`philharmonic-policy`, `philharmonic-workflow`, or
+`mechanics-config`.
 
-The lowerer's transformation of the per-tenant blob is
-**minimal**: decrypt from SCK, inspect only the `realm` field,
-re-encrypt as-is to the realm KEM. No field extraction,
-substitution, synthesis, or reshaping. The admin's submitted
-JSON is the payload, round-tripped through two encryption
-boundaries.
+The full lowering orchestration — store lookup of
+`TenantEndpointConfig` entities, SCK decryption, realm
+selection, `MechanicsConfig` assembly, and implementation of
+the `ConfigLowerer` trait — lives in the API server binary's
+`ConnectorConfigLowerer`, which depends on both this crate
+(for the crypto primitives) and the policy / workflow / store
+crates (for entity access and the trait definition).
 
 ### `philharmonic-connector-router`
 
@@ -264,24 +260,29 @@ holds no keys and speaks no wire format).
 
 ### `philharmonic-connector-service`
 
-Framework for per-realm connector service binaries.
+Framework for per-realm connector service binaries. Handles
+the crypto-sensitive request-validation path:
 
 - HTTP listener.
 - COSE_Sign1 signature verification.
 - COSE_Encrypt0 payload decryption with the realm private key.
 - Token claim checking (expiry, realm, payload hash).
-- Implementation registry built at binary startup from linked
-  impl crates (holds `Box<dyn Implementation>` values from
-  `connector-impl-api`).
-- Dispatch to the implementation named by the decrypted
-  payload's `impl` field.
+- `ConnectorCallContext` construction from verified token
+  claims.
 - Response path back to the executor.
 
-Per-realm binaries link the service framework together with
-the specific implementation crates configured for that realm.
+This crate does **not** host the `Implementation` trait
+registry and does **not** depend on `connector-impl-api`.
+The implementation dispatch — the registry of
+`Box<dyn Implementation>` values and the lookup by the
+decrypted payload's `impl` field — lives in the deployment
+binary (`bins/philharmonic-connector/`), which depends on
+both `connector-service` (for the crypto-validated request
+pipeline) and `connector-impl-api` (for the `Implementation`
+trait it dispatches to).
+
 Depends on `connector-common` (crypto primitives, token
-claims), `connector-impl-api` (the trait it dispatches to),
-and little else from the philharmonic namespace.
+claims) and little else from the philharmonic namespace.
 
 ### Per-implementation crates
 

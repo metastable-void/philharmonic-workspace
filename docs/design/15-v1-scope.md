@@ -50,17 +50,21 @@ Remaining: Tier 2 SMTP + Tier 3 LLM providers (post-Golden-Week).
   (no `claims`, no `tenant_id`) via a separate
   `StepRecordSubject` persistence type.
 
-### Needs implementation work
+### Implemented and published
 
-- `philharmonic-connector-client` — the lowerer; implements
-  `ConfigLowerer`.
+- `philharmonic-connector-client` — crypto/minting library
+  (COSE_Sign1 token minting, COSE_Encrypt0 payload
+  encryption). Published.
+- `philharmonic-connector-impl-api` — `Implementation` trait
+  contract. Published.
 - `philharmonic-connector-router` — pure HTTP dispatcher
-  binary.
-- `philharmonic-connector-service` — framework for per-realm
-  connector service binaries.
-- Per-implementation crates. Naming:
-  `philharmonic-connector-impl-<name>`.
-- `philharmonic-api` — public HTTP API.
+  binary. Published.
+- `philharmonic-connector-service` — service framework; token
+  verification, payload decryption, `ConnectorCallContext`
+  construction. Published.
+- Per-implementation crates
+  (`philharmonic-connector-impl-<name>`). Published.
+- `philharmonic-api` — public HTTP API. Published.
 
 ### Deferred or not planned
 
@@ -125,17 +129,20 @@ reference configs by UUID.
 
 ### Crate split
 
-Four crates plus per-implementation crates:
+Five crates plus per-implementation crates:
 
 - `philharmonic-connector-common` — shared types (COSE
   formats, realm model, `ConnectorCallContext`).
-- `philharmonic-connector-client` — the lowerer; SCK
-  decryption, realm KEM re-encryption, token minting.
+- `philharmonic-connector-client` — crypto/minting library;
+  COSE_Sign1 token minting, COSE_Encrypt0 payload encryption.
 - `philharmonic-connector-router` — pure HTTP dispatcher per
   realm.
-- `philharmonic-connector-service` — service framework; hosts
-  `Implementation` trait, verification, decryption,
-  impl-registry dispatch.
+- `philharmonic-connector-impl-api` — `Implementation` trait
+  contract; non-crypto, no key material.
+- `philharmonic-connector-service` — service framework; token
+  verification, payload decryption, `ConnectorCallContext`
+  construction. Does not host the `Implementation` trait
+  registry; dispatch lives in the deployment binary.
 - Per-implementation crates, one per implementation.
 
 ### Ships with v1

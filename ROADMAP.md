@@ -6,7 +6,7 @@
 family from current state to v1 MVP (working end-to-end deployment
 serving real tenants).
 
-**Current state** (2026-04-22):
+**Current state** (2026-04-30):
 
 - Design: complete.
 - Phase 0 (workspace setup): **done**, with substantial added
@@ -78,7 +78,13 @@ serving real tenants).
   `verify-tag.sh`: local + signed + pushed, ok). First real
   releases for client/service/router (names were never
   reserved at 0.0.0 on crates.io).
-- Phases 6–9: not started.
+- Phase 6 (API core): **done** (2026-04-24).
+- Phase 7 Tier 1 (6 connector impls): **done** (2026-04-27).
+  Tier 2–3 connectors (SMTP, Anthropic, Gemini) deferred to
+  post-Golden-Week (on or after 2026-05-07).
+- Phase 8 (end-to-end): **complete** (2026-04-28).
+- Phase 9 (integration + deployment): **substantially complete**
+  (2026-04-30); reference deployment in progress.
 
 Work through phases in order unless a phase is explicitly noted
 as parallel-safe. Consult the design documentation as the
@@ -127,8 +133,8 @@ repo containing:
   normal versioned deps so they remain independently
   buildable/publishable; the patch table rewrites them to local
   paths when building from the workspace.
-- 24 submodule directories, one per crate, each being a separate
-  Git repo at `github.com/metastable-void/<crate-name>`.
+- 26 submodule directories (25 crate submodules + docs-jp), each
+  being a separate Git repo at `github.com/metastable-void/<name>`.
 - `scripts/` — helper scripts (`status.sh`, `pull-all.sh`,
   `push-all.sh`, `commit-all.sh`).
 - `docs/design/` (expected) — design documentation this roadmap
@@ -366,7 +372,7 @@ beyond the original plan.
 
 **Originally-planned tasks** (all complete):
 - `philharmonic-workspace` repo initialized with submodules for
-  each of the 23 crates.
+  each of the 25 crates.
 - Workspace `Cargo.toml` with all members listed and
   `[workspace.dependencies]` populated.
 - Helper scripts in `scripts/` executable.
@@ -442,7 +448,7 @@ file inventory):
   against the previous crates.io release before any new release.
 
 **Acceptance criteria**:
-- `git submodule status` shows all 24 submodules at a clean
+- `git submodule status` shows all 26 submodules at a clean
   commit. ✓
 - `cargo check --workspace` succeeds. ✓
 - `./scripts/status.sh` runs without error. ✓
@@ -1816,10 +1822,16 @@ step execution, audit log.
       containers.
     - Local override files for HTTPS certs, hostnames.
 
-13. **Documentation reconciliation**:
-    - Update design docs where implementation diverged.
-    - Pass through docs 01, 08, 09, 10, 11, 15 at minimum.
-    - Resolve "still open" items in doc 14 that were settled.
+13. ✅ **Documentation reconciliation** (landed 2026-05-01):
+    - Updated design docs 08, 15 where implementation diverged
+      (connector-client is pure crypto, not full lowerer;
+      connector-service does not host Implementation registry).
+    - Fixed stale crate counts (23→25), submodule counts
+      (24→26), phase status in ROADMAP preamble.
+    - Fixed CONTRIBUTING.md §8.1 target-dir claim.
+    - Updated member crate READMEs (api, types, meta-crate).
+    - Added `pub(crate)` + doc comments across all crates;
+      gated pre-landing on `RUSTDOCFLAGS="-D missing_docs"`.
 
 **Cut order for 5/2** (must → should → can-slip):
 
@@ -1998,7 +2010,7 @@ otherwise."
 
 Philharmonic v1 is shipped when:
 
-- All 23 crates published at `0.1.0` or higher on crates.io.
+- All 25 crates published at `0.1.0` or higher on crates.io.
 - Reference deployment live on the developer's infrastructure with:
   - TLS-terminated API subdomain pattern working.
   - At least one tenant provisioned.

@@ -1134,13 +1134,13 @@ negligible after caching; the avoided stall is minutes. Not
 worth a more elaborate fix (e.g. excluding `xtask` from the
 workspace) just to de-duplicate.
 
-**Caveat:** other scripts that invoke cargo for member crates
-(`rust-lint.sh`, `rust-test.sh`, `pre-landing.sh`, etc.) do
-**not** set `CARGO_TARGET_DIR` — they use `target/` as normal.
-The split is specifically for the xtask wrapper, because that's
-the path workspace orchestration scripts take; member-crate
-compiles are already expected to hold the `target/` lock for
-the duration of the build.
+**Member-crate scripts:** other scripts that invoke cargo for
+member crates (`rust-lint.sh`, `rust-test.sh`, `pre-landing.sh`,
+etc.) source `scripts/lib/cargo-target-dir.sh` and use
+`target-main/` (see §5, "Target-dir split"). The xtask split
+(`target-xtask/`) is additional and specific to the xtask
+wrapper, so xtask builds don't contend with member-crate builds
+in `target-main/`.
 
 ### 8.2 Non-submodule member plumbing
 
