@@ -37,8 +37,17 @@ signing_key_kid = "api-2026-05"
 # lowerer_issuer = "philharmonic"     # defaults to issuer above
 # lowerer_token_lifetime_ms = 600000  # 10 minutes
 
-# --- Executor (connector service dispatch) ---
-# URL of the connector service for step execution.
+# --- Mechanics worker (JS execution) ---
+# URL of the mechanics worker for step execution.
+# mechanics_worker_url = "http://127.0.0.1:3001"
+
+# --- Connector router URL (as seen from the mechanics worker) ---
+# The lowerer builds endpoint configs that point here. The
+# mechanics worker's JS scripts POST to this URL with pre-baked
+# crypto headers. Typically the API server's own /connector path.
+# connector_router_url = "http://127.0.0.1:3000/connector"
+
+# --- Connector dispatch upstream ---
 # connector_service_url = "http://127.0.0.1:3002"
 
 # --- Connector router domain suffix ---

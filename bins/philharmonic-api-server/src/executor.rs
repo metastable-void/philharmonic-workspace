@@ -1,56 +1,52 @@
 use async_trait::async_trait;
 use philharmonic::types::JsonValue;
 use philharmonic::workflow::{StepExecutionError, StepExecutor};
-use reqwest::header::{AUTHORIZATION, CONTENT_TYPE};
+use reqwest::header::CONTENT_TYPE;
+use serde_json::json;
 
-const ENCRYPTED_PAYLOAD_HEADER: &str = "X-Encrypted-Payload";
-
-pub(crate) struct HttpStepExecutor {
+pub(crate) struct MechanicsWorkerExecutor {
     client: reqwest::Client,
-    connector_url: String,
+    worker_url: String,
 }
 
-impl HttpStepExecutor {
-    pub(crate) fn new(connector_url: String) -> Result<Self, String> {
-        let connector_url = connector_url.trim().to_owned();
-        if connector_url.is_empty() {
-            return Err("connector service URL must not be empty".to_string());
+impl MechanicsWorkerExecutor {
+    pub(crate) fn new(worker_url: String) -> Result<Self, String> {
+        let worker_url = worker_url.trim().to_owned();
+        if worker_url.is_empty() {
+            return Err("mechanics worker URL must not be empty".to_string());
         }
-        reqwest::Url::parse(&connector_url)
-            .map_err(|error| format!("connector service URL is invalid: {error}"))?;
+        reqwest::Url::parse(&worker_url)
+            .map_err(|error| format!("mechanics worker URL is invalid: {error}"))?;
         Ok(Self {
             client: reqwest::Client::new(),
-            connector_url,
+            worker_url,
         })
     }
 }
 
 #[async_trait]
-impl StepExecutor for HttpStepExecutor {
+impl StepExecutor for MechanicsWorkerExecutor {
     async fn execute(
         &self,
-        _script: &str,
+        script: &str,
         arg: &JsonValue,
         config: &JsonValue,
     ) -> Result<JsonValue, StepExecutionError> {
-        let token = required_string(config, "token")?;
-        let encrypted_payload = required_string(config, "encrypted_payload")?;
-        let request_body = config
-            .get("request")
-            .cloned()
-            .unwrap_or_else(|| arg.clone());
+        let job = json!({
+            "module_source": script,
+            "arg": arg,
+            "config": config,
+        });
 
         let response = self
             .client
-            .post(&self.connector_url)
-            .header(AUTHORIZATION, format!("Bearer {token}"))
-            .header(ENCRYPTED_PAYLOAD_HEADER, encrypted_payload)
+            .post(&self.worker_url)
             .header(CONTENT_TYPE, "application/json")
-            .json(&request_body)
+            .json(&job)
             .send()
             .await
             .map_err(|error| {
-                StepExecutionError::Transport(format!("connector service request failed: {error}"))
+                StepExecutionError::Transport(format!("mechanics worker request failed: {error}"))
             })?;
 
         let status = response.status();
@@ -59,7 +55,7 @@ impl StepExecutor for HttpStepExecutor {
                 Ok(body) => body,
                 Err(error) => format!("<failed to read error body: {error}>"),
             };
-            let detail = format!("connector service returned status {status}: {body}");
+            let detail = format!("mechanics worker returned status {status}: {body}");
             return if status.is_server_error() {
                 Err(StepExecutionError::Transport(detail))
             } else {
@@ -69,17 +65,8 @@ impl StepExecutor for HttpStepExecutor {
 
         response.json::<JsonValue>().await.map_err(|error| {
             StepExecutionError::Transport(format!(
-                "connector service returned invalid JSON response: {error}"
+                "mechanics worker returned invalid JSON response: {error}"
             ))
         })
     }
-}
-
-fn required_string<'a>(
-    value: &'a JsonValue,
-    field: &'static str,
-) -> Result<&'a str, StepExecutionError> {
-    value.get(field).and_then(JsonValue::as_str).ok_or_else(|| {
-        StepExecutionError::ScriptError(format!("lowered config field '{field}' must be a string"))
-    })
 }

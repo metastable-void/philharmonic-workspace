@@ -45,7 +45,7 @@ mod scope;
 mod security_headers;
 
 use config::ApiConfig;
-use executor::HttpStepExecutor;
+use executor::MechanicsWorkerExecutor;
 use lowerer::ConnectorConfigLowerer;
 use scope::HeaderBasedScopeResolver;
 
@@ -480,8 +480,9 @@ fn build_config_lowerer(
     let has_kid = config.lowerer_signing_key_kid.is_some();
     let has_realm_keys = !config.realm_public_keys.is_empty();
     let has_sck = state.sck_bytes.is_some();
+    let has_router_url = config.connector_router_url.is_some();
 
-    if !(has_path && has_kid && has_realm_keys && has_sck) {
+    if !(has_path && has_kid && has_realm_keys && has_sck && has_router_url) {
         eprintln!("philharmonic-api: lowerer not fully configured, using stub lowerer");
         if !has_path {
             eprintln!("  missing: lowerer_signing_key_path");
@@ -494,6 +495,11 @@ fn build_config_lowerer(
         }
         if !has_sck {
             eprintln!("  missing: sck_path (needed to decrypt endpoint configs)");
+        }
+        if !has_router_url {
+            eprintln!(
+                "  missing: connector_router_url (URL the mechanics worker uses to reach the connector router)"
+            );
         }
         return Ok(Arc::new(StubLowerer));
     }
@@ -521,6 +527,11 @@ fn build_config_lowerer(
     let sck = Arc::new(Sck::from_bytes(**sck_bytes));
     let lowerer_store = SqlStore::from_pool(state.pool.pool().clone());
 
+    let connector_router_url = config
+        .connector_router_url
+        .clone()
+        .ok_or("connector_router_url is required for lowerer")?;
+
     Ok(Arc::new(ConnectorConfigLowerer::new(
         signing_key,
         realm_keys,
@@ -528,18 +539,19 @@ fn build_config_lowerer(
         config.lowerer_token_lifetime_ms,
         lowerer_store,
         sck,
+        connector_router_url,
     )))
 }
 
 fn build_step_executor(config: &ApiConfig) -> Result<Arc<dyn StepExecutor>, String> {
-    let Some(connector_url) = &config.connector_service_url else {
-        eprintln!("philharmonic-api: connector service URL not configured, using stub executor");
+    let Some(worker_url) = &config.mechanics_worker_url else {
+        eprintln!("philharmonic-api: mechanics_worker_url not configured, using stub executor");
         return Ok(Arc::new(StubExecutor));
     };
 
     Ok(Arc::new(
-        HttpStepExecutor::new(connector_url.clone())
-            .map_err(|error| format!("invalid connector_service_url: {error}"))?,
+        MechanicsWorkerExecutor::new(worker_url.clone())
+            .map_err(|error| format!("invalid mechanics_worker_url: {error}"))?,
     ))
 }
 

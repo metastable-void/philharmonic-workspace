@@ -18,6 +18,8 @@ pub(crate) struct ApiConfig {
     #[serde(default = "default_lowerer_token_lifetime_ms")]
     pub(crate) lowerer_token_lifetime_ms: u64,
     pub(crate) realm_public_keys: Vec<RealmPublicKeyConfig>,
+    pub(crate) mechanics_worker_url: Option<String>,
+    pub(crate) connector_router_url: Option<String>,
     pub(crate) connector_service_url: Option<String>,
     pub(crate) verifying_keys: Vec<VerifyingKeyConfig>,
     pub(crate) sck_path: Option<PathBuf>,
@@ -44,6 +46,8 @@ impl Default for ApiConfig {
             lowerer_issuer: None,
             lowerer_token_lifetime_ms: default_lowerer_token_lifetime_ms(),
             realm_public_keys: Vec::new(),
+            mechanics_worker_url: None,
+            connector_router_url: None,
             connector_service_url: None,
             verifying_keys: Vec::new(),
             sck_path: None,
