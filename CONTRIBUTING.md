@@ -1757,6 +1757,22 @@ state that was published is only trivially recoverable if a tag
 marks it. Tags also give `cargo-semver-checks` a clean baseline
 reference for release-to-release API-breakage checks.
 
+### 12.5 Publish checklist
+
+The correct sequence for a crate release is:
+
+1. **Version bump** in `Cargo.toml`.
+2. **CHANGELOG update** — add a `## [<version>]` section with
+   what changed.
+3. **Commit** the version bump + CHANGELOG together.
+4. **`./scripts/publish-crate.sh`** — publishes to crates.io and
+   creates the signed release tag.
+5. **`./scripts/push-all.sh`** — pushes the tag.
+
+Steps 1–3 must happen **before** step 4. The CHANGELOG is part
+of the published crate artifact — publishing first means the
+crate on crates.io has an empty or stale CHANGELOG.
+
 **Post-release verification.** `./scripts/verify-tag.sh <crate>
 [<tag>]` confirms the tag landed cleanly end-to-end: local
 presence, signature verifying with the local keyring, and
