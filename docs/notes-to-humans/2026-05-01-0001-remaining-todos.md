@@ -70,30 +70,39 @@ consolidates what's left.
 
 ## Code hygiene
 
-17. **Visibility + docs audit for bin targets**: `pub` items in
-    `bins/*/src/` should be `pub(crate)` (nothing outside the bin
-    imports them) or, where genuinely public, have doc comments.
-    Affects `mechanics-worker`, `philharmonic-api-server`,
-    `philharmonic-connector`. Crate-by-crate: grep for bare `pub`
-    in each bin's `src/`, downgrade to `pub(crate)`, add docs to
-    any that stay `pub`. Then enable `#![warn(missing_docs)]` in
-    lib crates one at a time (gated by `RUSTDOCFLAGS="-D
-    missing_docs" cargo doc --no-deps -p <crate>` in
-    `rust-lint.sh`).
+17. ~~**Visibility + docs audit for bin targets**~~: **Done**
+    (2026-05-01). All `pub` → `pub(crate)` in bin targets, doc
+    comments added across all crates, `RUSTDOCFLAGS="-D
+    missing_docs"` gated in `rust-lint.sh`.
+
+18. **Feature-gate mechanics/boa in meta-crate**: `boa_engine`
+    (the JS runtime from `mechanics-core`) leaks into all three
+    bins via the unconditional `mechanics`/`mechanics_core`
+    re-exports in the `philharmonic` meta-crate. Only
+    `mechanics-worker` needs it. Add a `mechanics` Cargo feature
+    to the meta-crate (default off), enable it only in
+    `mechanics-worker`. Same pattern as the embed-weight split.
+
+19. **WebUI branding via API config**: Allow operators to replace
+    the "Philharmonic" display text in the WebUI with a
+    config-supplied string (e.g. `webui_brand_name = "Acme
+    Workflows"`). Injected at serve time via a template variable
+    or a `/v1/_meta/branding` endpoint that the React app fetches
+    on load. Icon/logo customization is out of scope for now.
 
 ---
 
 ## Post-Golden-Week tasks (on or after 2026-05-07)
 
-18. **Phase 7 Tier 2 — SMTP** (`email-smtp`): Single connector
+20. **Phase 7 Tier 2 — SMTP** (`email-smtp`): Single connector
     impl, `lettre`-based. Placeholder 0.0.0 is published.
     Discrete scope.
 
-19. **Phase 7 Tier 3 — Anthropic** (`llm-anthropic`): Native
+21. **Phase 7 Tier 3 — Anthropic** (`llm-anthropic`): Native
     Anthropic Messages API. Placeholder 0.0.0 published.
     Scheduled on or after 2026-05-07.
 
-20. **Phase 7 Tier 3 — Gemini** (`llm-gemini`): Native Google
+22. **Phase 7 Tier 3 — Gemini** (`llm-gemini`): Native Google
     Gemini API. Placeholder 0.0.0 published. Scheduled on or
     after 2026-05-07.
 
