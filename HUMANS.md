@@ -39,3 +39,13 @@ Structure:
 Add `cargo install mdbook` at setup.sh.
 
 Update all remaining references to new ones.
+
+Note: this docs will be at https://metastable-void.github.io/philharmonic-workspace/. Following notes apply.
+
+> If your book is not deployed at the root of the domain, then you should set the output.html.site-url setting so that the 404 page works correctly. It needs to know where the book is deployed in order to load the static files (like CSS) correctly. For example, this guide is deployed at https://rust-lang.github.io/mdBook/, and the site-url setting is configured like this:
+> 
+> ```
+> # book.toml
+> [output.html]
+> site-url = "/mdBook/"
+> ```

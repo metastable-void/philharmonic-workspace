@@ -19,13 +19,14 @@ consolidates what's left.
 
 ## Documentation polish (can be done anytime)
 
-2. **doc 08 (connector architecture)**: Should note the Phase 9
-   deployment shape where the router is embedded in the API bin.
+2. ~~**doc 08 (connector architecture)**~~: **Done** (2026-05-01).
+   Corrected connector-client/service descriptions.
 
-3. **doc 15 (v1 scope)**: Could add a completion note.
+3. ~~**doc 15 (v1 scope)**~~: **Done** (2026-05-01). "Needs
+   implementation work" → "Implemented and published".
 
-4. **Workspace README scripts section**: Missing entries for
-   `build-status.sh`, `release-build.sh`, `audit-log.sh`.
+4. ~~**Workspace README scripts section**~~: **Done**
+   (2026-05-01). All scripts and xtask bins listed.
 
 5. **CHANGELOG entries**: Several crates bumped (store 0.1.1,
    mechanics 0.4.0, connector-service 0.2.0, api 0.1.2,
@@ -83,7 +84,18 @@ consolidates what's left.
     to the meta-crate (default off), enable it only in
     `mechanics-worker`. Same pattern as the embed-weight split.
 
-19. **WebUI branding via API config**: Allow operators to replace
+19. **Restructure `docs/` for mdBook**: Per HUMANS.md — move
+    `ROADMAP.md` and `POSIX_CHECKLIST.md` under `docs/`, split
+    crypto proposals/vectors out of `docs/design/` into
+    `docs/crypto/`, demolish `docs/instructions/README.md`
+    (absorbed into CONTRIBUTING.md + agent MDs), make `docs/`
+    the home for mdBook-based GitHub Pages docs. Deployed at
+    `https://metastable-void.github.io/philharmonic-workspace/`
+    — set `[output.html] site-url = "/philharmonic-workspace/"`
+    in `book.toml`. Add `cargo install mdbook` to `setup.sh`.
+    Update all internal references to new paths.
+
+20. **WebUI branding via API config**: Allow operators to replace
     the "Philharmonic" display text in the WebUI with a
     config-supplied string (e.g. `webui_brand_name = "Acme
     Workflows"`). The `[P]` monogram icon should derive from the
@@ -96,15 +108,15 @@ consolidates what's left.
 
 ## Post-Golden-Week tasks (on or after 2026-05-07)
 
-20. **Phase 7 Tier 2 — SMTP** (`email-smtp`): Single connector
+21. **Phase 7 Tier 2 — SMTP** (`email-smtp`): Single connector
     impl, `lettre`-based. Placeholder 0.0.0 is published.
     Discrete scope.
 
-21. **Phase 7 Tier 3 — Anthropic** (`llm-anthropic`): Native
+22. **Phase 7 Tier 3 — Anthropic** (`llm-anthropic`): Native
     Anthropic Messages API. Placeholder 0.0.0 published.
     Scheduled on or after 2026-05-07.
 
-22. **Phase 7 Tier 3 — Gemini** (`llm-gemini`): Native Google
+23. **Phase 7 Tier 3 — Gemini** (`llm-gemini`): Native Google
     Gemini API. Placeholder 0.0.0 published. Scheduled on or
     after 2026-05-07.
 
