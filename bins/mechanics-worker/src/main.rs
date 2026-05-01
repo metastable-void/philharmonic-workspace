@@ -17,6 +17,8 @@ mod config;
 use config::MechanicsWorkerConfig;
 
 const DEFAULT_CONFIG: &str = r#"bind = "127.0.0.1:3001"
+# Empty list = every request returns 401 (fail-closed).
+# Add at least one token to accept traffic.
 tokens = []
 
 [pool]

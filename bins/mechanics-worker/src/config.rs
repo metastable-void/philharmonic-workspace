@@ -4,6 +4,7 @@ use std::net::SocketAddr;
 #[serde(default)]
 pub(crate) struct MechanicsWorkerConfig {
     pub(crate) bind: SocketAddr,
+    /// Empty list = every request returns 401 (fail-closed).
     pub(crate) tokens: Vec<String>,
     pub(crate) pool: PoolConfig,
     #[cfg(feature = "https")]
