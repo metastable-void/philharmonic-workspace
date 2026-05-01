@@ -86,9 +86,11 @@ consolidates what's left.
 19. **WebUI branding via API config**: Allow operators to replace
     the "Philharmonic" display text in the WebUI with a
     config-supplied string (e.g. `webui_brand_name = "Acme
-    Workflows"`). Injected at serve time via a template variable
-    or a `/v1/_meta/branding` endpoint that the React app fetches
-    on load. Icon/logo customization is out of scope for now.
+    Workflows"`). The `[P]` monogram icon should derive from the
+    first character of the brand name (e.g. `[A]` for "Acme").
+    Injected at serve time via a template variable or a
+    `/v1/_meta/branding` endpoint that the React app fetches on
+    load. Custom icon/logo upload is out of scope for now.
 
 ---
 
