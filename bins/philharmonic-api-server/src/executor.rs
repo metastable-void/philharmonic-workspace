@@ -11,7 +11,7 @@ pub(crate) struct MechanicsWorkerExecutor {
 
 impl MechanicsWorkerExecutor {
     pub(crate) fn new(worker_url: String) -> Result<Self, String> {
-        let worker_url = worker_url.trim().to_owned();
+        let worker_url = worker_url.trim().trim_end_matches('/').to_owned();
         if worker_url.is_empty() {
             return Err("mechanics worker URL must not be empty".to_string());
         }
@@ -38,9 +38,10 @@ impl StepExecutor for MechanicsWorkerExecutor {
             "config": config,
         });
 
+        let url = format!("{}/api/v1/mechanics", self.worker_url);
         let response = self
             .client
-            .post(&self.worker_url)
+            .post(&url)
             .header(CONTENT_TYPE, "application/json")
             .json(&job)
             .send()

@@ -38,7 +38,8 @@ signing_key_kid = "api-2026-05"
 # lowerer_token_lifetime_ms = 600000  # 10 minutes
 
 # --- Mechanics worker (JS execution) ---
-# URL of the mechanics worker for step execution.
+# Base URL of the mechanics worker for step execution.
+# The executor appends /api/v1/mechanics automatically.
 # mechanics_worker_url = "http://127.0.0.1:3001"
 
 # --- Connector router URL (as seen from the mechanics worker) ---
