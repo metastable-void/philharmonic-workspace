@@ -31,51 +31,95 @@ the endpoint connections:
 
 ### 1. Create an endpoint config
 
+The `config` JSON shape depends on which connector implementation
+will handle the endpoint. All configs are encrypted at rest using
+the SCK — API keys and secrets are never stored in plaintext.
+
+#### LLM (OpenAI-compatible)
+
 ```
 POST /v1/endpoints
-Authorization: Bearer pht_...
-X-Tenant-Id: <tenant-uuid>
 Content-Type: application/json
 
 {
-  "display_name": "My LLM Service",
+  "display_name": "My LLM",
   "config": {
-    "method": "post",
-    "url_template": "https://api.example.com/v1/chat/completions",
-    "headers": {
-      "Authorization": "Bearer sk-...",
-      "Content-Type": "application/json"
-    },
-    "response_body_type": "json"
+    "base_url": "https://api.openai.com/v1",
+    "api_key": "sk-...",
+    "dialect": "openai_native",
+    "timeout_ms": 60000
+  }
+}
+```
+
+| Field | Required | Description |
+|---|---|---|
+| `base_url` | yes | Provider base URL |
+| `api_key` | yes | Bearer token for the provider |
+| `dialect` | yes | `"openai_native"` or `"tool_call_fallback"` |
+| `timeout_ms` | no | Per-attempt timeout (default: 60000) |
+
+#### HTTP Forward (generic HTTP)
+
+```json
+{
+  "display_name": "External API",
+  "config": {
+    "endpoint": {
+      "method": "post",
+      "url_template": "https://api.example.com/v1/{resource}",
+      "headers": { "Authorization": "Bearer ..." },
+      "response_body_type": "json",
+      "response_max_bytes": 1048576
+    }
+  }
+}
+```
+
+The `endpoint` field is a `mechanics-config` `HttpEndpoint`
+definition (see `mechanics-core/ts-types/mechanics-json-shapes.d.ts`
+for the full TypeScript shape).
+
+#### SQL (PostgreSQL / MySQL)
+
+```json
+{
+  "display_name": "Analytics DB",
+  "config": {
+    "connection_url": "postgres://user:pass@host/db",
+    "max_connections": 10,
+    "default_timeout_ms": 30000,
+    "default_max_rows": 10000
+  }
+}
+```
+
+#### Text Embedding
+
+```json
+{
+  "display_name": "Embedder",
+  "config": {
+    "model_id": "bge-m3",
+    "max_batch_size": 32,
+    "timeout_ms": 10000
+  }
+}
+```
+
+#### Vector Search
+
+```json
+{
+  "display_name": "Searcher",
+  "config": {
+    "max_corpus_size": 1000,
+    "timeout_ms": 2000
   }
 }
 ```
 
 Response: `{ "endpoint_id": "<uuid>" }`
-
-The config value is an `HttpEndpoint` JSON object. Full
-TypeScript definition is in `mechanics-core/ts-types/
-mechanics-json-shapes.d.ts` (`HttpEndpointJson`). Key fields:
-
-| Field | Type | Default | Description |
-|---|---|---|---|
-| `method` | `"get"` \| `"post"` \| `"put"` \| `"patch"` \| `"delete"` \| `"head"` \| `"options"` | required | HTTP method (lowercase) |
-| `url_template` | string | required | URL with optional `{slot}` placeholders |
-| `url_param_specs` | `{ slot: { default?, min_bytes?, max_bytes? } }` | `{}` | URL slot validation |
-| `query_specs` | `QuerySpec[]` | `[]` | Query string emission rules |
-| `headers` | `{ name: value }` | `{}` | Fixed request headers |
-| `overridable_request_headers` | `string[]` | `[]` | Headers the script can set at call time |
-| `exposed_response_headers` | `string[]` | `[]` | Response headers visible to the script |
-| `request_body_type` | `"json"` \| `"utf8"` \| `"bytes"` | none | Request body encoding |
-| `response_body_type` | `"json"` \| `"utf8"` \| `"bytes"` | `"json"` | Response body decoding |
-| `timeout_ms` | number \| null | null | Request timeout in milliseconds |
-| `response_max_bytes` | number \| null | null | Maximum response body size |
-| `allow_non_2xx_status` | boolean | `false` | If false, non-2xx is an error |
-| `retry_policy` | `EndpointRetryPolicyJson` | default | Automatic retry configuration |
-
-Endpoint configs are encrypted at rest using the SCK (substrate
-confidentiality key). The API key and other secrets in the config
-are never exposed to the script or stored in plaintext.
 
 ### 2. Use the endpoint UUID in abstract config
 
@@ -375,10 +419,10 @@ export default function(arg) {
    {
      "display_name": "Local LLM",
      "config": {
-       "method": "post",
-       "url_template": "http://localhost:8080/v1/chat/completions",
-       "headers": { "Content-Type": "application/json" },
-       "response_body_type": "json"
+       "base_url": "http://localhost:8080/v1",
+       "api_key": "local-dev-key",
+       "dialect": "openai_native",
+       "timeout_ms": 120000
      }
    }
    ```
