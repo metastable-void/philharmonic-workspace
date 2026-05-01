@@ -71,7 +71,8 @@ struct Cli {
 
 #[derive(Clone)]
 struct DynamicRouter {
-    router: Arc<RwLock<Router>>,
+    api: Arc<RwLock<Router>>,
+    connector: Arc<RwLock<Option<Router>>>,
 }
 
 #[derive(Clone)]
@@ -88,7 +89,8 @@ struct RuntimeCounts {
 }
 
 struct Runtime {
-    router: Router,
+    api_router: Router,
+    connector_router: Option<Router>,
     counts: RuntimeCounts,
 }
 
@@ -341,7 +343,8 @@ async fn serve(args: BaseArgs) -> Result<(), String> {
 
     let runtime = build_runtime(&config, &state)?;
     let dynamic = DynamicRouter {
-        router: Arc::new(RwLock::new(runtime.router)),
+        api: Arc::new(RwLock::new(runtime.api_router)),
+        connector: Arc::new(RwLock::new(runtime.connector_router)),
     };
     let app =
         dynamic_router(dynamic.clone()).layer(axum::middleware::from_fn(security_headers::inject));
@@ -365,7 +368,8 @@ async fn serve(args: BaseArgs) -> Result<(), String> {
                 match build_runtime(&reloaded, &state) {
                     Ok(runtime) => {
                         log_tls_reload_note(&reloaded);
-                        *dynamic.router.write().await = runtime.router;
+                        *dynamic.api.write().await = runtime.api_router;
+                        *dynamic.connector.write().await = runtime.connector_router;
                         log_reload(counts, runtime.counts);
                         counts = runtime.counts;
                     }
@@ -421,15 +425,13 @@ fn build_runtime(config: &ApiConfig, state: &LongLivedState) -> Result<Runtime, 
     if let Some(sck_bytes) = &state.sck_bytes {
         builder = builder.sck(Sck::from_bytes(**sck_bytes));
     }
-    if let Some(connector) = connector {
-        builder = builder.bypass_routes(connector);
-    }
 
     let api = builder
         .build()
         .map_err(|error| format!("failed to build API router: {error}"))?;
     Ok(Runtime {
-        router: api.into_router(),
+        api_router: api.into_router(),
+        connector_router: connector,
         counts: RuntimeCounts {
             verifying_keys: config.verifying_keys.len(),
             connector_realms: config.connector_dispatch.len(),
@@ -682,11 +684,19 @@ async fn dispatch_dynamic(
     State(state): State<DynamicRouter>,
     request: Request<Body>,
 ) -> Response<Body> {
-    let is_api_path =
-        request.uri().path().starts_with("/v1/") || request.uri().path().starts_with("/connector/");
+    if request.uri().path().starts_with("/connector/") {
+        let guard = state.connector.read().await;
+        if let Some(router) = guard.clone() {
+            drop(guard);
+            return match router.oneshot(request).await {
+                Ok(response) => response,
+                Err(error) => match error {},
+            };
+        }
+    }
 
-    if is_api_path {
-        let router = state.router.read().await.clone();
+    if request.uri().path().starts_with("/v1/") {
+        let router = state.api.read().await.clone();
         return match router.oneshot(request).await {
             Ok(response) => response,
             Err(error) => match error {},
