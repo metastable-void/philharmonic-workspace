@@ -45,7 +45,7 @@ serving real tenants).
   (`1cde0e1` — cross-tenant role-confusion fix + atom
   validation) and zeroization hardening from Claude's Gate-2
   re-review pass (`7ca357e` — H1 + H2). Gate-1 approval at
-  `docs/design/crypto-approvals/2026-04-21-phase-2-sck-and-pht.md`
+  `docs/crypto/approvals/2026-04-21-phase-2-sck-and-pht.md`
   (amended 2026-04-22 for the `rand 0.10` swap), Gate-2
   approval at `-01.md` alongside.
 - Phase 3 (`philharmonic-connector-common`): **done**
@@ -61,7 +61,7 @@ serving real tenants).
   service-side verify live in the triangle crates.
 - Phase 5 Wave B (hybrid KEM + COSE_Encrypt0): **landed
   2026-04-23**, Gate-2 approved
-  (`docs/design/crypto-approvals/2026-04-23-0001-phase-5-wave-b-codex-dispatch-complete.md`).
+  (`docs/crypto/approvals/2026-04-23-0001-phase-5-wave-b-codex-dispatch-complete.md`).
   Two Codex rounds — main implementation
   (`docs/codex-prompts/2026-04-22-0005-phase-5-wave-b-hybrid-kem-cose-encrypt0.md`)
   + zeroization/dead-code follow-up
@@ -548,10 +548,10 @@ Landed across three dispatches plus a review pass:
   AES-256-GCM primitives with wire format v1 and AAD binding
   over `tenant_id || config_uuid || key_version`, `pht_` API
   token format with Zeroize discipline. Gate-1 approval at
-  `docs/design/crypto-approvals/2026-04-21-phase-2-sck-and-pht.md`
+  `docs/crypto/approvals/2026-04-21-phase-2-sck-and-pht.md`
   (amended 2026-04-22 to swap `rand_core + getrandom` for
   `rand 0.10`); Gate-2 approval at
-  `docs/design/crypto-approvals/2026-04-21-phase-2-sck-and-pht-01.md`.
+  `docs/crypto/approvals/2026-04-21-phase-2-sck-and-pht-01.md`.
   Detail in
   `docs/notes-to-humans/2026-04-22-0001-phase-2-wave-2-landed-pending-gate2.md`.
 - **Auth-boundary hardening** (submodule commit `1cde0e1`,
@@ -853,7 +853,7 @@ wave pattern and it kept round-trips manageable.
   and `connector-service` (verify). `connector-router` stays
   no-crypto. Smaller, well-understood primitives (RustCrypto
   `ed25519-dalek` + `coset`). Gate-1 proposal at
-  `docs/design/crypto-proposals/2026-04-22-phase-5-wave-a-cose-sign1-tokens.md`.
+  `docs/crypto/proposals/2026-04-22-phase-5-wave-a-cose-sign1-tokens.md`.
 
 - **Wave B — Hybrid KEM + AEAD payload encryption.** ML-KEM-768
   + X25519 hybrid KEM, HKDF-SHA256 key derivation, AES-256-GCM
@@ -863,24 +863,24 @@ wave pattern and it kept round-trips manageable.
   surface; more novel (PQC). Builds on Wave A's token so that
   encrypted payloads can be hash-bound at mint time.
   **Gate-1 approved 2026-04-22** (proposal r3 at
-  `docs/design/crypto-proposals/2026-04-22-phase-5-wave-b-hybrid-kem-cose-encrypt0.md`;
+  `docs/crypto/proposals/2026-04-22-phase-5-wave-b-hybrid-kem-cose-encrypt0.md`;
   approval at
-  `docs/design/crypto-approvals/2026-04-22-phase-5-wave-b-hybrid-kem-cose-encrypt0.md`;
+  `docs/crypto/approvals/2026-04-22-phase-5-wave-b-hybrid-kem-cose-encrypt0.md`;
   Codex security review at
   `docs/codex-reports/2026-04-22-0005-phase-5-wave-b-hybrid-kem-cose-encrypt0-security-review.md`).
-  Reference vectors live at `docs/crypto-vectors/wave-b/`
+  Reference vectors live at `philharmonic-connector-service/tests/vectors/wave-b/`
   (23 hex files + JSON plaintext + README). **Landed 2026-04-23**
   across two Codex rounds — main implementation
   (`docs/codex-prompts/2026-04-22-0005-phase-5-wave-b-hybrid-kem-cose-encrypt0.md`)
   + zeroization/dead-code follow-up
   (`docs/codex-prompts/2026-04-23-0001-phase-5-wave-b-zeroization-followup.md`).
   **Gate-2 approved 2026-04-23**
-  (`docs/design/crypto-approvals/2026-04-23-0001-phase-5-wave-b-codex-dispatch-complete.md`).
+  (`docs/crypto/approvals/2026-04-23-0001-phase-5-wave-b-codex-dispatch-complete.md`).
   Wave B also lands the `philharmonic-connector-common 0.2.0`
   bump (adds `iat` claim per Wave A Gate-2 decision (A) later)
   — forced a Wave A reference-vector regeneration and added a
   composition-vector family
-  (`docs/crypto-vectors/wave-a/wave_a_composition_*.hex`) that
+  (`philharmonic-connector-client/tests/vectors/wave-a/wave_a_composition_*.hex`) that
   points at Wave B's `payload_hash`.
 
 Neither wave publishes on its own — the triangle's crates
@@ -963,12 +963,12 @@ independently of the KEM work.
 **Wave A status — landed 2026-04-22, Gate-2 approved
 2026-04-22.**
 - Gate-1: approved (proposal r4,
-  `docs/design/crypto-approvals/2026-04-22-phase-5-wave-a-cose-sign1-tokens.md`).
+  `docs/crypto/approvals/2026-04-22-phase-5-wave-a-cose-sign1-tokens.md`).
   Triggered a `philharmonic-types 0.3.5` upstream fix
   (CBOR-bstr `Sha256` serde) and a new workspace rule at
   `docs/design/13-conventions.md` §Library crate boundaries.
 - Reference vectors: generated with cbor2 + cryptography at
-  `docs/crypto-vectors/wave-a/` before Codex dispatch; matched
+  `philharmonic-connector-client/tests/vectors/wave-a/` before Codex dispatch; matched
   byte-for-byte by the Rust implementation.
 - Implementation: Codex, commits `9634f68` + `bcf8ea6` + parent
   pointer `ac02232`. Codex prompt archive:
@@ -982,7 +982,7 @@ independently of the KEM work.
   no source claim; Codex set it to `now` at verify time —
   semantically "time verified" not "time issued").
 - Yuka Gate-2 approval:
-  `docs/design/crypto-approvals/2026-04-22-phase-5-wave-a-cose-sign1-tokens-01.md`.
+  `docs/crypto/approvals/2026-04-22-phase-5-wave-a-cose-sign1-tokens-01.md`.
   `issued_at` follow-up decided **(C) for now, (A) later** —
   accept `= now` through Wave A; add an `iat` claim to
   `ConnectorTokenClaims` with the `philharmonic-connector-common

@@ -87,7 +87,7 @@ decrypts a known-answer plaintext.
 - `philharmonic-connector-common 0.2.0` adds an `iat: UnixMillis`
   claim to `ConnectorTokenClaims`. Yuka's Gate-2 approval on
   Wave A chose option **(A) later**; Wave B is the "later."
-- Wave A reference vectors at `docs/crypto-vectors/wave-a/` get
+- Wave A reference vectors at `tests/crypto-vectors/wave-a/` get
   regenerated because the CBOR claim-map layout changes (9 →
   10 entries).
 - Wave A's `verify_token` reads `claims.iat` for
@@ -648,7 +648,7 @@ drops at the earliest possible scope.
   `kem_ss`. (ML-KEM's encapsulate is deterministic given
   randomness.)
 - Expected bytes committed at
-  `docs/crypto-vectors/wave-b/wave_b_kem_ct.hex`,
+  `tests/crypto-vectors/wave-b/wave_b_kem_ct.hex`,
   `wave_b_kem_ss.hex`, `wave_b_ecdh_ss.hex`,
   `wave_b_hkdf_prk.hex`, `wave_b_aead_key.hex`.
 
@@ -667,7 +667,7 @@ drops at the earliest possible scope.
 ### Wave-A × Wave-B composition
 
 - Regenerated Wave A positive vector at
-  `docs/crypto-vectors/wave-a/` so `payload_hash` equals
+  `tests/crypto-vectors/wave-a/` so `payload_hash` equals
   SHA-256 of the new `wave_b_cose_encrypt0.hex`, and the
   claim-set includes the new `iat` field.
 - Expected `wave_a_cose_sign1.hex` regenerated from the new
@@ -769,7 +769,7 @@ Wave A. Scope for the 0.2.0 bump:
 - Existing consumers (`philharmonic-connector-client`,
   `philharmonic-connector-service`) bump their pin to
   `philharmonic-connector-common = "0.2"`.
-- Wave A reference vectors at `docs/crypto-vectors/wave-a/`
+- Wave A reference vectors at `tests/crypto-vectors/wave-a/`
   regenerated as noted above.
 
 No other changes to `connector-common` in 0.2.0. Keep the bump
@@ -913,9 +913,9 @@ Source files (no code written yet):
   `philharmonic-connector-service/tests/decryption_vectors.rs`,
   `philharmonic-connector-service/tests/e2e_roundtrip.rs`
   (`#[ignore]`-gated).
-- Reference vectors: `docs/crypto-vectors/wave-b/` (new).
+- Reference vectors: `tests/crypto-vectors/wave-b/` (new).
   Regenerated Wave A vectors at
-  `docs/crypto-vectors/wave-a/` (in-place update with
+  `tests/crypto-vectors/wave-a/` (in-place update with
   regeneration date in the README).
 
 **Publish at Wave B end:** all three triangle crates

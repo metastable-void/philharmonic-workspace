@@ -90,7 +90,7 @@ Link to the ROADMAP phase or design-doc section that drives it.
 
 ## References
 
-- `ROADMAP.md` §<phase>
+- `docs/ROADMAP.md` §<phase>
 - `docs/design/<doc>.md` §<section>
 - Prior-round prompt if applicable: `docs/codex-prompts/…-0<N-1>.md`
 

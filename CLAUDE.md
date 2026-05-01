@@ -25,7 +25,7 @@ Developer: Yuka MORI.
   graph, complete a phase, reorganise `scripts/`), update
   `README.md` in the same commit** — see
   [`CONTRIBUTING.md §18.1`](CONTRIBUTING.md#181-readmemd--whole-project-executive-summary).
-- [`ROADMAP.md`](ROADMAP.md) — **single authoritative home for any
+- [`ROADMAP.md`](docs/ROADMAP.md) — **single authoritative home for any
   roadmap or plan.** Current phase, what's next, what's blocked,
   what was deferred and why. No parallel TODO lists or
   plans-of-record elsewhere. **When plans change (phase done, new
@@ -43,8 +43,7 @@ Developer: Yuka MORI.
 - [`HUMANS.md`](HUMANS.md) — Yuka's note-to-self. **Agent-readable,
   agent-writable is forbidden.** `commit-all.sh` sweeps her pending
   edits into whatever commit is being made; that's the only way
-  `HUMANS.md` changes reach the repo. See
-  [`docs/instructions/README.md`](docs/instructions/README.md).
+  `HUMANS.md` changes reach the repo.
 
 ## Hard stops before doing anything
 
@@ -62,7 +61,7 @@ Developer: Yuka MORI.
   COSE_Encrypt0, hybrid KEM, payload-hash, `pht_` tokens — all
   trigger Yuka's two-gate personal review protocol via the
   `crypto-review-protocol` skill. See
-  [`ROADMAP.md §5`](ROADMAP.md) and the skill.
+  [`ROADMAP.md §5`](docs/ROADMAP.md) and the skill.
 
 ## Claude vs. Codex division of labour
 

@@ -36,20 +36,20 @@
   phase completed, scripts reorganised), flag it so Claude can
   update `README.md` in the same commit. See
   [`CONTRIBUTING.md §18.1`](CONTRIBUTING.md#181-readmemd--whole-project-executive-summary).
-- **[`ROADMAP.md`](ROADMAP.md) is the single authoritative home
+- **[`ROADMAP.md`](docs/ROADMAP.md) is the single authoritative home
   for any roadmap or plan** — current phase, what's next,
   what's blocked, what was deferred and why. No plans live in
   chat or your working memory. If your implementation moves a
   phase forward, completes a task, or reveals that a planned
   approach was wrong, **surface that in your final summary** so
-  Claude can update `ROADMAP.md` in the same commit as the
+  Claude can update `docs/ROADMAP.md` in the same commit as the
   work. See
   [`CONTRIBUTING.md §16`](CONTRIBUTING.md#16-roadmap-maintenance)
   and
   [`§18.3`](CONTRIBUTING.md#183-roadmapmd--authoritative-home-for-plans).
 - [`docs/design/`](docs/design/) — architectural design docs. What
   Philharmonic *is*.
-- [`docs/instructions/README.md`](docs/instructions/README.md) —
+- [`CLAUDE.md`](CLAUDE.md) / [`AGENTS.md`](AGENTS.md) —
   agent-targeted rules (e.g. the `HUMANS.md` read-only rule).
 
 ## Hard stops
@@ -264,7 +264,8 @@ context, not your output surface.
 - If something in `HUMANS.md` looks wrong or outdated, flag it
   in your final summary. Don't edit it.
 
-See [`docs/instructions/README.md`](docs/instructions/README.md).
+See [`CLAUDE.md`](CLAUDE.md) for Claude Code rules,
+[`AGENTS.md`](AGENTS.md) for Codex rules.
 
 ## Workspace conventions belong in the repo, not memory
 

@@ -119,6 +119,8 @@ if command -v cargo >/dev/null 2>&1 && command -v rustc >/dev/null 2>&1; then
 
     ok "Installing cargo-audit"
     cargo install cargo-audit
+    ok "Installing mdbook (for docs/)"
+    cargo install mdbook
 else
     warn "Rust toolchain not found on PATH."
     warn "Install rustup from https://rustup.rs/ and ensure"

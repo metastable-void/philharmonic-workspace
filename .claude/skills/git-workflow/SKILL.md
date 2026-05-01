@@ -14,7 +14,7 @@ none of those mistakes are possible. Use them.
 
 Authoritative sources (read these if anything below is unclear):
 - `CLAUDE.md` → "Git workflow" bullet.
-- `ROADMAP.md` §2 "Submodule discipline", "Git via scripts",
+- `docs/ROADMAP.md` §2 "Submodule discipline", "Git via scripts",
   "Every commit is signed off".
 - `docs/design/13-conventions.md` §"Git workflow".
 

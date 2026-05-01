@@ -12,7 +12,7 @@ never caught by tests that aren't *specifically* designed for
 correctness-vs-a-reference, and the pre-approval gate is the
 cheapest place to catch misuse.
 
-Authoritative source: `ROADMAP.md` §5 "Crypto review protocol".
+Authoritative source: `docs/ROADMAP.md` §5 "Crypto review protocol".
 Also relevant: `docs/design/11-security-and-cryptography.md`
 (threat model, construction specifics).
 
@@ -63,8 +63,8 @@ proposal** and get Yuka's sign-off. The proposal names:
 - Test-vector plan (see below).
 
 Deliver the proposal as a Markdown file under
-`docs/design/crypto-proposals/<date>-<topic>.md` (create
-`docs/design/crypto-proposals/` if it does not exist yet), or as
+`docs/crypto/proposals/<date>-<topic>.md` (create
+`docs/crypto/proposals/` if it does not exist yet), or as
 a comment in the relevant GitHub issue. In either case, the
 proposal must exist before code starts; if it lives in GitHub,
 reference that issue in the implementation PR or commit history.

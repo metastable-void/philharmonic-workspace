@@ -1,0 +1,8 @@
+[book]
+title = "Philharmonic Workspace"
+authors = ["Yuka MORI"]
+language = "en"
+src = "docs"
+
+[output.html]
+site-url = "/philharmonic-workspace/"

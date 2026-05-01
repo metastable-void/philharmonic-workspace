@@ -23,19 +23,20 @@ here wins; every other doc (per-repo `README.md`, `CLAUDE.md`,
    change an existing one, retire an old one, or discover an
    unwritten rule that should be authoritative — **update
    `CONTRIBUTING.md` in the same commit**. See §18.2.
-3. **[`ROADMAP.md`](ROADMAP.md) is the authoritative home for
+3. **[`ROADMAP.md`](docs/ROADMAP.md) is the authoritative home for
    every roadmap and plan.** Current phase, what's next, what's
    blocked on what, what was deferred and why — all live there.
    No parallel TODO lists, no plans-of-record in chat / notes /
-   a person's head. **When plans change, update `ROADMAP.md` in
-   the same commit as the work that changes them.** See §16 for
+   a person's head. **When plans change, update
+   `docs/ROADMAP.md` in the same commit as the work that changes
+   them.** See §16 for
    mechanics and §18.3 for scope.
 
 Related authoritative docs that stay as their own homes:
-- [`ROADMAP.md`](ROADMAP.md) — linear plan (what to work on next).
+- [`ROADMAP.md`](docs/ROADMAP.md) — linear plan (what to work on next).
 - [`docs/design/`](docs/design/) — architectural design docs
   (what Philharmonic *is*, not how to contribute to it).
-- [`POSIX_CHECKLIST.md`](POSIX_CHECKLIST.md) — POSIX-shell
+- [`POSIX_CHECKLIST.md`](docs/POSIX_CHECKLIST.md) — POSIX-shell
   portability reference.
 
 Quick navigation (major sections):
@@ -190,8 +191,8 @@ published crate has its own issue tracker, CI, release cycle,
 - `xtask/` — in-tree non-submodule Rust dev tooling (see §8).
 - `.githooks/` — tracked Git hooks installed via `core.hooksPath` (see §4).
 - `docs/` — design docs, journal directories (see §15).
-- `CONTRIBUTING.md` (this file), `ROADMAP.md`, `README.md`,
-  `CLAUDE.md`, `AGENTS.md`, `HUMANS.md`, `POSIX_CHECKLIST.md`.
+- `CONTRIBUTING.md` (this file), `docs/ROADMAP.md`, `README.md`,
+  `CLAUDE.md`, `AGENTS.md`, `HUMANS.md`, `docs/POSIX_CHECKLIST.md`.
 
 Each submodule is a standalone single-crate repo. Inside a
 submodule: `Cargo.toml`, `README.md`, `CHANGELOG.md`,
@@ -837,8 +838,8 @@ supported. *Extremely stripped* busybox builds (e.g. Ubuntu's
 a real target. When picking a `ps` field or flag, prefer ones
 the Alpine build supports.
 
-**Reference checklist**: see [`POSIX_CHECKLIST.md`](POSIX_CHECKLIST.md)
-at the repo root for a detailed inventory of non-POSIX
+**Reference checklist**: see [`POSIX_CHECKLIST.md`](docs/POSIX_CHECKLIST.md)
+under `docs/` for a detailed inventory of non-POSIX
 constructs / utilities / flags to avoid (and the narrow set
 that *are* in POSIX.1-2024 Issue 8).
 
@@ -1260,7 +1261,7 @@ narrow exceptions.
   end-to-end, `debug_assert!` is acceptable; for external inputs
   validate with a `Result`-returning helper.
 - **`unsafe` blocks** — separately banned workspace-wide in
-  crypto-sensitive crates (see `ROADMAP.md §5` and
+  crypto-sensitive crates (see `docs/ROADMAP.md §5` and
   `docs/design/11-security-and-cryptography.md`). No library
   crate takes `unsafe` dependencies on invariants the type
   system can't express.
@@ -2182,7 +2183,7 @@ something or got something wrong, generate a new one
 
 ## 16. ROADMAP maintenance
 
-[`ROADMAP.md`](ROADMAP.md) at the repo root is the **single
+[`ROADMAP.md`](docs/ROADMAP.md) under `docs/` is the **single
 authoritative home for any roadmap or plan** in this workspace
 (see §18.3 for the same-commit rule that parallels
 `README.md` / `CONTRIBUTING.md`). It's the linear plan: where
@@ -2194,17 +2195,17 @@ you what to do next.
 
 - **Update in the same commit as the work.** A commit that
   moves a phase forward should also mark the relevant tasks
-  done (or partially done) in ROADMAP.md. Splitting "do the
-  work" and "update ROADMAP" into separate commits lets the
+  done (or partially done) in `docs/ROADMAP.md`. Splitting "do
+  the work" and "update ROADMAP" into separate commits lets the
   roadmap drift out of sync with reality; coupling them keeps
   the plan honest.
 - **When plans change, update the plan.** If implementation
-  reveals the planned approach is wrong, update ROADMAP.md
+  reveals the planned approach is wrong, update `docs/ROADMAP.md`
   (and the relevant design doc) with the new approach and a
   short line explaining *why* — future readers need the "why"
   more than the "what".
 - **Don't paper over an unclear roadmap with code.** If the
-  next step isn't clear from ROADMAP.md, stop and propose a
+  next step isn't clear from `docs/ROADMAP.md`, stop and propose a
   roadmap update first. Implementing against a guess creates
   churn.
 
@@ -2266,10 +2267,10 @@ to invoke the relevant skill when its trigger fires.
   agent-writable is **forbidden**. `commit-all.sh` sweeps her
   pending edits into whatever commit is being made; that's the
   only way `HUMANS.md` changes reach the repo.
-- [`docs/instructions/`](docs/instructions/) — human-authored
-  rules specifically targeted at agents (rules about how to
-  behave around particular artefacts like `HUMANS.md`). Not
-  the general-purpose conventions home — this file is.
+- `CLAUDE.md` and `AGENTS.md` — agent-facing rules that were
+  previously in `docs/instructions/` are now absorbed into
+  these top-level files. Not the general-purpose conventions
+  home — this file is.
 
 Those files should carry executive summaries + pointers, not
 restate the rules. This file is the authoritative home; the
@@ -2362,21 +2363,21 @@ executive summaries + pointers, not restatements).
 **When in doubt where a rule goes.** Convention rules belong
 here. Architectural rules ("Philharmonic encrypts config at
 rest with AES-256-GCM") belong in `docs/design/`. Plans belong
-in `ROADMAP.md`. Per-crate usage belongs in that crate's
+in `docs/ROADMAP.md`. Per-crate usage belongs in that crate's
 `README.md`. If a rule spans boundaries, pick the authoritative
 home and cross-reference from the others.
 
 ### 18.3 `ROADMAP.md` — authoritative home for plans
 
-[`ROADMAP.md`](ROADMAP.md) at the repo root is the **single
+[`ROADMAP.md`](docs/ROADMAP.md) under `docs/` is the **single
 authoritative home for any roadmap or plan** in this workspace:
 where the project is, which phase is next, what's blocked on
 what, what was deferred and why. No scattered TODO lists, no
 plans-of-record living in chat / `docs/notes-to-humans/` / a
 person's head — if it's a plan that matters for "what to do
-next," it lives in `ROADMAP.md`.
+next," it lives in `docs/ROADMAP.md`.
 
-**Rule: when plans change, update `ROADMAP.md` in the same
+**Rule: when plans change, update `docs/ROADMAP.md` in the same
 commit as the work that changes them.** Covers:
 
 - Completing a phase or task (mark it done with a date).
@@ -2426,7 +2427,7 @@ member crate (non-submodule), and its README documents what
 [`docs/design/`](docs/design/) documents **what Philharmonic
 is** — architectural decisions, layer boundaries, threat model,
 crypto design. Not *how* to contribute (that's this file); not
-the current state of the world (that's `ROADMAP.md`); not
+the current state of the world (that's `docs/ROADMAP.md`); not
 release-ready usage (that's per-crate READMEs).
 
 Design docs evolve when an architectural decision changes. If
@@ -2448,11 +2449,11 @@ right answer is almost always to extend an existing home, not
 to add `NOTES.md` / `TODO.md` / `STATUS.md` / etc. A new
 top-level doc requires justification and must be added to this
 §18 list at the same time so its role is part of the
-authoritative map. `HUMANS.md` and `POSIX_CHECKLIST.md` are
-the two existing top-level docs that have their own roles and
+authoritative map. `HUMANS.md` and `docs/POSIX_CHECKLIST.md` are
+the two existing standalone docs that have their own roles and
 aren't covered by the six homes above — `HUMANS.md` is the
 human developer's personal note-to-self (agent-readable but
 agent-writable-forbidden; see §17.4), and
-`POSIX_CHECKLIST.md` is an external-reference checklist of
+`docs/POSIX_CHECKLIST.md` is an external-reference checklist of
 non-POSIX constructs to avoid in shell code (§6 references it).
-Any further top-level `.md` files warrant a conversation first.
+Any further standalone `.md` files warrant a conversation first.

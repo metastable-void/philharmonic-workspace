@@ -137,7 +137,7 @@ files tracked directly in the parent repo):
   modes: freeform for `scripts/project-status.sh`, and
   fixture-capture with `--output-schema` / `--tool-call-fallback`
   / `--capture-*` flags that produced the
-  `docs/upstream-fixtures/openai-chat/` tree for Phase 6
+  `tests/fixtures/upstream/openai-chat/` tree for Phase 6
   Task 2), `calendar-jp` (agent-facing JST calendar with
   weekends + Japanese public holidays + current wall-clock;
   run at session start to ground deadline reasoning),
@@ -194,7 +194,7 @@ when including weights of that scale. Docker-backed
 integration tests in the SQL crates are serialized across
 test binaries via `serial_test`'s `#[file_serial(docker)]`
 to keep containers from piling up and OOMing the host. See
-[`ROADMAP.md` §Phase 7](ROADMAP.md#phase-7--additional-implementations-parallel-safe)
+[`ROADMAP.md` §Phase 7](docs/ROADMAP.md#phase-7--additional-implementations-parallel-safe)
 for the full tier breakdown and the Golden Week 2026 deferral
 of Tier 3.
 
@@ -582,7 +582,7 @@ Invoke by path (`./scripts/foo.sh`), not via `bash`.
   drift.
 - `./scripts/project-status.sh [-n <log-lines>] [--model <model>]` —
   generate an LLM-written summary of the workspace's development
-  history and current status. Assembles `README.md`, `ROADMAP.md`,
+  history and current status. Assembles `README.md`, `docs/ROADMAP.md`,
   and `./scripts/git-log.sh -n <N>` (default 500) into a single
   prompt payload, pipes it through
   `./scripts/xtask.sh openai-chat --`, and **writes the model's

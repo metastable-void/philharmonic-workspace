@@ -26,7 +26,7 @@ decision makers for in-corporate marketing and briefing.
    every time; the spec may have been updated.
 
 2. **Read the current state of the project** — `README.md`
-   (status section), `ROADMAP.md` (current phase), and any
+   (status section), `docs/ROADMAP.md` (current phase), and any
    recent `docs/notes-to-humans/` entries that describe what
    just landed.
 
