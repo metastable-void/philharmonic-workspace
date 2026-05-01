@@ -3,9 +3,6 @@ name: Deploy mdBook to GitHub Pages
 on:
   push:
     branches: [main]
-    paths:
-      - 'docs/**'
-      - 'book.toml'
   workflow_dispatch:
 
 permissions:
