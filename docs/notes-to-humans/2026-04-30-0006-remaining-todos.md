@@ -68,17 +68,32 @@ consolidates what's left.
 
 ---
 
+## Code hygiene
+
+17. **Visibility + docs audit for bin targets**: `pub` items in
+    `bins/*/src/` should be `pub(crate)` (nothing outside the bin
+    imports them) or, where genuinely public, have doc comments.
+    Affects `mechanics-worker`, `philharmonic-api-server`,
+    `philharmonic-connector`. Crate-by-crate: grep for bare `pub`
+    in each bin's `src/`, downgrade to `pub(crate)`, add docs to
+    any that stay `pub`. Then enable `#![warn(missing_docs)]` in
+    lib crates one at a time (gated by `RUSTDOCFLAGS="-D
+    missing_docs" cargo doc --no-deps -p <crate>` in
+    `rust-lint.sh`).
+
+---
+
 ## Post-Golden-Week tasks (on or after 2026-05-07)
 
-17. **Phase 7 Tier 2 — SMTP** (`email-smtp`): Single connector
+18. **Phase 7 Tier 2 — SMTP** (`email-smtp`): Single connector
     impl, `lettre`-based. Placeholder 0.0.0 is published.
     Discrete scope.
 
-18. **Phase 7 Tier 3 — Anthropic** (`llm-anthropic`): Native
+19. **Phase 7 Tier 3 — Anthropic** (`llm-anthropic`): Native
     Anthropic Messages API. Placeholder 0.0.0 published.
     Scheduled on or after 2026-05-07.
 
-19. **Phase 7 Tier 3 — Gemini** (`llm-gemini`): Native Google
+20. **Phase 7 Tier 3 — Gemini** (`llm-gemini`): Native Google
     Gemini API. Placeholder 0.0.0 published. Scheduled on or
     after 2026-05-07.
 
