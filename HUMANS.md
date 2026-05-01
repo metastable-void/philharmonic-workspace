@@ -24,6 +24,9 @@ Japanese translation to the WebUI (auto-detects language
 from the browser and also switchable from a dropdown
 menu).
 
+Note: 24-hour clock is preferred, with browser-native
+timezones.
+
 ## Update the workflow authoring guide
 
 Re-read the docs at mechanics-core crate, and update the
