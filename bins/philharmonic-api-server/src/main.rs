@@ -176,7 +176,10 @@ async fn bootstrap(args: BootstrapArgs) -> Result<(), String> {
             "tenant",
             EntityRefValue::pinned(tenant_id.internal().as_uuid(), 0),
         )
-        .with_scalar("kind", ScalarValue::I64(PrincipalKind::User.as_i64()))
+        .with_scalar(
+            "kind",
+            ScalarValue::I64(PrincipalKind::ServiceAccount.as_i64()),
+        )
         .with_scalar("epoch", ScalarValue::I64(0))
         .with_scalar("is_retired", ScalarValue::Bool(false));
     store
