@@ -30,12 +30,14 @@
       "Bash(./scripts/xtask.sh codex-fmt *)",
       "Bash(./scripts/pre-landing.sh philharmonic-connector-impl-sql-postgres *)",
       "Bash(./scripts/push-all.sh)",
-      "Bash(./scripts/status.sh)"
+      "Bash(./scripts/status.sh)",
+      "Bash(./scripts/webui-build.sh --production)"
     ],
     "additionalDirectories": [
       "/tmp"
     ]
   },
+  "model": "claude-opus-4-6[1m]",
   "enabledPlugins": {
     "codex@openai-codex": true
   },
@@ -48,6 +50,5 @@
     }
   },
   "fastMode": true,
-  "theme": "auto",
-  "model": "claude-opus-4-6[1m]"
+  "theme": "auto"
 }

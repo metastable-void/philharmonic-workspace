@@ -27,18 +27,22 @@ bundled into connector service binaries at build time. Adding
 a new implementation requires Rust work.
 
 **Tenant endpoint configs** are per-tenant `TenantEndpointConfig`
-entities in the substrate. Each entity holds an encrypted blob
-describing one call-site: which realm to route to, which
-implementation handles it, what credentials and per-call
-configuration to supply. Adding or changing a call-site is a
-tenant admin action — create a new entity or append a revision
-to an existing one. No deployment-wide registry to update.
+entities in the substrate. Each entity stores the connector
+implementation name as a separate content slot on the entity
+revision (the `implementation` content attribute), and holds an
+encrypted blob containing the connector-specific config (e.g.
+`{ "base_url": ..., "api_key": ... }` for an LLM endpoint).
+The `implementation` name is not inside the encrypted blob —
+it is readable without decryption. Adding or changing a
+call-site is a tenant admin action — create a new entity or
+append a revision to an existing one. No deployment-wide
+registry to update.
 
 The relationships:
 
-- One config → one implementation (the `impl` field inside the
-  encrypted blob names it).
-- One config → one realm (the `realm` field inside names it).
+- One config → one implementation (the `implementation` content
+  attribute on the entity revision names it).
+- One config → one realm (the `realm` field names it).
 - Multiple configs can share an implementation — two configs
   both backed by `llm_openai_compat` with different base URLs
   and API keys is a normal case.
@@ -343,9 +347,13 @@ payload records everything else.
 
 ### Encrypted payload contents
 
-The COSE_Encrypt0 payload is **arbitrary JSON**. It carries
-whatever the admin submitted for this config. The conventional
-top-level shape:
+The COSE_Encrypt0 payload is **arbitrary JSON**, assembled by
+the lowerer at call time. The lowerer reads the
+`implementation` name from the entity revision's
+`implementation` content attribute and the connector-specific
+`config` from the decrypted stored encrypted blob, then
+combines them into the payload. The conventional top-level
+shape:
 
 ```json
 {

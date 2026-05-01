@@ -43,6 +43,7 @@ Content-Type: application/json
 
 {
   "display_name": "My LLM",
+  "implementation": "llm_openai_compat",
   "config": {
     "base_url": "https://api.openai.com/v1",
     "api_key": "sk-...",
@@ -64,6 +65,7 @@ Content-Type: application/json
 ```json
 {
   "display_name": "External API",
+  "implementation": "http_forward",
   "config": {
     "endpoint": {
       "method": "post",
@@ -85,6 +87,7 @@ for the full TypeScript shape).
 ```json
 {
   "display_name": "Analytics DB",
+  "implementation": "sql_postgres",
   "config": {
     "connection_url": "postgres://user:pass@host/db",
     "max_connections": 10,
@@ -99,6 +102,7 @@ for the full TypeScript shape).
 ```json
 {
   "display_name": "Embedder",
+  "implementation": "embed",
   "config": {
     "model_id": "bge-m3",
     "max_batch_size": 32,
@@ -112,6 +116,7 @@ for the full TypeScript shape).
 ```json
 {
   "display_name": "Searcher",
+  "implementation": "vector_search",
   "config": {
     "max_corpus_size": 1000,
     "timeout_ms": 2000
@@ -418,6 +423,7 @@ export default function(arg) {
    ```json
    {
      "display_name": "Local LLM",
+     "implementation": "llm_openai_compat",
      "config": {
        "base_url": "http://localhost:8080/v1",
        "api_key": "local-dev-key",

@@ -126,8 +126,11 @@ connector router's URL as seen from the mechanics worker.
 ## Valid implementation names
 
 - `llm_openai_compat`
+- `llm_anthropic`
+- `llm_gemini`
 - `http_forward`
 - `sql_postgres`
 - `sql_mysql`
 - `embed`
 - `vector_search`
+- `email_smtp`
