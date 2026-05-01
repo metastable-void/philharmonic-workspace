@@ -84,7 +84,7 @@ if [ ! -d "$webui_dir" ]; then
 fi
 
 # ── Parse flags ──────────────────────────────────────────────
-mode="development"
+mode=""
 while [ $# -gt 0 ]; do
     case "$1" in
         --production) mode="production"; shift ;;
@@ -93,6 +93,14 @@ while [ $# -gt 0 ]; do
         *) break ;;
     esac
 done
+
+if [ -z "$mode" ]; then
+    printf '%s!!! --production flag is required.%s\n' "$C_ERR" "$C_RESET" >&2
+    printf '    Usage: ./scripts/webui-build.sh --production\n' >&2
+    printf '    Dev builds (style-loader, no source maps) do not produce\n' >&2
+    printf '    the artifacts the Rust binary embeds.\n' >&2
+    exit 2
+fi
 
 printf '%s=== WebUI build (mode: %s) ===%s\n' "$C_HEADER" "$mode" "$C_RESET"
 
