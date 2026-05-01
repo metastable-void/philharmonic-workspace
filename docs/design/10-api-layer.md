@@ -6,8 +6,7 @@ the `WorkflowEngine`, authenticates callers, enforces policy,
 exposes CRUD on tenant resources, and mints ephemeral tokens for
 tenant end users.
 
-The crate doesn't exist yet. Design is settled (this document);
-a single small open item — an atomic create-instance-and-mint
+A single small open item — an atomic create-instance-and-mint
 endpoint — is listed at the bottom.
 
 ## What the layer is responsible for
@@ -220,6 +219,28 @@ Deployment-operator endpoints (outside any tenant subdomain)
 require a deployment-admin principal — a special principal kind
 or a tenant designated as the operator tenant.
 
+## Meta endpoints
+
+Paths under `/v1/_meta/` are public — they bypass both scope
+resolution and authentication middleware. The scope middleware
+assigns `RequestScope::Operator` without consulting the
+resolver; the auth middleware passes through without checking
+for a bearer token. The authorization middleware also passes
+through because meta routes carry no `RequiredPermission`.
+
+Current meta endpoints:
+
+- `GET /v1/_meta/version` — returns `{version}`.
+- `GET /v1/_meta/health` — returns `{status: "ok"}`.
+- `GET /v1/_meta/branding` — returns `{name, monogram}`.
+  The name is configured via `webui_brand_name` in the
+  deployment config; `monogram` is the first character of
+  the name (uppercase).
+
+These endpoints are safe to call from unauthenticated
+contexts (e.g. the WebUI login page fetching branding before
+the user has logged in).
+
 ## Endpoint surface
 
 Organized by concern. URL paths use `/v1/` prefix (URL-path
@@ -276,11 +297,15 @@ they're consumed at step-execution time.
 
 - `POST /v1/endpoints` — create a new endpoint config.
   Requires `endpoint:create`. Request body:
-  `{display_name, config}` where `config` is the free-form
-  JSON blob (conventionally `{realm, impl, config: {...}}`).
-  API encrypts the blob with the substrate credential key
-  before storage. No schema validation on the blob contents
-  in v1; invalid configs fail at first call.
+  `{display_name, implementation, config}` where
+  `implementation` is the connector implementation name
+  (e.g. `"llm_openai_compat"`, `"sql_postgres"`) and `config`
+  is the free-form JSON blob containing connector-specific
+  settings. `implementation` is stored as a separate content
+  slot on the entity revision (plaintext, immutable across
+  rotations); `config` is encrypted with the substrate
+  credential key before storage. No schema validation on the
+  config contents in v1; invalid configs fail at first call.
 - `GET /v1/endpoints` — list endpoint configs (metadata only).
   Requires `endpoint:read_metadata`. Returns display names,
   creation times, retirement status, UUIDs.
@@ -490,11 +515,12 @@ Whatever runs the API crate needs:
   credential key (SCK) for decrypting `TenantEndpointConfig`
   entries. The lowerer is plugged into the engine as the
   `ConfigLowerer` implementation.
-- An executor endpoint — typically a load-balancer URL or
-  in-process handle pointing at a mechanics worker (or fleet).
-  An HTTP `StepExecutor` wraps the mechanics HTTP service;
-  in-process executor wirings are equally supported by the
-  trait.
+- An executor endpoint — the base URL of a mechanics worker
+  (or fleet). The HTTP `StepExecutor` implementation
+  (`MechanicsWorkerExecutor`) appends `/api/v1/mechanics` to
+  the configured base URL and authenticates with a shared
+  bearer token (`mechanics_worker_token`). In-process executor
+  wirings are equally supported by the trait.
 - The API signing key for ephemeral tokens.
 
 The crate is stateless beyond the per-request authentication

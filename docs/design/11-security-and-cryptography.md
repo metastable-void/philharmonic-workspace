@@ -35,6 +35,13 @@ private key.
 executor as ciphertext, decrypted only at the connector
 service.
 
+**Mechanics worker authentication:** the API server
+authenticates to the mechanics worker with a shared bearer
+token (`mechanics_worker_token` in API config, matched
+against `tokens` in mechanics worker config). An empty token
+list in the mechanics worker config is fail-closed — every
+request returns 401 until at least one token is configured.
+
 ### The API is the trust boundary for tenant callers
 
 Tenant callers authenticate to the API layer, which verifies
@@ -46,10 +53,10 @@ authorized the request.
 
 Substrate compromise should not yield plaintext credentials or
 other tenant-private endpoint configuration. Per-tenant
-endpoint configs are encrypted at rest as whole blobs; the
-substrate sees only the tenant reference, metadata scalars,
-and opaque ciphertext. Neither the destination realm nor the
-implementation name is visible in cleartext. A compromise
+endpoint configs are encrypted at rest; the substrate sees
+the tenant reference, metadata scalars, the plaintext
+`implementation` content slot (e.g. `"llm_openai_compat"`),
+and the opaque encrypted config ciphertext. A compromise
 exposes workflow history, template sources, and audit trails —
 but not the contents of `TenantEndpointConfig` entries.
 
@@ -233,27 +240,36 @@ For `TenantEndpointConfig` entities.
   decrypts on operator read) and the lowerer (decrypts at
   step-execution time). Both components run in the same
   process in v1 deployments.
-- **Scope of the encrypted blob**: the entire admin-submitted
-  config JSON — including realm, implementation name, and
-  credentials — as a single AES-256-GCM ciphertext. The
-  substrate sees only ciphertext plus metadata scalars.
+- **Scope of the encrypted blob**: the admin-submitted config
+  JSON — connector-specific settings (credentials, URLs,
+  parameters) — as a single AES-256-GCM ciphertext. The
+  `implementation` name is stored as a separate plaintext
+  content slot on the entity revision (not inside the
+  encrypted blob), readable without the SCK. The substrate
+  sees ciphertext plus metadata scalars plus the plaintext
+  implementation name.
 - **Rotation**: new key generated, all `TenantEndpointConfig`
   entities re-encrypted via new revisions, `key_version`
   scalar updated, old key retired.
 
-### Lowerer re-encryption — pure byte forwarding
+### Lowerer re-encryption — assembly from entity slots
 
-When the lowerer produces a per-step payload, it decrypts the
-SCK-encrypted blob and re-encrypts it byte-identical to the
-target realm's KEM public key. No field extraction,
-substitution, or reshaping. The bytes the admin submitted are
-the bytes the implementation deserializes. The only field the
-lowerer reads from the plaintext is `realm`, to pick the
-destination KEM key.
+When the lowerer produces a per-step payload, it reads the
+`implementation` content slot (plaintext) and decrypts the
+`encrypted_config` blob (SCK). It assembles a composite
+JSON payload `{realm, impl, config}` from these two sources
+plus the realm routing configuration, then encrypts the
+composite payload to the target realm's KEM public key via
+COSE_Encrypt0.
 
-Consequence: the lowerer is structurally simple. It's an
-encryption-boundary translator, not a config builder. Adding a
-new implementation does not require any lowerer changes.
+The connector service receives this composite payload and
+uses `impl` to look up the implementation and `config` to
+pass the connector-specific settings. The `realm` field is
+checked against the token's realm claim.
+
+Adding a new implementation does not require lowerer changes
+— the lowerer treats both `impl` and `config` as opaque
+values read from entity storage.
 
 ### Ephemeral API token signing key rotation
 
@@ -276,13 +292,13 @@ storage to external call:
    content slot. AES-256-GCM ciphertext under SCK. Substrate
    sees only tenant reference, metadata scalars, ciphertext.
 
-2. **At step mint**: Lowerer fetches config by UUID, decrypts
-   with SCK. In-memory plaintext briefly (includes realm,
-   impl, and credentials).
+2. **At step mint**: Lowerer fetches config by UUID, reads the
+   `implementation` content slot (plaintext), decrypts
+   `encrypted_config` with SCK. Assembles composite payload
+   `{realm, impl, config}` in memory.
 
-3. **At encapsulation**: Lowerer reads `realm` from the
-   plaintext; looks up the realm's KEM public key. Encrypts
-   the plaintext — byte-identical — with COSE_Encrypt0 to
+3. **At encapsulation**: Lowerer picks the realm's KEM public
+   key. Encrypts the composite payload with COSE_Encrypt0 to
    that realm's KEM key using the hybrid ML-KEM + X25519
    construction.
 
