@@ -2184,11 +2184,13 @@ repo. Read the report (per
 [`docs/project-status-reports/README.md`](docs/project-status-reports/README.md) —
 "do not commit reports without reading them first" —
 hallucinated SHAs or invented roadmap items are worth
-catching), then commit it parent-only. The commit message
-should be one short sentence describing what the milestone
-*was* (e.g. *"docs: project-status snapshot at Phase 7
-Tier 1 wave 1 publish"*) so the archive is browsable from
-`git log` without opening every file.
+catching), then **add an entry to `docs/SUMMARY.md`** under
+the "Project status reports" section (mdBook needs this to
+include the page), then commit parent-only. The commit
+message should be one short sentence describing what the
+milestone *was* (e.g. *"docs: project-status snapshot at
+Phase 7 Tier 1 wave 1 publish"*) so the archive is
+browsable from `git log` without opening every file.
 
 **Don't edit committed reports.** They're archived model
 output — see the directory's own README. If a report misses

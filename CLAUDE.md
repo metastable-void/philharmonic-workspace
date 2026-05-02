@@ -276,9 +276,10 @@ full in `CONTRIBUTING.md`. Read the full section before acting
   point-in-time LLM summary into
   `docs/project-status-reports/YYYY-MM-DD-hh-mm-ss.md`,
   read it (model output can hallucinate SHAs / invent
-  roadmap items), then commit it parent-only with a
-  one-sentence "what milestone" message. Don't run it after
-  every commit or speculatively — the value is in the
+  roadmap items), add an entry to `docs/SUMMARY.md` under
+  "Project status reports", then commit it parent-only with
+  a one-sentence "what milestone" message. Don't run it
+  after every commit or speculatively — the value is in the
   milestone shape, not in a dense archive.
   ([§15.4](CONTRIBUTING.md#154-project-status-reports))
 - **Update the Japanese executive summary at milestones.**
