@@ -15,6 +15,41 @@ this file, but never edit this file.
   workspace repo into a reusable template/Rust crate/etc.
   this can happen after the MVP work is done.
 
+## Pseudo TTY for convenience
+
+Equivalent Rust code for the following is required
+(POSIX.1-2001 clean):
+
+```
+int master = posix_openpt(O_RDWR | O_NOCTTY);
+grantpt(master);
+unlockpt(master);
+char *slave_name = ptsname(master);          // not thread-safe
+int slave = open(slave_name, O_RDWR | O_NOCTTY);
+// fork; child does setsid(); dup2(slave, 0/1/2); exec
+```
+
+Add an xtask that does this, and spawns a process with the arguments
+given, inside the pseudo TTY; Any writes to stdin goes to the pseodo
+TTY; any outputs from the pseudo TTY goes to the xtask's stdout.
+
+This is to force colored outputs for `git`/`cargo`/etc. cleanly
+when we actually grep them for example.
+
+Then add a grep/sed/awk (I don't know) to `pre-landing.sh`/
+`release-build.sh`/`musl-build.sh` to remove the following lines,
+via the PTY wrapper (please note that there is escape sequences
+in outputs because they carry colors):
+
+```
+warning: profiles for the non root package will be ignored, specify profiles at the workspace root
+package:   /home/<user>/philharmonic-workspace/<crate>/Cargo.toml
+workspace: /home/<user>/philharmonic-workspace/Cargo.toml
+```
+
+ofc the exact paths will differ (the developer might not clone
+the workspace repo directly under their HOME directory, etc.).
+
 ## Embedding DB component
 
 Not in the original v1 scope; MVP done, so we want the
