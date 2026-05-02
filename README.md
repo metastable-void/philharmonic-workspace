@@ -384,7 +384,7 @@ ruleset — GitHub's native ruleset grammar has no DCO rule type;
 sign-offs remain a local-hook + `scripts/git-log.sh` review
 concern. Submodule repositories do not carry matching rulesets
 today; the local hook layer is the defence line there. See
-[`CONTRIBUTING.md §4.7`](CONTRIBUTING.md#47-github-side-ruleset-parent-workspace-repo-only)
+[`CONTRIBUTING.md §4.8`](CONTRIBUTING.md#48-github-side-ruleset-parent-workspace-repo-only)
 for the full breakdown and the command to inspect the current
 ruleset.
 

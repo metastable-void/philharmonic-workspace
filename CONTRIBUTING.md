@@ -415,7 +415,7 @@ for a "legitimate" reason that isn't in the list above, stop and
 surface it. This rule has no quiet exceptions.
 
 **Push early, push often — mid-work pushes are encouraged.** The
-local hook layer (§4.5) and the GitHub-side ruleset (§4.7) both
+local hook layer (§4.5) and the GitHub-side ruleset (§4.8) both
 accept work-in-progress commits on `main` as long as they're
 signed, signed-off, and not force-pushes. Do not hoard commits
 locally out of a "wait until it's clean" habit — in an
@@ -517,7 +517,32 @@ is cross-checking "which machine produced this" against a
 local-state map. It's not a substitute for the DCO or the
 signature.
 
-### 4.7 GitHub-side ruleset (parent workspace repo only)
+Inspect with `./scripts/audit-log.sh` (one line per commit —
+hash, timestamp, signature/sign-off verdicts, author, diffstat,
+and the Audit-Info trailer).
+
+### 4.7 Code-stats trailer
+
+`commit-all.sh` also writes a `Code-stats:` trailer recording a
+snapshot of workspace size at commit time:
+
+```
+Code-stats: 812 files, 135719 total lines (68821 code lines, 48917 docs lines)
+```
+
+Produced from `./scripts/stats.sh` (which parses the Total row
+from `./scripts/tokei.sh`). Per-commit deltas are not stored —
+each trailer is an absolute snapshot — but
+`./scripts/stats-log.sh` walks the log and computes deltas
+against each commit's predecessor for at-a-glance growth
+review. Submodule commits do not get this trailer (it's a
+parent-level summary).
+
+Older history predating the trailer adoption shows `-` for
+both stats and delta in `stats-log.sh` output; that's
+expected, not missing data.
+
+### 4.8 GitHub-side ruleset (parent workspace repo only)
 
 The local hooks described in §4.5 are defence-in-depth, but they
 run on the contributor's machine and can be bypassed
@@ -578,7 +603,7 @@ today; drift is caught by reviewing this section against
 `gh api repos/metastable-void/philharmonic-workspace/rulesets/<id>`
 output when anything changes.
 
-### 4.8 Other git rules
+### 4.9 Other git rules
 
 - **Don't invoke `git log -n 1`** to list HEAD state across the
   workspace — use `./scripts/heads.sh`. Raw `git log` remains
