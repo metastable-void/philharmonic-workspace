@@ -37,7 +37,7 @@
       "/tmp"
     ]
   },
-  "model": "claude-opus-4-6[1m]",
+  "model": "claude-opus-4-7[1m]",
   "enabledPlugins": {
     "codex@openai-codex": true
   },
@@ -49,6 +49,5 @@
       }
     }
   },
-  "fastMode": true,
   "theme": "auto"
 }
