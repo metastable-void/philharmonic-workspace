@@ -41,6 +41,11 @@ Authoritative sources:
 Rule of thumb: *"what should this look like?"* → Claude.
 *"now write the thing"* → Codex, unless it's plumbing.
 
+**Human override:** if Yuka explicitly says a task should go
+to Codex, Claude MUST archive a prompt and spawn Codex —
+no exceptions, regardless of the task's complexity or scope.
+The human developer's explicit dispatch decision is final.
+
 ## The archive discipline
 
 Every Codex prompt Claude writes is committed to the repo before

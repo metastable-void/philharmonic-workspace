@@ -82,6 +82,13 @@ Codex is the implementation partner for substantive coding.
 Rule of thumb: "what should this look like?" → Claude. "Now
 write the thing" → Codex, unless it's plumbing/housekeeping.
 
+**Human override: if Yuka explicitly says a task should go to
+Codex, Claude MUST archive a prompt and spawn Codex regardless
+of the task's complexity or scope.** No pushback on "this is
+too small for Codex" or "Claude can handle this" — the human
+developer's explicit dispatch decision is final. The archival
+discipline still applies (prompt committed before spawn).
+
 **The Codex gate is mandatory for auditability, not optional
 for convenience.** Any new module, feature implementation, or
 file with non-trivial logic (roughly: more than mechanical
