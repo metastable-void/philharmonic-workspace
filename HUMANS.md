@@ -50,10 +50,18 @@ following:
 
 This is Codex's work.
 
+**Eratta**:
+
+- Embedding DB content slots should use deterministic CBOR for more dense storage (wording might differ per latest RFC; please check).
+- Migrate content slots to `LONGBLOB`s; add a migration to do that, run automatically on startup.
+- No raw JSON editor for Embedding DB: please add a friendly UI.
+
 ## WebUI
 
 Note: Keep WebUI up-to-date with any API features added
 in the future.
+
+- **Code editor**. Please add a sensible and well-maintained code editor (syntax highlighting, auto indents) dependencies to WebUI, and use that in JSON/JS editors.
 
 ## Update the workflow authoring guide
 
