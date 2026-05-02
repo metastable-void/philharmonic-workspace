@@ -96,8 +96,10 @@ in `MEDIUMBLOB`, capped at 16 MB per blob — too small.
   `philharmonic-store-sqlx-mysql`.
 - The migration runs automatically on startup if the column
   type does not match. Idempotent.
-- The SQLite substrate uses untyped `BLOB` already and needs
-  no migration.
+- Any future SQL backend (e.g. a SQLite substrate, not in
+  v1) is responsible for selecting an equivalently-sized
+  blob column type at first migration; the workspace ships
+  only the MySQL backend today.
 
 ### Hard limits enforced by the API
 
@@ -250,29 +252,42 @@ export default async function({context, args, input, subject, data}) {
   }
 
   // Embed the user's query
-  const embedResult = await endpoint("embed", {
+  const embedResponse = await endpoint("embed", {
     body: { texts: [input.text] }
   });
-  const queryVector = embedResult.embeddings[0];
+  const queryVector = embedResponse.body.embeddings[0];
 
   // Search the pre-embedded corpus
-  const searchResult = await endpoint("vector_search", {
+  const searchResponse = await endpoint("vector_search", {
     body: { query_vector: queryVector, corpus, top_k: 5 }
   });
 
   // Use search results to build LLM context
-  const relevantDocs = searchResult.results.map(r => r.payload?.text).join("\n");
-  const llmResult = await endpoint("llm", {
+  const relevantDocs = searchResponse.body.results
+    .map(r => r.payload?.text)
+    .join("\n");
+
+  const llmResponse = await endpoint("llm", {
     body: {
       model: "gpt-5.5",
       messages: [
         { role: "system", content: `Answer using: ${relevantDocs}` },
         { role: "user", content: input.text }
-      ]
+      ],
+      output_schema: {
+        type: "object",
+        properties: { text: { type: "string" } },
+        required: ["text"],
+        additionalProperties: false
+      }
     }
   });
 
-  return { output: { text: llmResult.output.text }, context, done: true };
+  return {
+    output: { text: llmResponse.body.output.text },
+    context,
+    done: true
+  };
 }
 ```
 
@@ -544,15 +559,31 @@ with spinner text), Ready (good), Failed (bad).
 
 ### Create form
 
-Fields: Display Name (text), Embed Endpoint (dropdown of
-active `embed`-implementation endpoints), Items (structured
-table editor with one row per item: `id` text input, `text`
-multiline input, `payload` collapsed JSON editor that
-defaults to empty). Add/remove rows, paste-import from CSV
-or JSON, and per-row schema validation with the failing item
-index in errors. A raw-JSON view is available behind a
-toggle for power users / batch import, but is not the
-default.
+Fields:
+
+- **Display Name** — text input.
+- **Embed Endpoint** — dropdown of active
+  `embed`-implementation endpoints.
+- **Items** — structured table editor with one row per item:
+  - `id` — text input.
+  - `text` — multiline input.
+  - `payload` — structured key/value editor for simple flat
+    payloads, with the option to expand a row into a small
+    JSON-aware editor component (a maintained code-editor
+    dependency — see HUMANS.md "Code editor" item — with
+    JSON syntax highlighting and validation, **not** a raw
+    textarea) for nested payloads. Defaults to empty.
+
+Add / remove / reorder rows; per-row schema validation with
+the failing item index surfaced in errors.
+
+**Bulk import** is a separate affordance: an Import modal
+that accepts pasted CSV or JSON, runs validation, and
+populates the structured table. After import the user
+edits via the structured table; there is no persistent
+raw-JSON view of the dataset itself. This matches the
+HUMANS.md erratum "No raw JSON editor for Embedding DB:
+please add a friendly UI."
 
 ### Detail page
 
@@ -608,8 +639,10 @@ section.
   before any code lands.**
 - **Storage substrate**: small change — `philharmonic-store-sqlx-mysql`
   migrates the content blob column from `MEDIUMBLOB` to
-  `LONGBLOB` (auto-applied on startup). SQLite substrate
-  unaffected.
+  `LONGBLOB` (auto-applied on startup). The MySQL backend is
+  the only SQL backend shipped today; a future SQLite (or
+  other) backend would need to pick an equivalent blob column
+  at its first migration.
 - **Encrypted config model**: datasets are not encrypted.
   Source items and corpora are plaintext content blobs.
   `embed_endpoint_id` is a plaintext content slot pointing at

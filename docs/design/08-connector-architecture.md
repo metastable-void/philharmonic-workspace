@@ -1150,10 +1150,11 @@ crates.
 - **`vector_search`** — vector in, nearest neighbors out.
   V1 reference: stateless in-memory cosine kNN, corpus-
   per-request (no persistent state), hundreds-to-thousands
-  scale, strings-only id payload —
-  `philharmonic-connector-impl-vector-search` 0.1.0
-  published 2026-04-27. Stateful backends (e.g. an
-  external vector store) are shape-compatible additions.
+  scale, string `id` plus optional JSON `payload` echoed
+  from matching corpus items —
+  `philharmonic-connector-impl-vector-search` is published
+  on crates.io. Stateful backends (e.g. an external vector
+  store) are shape-compatible additions.
 
 At least one implementation of each ships in v1. Splitting
 keeps the two concerns independent: an embedding change

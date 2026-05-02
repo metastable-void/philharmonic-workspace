@@ -71,8 +71,10 @@ Settled since the previous draft:
   embedding via the workspace's `inline-blob` proc-macro.
 - **`vector_search`** — stateless in-memory cosine kNN,
   corpus-per-request (no persistent state), hundreds-to-
-  thousands scale, strings-only id payload. Phase 7 Tier 1
-  `vector-search` 0.1.0 published 2026-04-27.
+  thousands scale, string `id` plus optional JSON `payload`
+  echoed from matching corpus items.
+  `philharmonic-connector-impl-vector-search` is published
+  on crates.io.
 
 ## Non-blocking for v1 but important
 
