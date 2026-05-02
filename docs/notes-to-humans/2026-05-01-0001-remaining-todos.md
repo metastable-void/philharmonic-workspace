@@ -82,33 +82,21 @@ consolidates what's left.
     comments added across all crates, `RUSTDOCFLAGS="-D
     missing_docs"` gated in `rust-lint.sh`.
 
-18. **Feature-gate mechanics/boa in meta-crate**: `boa_engine`
-    (the JS runtime from `mechanics-core`) leaks into all three
-    bins via the unconditional `mechanics`/`mechanics_core`
-    re-exports in the `philharmonic` meta-crate. Only
-    `mechanics-worker` needs it. Add a `mechanics` Cargo feature
-    to the meta-crate (default off), enable it only in
-    `mechanics-worker`. Same pattern as the embed-weight split.
+18. ~~**Feature-gate mechanics/boa in meta-crate**~~: **Done**
+    (2026-05-02). API server and connector binaries no longer
+    link `boa_engine` unnecessarily; `mechanics-worker` keeps the
+    mechanics runtime path.
 
-19. **Restructure `docs/` for mdBook**: Per HUMANS.md — move
-    `ROADMAP.md` and `POSIX_CHECKLIST.md` under `docs/`, split
-    crypto proposals/vectors out of `docs/design/` into
-    `docs/crypto/`, demolish `docs/instructions/README.md`
-    (absorbed into CONTRIBUTING.md + agent MDs), make `docs/`
-    the home for mdBook-based GitHub Pages docs. Deployed at
-    `https://metastable-void.github.io/philharmonic-workspace/`
-    — set `[output.html] site-url = "/philharmonic-workspace/"`
-    in `book.toml`. Add `cargo install mdbook` to `setup.sh`.
-    Update all internal references to new paths.
+19. ~~**Restructure `docs/` for mdBook**~~: **Done**
+    (2026-05-02). `ROADMAP.md` and `POSIX_CHECKLIST.md` live
+    under `docs/`, crypto materials live under `docs/crypto/`,
+    legacy agent rules from `docs/instructions/` are absorbed
+    into top-level agent/contributor docs, and GitHub Pages
+    builds through mdBook.
 
-20. **WebUI branding via API config**: Allow operators to replace
-    the "Philharmonic" display text in the WebUI with a
-    config-supplied string (e.g. `webui_brand_name = "Acme
-    Workflows"`). The `[P]` monogram icon should derive from the
-    first character of the brand name (e.g. `[A]` for "Acme").
-    Injected at serve time via a template variable or a
-    `/v1/_meta/branding` endpoint that the React app fetches on
-    load. Custom icon/logo upload is out of scope for now.
+20. ~~**WebUI branding via API config**~~: **Done**
+    (2026-05-01). Branding is served via `/v1/_meta/branding`
+    and configurable through the API server config.
 
 ---
 

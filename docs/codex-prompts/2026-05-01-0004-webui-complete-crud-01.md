@@ -36,7 +36,10 @@ product unusable for production without raw API calls.
 
 ## Outcome
 
-Pending — will be updated after Codex run.
+Completed. Commit `a39ca09` added WebUI CRUD pages for endpoints,
+principals, roles, role memberships, and minting authorities.
+Follow-up commits adjusted related endpoint configuration and
+display behavior as deployment testing exposed issues.
 
 ---
 

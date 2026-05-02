@@ -41,7 +41,12 @@ one-time `pht_` token to stdout, unblocking first deployment.
 
 ## Outcome
 
-Pending — will be updated after Codex run.
+Completed. The bootstrap command landed and later needed a
+follow-up fix: the first implementation created the tenant and
+principal but not the bootstrap admin role or membership, so the
+seed principal had no permissions. Commit `951d722` fixed that by
+creating the role definition and membership as part of bootstrap;
+see `docs/notes-to-humans/2026-05-01-0002-bootstrap-missing-role.md`.
 
 ---
 

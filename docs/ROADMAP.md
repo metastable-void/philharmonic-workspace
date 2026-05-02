@@ -100,6 +100,7 @@ decision:
   root).
 - `14-open-questions.md` — still-open design questions.
 - `15-v1-scope.md` — what ships with v1.
+- `16-embedding-datasets.md` — post-v1 embedding dataset design.
 
 ---
 
@@ -180,7 +181,7 @@ Stop and flag for Yuka's review rather than proceeding:
   signing/verification, COSE_Encrypt0 encryption/decryption, the
   ML-KEM-768 + X25519 + HKDF + AES-256-GCM hybrid construction,
   payload-hash binding. Yuka reviews this code personally. See
-  §7 "Crypto review protocol" below.
+  §5 "Crypto review protocol" below.
 - **Schema changes after 0.1.0 publication.** Breaking changes to
   published crates need explicit decisions about bump cadence
   and migration.
@@ -753,8 +754,8 @@ ongoing development.
 - `README.md` — public-facing overview + contributor-facing
   workflow (cloning, scripts, pre-landing, publishing,
   AI-assisted development split).
-- `ROADMAP.md` — this file. Living; updated in the same commit
-  as work it describes.
+- `docs/ROADMAP.md` — this file. Living; updated in the same
+  commit as work it describes.
 - `CLAUDE.md` — Claude Code's session bootstrap: pointers to
   the roadmap, conventions, and the mandatory rules (scripts
   for Git, POSIX shell, pre-landing checks, journal filename
@@ -763,9 +764,9 @@ ongoing development.
   division from Codex's side (implementer role, no commits, no
   branches, POSIX-sh if writing shell, crypto paths flag-only).
 - `HUMANS.md` — Yuka's own notes-to-self. Agent-readable,
-  agent-immutable (enforced by
-  `docs/instructions/README.md §HUMANS.md`). `commit-all.sh`
-  auto-includes pending edits via `git add -A`.
+  agent-writable is forbidden. `commit-all.sh` auto-includes
+  pending edits via `git add -A`; agent rules live in
+  `CLAUDE.md`, `AGENTS.md`, and `CONTRIBUTING.md`.
 - `LICENSE-APACHE`, `LICENSE-MPL` — dual-license text.
 - `.gitignore` — `target/`, editor droppings, Codex session
   state under `.codex/`.
@@ -791,9 +792,6 @@ ongoing development.
   archived Codex prompts.
 - `docs/notes-to-humans/YYYY-MM-DD-NNNN-<slug>[-NN].md` —
   Claude's significant-finding journal for Yuka.
-- `docs/instructions/README.md` — human-to-agent rules that
-  don't fit in CLAUDE.md or AGENTS.md (currently: HUMANS.md
-  access rule).
 
 **Per-submodule** (each crate repo):
 

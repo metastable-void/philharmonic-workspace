@@ -1099,14 +1099,14 @@ releases, tooling like `cargo-workspaces` or `release-plz` can
 help — but for pre-1.0 infrequent releases, `publish-crate.sh`
 run per crate is fine.
 
-## Design documentation
+## Design Documentation
 
 The full design corpus (architecture, crypto design, entity models,
-API surface, v1 scope) lives in a separate design documentation
-repository. Implementation should match what's specified there; when
-implementation discovers that the docs got something wrong, update
-the docs first, then the code. Docs that describe reality are useful;
-docs describing an aspirational past are worse than nothing.
+API surface, v1 scope, and post-v1 extension designs) lives under
+[`docs/`](docs/). Implementation should match what's specified there;
+when implementation discovers that the docs got something wrong,
+update the docs first, then the code. Docs that describe reality are
+useful; docs describing an aspirational past are worse than nothing.
 
 ## Terminology and language
 
