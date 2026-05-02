@@ -152,80 +152,58 @@ files tracked directly in the parent repo):
 
 ## Status
 
-Design is substantially settled; implementation is in active progress.
-The connector triangle + foundational crates are published with
-substantive content; **Phase 8 is complete end-to-end** —
-`philharmonic-api` 0.1.0 and `philharmonic-policy` 0.2.0
-published to crates.io on 2026-04-28. All nine sub-phases
-(skeleton → auth → authz → workflow → endpoint-config →
-identity CRUD → token minting → audit/rate-limit/admin →
-publish) landed in a single day with three crypto-review gate
-cycles passed. Phase 6 and Phase 7 Tier 1 were completed
-previously (2026-04-24 / 2026-04-27). The unpublished
-`philharmonic-connector-impl-*` crates land in their respective
-phase tiers; until then they exist on crates.io as `0.0.x`
-**published placeholders** (name reservations with no
-substantive code), distinct from the Phase 6 / Phase 7 Tier 1
-crates that ship as **published substantive implementations**
-at `0.1.0` or higher.
+Design is substantially settled and the v1 implementation path is
+complete through Phase 9. The reference deployment is operational as of
+2026-05-02: a WebUI-created workflow has run through the full production
+path from API server to mechanics worker, connector router, connector
+service, and an OpenAI-compatible upstream LLM via `llm_openai_compat`.
 
-**Phase 9 — Integration and deployment** is complete
-(2026-04-29 through 2026-05-02). Three bin targets live in
-separate in-tree crates under `bins/` (`mechanics-worker`
-13 MB, `philharmonic-api` 11 MB, `philharmonic-connector`
-2.2 GB with bundled bge-m3 ONNX model). Reference
-deployment is operational with a minimal end-to-end
-workflow (OpenAI-compatible LLM via `llm_openai_compat`
-connector) verified through the WebUI on 2026-05-02. The
-full execution path — API server → lowerer (COSE_Sign1 +
-COSE_Encrypt0) → mechanics worker (JS) → connector router
-→ connector service → upstream LLM — is proven in
-production. All 25 crate names live on crates.io —
-substantive implementations (Phase 6 + Phase 7 Tier 1) at
-`0.1.0` or higher, plus three placeholder names
-(`philharmonic-connector-impl-email-smtp`,
-`-llm-anthropic`, `-llm-gemini`) at `0.0.x` reserving the
-namespace for the remaining Phase 7 Tier 2/3 implementations.
-Musl static builds, Docker compose, `install` subcommand,
-and full-pipeline e2e tests landed. Remaining Phase 7
-connector implementations (Tier 2/3) deferred post-GW.
+Current active work is post-v1 scope: embedding datasets, the remaining
+Phase 7 Tier 2/3 connector implementations (SMTP, Anthropic, Gemini),
+and WebUI/docs follow-through. The authoritative task list lives in
+[`docs/ROADMAP.md` §9](docs/ROADMAP.md#9-post-v1-dispatch-plan).
 
-**Phase 7 Tier 1 — done 2026-04-27.** The pivot to pure-Rust
-`tract` + `tokenizers` for `embed` (replacing the round-01
-`fastembed` + `ort` stack, which was glibc-only via
-`ort-download-binaries` and didn't fit our musl deployment
-target) landed cleanly. The default-bundled bge-m3 path uses
-the in-tree [`inline-blob`](inline-blob) proc-macro (also
-shipped this session) to place the 2.27 GB ONNX +
-external-data bytes in `.lrodata.*` ELF sections, working
-around rust-lld's small-code-model 32-bit-relocation overflow
-when including weights of that scale. Docker-backed
-integration tests in the SQL crates are serialized across
-test binaries via `serial_test`'s `#[file_serial(docker)]`
-to keep containers from piling up and OOMing the host. See
-[`ROADMAP.md` §Phase 7](docs/ROADMAP.md#phase-7--additional-implementations-parallel-safe)
-for the full tier breakdown and the Golden Week 2026 deferral
-of Tier 3.
+All 25 crate names are reserved on crates.io. Foundational, API,
+connector-triangle, and Phase 6/7 Tier 1 implementation crates have
+published substantive releases at `0.1.0` or higher. The remaining
+connector names (`philharmonic-connector-impl-email-smtp`,
+`philharmonic-connector-impl-llm-anthropic`, and
+`philharmonic-connector-impl-llm-gemini`) are published placeholders at
+`0.0.x` until their implementations land.
 
-Already published with substantive content:
-`philharmonic-types`, `philharmonic-store`,
-`philharmonic-store-sqlx-mysql`, `mechanics-config`,
-`mechanics-core`, `mechanics`, `philharmonic-policy`,
-`philharmonic-connector-common` (0.2.0 as of 2026-04-23),
-`philharmonic-workflow`,
-`philharmonic-connector-client` (0.1.0, 2026-04-23),
-`philharmonic-connector-service` (0.1.0, 2026-04-23),
-`philharmonic-connector-router` (0.1.0, 2026-04-23),
-`philharmonic-connector-impl-api` (0.1.0, 2026-04-24),
-`philharmonic-connector-impl-http-forward` (0.1.0, 2026-04-24),
-`philharmonic-connector-impl-llm-openai-compat` (0.1.0, 2026-04-24),
-`philharmonic-connector-impl-sql-postgres` (0.1.0, 2026-04-27),
-`philharmonic-connector-impl-sql-mysql` (0.1.0, 2026-04-27),
-`philharmonic-connector-impl-vector-search` (0.1.0, 2026-04-27),
-`philharmonic-connector-impl-embed` (0.1.0, 2026-04-27),
-`inline-blob` (0.1.0, 2026-04-27),
-`philharmonic-policy` (0.2.0, 2026-04-28),
-`philharmonic-api` (0.1.0, 2026-04-28).
+## Completed Milestone Archive
+
+### Foundation and connector core
+
+Phases 0-5 established the workspace, extracted `mechanics-config`,
+published `philharmonic-policy`, `philharmonic-workflow`, and the
+connector triangle, and completed the COSE_Sign1 + hybrid KEM /
+COSE_Encrypt0 crypto path under Yuka's two-gate review process. The
+substantive published foundation includes `philharmonic-types`,
+`philharmonic-store`, `philharmonic-store-sqlx-mysql`, `mechanics-*`,
+`philharmonic-policy`, `philharmonic-workflow`,
+`philharmonic-connector-common`, `philharmonic-connector-client`,
+`philharmonic-connector-service`, and `philharmonic-connector-router`.
+
+### Connector implementations
+
+Phase 6 published the implementation trait crate plus `http_forward` and
+`llm_openai_compat`. Phase 7 Tier 1 published SQL Postgres, SQL MySQL,
+stateless vector search, and local embedding. The embedding crate uses a
+pure-Rust `tract` + `tokenizers` stack with a default bundled bge-m3 model;
+`inline-blob` was added to support the multi-GB ONNX/external-data bundle
+on musl-oriented deployments.
+
+### API and deployment
+
+Phase 8 published `philharmonic-api 0.1.0` and `philharmonic-policy
+0.2.0` after landing the API router, auth/authz, workflow endpoints,
+endpoint config management, identity CRUD, token minting, audit log, rate
+limiting, tenant/operator routes, pagination, observability, and error
+envelopes. Phase 9 added three executable bins under `bins/`, shared server
+infrastructure, optional TLS, config/drop-in loading, SIGHUP reloads,
+install support, musl builds, Docker compose, real lowerer/executor wiring,
+WebUI embedding, e2e tests, and the 2026-05-02 reference deployment.
 
 ## Prerequisites
 
