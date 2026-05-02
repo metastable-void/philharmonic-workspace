@@ -70,7 +70,7 @@ fi
 if [ -n "$baseline_version" ]; then
     printf '=== cargo semver-checks check-release -p %s --baseline-version %s ===\n' \
         "$crate" "$baseline_version"
-    run_with_cargo_noise_filter cargo --color=always semver-checks check-release \
+    run_with_cargo_noise_filter cargo semver-checks check-release \
         -p "$crate" \
         --baseline-version "$baseline_version"
     exit $?
@@ -81,4 +81,4 @@ fi
 # crate has never been published (no baseline to compare against).
 printf '=== cargo semver-checks check-release -p %s (baseline = latest on crates.io) ===\n' \
     "$crate"
-run_with_cargo_noise_filter cargo --color=always semver-checks check-release -p "$crate"
+run_with_cargo_noise_filter cargo semver-checks check-release -p "$crate"

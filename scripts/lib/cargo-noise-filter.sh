@@ -47,12 +47,27 @@
 # anchoring is safe. `LC_ALL=C` forces byte-mode matching so the
 # filter doesn't choke on terminal-control bytes mid-stream.
 #
-# Pair with `cargo --color=always` at the call site so colored
-# output survives the pipe (cargo otherwise auto-disables color
-# when stdout isn't a TTY).
+# Sourcing this lib also forces colored cargo output (default-
+# only — caller can override by exporting `CARGO_TERM_COLOR=
+# never` before invoking the script). The env var is the
+# universal switch: it propagates through cargo to clippy-
+# driver and rustc cleanly, where the flag-form `cargo
+# --color=always <subcommand>` does NOT — empirically, that
+# placement leaves `cargo clippy`'s lint diagnostics entirely
+# uncoloured (cargo only colours its own banner; the clippy /
+# rustc child processes don't see the flag). The flag-form
+# `cargo <subcommand> --color=always` does work for clippy but
+# is rejected by `cargo fmt`, so a single placement that suits
+# every subcommand is `CARGO_TERM_COLOR=always` once in the env.
+# Drop per-call `--color=always` flags now that the env var
+# does the lifting.
 #
 # POSIX sh — see CONTRIBUTING.md §6. Sourced by build/test/lint
 # scripts that invoke cargo.
+
+# Default cargo to colored output; let the caller override.
+: "${CARGO_TERM_COLOR:=always}"
+export CARGO_TERM_COLOR
 
 # Drop the noise trio from stdin; pass everything else through.
 # Treat grep's "no match" exit (1) as success — that just means

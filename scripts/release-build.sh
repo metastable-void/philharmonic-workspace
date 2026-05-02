@@ -104,7 +104,7 @@ printf '%s    target: %s%s\n' "$C_NOTE" "$TARGET" "$C_RESET"
 # bleed into the other bins via the shared philharmonic dependency.
 for pkg in $bin_args; do
     printf '%s    building %s ...%s\n' "$C_NOTE" "$pkg" "$C_RESET"
-    run_with_cargo_noise_filter cargo --color=always build --release --target "$TARGET" -p "$pkg" --bins
+    run_with_cargo_noise_filter cargo build --release --target "$TARGET" -p "$pkg" --bins
 done
 
 out_dir="$CARGO_TARGET_DIR/$TARGET/release"

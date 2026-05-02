@@ -141,15 +141,15 @@ if [ "$1" = "--workspace" ]; then
         exit 2
     fi
     echo "=== cargo +nightly miri test --workspace ==="
-    run_with_cargo_noise_filter cargo +nightly --color=always miri test --workspace
+    run_with_cargo_noise_filter cargo +nightly miri test --workspace
 else
     crate="$1"
     shift
     if [ $# -eq 0 ]; then
         printf '=== cargo +nightly miri test -p %s ===\n' "$crate"
-        run_with_cargo_noise_filter cargo +nightly --color=always miri test -p "$crate"
+        run_with_cargo_noise_filter cargo +nightly miri test -p "$crate"
     else
         printf '=== cargo +nightly miri test -p %s -- %s ===\n' "$crate" "$*"
-        run_with_cargo_noise_filter cargo +nightly --color=always miri test -p "$crate" -- "$@"
+        run_with_cargo_noise_filter cargo +nightly miri test -p "$crate" -- "$@"
     fi
 fi

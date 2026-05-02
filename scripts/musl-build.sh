@@ -93,7 +93,7 @@ printf '%s    target: %s%s\n' "$C_NOTE" "$TARGET" "$C_RESET"
 # Build each bin SEPARATELY — see release-build.sh for rationale.
 for pkg in $bin_args; do
     printf '%s    building %s ...%s\n' "$C_NOTE" "$pkg" "$C_RESET"
-    run_with_cargo_noise_filter cargo --color=always build --target "$TARGET" -p "$pkg"
+    run_with_cargo_noise_filter cargo build --target "$TARGET" -p "$pkg"
 done
 
 out_dir="$CARGO_TARGET_DIR/$TARGET/debug"

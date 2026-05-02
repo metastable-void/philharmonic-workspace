@@ -88,15 +88,15 @@ esac
 if [ "$xtask_only" -eq 1 ]; then
     printf '=== cargo test -p xtask %s (CARGO_TARGET_DIR=%s) ===\n' "$extra" "$CARGO_TARGET_DIR"
     # shellcheck disable=SC2086
-    run_with_cargo_noise_filter cargo --color=always test -p xtask $extra
+    run_with_cargo_noise_filter cargo test -p xtask $extra
 elif [ -n "$crate" ]; then
     printf '=== cargo test -p %s %s ===\n' "$crate" "$extra"
     # $extra is intentionally unquoted so `-- --ignored` word-splits
     # into two arguments (an empty $extra expands to no args).
     # shellcheck disable=SC2086
-    run_with_cargo_noise_filter cargo --color=always test -p "$crate" $extra
+    run_with_cargo_noise_filter cargo test -p "$crate" $extra
 else
     printf '=== cargo test --workspace --exclude xtask %s ===\n' "$extra"
     # shellcheck disable=SC2086
-    run_with_cargo_noise_filter cargo --color=always test --workspace --exclude xtask $extra
+    run_with_cargo_noise_filter cargo test --workspace --exclude xtask $extra
 fi

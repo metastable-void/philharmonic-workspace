@@ -116,9 +116,13 @@ export CARGO_TARGET_DIR
 # (`sysres=$(./scripts/xtask.sh system-resources)`). Filtering only
 # stderr keeps the captured stdout pristine while still hiding the
 # cargo noise from the user's terminal. Exit status is preserved by
-# the wrapper.
+# the wrapper. Color is forced via CARGO_TERM_COLOR=always exported
+# from cargo-noise-filter.sh — a flag-form `cargo --color=always
+# xtask <tool>` would mis-place into the alias expansion and
+# `cargo xtask --color=always <tool>` would feed `--color=always`
+# as the bin name to `--bin`; the env var sidesteps both.
 #
 # We can't `exec` the cargo invocation here — `run_with_cargo_noise
 # _filter_stderr` is a shell function, so the script process must
 # stay alive to manage the FIFO + filter subprocess.
-run_with_cargo_noise_filter_stderr cargo --color=always xtask "$tool" -- "$@"
+run_with_cargo_noise_filter_stderr cargo xtask "$tool" -- "$@"
