@@ -1099,11 +1099,67 @@ xtask/
         │                         # pre-flight before pre-landing.sh,
         │                         # a Codex dispatch, or any
         │                         # resource-heavy operation
+        ├── stats-graph.rs        # read stats-log.sh lines from
+        │                         # stdin, emit SVG line chart of
+        │                         # total/code/docs lines over time
+        │                         # via the `poloto` crate.
+        │                         # Y-axis zero-grounded with SI
+        │                         # suffixes; pipelined by
+        │                         # `./scripts/update-stats-graph.sh`
+        │                         # into `docs/stats.svg`, embedded
+        │                         # in `docs/README.md`
         ├── web-post.rs           # HTTP POST JSON payload (ureq + rustls)
         └── tokei-stats.rs        # per-language file-size distribution
                                   # (N, min, Q1, Q2, Q3, max, avg,
                                   # stddev) via the tokei library crate
 ```
+
+### JST is this workspace's authoritative timezone
+
+**Every wall-clock reading in this workspace is JST (Asia/Tokyo,
+UTC+09:00) unless an explicit external constraint forces
+something else.** The maintainer (Yuka MORI) is based in Japan
+and conducts the project on JST time, so deadlines, working
+hours, schedules, holidays, the Code-stats / stats-graph chart
+labels, the project-status report timestamps, and any other
+human-facing time display all default to JST. This applies
+regardless of where the host machine, agent, contributor, or
+CI runner happens to live or report — JST is project-canonical,
+not host-canonical.
+
+External constraints that override the JST default — and only
+those — are allowed to use UTC or another zone explicitly,
+clearly labelled:
+
+- **Git commit metadata** stays in committer-local time as
+  recorded by Git itself; that's a Git-protocol concern, not a
+  display choice.
+- **Wire-format timestamps** in API payloads, COSE token
+  fields, audit log entries, etc. are RFC 3339 / Unix epoch
+  per their respective specs (typically UTC). Those are
+  machine-protocol fields, not display.
+- **`Audit-Info:` trailer's `t=` field** is Unix epoch seconds
+  (UTC-anchored by definition); the human reading time from it
+  formats to JST.
+- **External services** (crates.io publication times, GitHub
+  Actions runner clock, OpenAI API responses) report whatever
+  they report; consume as-is and convert to JST for any
+  human-facing display we render on top.
+
+In Rust code, the canonical way is `chrono` + `chrono_tz`:
+`chrono_tz::Asia::Tokyo` resolves to the JST zone (no DST,
+fixed UTC+09:00). In shell, `TZ=Asia/Tokyo date ...` (or
+`./scripts/xtask.sh calendar-jp`, which already pins JST).
+
+Documentation prose should match: when writing a date in a
+.md file, an issue, a commit message, a notes-to-humans entry,
+default to JST and call out the zone if it could be ambiguous
+("2026-05-02 21:30 JST"). The standalone form `YYYY-MM-DD` is
+fine when the time-of-day doesn't matter.
+
+`calendar-jp` (next subsection) is the agent-facing tool for
+keeping wall-clock reasoning fresh; `stats-graph`'s X axis
+labels JST per this rule.
 
 ### Agent usage of `calendar-jp`
 

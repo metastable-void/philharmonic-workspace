@@ -93,6 +93,15 @@ than proceeding.
   message rather than guessing.
 - **Don't commit, don't push, don't branch.** Leave the working
   tree dirty. Claude commits via `scripts/*.sh` after review.
+- **JST is this workspace's authoritative timezone.** Every
+  human-facing wall-clock reading defaults to JST
+  (Asia/Tokyo, UTC+09:00) — deadlines, schedules, generated
+  chart labels, status reports, prose dates. Wire-format
+  fields (RFC 3339 audit trailers, Git committer time) stay
+  in whatever zone the spec mandates and are converted to JST
+  for display. In Rust use `chrono_tz::Asia::Tokyo`; in shell
+  use `TZ=Asia/Tokyo` or `calendar-jp`. See
+  [`CONTRIBUTING.md §JST`](CONTRIBUTING.md#jst-is-this-workspaces-authoritative-timezone).
 - **Ground yourself in JST time — regularly, not just once.**
   Run `./scripts/xtask.sh calendar-jp` — prints a 5-week grid
   centred on today (JST) with weekend/holiday markers and the

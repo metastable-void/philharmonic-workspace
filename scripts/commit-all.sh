@@ -20,6 +20,13 @@
 # `scripts/publish-crate.sh`) — a permission entry for either
 # would let agents commit or publish without human approval.
 #
+# Side effect: before every parent commit (real, not --dry-run),
+# runs `./scripts/update-stats-graph.sh` to refresh
+# `docs/stats.svg` so HEAD always carries an up-to-date growth
+# chart. Failure aborts the commit so a stale chart isn't shipped
+# silently; pass nothing for an opt-out — the regen is part of the
+# parent-commit contract. Submodule walks are unaffected.
+#
 # Usage:
 #   scripts/commit-all.sh [--anonymize] [--parent-only] [--dry-run]
 #                          [--exclude <path>]... [message]
@@ -193,6 +200,20 @@ fi
 # The check is a verbatim fixed-string match so any form of the
 # allow entry is caught. To restore the ability to commit, remove
 # the offending entry from .claude/settings.json.
+# Refresh docs/stats.svg from the workspace's commit-stats
+# history so HEAD always carries an up-to-date growth chart.
+# Skipped under --dry-run (read-only preview). The SVG renders
+# only commits whose `Code-stats:` trailer is parseable; if
+# nothing has changed since the last regen, `git add -A` below
+# sees an unchanged file and the parent commit doesn't grow.
+# Failure here aborts the commit so problems surface rather than
+# producing a stale chart silently.
+if [ "$dry_run" -eq 0 ] && [ -x ./scripts/update-stats-graph.sh ]; then
+    printf '%s=== refreshing docs/stats.svg via update-stats-graph.sh ===%s\n' \
+        "$C_DIM" "$C_RESET"
+    ./scripts/update-stats-graph.sh
+fi
+
 # Skip the settings.json guard under --dry-run: nothing is being
 # committed, so the gate has no work to do. Run it normally on the
 # real-commit path.

@@ -23,3 +23,5 @@ tokei = "14"
 tar = "0.4"
 flate2 = "1"
 zstd = { version = "0.13", features = ["zstdmt"] }
+poloto = "19"
+tagu = "0.1"

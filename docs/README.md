@@ -46,3 +46,11 @@ and [ROADMAP.md](ROADMAP.md).
 Files mix **settled decisions** with **open questions** and
 mark the difference explicitly. When a doc and the code
 disagree, the code wins; flag the doc drift.
+
+## Workspace size over time
+
+![Workspace lines over time — total / code / docs](stats.svg)
+
+Generated from the `Code-stats:` trailer on each commit by
+`./scripts/update-stats-graph.sh` (regenerates `stats.svg`).
+Re-run after a noticeable batch of commits has landed.

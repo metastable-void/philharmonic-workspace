@@ -182,6 +182,17 @@ Every item here is the short form of something documented in
 full in `CONTRIBUTING.md`. Read the full section before acting
 — this summary is a prompt, not a spec.
 
+- **JST is this workspace's authoritative timezone.** Every
+  human-facing wall-clock reading (deadlines, schedules,
+  generated chart labels, status-report timestamps, prose
+  dates, anything visible to a person) defaults to JST
+  (Asia/Tokyo, UTC+09:00). Wire-format / machine-protocol
+  fields (RFC 3339 audit trailers, Git committer time,
+  external-service clocks) stay in whatever zone the spec
+  mandates; format to JST when displaying them. In Rust use
+  `chrono_tz::Asia::Tokyo`; in shell use `TZ=Asia/Tokyo` or
+  `calendar-jp`. ([CONTRIBUTING.md §JST is this workspace's
+  authoritative timezone](CONTRIBUTING.md#jst-is-this-workspaces-authoritative-timezone))
 - **Ground yourself in JST time — regularly, not just once.**
   Run `./scripts/xtask.sh calendar-jp` — prints a 5-week grid
   centred on today (JST), marks weekends and Japanese public
