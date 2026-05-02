@@ -95,8 +95,8 @@ while [ $# -gt 0 ]; do
     esac
 done
 
-[ -f README.md ]  || { printf '!!! project-status: README.md not found at workspace root\n' >&2;  exit 1; }
-[ -f ROADMAP.md ] || { printf '!!! project-status: ROADMAP.md not found at workspace root\n' >&2; exit 1; }
+[ -f ./README.md ]  || { printf '!!! project-status: README.md not found at workspace root\n' >&2;  exit 1; }
+[ -f ./docs/ROADMAP.md ] || { printf '!!! project-status: ROADMAP.md not found at docs directory\n' >&2; exit 1; }
 [ -d "$reports_dir" ] || {
     printf '!!! project-status: report directory %s does not exist\n' "$reports_dir" >&2
     exit 1
@@ -116,9 +116,9 @@ trap 'rm -f "$prompt_tmp" "$output_tmp"' EXIT INT HUP TERM
 
 {
     printf '=== README.md ===\n\n'
-    cat README.md
+    cat ./README.md
     printf '\n\n=== ROADMAP.md ===\n\n'
-    cat ROADMAP.md
+    cat ./docs/ROADMAP.md
     printf '\n\n=== ./scripts/git-log.sh -n %s (parent workspace) ===\n\n' "$log_lines"
     ./scripts/git-log.sh -n "$log_lines"
 } > "$prompt_tmp"
@@ -142,3 +142,5 @@ fi
 mv "$output_tmp" "$report_path"
 
 printf '%s\n' "$report_path"
+
+echo 'Please update docs/SUMMARY.md'

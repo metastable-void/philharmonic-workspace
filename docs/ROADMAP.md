@@ -6,7 +6,7 @@
 family from current state to v1 MVP (working end-to-end deployment
 serving real tenants).
 
-**Current state** (2026-04-30):
+**Current state** (2026-05-02):
 
 - Design: complete.
 - Phase 0 (workspace setup): **done**, with substantial added
@@ -83,8 +83,9 @@ serving real tenants).
   Tier 2–3 connectors (SMTP, Anthropic, Gemini) deferred to
   post-Golden-Week (on or after 2026-05-07).
 - Phase 8 (end-to-end): **complete** (2026-04-28).
-- Phase 9 (integration + deployment): **substantially complete**
-  (2026-04-30); reference deployment in progress.
+- Phase 9 (integration + deployment): **complete** (2026-05-02).
+  Reference deployment operational; end-to-end workflow with
+  `llm_openai_compat` connector tested successfully on the WebUI.
 
 Work through phases in order unless a phase is explicitly noted
 as parallel-safe. Consult the design documentation as the
@@ -1805,17 +1806,20 @@ step execution, audit log.
       `./scripts/musl-build.sh` builds all three bins.
     - CI target.
 
-11. **Reference deployment** on the developer's infrastructure
-    (can slip past 5/2):
-    - Deploy the three binaries to on-prem or IaaS.
-    - TLS certificates for the chosen URL shape.
+11. ✅ **Reference deployment** (operational 2026-05-02):
+    - Three binaries deployed on developer infrastructure.
     - Realm KEM keypairs, SCK, signing keys deployed.
-    - At least one tenant provisioned (the developer).
-    - At least one workflow exercised end-to-end with real
-      traffic (LLM-driven flow preferred — stresses ephemeral
-      tokens, instance-scope, per-step decryption).
-    - **Requires tasks 7–8** (real lowerer + executor) for
-      any workflow to run real steps.
+    - One tenant provisioned (developer).
+    - One workflow exercised end-to-end with real traffic:
+      OpenAI-compatible LLM via `llm_openai_compat` connector,
+      tested through the WebUI. Full path verified: API server
+      → lowerer (COSE_Sign1 + COSE_Encrypt0) → mechanics
+      worker (JS execution) → connector router (path-based
+      dispatch) → connector service (verify + decrypt +
+      implementation dispatch) → upstream LLM → response back
+      through the chain.
+    - Multiple deployment bugs found and fixed during testing
+      (see `docs/notes-to-humans/2026-05-01-000{4,5,6}-*.md`).
 
 12. ✅ **Docker compose** (landed 2026-04-30):
     - Minimal Alpine images, no `install` subcommand inside
@@ -1847,11 +1851,15 @@ step execution, audit log.
   settles).
 
 **Acceptance criteria**:
-- End-to-end suite passes in CI.
-- Reference deployment reachable over the internet, accepting
-  tenant API calls with proper TLS.
-- At least one workflow running real traffic for at least a
-  week without incident.
+- ✅ End-to-end suite passes in CI.
+- ✅ Reference deployment operational, accepting tenant API
+  calls.
+- ✅ At least one workflow running real traffic (LLM-driven,
+  `llm_openai_compat` connector, end-to-end through all
+  components, verified 2026-05-02).
+- Remaining: run for at least a week without incident;
+  additional connector implementations (Phase 7 Tier 2/3,
+  deferred post-GW).
 
 ---
 

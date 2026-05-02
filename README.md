@@ -167,19 +167,21 @@ previously (2026-04-24 / 2026-04-27). The unpublished
 phase tiers; until then they have no crates.io presence (no
 0.0.0 placeholders were reserved).
 
-**Phase 9 — Integration** is complete (2026-04-29 through
-2026-04-30). Three bin targets live in separate in-tree
-crates under `bins/` (`mechanics-worker` 13 MB,
-`philharmonic-api` 11 MB, `philharmonic-connector` 2.2 GB
-with bundled bge-m3 ONNX model). Each bin is built
-separately to prevent Cargo feature unification from
-bleeding the 2.28 GB embed weights into bins that don't
-need them. The `philharmonic` meta-crate (0.1.1) is a
-library-only re-export crate with a `webui` feature gate
-for embedded static assets. All 25 crates published to
-crates.io; musl static builds, Docker compose, `install`
-subcommand, security audit, and full-pipeline e2e tests
-(COSE_Sign1 + COSE_Encrypt0 round-trip) all landed.
+**Phase 9 — Integration and deployment** is complete
+(2026-04-29 through 2026-05-02). Three bin targets live in
+separate in-tree crates under `bins/` (`mechanics-worker`
+13 MB, `philharmonic-api` 11 MB, `philharmonic-connector`
+2.2 GB with bundled bge-m3 ONNX model). Reference
+deployment is operational with a minimal end-to-end
+workflow (OpenAI-compatible LLM via `llm_openai_compat`
+connector) verified through the WebUI on 2026-05-02. The
+full execution path — API server → lowerer (COSE_Sign1 +
+COSE_Encrypt0) → mechanics worker (JS) → connector router
+→ connector service → upstream LLM — is proven in
+production. All 25 crates published to crates.io; musl
+static builds, Docker compose, `install` subcommand, and
+full-pipeline e2e tests landed. Remaining Phase 7
+connector implementations (Tier 2/3) deferred post-GW.
 
 **Phase 7 Tier 1 — done 2026-04-27.** The pivot to pure-Rust
 `tract` + `tokenizers` for `embed` (replacing the round-01

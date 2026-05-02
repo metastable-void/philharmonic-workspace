@@ -118,20 +118,24 @@ Implemented and published (as of 2026-04-24):
 - `philharmonic-connector-impl-llm-openai-compat` — 0.1.0 on
   crates.io 2026-04-24 (Phase 6 Task 2).
 
+Implemented and deployed (Phase 8–9 complete 2026-05-02):
+
+- `philharmonic-api` — 0.1.3, public HTTP API with embedded
+  WebUI. Reference deployment operational.
+- Phase 7 Tier 1–2 connector impls shipped: `sql-postgres`,
+  `sql-mysql`, `embed`, `vector-search`.
+
 Designed, not yet implemented:
 
-- Remaining per-implementation crates for Phase 7:
-  `llm-anthropic`, `llm-gemini`, `sql-postgres`, `sql-mysql`,
-  `email-smtp`, `embed`, `vector-search`.
-- `philharmonic-api` (Phase 8+).
+- Remaining Phase 7 Tier 3 connector impls (deferred
+  post-GW): `llm-anthropic`, `llm-gemini`, `email-smtp`.
 
-Remaining items blocking v1, per `14-open-questions.md`:
+Remaining items per `14-open-questions.md`:
 
 - Per-implementation wire-protocol details for the remaining
-  Phase 7 impls (`llm_anthropic`, `llm_gemini`, `sql_query`,
-  `email_send`, `embed`, `vector_search`). Phase 6's
-  `http_forward` and `llm_openai_compat` shipped 2026-04-24;
-  their wire-protocol details are concrete and published.
+  Tier 3 impls. Phase 6's `http_forward` and
+  `llm_openai_compat` shipped 2026-04-24; their wire-protocol
+  details are concrete and published.
 
 The permission atom vocabulary in `09-policy-and-tenancy.md`
 is treated as closed for v1 and adjusted deliberately if

@@ -217,13 +217,17 @@ crates (for entity access and the trait definition).
 
 ### `philharmonic-connector-router`
 
-Pure HTTP dispatcher. Deployed as a small static binary per
-realm.
+Pure HTTP dispatcher. Can be embedded in the API server
+(typical for single-machine deployments) or deployed as a
+standalone binary per realm.
 
-- Terminates TLS for whichever realm-scoped URL the
-  deployment configures (a per-realm subdomain and a
-  per-realm path prefix are both common; the router is
-  agnostic).
+Two dispatch modes:
+- **Path-based** (`/{realm}`) — the lowerer embeds the realm
+  in the URL. No hostname assumptions. Used by the embedded
+  deployment shape.
+- **Host-based** (`Host: <realm>.connector.<domain_suffix>`)
+  — for deployments with per-realm DNS.
+
 - Forwards requests to connector services in the realm.
 - Load-balances across connector service instances.
 - No token verification (services do this).
@@ -1181,13 +1185,16 @@ deployment binds them to URLs.
 - Implementations bundled into each realm's service binary at
   build time. No runtime plug-ins.
 
-**Phase 9 reference shape (2026-04-30):** the connector router
-is embedded directly in the `philharmonic-api` binary via
-`extra_routes`, and each realm's connector service runs as a
-separate `philharmonic-connector` process. This collapses the
-router into the API server for single-machine deployments
-while keeping per-realm service isolation. Multi-machine
-topologies still deploy separate routers.
+**Phase 9 reference shape (2026-05-02):** the connector
+dispatch is embedded in the `philharmonic-api` binary as a
+separate concern from the API middleware stack. The API
+binary's `dispatch_dynamic` handler routes `/connector/{realm}`
+requests directly to `dispatch_to_realm()` (path-based realm
+extraction, no hostname assumptions), bypassing the API's
+auth/scope middleware entirely. Each realm's connector service
+runs as a separate `philharmonic-connector` process. The axum
+`router()` with host-based dispatch remains available for
+standalone connector-router deployments with per-realm DNS.
 
 Typical realm layout: `llm`, `sql`, `http`, `email`, `vector`,
 or combined into fewer realms as operationally convenient.
