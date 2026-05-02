@@ -146,6 +146,36 @@ continuous monitoring. Reference it in Codex prompts to
 prevent false "build is stuck" aborts.
 ([§5.1](CONTRIBUTING.md#51-build-status-monitoring))
 
+**Check resource pressure before kicking off heavy
+work.** `./scripts/xtask.sh resource-pressure` prints a
+one-line summary: CPU%, `load_avg_1 / num_cpus` ratio,
+available/total memory, used/total swap. Run it before
+`pre-landing.sh`, before dispatching Codex, before a
+`cargo test --workspace` pass, or any time you'd like
+a fast read on whether the box has headroom. If
+`load1/cpus` is well above 1.0 or swap usage is climbing,
+something else is already saturating the host; queue
+heavy work behind it instead of piling on. The companion
+bin `system-resources` is reserved for machine-readable
+audit-trailer generation — don't use it for status
+checks; it doesn't sample CPU activity.
+
+**Codex monitoring scripts have a scope.**
+`./scripts/codex-status.sh` and `./scripts/codex-logs.sh`
+both filter on `originator: Claude Code` — they only see
+Codex sessions spawned via the Claude-Code `codex:` plugin
+shim. **A standalone `codex` run launched independently
+(e.g. by the user in another terminal, or the VSCode
+extension's app-server) does not appear in either tool.**
+A "No Codex process running" report from
+`codex-status.sh` only confirms no Claude-Code-spawned
+Codex is active — an independent session may still be
+live and editing the workspace. When the user has
+separately dispatched Codex, the codex-completion
+verification protocol above does not apply mechanically;
+ask the user to confirm completion before touching the
+working tree.
+
 ## Executive summary of the rules you'll trip over most
 
 Every item here is the short form of something documented in
@@ -230,17 +260,23 @@ full in `CONTRIBUTING.md`. Read the full section before acting
   wrapper covers your case, extend one.
   ([§5](CONTRIBUTING.md#5-script-wrappers-over-raw-cargo))
 - **Run `./scripts/pre-landing.sh` before every commit that
-  touches Rust.** fmt + check + clippy (`-D warnings`) + test,
-  auto-detecting modified crates. CI runs the same script.
-  Slow-by-design (minutes per run on this workspace's ~25
-  crates with `aws-lc-rs` C builds and Boa) — **run it once
-  before the commit, not repeatedly within a single turn**.
-  Stage all the turn's edits, then run pre-landing once. For
-  focused mid-iteration debugging use a narrow
-  `cargo test <name>`; save the full pre-landing pass for the
-  commit. A re-run after fixing a real failure is fine; a
-  tight edit/re-run loop in one turn just burns time.
-  ([§11](CONTRIBUTING.md#11-pre-landing-checks))
+  touches Rust.** fmt + check + clippy (`-D warnings`) +
+  rustdoc + test, auto-detecting modified crates. The default
+  flow runs `--workspace --exclude xtask` throughout — xtask
+  is gated behind `pre-landing.sh --xtask` (uses
+  `target-xtask/` instead of `target-main/`, so xtask checks
+  don't fight Codex or workspace builds for the same build
+  cache). When you've touched both workspace crates and
+  xtask, run pre-landing twice: once default, once `--xtask`.
+  CI runs the same script. Slow-by-design (minutes per run
+  on this workspace's ~25 crates with `aws-lc-rs` C builds
+  and Boa) — **run it once before the commit, not repeatedly
+  within a single turn**. Stage all the turn's edits, then
+  run pre-landing once. For focused mid-iteration debugging
+  use a narrow `cargo test <name>`; save the full pre-landing
+  pass for the commit. A re-run after fixing a real failure
+  is fine; a tight edit/re-run loop in one turn just burns
+  time. ([§11](CONTRIBUTING.md#11-pre-landing-checks))
 - **Run `./scripts/miri-test.sh` on the crypto crate set at
   every checkpoint** — before publishing crypto-touching
   crates, after completing a phase/sub-phase with crypto

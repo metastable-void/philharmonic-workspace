@@ -1087,7 +1087,18 @@ xtask/
         ├── encode-json-str.rs    # stdin → JSON string literal
         ├── hf-fetch-embed-model.rs # fetch ONNX embedding model from
         │                         # HuggingFace for build-time use
-        ├── system-resources.rs   # print thread count + memory stats
+        ├── system-resources.rs   # machine-readable thread count +
+        │                         # memory stats; consumed by
+        │                         # `Audit-Info:` trailer generation
+        │                         # (NOT for day-to-day status — use
+        │                         # `resource-pressure` for that)
+        ├── resource-pressure.rs  # canonical day-to-day one-line
+        │                         # pressure summary: CPU%,
+        │                         # load1/cpus ratio, mem avail/total,
+        │                         # swap used/total. Agent-facing
+        │                         # pre-flight before pre-landing.sh,
+        │                         # a Codex dispatch, or any
+        │                         # resource-heavy operation
         ├── web-post.rs           # HTTP POST JSON payload (ureq + rustls)
         └── tokei-stats.rs        # per-language file-size distribution
                                   # (N, min, Q1, Q2, Q3, max, avg,
@@ -1697,12 +1708,13 @@ Auto-detects modified crates (submodules with a dirty working
 tree) and runs, in order:
 
 1. `./scripts/rust-lint.sh` — fmt-check + check + clippy
-   (`-D warnings`).
-2. `./scripts/rust-test.sh` — `cargo test --workspace` (skips
-   `#[ignore]`-gated tests).
+   (`-D warnings`) + rustdoc (`-D missing_docs`),
+   `--workspace --exclude xtask` throughout.
+2. `./scripts/rust-test.sh` — `cargo test --workspace
+   --exclude xtask` (skips `#[ignore]`-gated tests).
 3. `./scripts/rust-test.sh --ignored <crate>` for every modified
-   crate — exercises integration tests for what you actually
-   changed.
+   non-xtask crate — exercises integration tests for what you
+   actually changed.
 
 Pass crate names to `pre-landing.sh` to override auto-detection;
 pass `--no-ignored` to skip step 3 (rare, for fast iteration
@@ -1711,6 +1723,40 @@ when you're certain the slow tests aren't affected).
 GitHub CI runs the same script on a clean checkout (no dirty
 submodules → step 3 naturally empty) so contributor and CI
 behaviour don't drift.
+
+### 11.0.1 xtask is gated behind `--xtask`
+
+xtask is the in-tree dev-tooling crate (§8.1) and carries its
+own `target-xtask/` build cache so workspace builds and Codex
+runs share `target-main/` without xtask compilation artifacts
+piling up. The default workspace flow above **excludes** xtask
+from every cargo invocation (`--workspace --exclude xtask`,
+fmt enumeration over non-xtask members, `show-dirty.sh`
+output filtered through `grep -v -x -F xtask` for the
+`--ignored` loop). A positional `xtask` argument to
+`pre-landing.sh` is rejected explicitly with a hint to use
+`--xtask`.
+
+When xtask itself was changed (a new bin under
+`xtask/src/bin/`, a `xtask/Cargo.toml` dep edit, anything
+under `xtask/`), run the xtask-only flow:
+
+```sh
+./scripts/pre-landing.sh --xtask
+```
+
+This pins `CARGO_TARGET_DIR=target-xtask` for the entire run
+and scopes to `cargo … -p xtask` for fmt/check/clippy/doc/test.
+`--xtask` is mutually exclusive with positional crate names
+and with `--no-ignored` (xtask has no `#[ignore]`-gated
+integration tests, so step 3 is N/A). `rust-lint.sh --xtask`
+and `rust-test.sh --xtask` are equivalent narrower entry
+points if you only need one phase.
+
+The two flows are mutually exclusive on purpose — landing a
+change that touches both workspace members and xtask requires
+two pre-landing runs (one default, one `--xtask`), which is
+the intended cost of keeping the build caches isolated.
 
 **Why split the test run.** Integration tests that need real
 infrastructure carry `#[ignore]` so the default workspace run

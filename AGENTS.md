@@ -216,6 +216,18 @@ Read the full section when in doubt.
   `./scripts/check-md-bloat.sh` and `./scripts/tokei.sh`.
   Note the output in your final summary — it helps Claude
   and Yuka gauge growth.
+- **Check resource pressure before heavy work.** Run
+  `./scripts/xtask.sh resource-pressure` for a one-line
+  summary of CPU%, `load_avg_1 / num_cpus`, available/total
+  memory, and used/total swap. Use it as a pre-flight
+  before kicking off `pre-landing.sh`, a long
+  `cargo test --workspace`, or anything else that's going
+  to compete for CPU/RAM. If `load1/cpus` is well above
+  1.0 or swap is climbing, the box is already saturated;
+  defer rather than pile on. Don't confuse this with
+  `xtask.sh system-resources`, which is the
+  machine-readable audit-trailer feed and doesn't sample
+  CPU activity.
 
 ## Shell scripts — short form
 
@@ -285,13 +297,19 @@ per-crate scoping, auto-install of optional tools) so your local
 runs match CI. Raw `cargo <subcommand>` drifts.
 
 - `./scripts/pre-landing.sh` — canonical fmt + check + clippy
-  (`-D warnings`) + test. Run before finishing any
-  Rust-touching task. Slow-by-design (minutes per run on this
-  workspace's ~25 crates with `aws-lc-rs` C builds and Boa) —
-  **run it once at the end of the task, not repeatedly between
-  edits in one turn**. For focused mid-iteration debugging use
-  a narrow `cargo test <name>`; save the full pre-landing for
-  the hand-off. A re-run after fixing a real failure is fine.
+  (`-D warnings`) + rustdoc + test. Run before finishing any
+  Rust-touching task. Default flow runs
+  `--workspace --exclude xtask` throughout; xtask is gated
+  behind `pre-landing.sh --xtask` (uses `target-xtask/` so
+  xtask checks don't share the build cache with workspace
+  builds or Codex). If your task touched both workspace
+  crates and xtask, run pre-landing twice (default + xtask).
+  Slow-by-design (minutes per run on this workspace's ~25
+  crates with `aws-lc-rs` C builds and Boa) — **run it once
+  at the end of the task, not repeatedly between edits in one
+  turn**. For focused mid-iteration debugging use a narrow
+  `cargo test <name>`; save the full pre-landing for the
+  hand-off. A re-run after fixing a real failure is fine.
   See [`CONTRIBUTING.md §11`](CONTRIBUTING.md#11-pre-landing-checks).
 - `./scripts/rust-lint.sh [<crate>]`,
   `./scripts/rust-test.sh [--include-ignored|--ignored] [<crate>]`
