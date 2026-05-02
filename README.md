@@ -436,7 +436,7 @@ Invoke by path (`./scripts/foo.sh`), not via `bash`.
   degrades to a plain checkout when HEAD was already detached,
   so it does not re-attach on its own). Does *not* commit the
   bumped submodule pointers.
-- `./scripts/commit-all.sh [--anonymize] [--parent-only] [message]` —
+- `./scripts/commit-all.sh [--anonymize] [--parent-only] [--dry-run] [--exclude <path>]... [message]` —
   commit pending changes. Walks each dirty submodule first
   (committing with `-s -S`), then the parent. Every commit gets
   an `Audit-Info:` trailer recording the environment that
@@ -455,7 +455,18 @@ Invoke by path (`./scripts/foo.sh`), not via `bash`.
   the DCO `Signed-off-by:` or the GPG/SSH signature — all of this
   metadata travels together in the trailer block. See
   [§Commit audit trailer](#commit-audit-trailer) below for the
-  full rationale.
+  full rationale. `--dry-run` walks each dirty repo and prints
+  the would-be-staged file list (`git status --short`) without
+  committing or signing — read-only preview, recommended after a
+  Codex dispatch or any uncertain working-tree state.
+  `--exclude <path>` (repeatable; workspace-root-relative,
+  whitespace-free) holds a parent-repo file back from the
+  commit by unstaging it after `git add -A`; submodule walks
+  ignore the flag. Typical use: hold `Cargo.lock` back from a
+  parent-only doc commit so it lands with the corresponding
+  submodule version-bump commits later. Codex itself never runs
+  `commit-all.sh` (including `--dry-run`); a process-tree guard
+  at the top of the script aborts under any Codex ancestor.
 - `./scripts/push-all.sh` — push each submodule's current
   branch, then the parent. Aborts before pushing the parent if
   any submodule push fails.
@@ -590,8 +601,9 @@ Invoke by path (`./scripts/foo.sh`), not via `bash`.
   for the archive's role and editorial policy.
 - `./scripts/check-md-bloat.sh` — lists line counts for every
   `.md` / `.MD` file reachable from the workspace root (excluding
-  `target/` build trees); output ends with a `total` line. Pipe
-  through `sort -n | tail -20` to surface the biggest files.
+  `target/` build trees and `node_modules/` — third-party JS deps
+  under `philharmonic/webui/`); output ends with a `total` line.
+  Pipe through `sort -n | tail -20` to surface the biggest files.
   Use after doc restructures, or when deciding whether a doc
   has grown past its intended role per
   [`CONTRIBUTING.md §18`](CONTRIBUTING.md#18-documentation-obligations).

@@ -286,7 +286,13 @@ runs match CI. Raw `cargo <subcommand>` drifts.
 
 - `./scripts/pre-landing.sh` — canonical fmt + check + clippy
   (`-D warnings`) + test. Run before finishing any
-  Rust-touching task.
+  Rust-touching task. Slow-by-design (minutes per run on this
+  workspace's ~25 crates with `aws-lc-rs` C builds and Boa) —
+  **run it once at the end of the task, not repeatedly between
+  edits in one turn**. For focused mid-iteration debugging use
+  a narrow `cargo test <name>`; save the full pre-landing for
+  the hand-off. A re-run after fixing a real failure is fine.
+  See [`CONTRIBUTING.md §11`](CONTRIBUTING.md#11-pre-landing-checks).
 - `./scripts/rust-lint.sh [<crate>]`,
   `./scripts/rust-test.sh [--include-ignored|--ignored] [<crate>]`
   — individual phases.

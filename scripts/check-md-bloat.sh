@@ -1,9 +1,11 @@
 #!/bin/sh
 # Detect bloated Markdown files in the workspace. Prints line
 # counts for every `.md` / `.MD` file reachable from the workspace
-# root, excluding any `target/` build-output trees. Output ends
-# with a `total` line (standard `wc -l` behaviour with multiple
-# files).
+# root, excluding `target/` build-output trees and `node_modules/`
+# (third-party JS dependencies under `philharmonic/webui/`; their
+# bundled READMEs and CHANGELOGs are not workspace-authored prose
+# and would dominate the output). Output ends with a `total` line
+# (standard `wc -l` behaviour with multiple files).
 #
 # Pipe through `sort -n` to surface the biggest files:
 #
@@ -22,4 +24,4 @@ set -eu
 
 . "$(dirname -- "$0")/lib/workspace-cd.sh"
 
-find . -type d -name target -prune -o -type f -name '*.[mM][dD]' -exec wc -l {} + | sort -nr
+find . -type d \( -name target -o -name node_modules \) -prune -o -type f -name '*.[mM][dD]' -exec wc -l {} + | sort -nr

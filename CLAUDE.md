@@ -114,6 +114,30 @@ is still running will silently kill it or produce broken
 state from incomplete output. This has caused repeated
 incidents.
 
+**Once Codex is verifiably done, dry-run before
+committing.** Codex may have touched files outside the
+prompt's stated scope (a stray `Cargo.lock` regen, an
+unintended doc edit, a new untracked report). Run
+`./scripts/commit-all.sh --dry-run` (combine with
+`--parent-only` to scope to the parent repo) to preview
+the exact file list that `git add -A` would sweep into
+each commit. Inspect the output, confirm the scope
+matches what you expected from the dispatch, and only
+then run the real `commit-all.sh`. Dry-run is read-only
+— no staging, no signing, no temp message file, no
+`.claude/settings.json` guard — purely a preview. If the
+dry-run reveals a file you want kept out of the commit,
+pass `--exclude <workspace-relative-path>` (repeatable)
+to `commit-all.sh`; the flag unstages each named path
+after `git add -A`, leaving its working-tree change
+dirty for a follow-up commit. Typical use: hold
+`Cargo.lock` back from a parent-only doc commit so it
+lands with the corresponding submodule version-bump
+commits later. **Codex itself never runs
+`commit-all.sh`** (including `--dry-run` and
+`--exclude`); the codex-guard in the script aborts
+under any Codex ancestor process.
+
 **When cargo appears stuck** (no output for minutes),
 run `./scripts/build-status.sh` — it shows which crates
 are being compiled/linked/tested, with PIDs and elapsed
@@ -208,6 +232,14 @@ full in `CONTRIBUTING.md`. Read the full section before acting
 - **Run `./scripts/pre-landing.sh` before every commit that
   touches Rust.** fmt + check + clippy (`-D warnings`) + test,
   auto-detecting modified crates. CI runs the same script.
+  Slow-by-design (minutes per run on this workspace's ~25
+  crates with `aws-lc-rs` C builds and Boa) — **run it once
+  before the commit, not repeatedly within a single turn**.
+  Stage all the turn's edits, then run pre-landing once. For
+  focused mid-iteration debugging use a narrow
+  `cargo test <name>`; save the full pre-landing pass for the
+  commit. A re-run after fixing a real failure is fine; a
+  tight edit/re-run loop in one turn just burns time.
   ([§11](CONTRIBUTING.md#11-pre-landing-checks))
 - **Run `./scripts/miri-test.sh` on the crypto crate set at
   every checkpoint** — before publishing crypto-touching

@@ -238,11 +238,28 @@ for history browsing; the prohibition is on state changes.
   to a plain checkout when HEAD was already detached, so it does
   not re-attach on its own). Does *not* commit bumped pointers.
   See §4.4 for the rebase-on-pull exception.
-- `commit-all.sh [--anonymize] [--parent-only] [message]` —
+- `commit-all.sh [--anonymize] [--parent-only] [--dry-run] [--exclude <path>]... [message]` —
   commit pending changes. Walks each dirty submodule first
   (committing with `-s -S`), then the parent. Default message
   is `"updates"`. `--parent-only` skips the submodule walk for
-  parent-only work (docs, scripts, ROADMAP).
+  parent-only work (docs, scripts, ROADMAP). `--dry-run` walks
+  each dirty repo and prints `git status --short` for it without
+  staging, committing, signing, computing the audit trailer, or
+  running the settings.json guard — a read-only preview of what
+  the real invocation would sweep in. Recommended pre-flight
+  whenever the working tree's contents are uncertain (e.g. after
+  a Codex dispatch). `--exclude <path>` (repeatable) holds a
+  workspace-root-relative parent-repo path back from the commit:
+  `git add -A` runs as usual, then each excluded path is
+  unstaged with `git reset HEAD -- <path>`, leaving the
+  working-tree change dirty for a later commit. Applies only to
+  the parent commit phase; the submodule walk ignores `--exclude`.
+  Paths must be whitespace-free. Typical use: hold `Cargo.lock`
+  back from a parent-only doc commit so it lands with the
+  corresponding submodule version-bump commits later. Codex
+  itself never runs `commit-all.sh`, including `--dry-run` — the
+  codex-guard sources at the top of the script abort under any
+  Codex ancestor process.
 - `push-all.sh` — push each submodule's current branch, then
   the parent. Aborts before the parent push if any submodule
   push fails, so origin never sees an unresolvable parent
@@ -293,6 +310,47 @@ is that the script's contract is "commit everything dirty,
 correctly, with every required invariant" — a selective path
 would need different tooling, and if you find yourself wanting
 it often, extend the script rather than working around it.
+
+**Preview the sweep with `--dry-run` first when the tree's
+contents are uncertain.** `./scripts/commit-all.sh --dry-run`
+(optionally combined with `--parent-only`) walks each dirty
+repo and prints `git status --short` for it. No staging, no
+signing, no temp message file, no `Audit-Info` / `Code-stats`
+computation, no settings.json guard — purely read-only. Use it
+after a Codex dispatch (or any other batch of edits) so the
+real `commit-all.sh` invocation doesn't sweep in unintended
+files (a stray `Cargo.lock` regen, an unrelated doc edit, a
+new untracked report, etc.). The submodule walk uses the same
+`git status --short` shape per submodule, so the dry-run
+output is the authoritative preview of what `git add -A` would
+stage on the next pass.
+
+**Hold specific parent-repo paths back with `--exclude`.** When
+the dry-run reveals a file you want kept out of the commit
+(typically `Cargo.lock` after a submodule version bump that
+hasn't landed yet), pass `--exclude <path>` per file. The flag
+is repeatable, the path is workspace-root-relative, and
+whitespace in paths is rejected at parse time. Implementation:
+`git add -A` runs as normal, then each excluded path is
+unstaged with `git reset HEAD -- <path>`, leaving the working
+tree dirty so the file is available for a follow-up commit.
+This is the mechanized form of the "move them to /tmp and
+restore after" pattern above; prefer it for routine cases like
+`Cargo.lock`. The flag applies only to the parent commit phase
+— the submodule walk doesn't honor it. If `--exclude` removes
+every staged change so the parent commit would be empty, the
+script aborts with an explicit error rather than producing an
+empty commit attempt. Under `--dry-run`, the excluded paths
+are listed beneath the would-commit status block so the
+preview matches the planned scope.
+
+**Codex itself never runs `commit-all.sh`**, including
+`--dry-run`. `scripts/lib/codex-guard.sh` is sourced at the
+top of the script and walks the ancestor process tree; if
+any process name matches `*codex*` (case-insensitive), the
+script aborts before doing anything. Codex's contract is
+"leave the tree dirty for Claude" (AGENTS.md §Don't commit);
+the dry-run preview is Claude's tool, not Codex's.
 
 ### 4.3 Every commit is signed off *and* cryptographically signed
 
@@ -351,14 +409,17 @@ to local not-yet-pushed commits:
    commit messages (including `Audit-Info:` and
    `Signed-off-by:` trailers) are preserved verbatim;
    author-date is preserved, committer-date is refreshed. The
-   alternatives examined — `--ff-only` (fails in the uncommon
-   case, no wrapper-friendly recovery path), default merge
-   (produces merge commits, requires pre-commit hook wiring),
-   default submodule checkout (detaches HEAD, breaks
-   `commit-all.sh`'s detached-HEAD guard) — each violate other
-   workspace invariants. Do not run `git pull --rebase` or
-   `git rebase` outside `pull-all.sh`; the exception is for the
-   script, not for the subcommand.
+   historical note below explains why this script-owned rebase
+   path exists. Do not run `git pull --rebase` or `git rebase`
+   outside `pull-all.sh`; the exception is for the script, not
+   for the subcommand.
+
+   Historical note: the alternatives originally considered each
+   broke another workspace invariant. `--ff-only` failed when
+   local commits existed and gave the wrapper no recovery path;
+   default merge produced merge commits and required pre-commit
+   hook plumbing; default submodule checkout detached HEAD and
+   broke `commit-all.sh`'s detached-HEAD guard.
 
 Nothing outside these two cases is authorised to rewrite history
 — not amend, not rebase, not reset, not anything else,
@@ -541,9 +602,9 @@ submodule commits made by that invocation carry the same
 `Code-stats:` trailer too; the numbers are still a parent
 workspace snapshot, not per-submodule counts.
 
-Older history predating the trailer adoption shows `-` for
-both stats and delta in `stats-log.sh` output; that's
-expected, not missing data.
+Historical note: commits before the `Code-stats:` trailer was
+adopted show `-` for both stats and delta in `stats-log.sh`
+output. That's expected archival history, not missing data.
 
 ### 4.8 GitHub-side ruleset (parent workspace repo only)
 
@@ -1146,14 +1207,16 @@ shared `target/`. `.gitignore` lists `target-xtask/` alongside
 
 **Why:** without this split, workspace tooling driven through
 `xtask.sh` contends with concurrent member-crate builds for
-`target/debug/.cargo-lock`. The concrete failure mode seen
-2026-04-23: `commit-all.sh` → `print-audit-info.sh` →
-`./scripts/xtask.sh web-fetch` sat for six minutes waiting for
-a concurrent Codex cargo build to finish compiling the connector
-crates, because both wanted the same target-dir lock.
-Separating the target dirs lets the audit-info flow complete
-regardless of whatever compile is running in `target/`, which
-directly supports the "push early, push often" policy in §4.4.
+`target/debug/.cargo-lock`. Separating the target dirs lets the
+audit-info flow complete regardless of whatever compile is
+running in `target/`, which directly supports the "push early,
+push often" policy in §4.4.
+
+Historical note: this rule was added after a 2026-04-23
+incident where `commit-all.sh` → `print-audit-info.sh` →
+`./scripts/xtask.sh web-fetch` waited six minutes behind a
+concurrent Codex build because both processes wanted the same
+target-dir lock.
 
 **Cost:** xtask bins get built twice — once into `target-xtask/`
 by the wrapper, once into `target/` by any workspace-wide
@@ -1657,6 +1720,23 @@ split is workspace-level skip-ignored for regression coverage
 and per-touched-crate `--ignored` for your actual changes.
 Don't run `--ignored` against untouched crates; it's waste.
 
+**Pre-landing is slow-by-design — run it once per commit, not
+repeatedly.** Even on a warm cache, `pre-landing.sh` walks
+fmt-check + workspace check + workspace clippy + workspace
+test + per-modified-crate `--ignored` test, which takes minutes
+on a workspace with ~25 crates plus `aws-lc-rs` C builds and
+Boa. That's the cost of being the canonical CI-mirroring gate;
+it isn't a bug. **Agents should run `pre-landing.sh` exactly
+once before a commit lands, not on every intermediate edit
+within a single turn.** If you've made several edits in one
+turn, stage them, then run `pre-landing.sh` once at the end.
+If a single run fails and you fix the underlying cause, the
+re-run is justified — but a tight edit/re-run/edit/re-run
+loop in one session burns time without surfacing new
+information. For focused mid-iteration debugging, use a
+narrow `cargo test some_specific_test` (CONTRIBUTING.md §5)
+and save the full pre-landing pass for the commit itself.
+
 ### 11.1 Don't go raw
 
 **Do not run raw `cargo fmt`, `cargo check`, `cargo clippy`, or
@@ -1748,16 +1828,18 @@ uses that as the baseline. Pass an explicit version (e.g.
 script installs `cargo-semver-checks` via `cargo install
 --locked` on first use.
 
-**Per-crate, not workspace-wide.** An earlier version used
-`--workspace --baseline-rev <rev>`. That doesn't work here: the
-parent is a virtual workspace (no `[package]` table), and
-`cargo-semver-checks` resolves `--baseline-rev` by `git clone`
-at that rev — which doesn't recurse into submodules, so
-workspace members can't be found at the baseline root. Per-crate
-against a crates.io baseline sidesteps the problem entirely.
-See
+**Per-crate, not workspace-wide.** The parent is a virtual
+workspace (no `[package]` table), and `cargo-semver-checks`
+resolves git baselines without recursing into submodules, so
+workspace members can't be found at the baseline root.
+Per-crate checks against a crates.io baseline sidestep that
+problem entirely.
+
+Historical note: an earlier wrapper used `--workspace
+--baseline-rev <rev>` and failed on the virtual-workspace /
+submodule layout. See
 [`docs/notes-to-humans/2026-04-21-0006-mechanics-core-semver-checks-finding.md`](docs/notes-to-humans/2026-04-21-0006-mechanics-core-semver-checks-finding.md)
-for the history.
+for the archived finding.
 
 **When to run:** before preparing a crate release, as part of
 the pre-release review checklist. Not part of the default
@@ -2320,10 +2402,10 @@ to invoke the relevant skill when its trigger fires.
   agent-writable is **forbidden**. `commit-all.sh` sweeps her
   pending edits into whatever commit is being made; that's the
   only way `HUMANS.md` changes reach the repo.
-- `CLAUDE.md` and `AGENTS.md` — agent-facing rules that were
-  previously in `docs/instructions/` are now absorbed into
-  these top-level files. Not the general-purpose conventions
-  home — this file is.
+- `CLAUDE.md` and `AGENTS.md` — agent-facing orientation files,
+  not the general-purpose conventions home. Historical note:
+  rules previously kept under `docs/instructions/` were
+  absorbed into these top-level files.
 
 Those files should carry executive summaries + pointers, not
 restate the rules. This file is the authoritative home; the
@@ -2419,6 +2501,15 @@ rest with AES-256-GCM") belong in `docs/design/`. Plans belong
 in `docs/ROADMAP.md`. Per-crate usage belongs in that crate's
 `README.md`. If a rule spans boundaries, pick the authoritative
 home and cross-reference from the others.
+
+**Historical notes inside this file.** Keep current conventions
+separate from historical context. If an old incident, rejected
+approach, or predecessor rule is useful for understanding the
+current convention, label it `Historical note:` and summarize it
+briefly after the active rule. Longer narratives belong in the
+journal archives (`docs/notes-to-humans/`, `docs/codex-reports/`,
+`docs/codex-prompts/`) with a cross-reference from here when the
+history is load-bearing.
 
 ### 18.3 `ROADMAP.md` — authoritative home for plans
 
