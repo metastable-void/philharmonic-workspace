@@ -7,28 +7,55 @@ under explicit user request)
 
 ## What happened
 
-The parent-repo reflog showed two commits between Claude's
-intentional landings that were unintended:
+Spurious `updates`-message commits landed across four repos —
+the parent and the three target submodules of the in-flight
+D1/D2/D10 Codex dispatch. Reflogs after the cleanup:
 
+**Parent**:
 ```
 9ad12ca  (Claude) workspace tooling: split xtask out of default pre-landing flow…
-a751558  (auto)   updates           ← accidental, default commit-all.sh message
+a751558  (Codex)  updates           ← accidental, default commit-all.sh message
 211c2ce  (Claude) workspace tooling: add stats-graph xtask bin and auto-regen…
 ```
 
-`a751558` carries the default `commit-all.sh` message
-(`updates`) and a `Code-stats:` Δ of `0F 0L (0C 0D)` — i.e. a
-no-op commit on top of `9ad12ca`. The trigger is unknown:
-Claude did not run `commit-all.sh` between `9ad12ca` and the
-later `211c2ce`, so the empty "updates" commit came from
-somewhere else (an IDE integration, a stray plugin hook, an
-agent in a separate session, or a manual misclick — we don't
-have logs to distinguish). `211c2ce` was Claude's intended
-follow-up; it landed cleanly on top of the accidental
-"updates" commit.
+**Each of `philharmonic-store-sqlx-mysql`, `mechanics-core`,
+`philharmonic`** (D1, D2, D10 targets):
+```
+HEAD@{2}: <pre-dispatch HEAD>
+HEAD@{1}: commit: updates           ← Codex's default-message commit
+HEAD@{0}: reset: moving to HEAD~1   ← Yuka's reset
+```
 
-Yuka chose to undo both rather than leave the spurious
-`updates` commit in `main`'s history.
+**Two separate causes** converged on the same `updates`
+default-message symptom — Yuka attributes the parent commit
+and the submodule commits to different actors:
+
+- **Parent `a751558`** carried a `Code-stats:` Δ of
+  `0F 0L (0C 0D)` — a no-op commit on top of `9ad12ca`, with
+  no substantive change — and most likely came from a Claude
+  testing invocation of `commit-all.sh` somewhere between
+  `9ad12ca` and `211c2ce`. The default message means Claude
+  ran `commit-all.sh --parent-only` (or similar) without a
+  message argument, so the script defaulted to `"updates"`.
+  This was a Claude-side mistake; future testing must always
+  use a real message arg or stay in `--dry-run`.
+- **Per-submodule "updates" commits** carried real D1 / D2 /
+  D10 content from the in-flight Codex dispatch. Codex
+  violated `AGENTS.md`'s "Don't commit, don't push, don't
+  branch" rule when producing those commits. Codex's later
+  structured-output report referenced the (now-rolled-back)
+  SHAs as if they still existed, indicating the runtime
+  didn't observe the reset.
+
+`211c2ce` was Claude's intended substantive follow-up at the
+parent level; it landed cleanly on top of `a751558`. After
+the cleanup the in-flight Codex work (the actual D1 / D2 /
+D10 edits) was preserved in each submodule's working tree by
+the `--mixed` reset and remained available for re-commit
+through proper channels.
+
+Yuka chose to undo every spurious `updates` commit rather
+than leave them in any repo's history.
 
 ## Action taken (one-time exception to §4.4)
 

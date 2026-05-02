@@ -138,18 +138,27 @@ fn rotate_x_ticks(svg: String) -> String {
         let next = content_start + end_rel + "</tspan>".len();
 
         if let (Some(x), Some(y)) = (extract_attr(attrs, "x"), extract_attr(attrs, "y")) {
-            // text-anchor="start" + rotate(+90, x, y) makes the
-            // label start at the tick mark and extend DOWNWARD
-            // (SVG +y is down; +90 is CW rotation; original
-            // RIGHT direction → DOWN). The user reads top-to-
-            // bottom by tilting their head right. Anchor stays
-            // at (x, y) so the tick line meets the start of the
-            // date string.
+            // International convention for vertical Western /
+            // Latin-script date labels is BOTTOM-TO-TOP — the
+            // reader tilts their head LEFT (CCW) to read the
+            // string left-to-right. matplotlib's rotation=90
+            // default, D3.js examples, ggplot, IEEE figure-style
+            // guides and Tufte all use this orientation.
+            //
+            // SVG geometry to achieve it: text-anchor="end" +
+            // transform="rotate(-90 x y)". Original text "ends
+            // at (x, y), extending LEFT". rotate(-90 x y) is
+            // CCW around the anchor; LEFT direction maps to
+            // DOWN (SVG +y is down). So the END of the string
+            // sits at the tick (top, y), and the START extends
+            // DOWN to (x, y + W). Reading bottom-to-top with a
+            // leftward head-tilt yields normal left-to-right
+            // text flow.
             rotated.push_str("\n\t\t<text x=\"");
             rotated.push_str(x);
             rotated.push_str("\" y=\"");
             rotated.push_str(y);
-            rotated.push_str("\" text-anchor=\"start\" transform=\"rotate(90 ");
+            rotated.push_str("\" text-anchor=\"end\" transform=\"rotate(-90 ");
             rotated.push_str(x);
             rotated.push(' ');
             rotated.push_str(y);
