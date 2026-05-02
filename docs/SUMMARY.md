@@ -21,6 +21,7 @@
 - [Conventions](design/13-conventions.md)
 - [Open questions](design/14-open-questions.md)
 - [V1 scope](design/15-v1-scope.md)
+- [Embedding datasets](design/16-embedding-datasets.md)
 
 # Guide
 
