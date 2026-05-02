@@ -164,8 +164,11 @@ publish) landed in a single day with three crypto-review gate
 cycles passed. Phase 6 and Phase 7 Tier 1 were completed
 previously (2026-04-24 / 2026-04-27). The unpublished
 `philharmonic-connector-impl-*` crates land in their respective
-phase tiers; until then they have no crates.io presence (no
-0.0.0 placeholders were reserved).
+phase tiers; until then they exist on crates.io as `0.0.x`
+**published placeholders** (name reservations with no
+substantive code), distinct from the Phase 6 / Phase 7 Tier 1
+crates that ship as **published substantive implementations**
+at `0.1.0` or higher.
 
 **Phase 9 — Integration and deployment** is complete
 (2026-04-29 through 2026-05-02). Three bin targets live in
@@ -178,9 +181,14 @@ connector) verified through the WebUI on 2026-05-02. The
 full execution path — API server → lowerer (COSE_Sign1 +
 COSE_Encrypt0) → mechanics worker (JS) → connector router
 → connector service → upstream LLM — is proven in
-production. All 25 crates published to crates.io; musl
-static builds, Docker compose, `install` subcommand, and
-full-pipeline e2e tests landed. Remaining Phase 7
+production. All 25 crate names live on crates.io —
+substantive implementations (Phase 6 + Phase 7 Tier 1) at
+`0.1.0` or higher, plus three placeholder names
+(`philharmonic-connector-impl-email-smtp`,
+`-llm-anthropic`, `-llm-gemini`) at `0.0.x` reserving the
+namespace for the remaining Phase 7 Tier 2/3 implementations.
+Musl static builds, Docker compose, `install` subcommand,
+and full-pipeline e2e tests landed. Remaining Phase 7
 connector implementations (Tier 2/3) deferred post-GW.
 
 **Phase 7 Tier 1 — done 2026-04-27.** The pivot to pure-Rust
@@ -1185,9 +1193,14 @@ the `uname -s` / `Win32` exceptions spelled out, is
 ## Editions and MSRV
 
 - Edition 2024.
-- MSRV 1.88.
+- Workspace baseline MSRV: 1.88.
+- Documented exceptions (MSRV 1.89): `inline-blob` and
+  `philharmonic-connector-impl-embed`. They depend on
+  language/library features introduced in 1.89.
 
-Declared in workspace policy and mirrored in each crate manifest.
+Declared in workspace policy and mirrored in each crate
+manifest. See
+[`CONTRIBUTING.md §10.1`](CONTRIBUTING.md#101-edition-and-msrv).
 
 ## License
 

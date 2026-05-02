@@ -283,8 +283,9 @@ crates (split, settled):
 - Per-tenant encryption keys.
 - Per-ephemeral-token revocation lists.
 - OAuth 2.0 / OIDC federation.
-- Per-minting-authority rate limits (single per-tenant API
-  rate limit on the mint endpoint is the v1 guardrail).
+- Distributed rate limiting (v1 ships per-tenant and
+  per-minting-authority single-node token buckets — see doc
+  10 — but cross-node coordination is deferred).
 - Persistence of full injected subject claims in audit
   records.
 - Background reconciler for duplicate-config races (accept
@@ -435,82 +436,79 @@ single-AZ or multi-AZ within that region.
 - Automated key rotation procedures (manual rotation
   documented).
 
-## Critical v1 path
+## Current state (Phase 9 complete, 2026-05-02)
 
-Order of work, with parallelism noted.
+The critical path below is preserved as a historical record.
+For current implementation status, the authoritative sources
+are the workspace `README.md` (phase status) and
+[`docs/ROADMAP.md`](../ROADMAP.md) (current and remaining
+work).
 
-1. **Close remaining design questions** (mostly done):
+Summary of where v1 stands:
 
-   - **Still open:** per-implementation wire-protocol details
-     for SQL (row shape, parameter binding, timeouts, errors),
-     email (SMTP submission shape), and vector-search (output
-     vector format, nearest-neighbor result shape). Resolve
-     when each implementation begins.
-   - **Already settled:** permission atom vocabulary (closed
-     for v1; adjustable via deliberate doc updates — see
-     `14-open-questions.md`); `http_forward` wire protocol
-     (reuses `mechanics_config::HttpEndpoint`; full spec in
-     `08-connector-architecture.md`); embedding and vector
-     search split into two capabilities; no global endpoint
-     registry; `TenantEndpointConfig` minimal shape; per-tenant
-     free-form JSON configs; SCK restored with operator-visible
-     decryption; `Principal.epoch` reserved; token claim set;
-     simplified role schema; committed simplifications list in
-     `14-open-questions.md`.
+- Cornerstone, storage, execution substrate, policy, and
+  workflow crates are published and in production use.
+- Connector framework + Phase 6 implementations
+  (`http_forward`, `llm_openai_compat`) are published and
+  exercised by the reference deployment.
+- Phase 7 Tier 1 implementations (`sql_postgres`,
+  `sql_mysql`, `embed`, `vector_search`) are published.
+- Phase 7 Tier 2/3 (`email_smtp`, `llm_anthropic`,
+  `llm_gemini`) are deferred post-Golden-Week 2026; their
+  crate names are reserved as `0.0.x` placeholders on
+  crates.io.
+- `philharmonic-api` and the three deployment binaries
+  (`philharmonic-api-server`, `mechanics-worker`,
+  `philharmonic-connector`) are published and operational.
 
-2. **Claim remaining crate names** as 0.0.0 stubs on
-   crates.io:
+## Historical v1 implementation path
 
-   - `mechanics-config`
-   - `philharmonic-policy`
-   - `philharmonic-workflow`
-   - `philharmonic-connector-common`
-   - `philharmonic-connector-client`
-   - `philharmonic-connector-router`
-   - `philharmonic-connector-service`
-   - `philharmonic-api`
-   - `philharmonic-connector-impl-http-forward` etc.
+The original critical path for getting from "design docs only"
+to "shipped v1." Kept here for context on how the work was
+sequenced; **not** an authoritative open-task list. Items
+marked stale in the audit (e.g. "extract mechanics-config",
+"claim remaining crate names as 0.0.0 stubs") have already
+landed.
 
-3. **Extract `mechanics-config`** from `mechanics-core`.
+1. **Close remaining design questions** (now mostly done; the
+   audit and doc reconciliation passes settled
+   `TenantEndpointConfig` shape, lowerer semantics,
+   `http_forward` wire protocol, `embed` / `vector_search`
+   split, etc.). Per-implementation wire-protocol details
+   still pending only for the deferred Tier 3 LLM impls.
 
-4. **Implement `philharmonic-policy`** (parallelizable with
-   step 3). Entity kinds, basic queries, SCK-based
-   encrypt/decrypt of `TenantEndpointConfig`.
+2. **Claim remaining crate names** on crates.io. Done — every
+   v1 crate name is on crates.io as either a substantive
+   implementation (`0.1.0+`) or a published placeholder
+   (`0.0.x`); see "Phase/status language" in the workspace
+   `README.md`.
 
-5. **Implement `philharmonic-connector-common`** (after step
-   4 for `Tenant` marker). COSE format types, realm model,
-   `ConnectorCallContext`.
+3. **Extract `mechanics-config`** from `mechanics-core`. Done.
 
-6. **Implement `philharmonic-workflow`** (needs policy for
-   `Tenant`, needs common for `ConfigLowerer` trait
-   signatures to be stable).
+4. **Implement `philharmonic-policy`**. Done.
 
-7. **Implement connector layer** (parallel):
+5. **Implement `philharmonic-connector-common`**. Done.
 
-   - `philharmonic-connector-client` (the lowerer).
-   - `philharmonic-connector-service` (framework).
-   - `philharmonic-connector-router` (minimal).
+6. **Implement `philharmonic-workflow`**. Done.
 
-8. **Implement per-implementation crates** in parallel. Order
-   within this step (generic HTTP as baseline, LLM as first
-   specialization):
+7. **Implement connector layer**. Done — connector-client
+   (crypto primitives), connector-router (dispatcher), and
+   connector-service (framework) all published.
 
-   - `http_forward` — the baseline HTTP implementation.
-   - LLM × 3 — `llm_openai_compat` (covering OpenAI + vLLM)
-     is first priority as it unblocks the chat-app
-     end-to-end path; then `llm_anthropic`, `llm_gemini`.
-   - `sql_postgres`, `sql_mysql`.
-   - `email_smtp`.
-   - `embed` + `vector_search` (at least one impl of each).
+8. **Implement per-implementation crates** in parallel.
+   Phase 6 (`http_forward`, `llm_openai_compat`) and Phase 7
+   Tier 1 (`sql_postgres`, `sql_mysql`, `embed`,
+   `vector_search`) done. Tier 2 (`email_smtp`) and Tier 3
+   (`llm_anthropic`, `llm_gemini`) deferred post-GW.
 
-9. **Implement `philharmonic-api`** (needs everything above).
+9. **Implement `philharmonic-api`**. Done.
 
-10. **End-to-end integration testing** via testcontainers.
+10. **End-to-end integration testing**. Done via
+    testcontainers and full-pipeline e2e tests.
 
-11. **Deploy reference deployment.**
-
-Steps 7 and 8 have significant parallelism. Steps 1–6 are
-largely sequential.
+11. **Deploy reference deployment.** Done — reference
+    deployment operational with the OpenAI-compatible LLM
+    workflow verified through the WebUI on 2026-05-02.
 
 ## Out of scope entirely
 

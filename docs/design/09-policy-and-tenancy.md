@@ -324,9 +324,14 @@ the required permission for each.
 
 | Endpoint | Permission |
 | --- | --- |
+| `GET /v1/_meta/version` | _public — no auth_ |
+| `GET /v1/_meta/health` | _public — no auth_ |
+| `GET /v1/_meta/branding` | _public — no auth_ |
+| `GET /v1/whoami` | _authenticated, no permission required_ |
 | `POST /v1/workflows/templates` | `workflow:template_create` |
 | `GET /v1/workflows/templates` | `workflow:template_read` |
 | `GET /v1/workflows/templates/{id}` | `workflow:template_read` |
+| `PATCH /v1/workflows/templates/{id}` | `workflow:template_create` |
 | `POST /v1/workflows/templates/{id}/retire` | `workflow:template_retire` |
 | `POST /v1/workflows/instances` | `workflow:instance_create` |
 | `GET /v1/workflows/instances` | `workflow:instance_read` |
@@ -362,6 +367,11 @@ the required permission for each.
 | `GET /v1/tenant` | `tenant:settings_read` |
 | `PATCH /v1/tenant` | `tenant:settings_manage` |
 | `GET /v1/audit` | `audit:read` |
+| `POST /v1/operator/tenants` | `deployment:tenant_manage` |
+| `GET /v1/operator/tenants` | `deployment:tenant_manage` |
+| `GET /v1/operator/tenants/{id}` | `deployment:tenant_manage` |
+| `POST /v1/operator/tenants/{id}/suspend` | `deployment:tenant_manage` |
+| `POST /v1/operator/tenants/{id}/unsuspend` | `deployment:tenant_manage` |
 
 The `tenant:principal_manage` atom covers both create and
 retire operations on principals rather than splitting into
@@ -520,9 +530,13 @@ Three levels:
 - **Authority retirement** — setting `is_retired: true` on the
   `MintingAuthority`. Verification fails regardless of epoch.
 
-No per-token revocation lists for v1. Per-authority rate limits
-on minting are also deferred; the per-tenant API rate limit on
-the mint endpoint provides the baseline abuse guardrail.
+No per-token revocation lists for v1. Per-minting-authority
+rate limits **are** in v1: the API's mint-endpoint rate
+limiter keys on `(tenant, minting_authority)`, so a noisy
+authority can be throttled without affecting other authorities
+inside the same tenant. The per-tenant API rate limit remains
+a coarser guardrail above it. See doc 10 §"Rate limiting" and
+`philharmonic-api/src/middleware/rate_limit.rs`.
 
 ### Subject claims flow to workflow scripts
 

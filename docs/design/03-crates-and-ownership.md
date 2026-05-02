@@ -1,254 +1,269 @@
 # Crates and Ownership
 
-## Currently published with substantive content
+This document describes the **architectural** crate layout —
+what each crate owns and which other crates it depends on. It
+does **not** pin versions; use `./scripts/crate-version.sh
+--all` for current local versions and `./scripts/xtask.sh
+crates-io-versions -- <crate>` for crates.io state.
 
-- **`philharmonic-types`** (v0.3.4) — cornerstone vocabulary.
-- **`philharmonic-store`** (v0.1.0) — storage substrate traits.
-- **`philharmonic-store-sqlx-mysql`** (v0.1.0) — SQL backend.
-- **`mechanics-config`** (v0.1.0) — Boa-free schema types
-  (`MechanicsConfig`, `HttpEndpoint`, supporting types) extracted
-  from `mechanics-core` so the lowerer can consume schema without
-  pulling in Boa / reqwest / tokio.
-- **`mechanics-core`** (v0.3.0) — JS executor library (Boa-backed).
-- **`mechanics`** (v0.3.0) — HTTP service wrapping `mechanics-core`.
-- **`philharmonic-policy`** (v0.1.0) — tenants, principals,
-  per-tenant endpoint configs (`TenantEndpointConfig`) with SCK
-  AES-256-GCM at-rest encryption, roles, role memberships,
-  minting authorities, audit events; `pht_` long-lived API
-  token format.
-- **`philharmonic-connector-common`** (v0.2.0 on crates.io,
-  published 2026-04-23) — shared vocabulary for the connector
-  layer: COSE token and payload types (`ConnectorTokenClaims`,
-  `ConnectorSignedToken`, `ConnectorEncryptedPayload`), realm
-  model (`RealmId`, `RealmPublicKey`, `RealmRegistry`),
+## Substantive crates
+
+The workspace is divided into the following groups. Each
+crate is published on crates.io as a substantive
+implementation unless otherwise noted.
+
+### Cornerstone and storage
+
+- **`philharmonic-types`** — cornerstone vocabulary
+  (`Entity`/slot model, `Uuid`, `EntityId`, scalar/content
+  types). Many crates depend on it; revisions follow the
+  strict-end of the workspace versioning discipline.
+- **`philharmonic-store`** — storage substrate traits:
+  `EntityStore`, `EntityStream`, `EntityRevision`. Defines
+  the interface; no concrete backends.
+- **`philharmonic-store-sqlx-mysql`** — sqlx-MySQL backend
+  for `philharmonic-store`. Carries schema migrations.
+
+### Execution substrate
+
+- **`mechanics-config`** — Boa-free schema types
+  (`MechanicsConfig`, `HttpEndpoint`, URL/header/retry
+  supporting types) plus structural validation. Depends on
+  `serde`/`serde_json` only; no Boa, no philharmonic crates.
+  Exists so the lowerer (in `philharmonic-api-server`) can
+  produce `MechanicsConfig` values without pulling in Boa.
+- **`mechanics-core`** — JS executor library wrapping Boa.
+  Depends on `mechanics-config` and adds Boa GC trait wrapper
+  newtypes. No philharmonic dependencies.
+- **`mechanics`** — HTTP worker binary wrapping
+  `mechanics-core`. One of the deployment binaries.
+
+### Policy and workflow
+
+- **`philharmonic-policy`** — tenants, principals,
+  per-tenant endpoint configs (`TenantEndpointConfig`) with
+  SCK AES-256-GCM at-rest encryption (credentials only —
+  the `implementation` name is a plaintext content slot;
+  see doc 09), roles, role memberships, minting
+  authorities, audit events; `pht_` long-lived API token
+  format.
+- **`philharmonic-workflow`** — orchestration engine. Three
+  entity kinds (`WorkflowTemplate`, `WorkflowInstance`,
+  `StepRecord`) with append-only revision-based state
+  evolution. `SubjectContext` / `SubjectKind` for caller
+  attribution, reusing `philharmonic-policy`'s `Tenant` and
+  `MintingAuthority` markers. Async trait boundaries
+  (`StepExecutor`, `ConfigLowerer`) keep the engine
+  transport- and lowerer-naive. `WorkflowEngine<S, E, L>`
+  implements the execution sequence, the five-state
+  lifecycle with terminal-state immutability, and the
+  architecturally-enforced step-record audit discipline
+  (persisted subject drops `claims` and `tenant_id` by type
+  construction).
+
+### Connector framework
+
+- **`philharmonic-connector-common`** — shared vocabulary
+  for the connector layer: COSE token and payload types
+  (`ConnectorTokenClaims`, `ConnectorSignedToken`,
+  `ConnectorEncryptedPayload`), realm model (`RealmId`,
+  `RealmPublicKey`, `RealmRegistry`),
   `ConnectorCallContext` (verified claims delivered to
   implementations), and the shared `ImplementationError`
-  taxonomy. Types-only; crypto construction lives in
-  `philharmonic-connector-client` and
-  `philharmonic-connector-service`. 0.2.0 adds an `iat` claim
-  to `ConnectorTokenClaims` (Wave A Gate-2 follow-up) and
-  publishes with the rest of the connector triangle after Wave B.
-- **`philharmonic-workflow`** (v0.1.0) — orchestration engine.
-  Three entity kinds (`WorkflowTemplate`, `WorkflowInstance`,
-  `StepRecord`) with append-only revision-based state evolution.
-  `SubjectContext` / `SubjectKind` for caller attribution,
-  reusing `philharmonic-policy`'s `Tenant` and
-  `MintingAuthority` markers. Async trait boundaries
-  (`StepExecutor`, `ConfigLowerer`) keep the engine transport-
-  and lowerer-naive. `WorkflowEngine<S, E, L>` implements the
-  nine-step execution sequence, five-state lifecycle with
-  terminal-state immutability, and architecturally-enforced
-  step-record audit discipline (persisted subject drops
-  `claims` and `tenant_id` by type construction).
-
-## Connector triangle (published 2026-04-23)
-
-- **`philharmonic-connector-client`** — the lowerer. Produces
-  concrete `MechanicsConfig` values by fetching
-  `TenantEndpointConfig` entities via policy, decrypting each
-  with the substrate credential key, re-encrypting the
-  byte-identical plaintext to the destination realm's KEM
-  public key, and minting signed authorization tokens binding
-  the payload hash to the step context. Implements
-  `ConfigLowerer` from `philharmonic-workflow`. Wave A mint
-  path (COSE_Sign1) landed 2026-04-22; Wave B encrypt path
-  (hybrid ML-KEM-768 + X25519 + AES-256-GCM COSE_Encrypt0)
-  landed 2026-04-23. Published as `0.1.0` on 2026-04-23.
-- **`philharmonic-connector-router`** — pure HTTP dispatcher
-  binary library. Routes requests by realm. Landed and
-  published as `0.1.0` on 2026-04-23 alongside the rest of the
-  triangle.
-- **`philharmonic-connector-service`** — service framework for
-  per-realm connector service binaries. Hosts the
-  `Implementation` trait, token verification, payload
-  decryption, dispatch. Wave A verify path landed 2026-04-22;
-  Wave B decrypt path + `verify_and_decrypt` chain landed
-  2026-04-23. Published as `0.1.0` on 2026-04-23.
-
-## Connector implementations (Phase 6 — published 2026-04-24)
-
+  taxonomy. Types and crypto contract only.
+- **`philharmonic-connector-client`** — crypto/minting
+  primitives: COSE_Sign1 token minting and COSE_Encrypt0
+  payload encryption (hybrid ML-KEM-768 + X25519 +
+  AES-256-GCM). Pure crypto library; **does not** read
+  policy storage and **does not** implement
+  `ConfigLowerer`. The full lowerer (which fetches
+  `TenantEndpointConfig`, decrypts SCK, assembles
+  `{realm, impl, config}`, and calls the connector-client
+  primitives) lives in the API server binary.
+- **`philharmonic-connector-router`** — pure HTTP
+  dispatcher library used by the deployment binary to
+  forward by-realm requests upstream.
+- **`philharmonic-connector-service`** — service framework
+  for connector service binaries: token verification,
+  payload decryption, `ConnectorCallContext` construction.
+  **Does not** host the `Implementation` trait registry —
+  the registry/dispatch lives in the deployment binary that
+  embeds the framework plus the implementations it serves.
 - **`philharmonic-connector-impl-api`** — non-crypto
-  trait-only crate hosting the `#[async_trait] Implementation`
-  trait plus re-exports of `ConnectorCallContext`,
+  trait-only crate hosting `#[async_trait] Implementation`
+  plus re-exports of `ConnectorCallContext`,
   `ImplementationError`, `JsonValue`, and the `async_trait`
-  macro. Published as `0.1.0` on 2026-04-24 (Phase 6 Task 0).
+  macro.
+
+### Connector implementations
+
+Substantive (production):
+
 - **`philharmonic-connector-impl-http-forward`** — generic
   HTTP-forwarding connector. Reuses
-  `mechanics_config::HttpEndpoint` for config; handles
-  per-body-type decoding, full-jitter exponential retry with
-  Retry-After support, `response_max_bytes` enforcement via
-  streamed accumulator. Published as `0.1.0` on 2026-04-24
-  (Phase 6 Task 1).
+  `mechanics_config::HttpEndpoint` for config.
 - **`philharmonic-connector-impl-llm-openai-compat`** —
-  OpenAI-compatible LLM connector covering OpenAI itself +
-  vLLM + Together + Groq + OpenRouter via three dialects
-  (`openai_native` / `vllm_native` / `tool_call_fallback`),
-  all with `strict: true` token-level schema enforcement.
-  Published as `0.1.0` on 2026-04-24 (Phase 6 Task 2).
-
-## Phase 7 Tier 1 — published 2026-04-27 (wave 1)
-
-- **`philharmonic-connector-impl-sql-postgres`** — sqlx-
-  postgres-backed `sql_query` capability. Published as
-  `0.1.0` on 2026-04-27 (Phase 7 Tier 1 wave 1).
-- **`philharmonic-connector-impl-sql-mysql`** — sqlx-mysql-
-  backed `sql_query` capability. Published as `0.1.0` on
-  2026-04-27 (Phase 7 Tier 1 wave 1).
+  OpenAI-compatible LLM connector covering OpenAI / vLLM /
+  compatible gateways with `openai_native`, `vllm_native`,
+  and `tool_call_fallback` dialects.
+- **`philharmonic-connector-impl-sql-postgres`** —
+  sqlx-postgres-backed `sql_query`.
+- **`philharmonic-connector-impl-sql-mysql`** —
+  sqlx-mysql-backed `sql_query`.
 - **`philharmonic-connector-impl-vector-search`** —
-  stateless in-memory cosine kNN `vector_search`
-  capability; corpus-per-request, hundreds-to-thousands
-  scale, strings-only id payload, no persistent state.
-  Published as `0.1.0` on 2026-04-27 (Phase 7 Tier 1
-  wave 1).
+  stateless in-memory cosine kNN `vector_search`,
+  corpus-per-request.
 - **`philharmonic-connector-impl-embed`** — pure-Rust
-  `tract` + `tokenizers` `embed` capability with a
-  default-bundled bge-m3 ONNX model gated behind the
-  default-on `bundled-default-model` Cargo feature.
-  Build-time HuggingFace fetch with cache, env-var
-  override knobs, `--no-default-features` opt-out for
-  offline / packaging builds. Published as `0.1.0` on
-  2026-04-27 (Phase 7 Tier 1 wave 2). Replaces the
-  earlier round-01 `fastembed` + `ort` design that was
-  rejected for incompatibility with musl deployment
-  targets.
-- **`inline-blob`** — workspace-internal proc-macro
-  crate that emits `static [u8; N]` items into
-  `.lrodata.<name>` ELF sections (with anchor in
+  `tract` + `tokenizers` `embed` with a default-bundled
+  bge-m3 ONNX model gated behind the
+  `bundled-default-model` Cargo feature.
+
+Placeholders (deferred Tier 2/3 — names reserved on
+crates.io as `0.0.x` placeholders, no substantive
+implementation yet):
+
+- **`philharmonic-connector-impl-email-smtp`** (Tier 2).
+- **`philharmonic-connector-impl-llm-anthropic`** (Tier 3).
+- **`philharmonic-connector-impl-llm-gemini`** (Tier 3).
+
+### Workspace internal
+
+- **`inline-blob`** — proc-macro emitting `static [u8; N]`
+  items into `.lrodata.<name>` ELF sections (with anchor in
   `.lbss.<name>`) so multi-gigabyte blobs can be
-  `include_bytes!`-d into ELF binaries without
-  triggering rust-lld's small-code-model 32-bit
-  relocation overflow. Published as `0.1.0` on
-  2026-04-27. Consumed today by
-  `philharmonic-connector-impl-embed`; available for
-  any future workspace member that needs the same.
+  `include_bytes!`-d into ELF binaries without triggering
+  rust-lld's small-code-model 32-bit relocation overflow.
+  Consumed by `philharmonic-connector-impl-embed`.
 
-## Pending publish (Phase 7+ and beyond)
+### API and meta
 
-Crates with no crates.io presence yet (no `0.0.0`
-placeholders were reserved for these names):
+- **`philharmonic-api`** — public HTTP API library (axum
+  routes, middleware, executor wiring). Consumed by the API
+  binary.
+- **`philharmonic`** — meta-crate / WebUI asset host.
+- **In-tree binaries** (under `bins/`, never published):
+  `philharmonic-api-server`, `philharmonic-connector`
+  (deployment connector binary), and the workspace-internal
+  `xtask/` crate.
 
-- **`philharmonic`** — meta-crate. No publish window yet.
-- **`philharmonic-api`** — public HTTP API (Phase 8+).
-- **Tier 2** (deferred until after Phase 8 + Phase 9
-  prototype per the macro sequence):
-  - `philharmonic-connector-impl-email-smtp`.
-- **Tier 3** (deferred until on or after 2026-05-07,
-  post-Golden-Week 2026):
-  - `philharmonic-connector-impl-llm-anthropic`.
-  - `philharmonic-connector-impl-llm-gemini`.
+### Naming history
 
-The single `philharmonic-connector` crate in the earlier sketch
-has been split into four (common / client / router / service)
-to give each connector responsibility clean boundaries. The
-name `philharmonic-connector` itself may be kept as a meta-crate
-placeholder or released.
-
-The `philharmonic-realm` name is released: realm vocabulary
-folds into `philharmonic-connector-common`. Realms don't warrant
-a separate crate.
+The single `philharmonic-connector` crate in early sketches
+was split into the framework crates above (`-common`,
+`-client`, `-router`, `-service`, `-impl-api`) so each
+responsibility has a clean boundary. The
+`philharmonic-realm` name is released; realm vocabulary
+folds into `philharmonic-connector-common`.
 
 ## Dependency graph
 
-### Current
-
 ```
-philharmonic-types               (no philharmonic deps)
-philharmonic-store               → philharmonic-types
-philharmonic-store-sqlx-mysql    → philharmonic-store, philharmonic-types
-mechanics-core                   (no philharmonic deps; depends on Boa)
-mechanics                        → mechanics-core
-```
+philharmonic-types                (no philharmonic deps)
+philharmonic-store                → philharmonic-types
+philharmonic-store-sqlx-mysql     → philharmonic-store, philharmonic-types
 
-### Planned
+mechanics-config                  (no philharmonic deps, no Boa)
+mechanics-core                    → mechanics-config, boa_engine
+                                    (wrapper newtypes impl Boa GC traits)
+mechanics (bin)                   → mechanics-core
 
-```
-# Schema extraction (mechanics-core reorg):
+philharmonic-policy               → philharmonic-types,
+                                    philharmonic-store
 
-mechanics-config                 (no philharmonic deps, no Boa)
-mechanics-core                   → mechanics-config, boa_engine
-                                   (wrapper newtypes impl Boa GC traits)
-mechanics                        → mechanics-core
+philharmonic-workflow             → philharmonic-types,
+                                    philharmonic-store,
+                                    philharmonic-policy
+                                    (defines StepExecutor and
+                                    ConfigLowerer traits;
+                                    WorkflowInstance has tenant
+                                    entity slot)
 
-# Policy and workflow:
+philharmonic-connector-common     → philharmonic-types
+                                    (COSE formats, realm model,
+                                    ConnectorCallContext)
 
-philharmonic-policy              → philharmonic-types,
-                                   philharmonic-store
-philharmonic-workflow            → philharmonic-types,
-                                   philharmonic-store,
-                                   philharmonic-policy
-                                   (defines StepExecutor and
-                                   ConfigLowerer traits;
-                                   WorkflowInstance has
-                                   tenant entity slot)
+philharmonic-connector-client     → philharmonic-connector-common,
+                                    philharmonic-types
+                                    (crypto primitives only)
 
-# Connector layer:
+philharmonic-connector-router     → philharmonic-connector-common,
+                                    philharmonic-types
 
-philharmonic-connector-common    → philharmonic-types,
-                                   mechanics-config
-                                   (COSE formats, realm model,
-                                   ConnectorCallContext)
+philharmonic-connector-service    → philharmonic-connector-common,
+                                    philharmonic-types
+                                    (verification, decryption,
+                                    framework — does NOT host the
+                                    Implementation registry)
 
-philharmonic-connector-client    → philharmonic-connector-common,
-                                   philharmonic-types,
-                                   philharmonic-store,
-                                   philharmonic-policy,
-                                   philharmonic-workflow,
-                                   mechanics-config
-                                   (implements ConfigLowerer)
+philharmonic-connector-impl-api   → philharmonic-connector-common
+                                    (Implementation trait, no crypto)
 
-philharmonic-connector-router    → philharmonic-connector-common,
-                                   philharmonic-types
+philharmonic-connector-impl-*     → philharmonic-connector-impl-api,
+                                    philharmonic-connector-common,
+                                    (per-implementation deps:
+                                    reqwest, sqlx, lettre, tract, …)
 
-philharmonic-connector-service   → philharmonic-connector-common,
-                                   philharmonic-types
-                                   (Implementation trait,
-                                   verification, decryption,
-                                   dispatch)
+philharmonic-api                  → philharmonic-types,
+                                    philharmonic-store,
+                                    philharmonic-workflow,
+                                    philharmonic-policy,
+                                    philharmonic-connector-client,
+                                    philharmonic-connector-common
+                                    (axum API library; routes, middleware)
 
-# Connector implementations (one crate per implementation):
+bins/philharmonic-api-server      → philharmonic-api,
+                                    philharmonic-connector-router,
+                                    mechanics-config
+                                    (lowerer lives here; assembles
+                                    {realm, impl, config} from
+                                    plaintext implementation slot
+                                    and decrypted SCK blob, then
+                                    calls connector-client primitives)
 
-philharmonic-connector-impl-*    → philharmonic-connector-service,
-                                   philharmonic-connector-common,
-                                   (per-implementation deps:
-                                   reqwest, sqlx, lettre, etc.)
+bins/philharmonic-connector       → philharmonic-connector-service,
+                                    philharmonic-connector-impl-*
+                                    (registers and dispatches
+                                    Implementations; per-realm)
 
-# API layer:
-
-philharmonic-api                 → philharmonic-types,
-                                   philharmonic-store,
-                                   philharmonic-workflow,
-                                   philharmonic-policy,
-                                   philharmonic-connector-client,
-                                   philharmonic-connector-common
+philharmonic                      → philharmonic-api
+                                    (WebUI assets bundled here)
 ```
 
 ### Key points about the dependency graph
 
 **`philharmonic-workflow` does not depend on `mechanics-core` or
 `mechanics`.** Workflow code reaches the executor via the
-`StepExecutor` trait; the HTTP-client implementation of that
-trait lives in the API binary or a separate glue crate.
+`StepExecutor` trait; the HTTP-client implementation lives in the
+API binary.
 
 **`philharmonic-connector-client` does not depend on
-`mechanics-core`.** The lowerer produces `MechanicsConfig` values
-via `mechanics-config`, which is Boa-free. This is the main
-reason the schema extraction is worth doing.
+`mechanics-core`** and does not depend on
+`philharmonic-policy` or `philharmonic-store` either. It is a
+pure crypto library — minting and encrypting given inputs.
+Reading `TenantEndpointConfig`, decrypting SCK, and assembling
+the connector payload is the API server binary's job.
 
 **`philharmonic-connector-router` has minimal dependencies.** It
-needs only the realm model from `connector-common` and basic HTTP
-infrastructure. No policy, no store, no workflow. A pure
+needs only the realm model from `connector-common` and basic
+HTTP infrastructure. No policy, no store, no workflow. A pure
 dispatcher.
 
-**`philharmonic-connector-service` does not depend on the client.**
-Client and service communicate through the COSE token and payload
-formats defined in `connector-common`. Each side implements its
-half of the protocol independently.
+**`philharmonic-connector-service` does not depend on the
+client.** Client and service communicate through the COSE token
+and payload formats defined in `connector-common`. Each side
+implements its half of the protocol independently.
 
-**Per-implementation crates depend only on the service framework
-and common types.** An implementation crate carries its own
-external dependencies (HTTP clients, database drivers, vector
-store clients) but stays within the connector layer. It does not
-depend on the workflow, policy, or store crates.
+**`philharmonic-connector-service` does not host the
+`Implementation` trait registry.** The framework provides
+verification + decryption + `ConnectorCallContext`; the
+deployment binary that consumes the framework decides which
+`Implementation`s are registered and dispatches accordingly.
+
+**Per-implementation crates depend only on
+`-impl-api` + `-common`.** They carry their own external
+dependencies (HTTP clients, database drivers, ONNX runtimes)
+but stay within the connector layer — no workflow, policy, or
+store dependencies.
 
 ## Why the connector split
 
@@ -330,9 +345,18 @@ every client, router, service, and implementation simultaneously.
 ## Edition and MSRV
 
 - Edition 2024.
-- MSRV 1.88.
+- Workspace baseline MSRV: **1.88**.
+- Documented exceptions: `inline-blob` and
+  `philharmonic-connector-impl-embed` declare
+  `rust-version = "1.89"` because they require
+  language/library features (large array literals and
+  associated `slice` APIs) introduced in 1.89.
 
-Documented in each crate's `Cargo.toml` via `rust-version = "1.88"`.
+Documented in each crate's `Cargo.toml` via `rust-version`. A
+workspace-wide bump is the right long-term answer; until then,
+the two 1.89 crates are the single source of truth for the
+exception, and any new crate should default to the 1.88
+baseline.
 
 ## Build targets
 

@@ -1190,17 +1190,24 @@ and commit. Never regenerate.
 ### 10.1 Edition and MSRV
 
 - **Edition 2024.**
-- **MSRV 1.88.**
+- **Workspace baseline MSRV: 1.88.**
+- **Documented exceptions: 1.89.** Two crates declare
+  `rust-version = "1.89"` because they require language /
+  library features introduced in 1.89:
+  - `inline-blob` (proc-macro emitting large `static` items).
+  - `philharmonic-connector-impl-embed` (bundles a multi-GB
+    ONNX model via `inline-blob`).
 
 Documented in each `Cargo.toml`:
 
 ```toml
 edition = "2024"
-rust-version = "1.88"
+rust-version = "1.88"   # or "1.89" for the two exceptions above
 ```
 
 MSRV bumps happen in coordinated minor releases across the
-workspace.
+workspace. Until a workspace-wide bump, new crates default to
+1.88 and any exception is recorded in this section.
 
 ### 10.2 Build targets
 

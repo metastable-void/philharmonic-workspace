@@ -230,8 +230,12 @@ soft-deletes are revisions with an `is_retired` scalar set true.
 If you find yourself wanting to "just update a field," re-read
 `02-design-principles.md` and `05-storage-substrate.md`.
 
-**MSRV and edition.** Edition 2024, `rust-version = "1.88"`, set
-in every crate's own `Cargo.toml`.
+**MSRV and edition.** Edition 2024. Workspace baseline
+`rust-version = "1.88"`, set in every crate's own
+`Cargo.toml`. Two crates declare 1.89 as a documented
+exception: `inline-blob` and
+`philharmonic-connector-impl-embed`. See
+[`CONTRIBUTING.md §10.1`](../CONTRIBUTING.md#101-edition-and-msrv).
 
 **Licensing.** All crates: `license = "Apache-2.0 OR MPL-2.0"`.
 Include `LICENSE-APACHE` and `LICENSE-MPL` in each submodule.
@@ -2018,7 +2022,12 @@ otherwise."
 
 Philharmonic v1 is shipped when:
 
-- All 25 crates published at `0.1.0` or higher on crates.io.
+- All 25 crate names present on crates.io: substantive
+  implementations at `0.1.0` or higher, plus the three
+  Phase 7 Tier 2/3 placeholder names
+  (`philharmonic-connector-impl-email-smtp`,
+  `-llm-anthropic`, `-llm-gemini`) at `0.0.x` reserving
+  namespace until they ship substantively.
 - Reference deployment live on the developer's infrastructure with:
   - TLS-terminated API subdomain pattern working.
   - At least one tenant provisioned.

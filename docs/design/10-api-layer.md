@@ -241,6 +241,17 @@ These endpoints are safe to call from unauthenticated
 contexts (e.g. the WebUI login page fetching branding before
 the user has logged in).
 
+## Identity introspection
+
+- `GET /v1/whoami` — returns the authenticated principal's
+  identity for the current request.
+
+Authenticated, no permission required (any valid principal
+can call). The response includes the principal's UUID,
+display name, and the tenant scope the request was resolved
+against. Used by the WebUI session bootstrap and by
+operators verifying their token is wired up correctly.
+
 ## Endpoint surface
 
 Organized by concern. URL paths use `/v1/` prefix (URL-path
@@ -447,10 +458,22 @@ could be added later as an ergonomic helper; not in v1.
 - `PATCH /v1/tenant` — update settings (new settings
   revision). Requires `tenant:settings_manage`.
 
-Deployment-operator-level tenant management (creating
-tenants, suspending them) lives on whichever ingress the
-deployment designates for operator endpoints — distinct
-from any tenant's routing scope.
+Deployment-operator-level tenant management lives under
+`/v1/operator/` and is served on the operator-ingress
+hostname (distinct from any tenant subdomain). All operator
+routes require a deployment-admin principal.
+
+- `POST /v1/operator/tenants` — create a tenant.
+  Requires `deployment:tenant_manage`.
+- `GET /v1/operator/tenants` — list tenants across the
+  deployment. Requires `deployment:tenant_manage`.
+- `GET /v1/operator/tenants/{id}` — read tenant settings
+  cross-tenant. Requires `deployment:tenant_manage`.
+- `POST /v1/operator/tenants/{id}/suspend` — suspend a
+  tenant (rejects new API requests; bumps every minting
+  authority's epoch). Requires `deployment:tenant_manage`.
+- `POST /v1/operator/tenants/{id}/unsuspend` — reverse a
+  suspension. Requires `deployment:tenant_manage`.
 
 ### Audit log access
 

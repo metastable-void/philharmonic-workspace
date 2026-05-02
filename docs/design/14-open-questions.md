@@ -191,8 +191,11 @@ settled.
   No per-tenant knob.
 - **Automatic epoch bump on tenant suspension**: yes,
   automatic. No knob.
-- **Minting authority rate limits**: deferred. Per-tenant API
-  rate limit on the mint endpoint is the v1 guardrail.
+- **Minting authority rate limits**: in v1. The mint-endpoint
+  rate limiter keys on `(tenant, minting_authority)` so noisy
+  authorities can be throttled without affecting their
+  siblings; per-tenant rate limiting remains a coarser layer
+  above it. See `philharmonic-api/src/middleware/rate_limit.rs`.
 - **Ephemeral token claim size limit**: 4 KB.
 
 ### Tokens and revocation
@@ -341,7 +344,6 @@ items that got collapsed to committed defaults with no knob:
 
 - Subject claim persistence (identifier + authority only).
 - Automatic epoch bump on tenant suspension.
-- Per-minting-authority rate limits (deferred entirely).
 - Background reconciler for duplicate-config races (don't
   ship; accept the theoretical race).
 - Role schema complexity (simple array).
