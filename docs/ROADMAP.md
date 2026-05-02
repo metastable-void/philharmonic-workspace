@@ -387,7 +387,7 @@ beyond the original plan.
   auto-configured by `./scripts/setup.sh`; the three
   non-safety-critical ones documented in README).
 
-**Infrastructure added beyond the plan** (see §9 for the full
+**Infrastructure added beyond the plan** (see §10 for the full
 file inventory):
 
 - `scripts/` expanded from basic helpers to a full workflow:
@@ -2047,7 +2047,133 @@ scope into v1 phases.
 
 ---
 
-## 9. Project-level files (current inventory)
+## 9. Post-v1 dispatch plan
+
+Phase 9 is complete (2026-05-02) and the reference deployment
+is operational. The work below is post-v1 / post-GW: it does
+not block deployment and is sequenced for the next development
+cycle. Each numbered item is one Codex dispatch with its own
+archived prompt under `docs/codex-prompts/` (see
+`.claude/skills/codex-prompt-archive/SKILL.md`). The single
+`(Gate 1)` item is **not** a Codex dispatch — Claude drafts the
+proposal, Yuka reviews per the two-gate crypto-review protocol
+(§5).
+
+Total: **11 Codex dispatches plus 1 Gate-1 proposal.**
+
+### A. Embedding datasets (6 dispatches + 1 Gate-1)
+
+Authoritative design: [`docs/design/16-embedding-datasets.md`](design/16-embedding-datasets.md).
+HUMANS.md errata (deterministic CBOR storage, `LONGBLOB`
+migration on startup, friendly UI) are folded into the design.
+
+- **(Gate 1)** Lowerer ephemeral support — Claude writes a
+  Gate-1 proposal under `docs/crypto/proposals/` choosing
+  between Approach A (`LowerScope` enum, public-trait change
+  to `philharmonic-workflow`) and Approach B (synthesized
+  non-persisted instance UUID, no trait change). Yuka reviews
+  and signs off. **D4 and D5 below cannot start before Gate 1
+  clears** because they touch COSE_Sign1 claim semantics and
+  COSE_Encrypt0 AAD inputs.
+- **D1** Substrate `MEDIUMBLOB → LONGBLOB` migration in
+  `philharmonic-store-sqlx-mysql`, applied idempotently on
+  startup. Independent of Gate 1.
+- **D2** `mechanics-core`: optional `MechanicsJob.run_timeout`
+  override, honored by `MechanicsPool`. Backward-compatible
+  `Option<Duration>`. Independent of Gate 1.
+- **D3** Embedding-datasets backend:
+  - `EmbeddingDataset` entity + scalar/content slots in
+    `philharmonic-policy`.
+  - Permission atoms (`embed_dataset:create|read|update|retire`).
+  - API CRUD endpoints + source-items + corpus endpoints in
+    `philharmonic-api`.
+  - `WorkflowTemplate.data_config` content slot + API
+    validation.
+  - Workflow engine `data` assembly in `execute_step`
+    (`philharmonic-workflow`).
+
+  Cross-crate but cohesive feature surface; one dispatch.
+  Independent of Gate 1. If Codex hits scope limits, split
+  into "policy entity + atoms" round-01 and "API + workflow
+  data assembly" round-02.
+- **D4** Lowerer ephemeral support per Gate-1 outcome.
+  Touches `philharmonic-workflow` (Approach A) or only the
+  API server lowerer (Approach B). **Gated on Gate 1.**
+- **D5** Ephemeral embed job: built-in JS embed script
+  (Codex-authored, compiled into the API binary as a static
+  string) plus the background tokio task in
+  `philharmonic-api-server` that lowers the embed endpoint,
+  dispatches the mechanics job, and appends `Ready` /
+  `Failed` revisions. **Gated on D4** (and therefore on
+  Gate 1).
+- **D6** Embedding-datasets WebUI: structured table editor
+  for source items, Import modal for CSV/JSON bulk import,
+  collapsed-by-default vector view in the corpus tab,
+  i18n for `en.ts` and `ja.ts`. Depends on D3's API
+  endpoints; can run in parallel with D4/D5. Per the
+  HUMANS.md erratum, **no persistent raw-JSON view of the
+  dataset itself**.
+
+### B. Phase 7 Tier 2/3 connector implementations (3 dispatches)
+
+Deferred post-Golden-Week 2026 per Phase 7 plan above. Each is
+one substantive crate going from `0.0.x` placeholder to
+`0.1.0` substantive implementation. None of these touch the
+crypto path; the connector-service framework already validates
+tokens and decrypts payloads — implementations only need to
+implement the `Implementation` trait.
+
+- **D7** `philharmonic-connector-impl-email-smtp` (Tier 2).
+- **D8** `philharmonic-connector-impl-llm-anthropic` (Tier 3).
+- **D9** `philharmonic-connector-impl-llm-gemini` (Tier 3).
+
+Independent of one another and of section A; safe to run in
+parallel.
+
+### C. WebUI infrastructure and docs (2 dispatches)
+
+- **D10** Add a maintained code-editor dependency
+  (CodeMirror 6 or equivalent — must be FLOSS, actively
+  maintained, no large native deps) to the WebUI for JSON /
+  JavaScript editing. Retrofit existing JSON / JS editors
+  (endpoint configs, workflow templates, etc.) to use it.
+  Per HUMANS.md "Code editor" item. Useful prerequisite for
+  D6's payload editor; can ship before D6.
+- **D11** Workflow authoring guide rewrite (English).
+  Codex re-reads the design docs and connector-architecture
+  spec, then rewrites
+  [`docs/guide/workflow-authoring.md`](guide/workflow-authoring.md)
+  from scratch to reflect current implementation reality
+  (per HUMANS.md "Update the workflow authoring guide").
+  The Japanese mirror in
+  [`docs-jp/ワークフロー作成ガイド.md`](../docs-jp/) is
+  **not** a Codex dispatch — `docs-jp/README.md` reserves
+  that submodule to Claude Code. Claude regenerates the JP
+  guide after D11 lands.
+
+### Suggested sequencing
+
+1. **Now-ish** (no gates, independent, small): D1, D2, D10.
+2. **Gate 1** — Claude drafts proposal; Yuka signs off.
+3. **Embedding datasets feature**: D3 → D4 → D5; D6 in
+   parallel after D3.
+4. **Post-GW**: D7 / D8 / D9 in parallel (one crate each).
+5. **Anytime**: D11 (independent of everything else).
+
+### Dispatch discipline reminder
+
+Per `.claude/skills/codex-prompt-archive/SKILL.md` and
+[`CONTRIBUTING.md §15.2`](../CONTRIBUTING.md#152-codex-prompt-archive):
+every Codex prompt is archived to
+`docs/codex-prompts/YYYY-MM-DD-NNNN-<slug>.md` and committed
+**before** the spawn. Each item above corresponds to one
+archived prompt; multi-round work shares the daily-sequence
+`NNNN` and increments the trailing `-NN` per the file-naming
+convention.
+
+---
+
+## 10. Project-level files (current inventory)
 
 The files in place at the workspace root and inside each
 submodule, as of Phase 0's completion. Maintain these through
@@ -2123,7 +2249,7 @@ ongoing development.
 
 ---
 
-## 10. Quick reference — command shortcuts
+## 11. Quick reference — command shortcuts
 
 From the workspace root:
 
