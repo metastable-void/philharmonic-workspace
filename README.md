@@ -464,17 +464,20 @@ Invoke by path (`./scripts/foo.sh`), not via `bash`.
   an `Audit-Info:` trailer recording the environment that
   produced it — timestamp, hostname, user/uid, group/gid, public
   IPv4+v6 with geolocation (queried once per invocation from
-  `1.1.1.1`, not per submodule), kernel/release, arch, and OS.
+  `ipv4.icanhazip.com` and `ipv6.icanhazip.com`, not per
+  submodule), kernel/release, arch, and OS.
   The line is produced by
   [`./scripts/print-audit-info.sh`](scripts/print-audit-info.sh)
   and parsed as a standard git trailer (queryable via
   `git log --format='%(trailers)'`). Pass `--anonymize` to
   replace the IPv4 and IPv6 fields with `hidden/ZZ` while
   keeping the rest; host/user/kernel/os are always recorded.
-  The audit line is not a substitute for the DCO `Signed-off-by:`
-  or the GPG/SSH signature — all three travel together in the
-  trailer block. See [§Commit audit trailer](#commit-audit-trailer)
-  below for the full rationale.
+  Commits also get a `Code-stats:` trailer recording the current
+  workspace size snapshot. The audit line is not a substitute for
+  the DCO `Signed-off-by:` or the GPG/SSH signature — all of this
+  metadata travels together in the trailer block. See
+  [§Commit audit trailer](#commit-audit-trailer) below for the
+  full rationale.
 - `./scripts/push-all.sh` — push each submodule's current
   branch, then the parent. Aborts before pushing the parent if
   any submodule push fails.
@@ -690,6 +693,8 @@ Invoke by path (`./scripts/foo.sh`), not via `bash`.
 - `./scripts/audit-log.sh [-n <count>] [--no-color] [<submodule>]`
   — pretty-print the commit audit trail (`Audit-Info:` trailers)
   with signature status, sign-off, and diffstat.
+- `./scripts/stats-log.sh [-n <count>] [--no-color] [<submodule>]`
+  — pretty-print `Code-stats:` trailers with per-commit deltas.
 - `./scripts/new-submodule.sh --name <N> --remote-url <URL>
   [--description <D>] [--before <M>] [--skip-workspace-member]
   [--adopt-existing] [--dry-run]` — scaffold a new submodule

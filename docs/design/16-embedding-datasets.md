@@ -25,19 +25,18 @@ Admin-submitted raw data. Each item has:
 
 - `id` — stable string identifier (tenant-chosen).
 - `text` — the text to embed.
-- `payload` — optional free-form CBOR/JSON echoed through to
+- `payload` — optional JSON-compatible value echoed through to
   `vector_search` results (e.g. the full answer text, a URL,
-  metadata).
+  metadata). It is encoded inside the CBOR storage blob, but the
+  public connector/API contract remains JSON-compatible because
+  `vector_search` uses `serde_json::Value`.
 
 Source items are stored as a deterministic CBOR (RFC 8949
 §4.2.1 "Core Deterministic Encoding") content blob on the
-dataset entity. CBOR is used (rather than JSON) because vector
-arrays and large repetitive payload structures encode much
-more densely as CBOR. They are **not** encrypted — they contain
-corpus content, not credentials or capability-bearing URLs. If
-a future use case requires encrypted source items, that would
-be a separate content slot with SCK, not a change to this
-design.
+dataset entity. They are **not** encrypted — they contain corpus
+content, not credentials or capability-bearing URLs. If a future
+use case requires encrypted source items, that would be a
+separate content slot with SCK, not a change to this design.
 
 ### Corpus
 
@@ -55,10 +54,25 @@ pub struct CorpusItem {
 Each corpus item corresponds to one source item. The `id` and
 `payload` are carried through from the source; the `vector` is
 the embedding produced by the `embed` connector. Stored as a
-deterministic CBOR content blob on the dataset entity (same
-encoding as source items; vectors of `f32` benefit
-particularly from CBOR's compact tagged-array encoding compared
-to JSON-encoded float arrays).
+deterministic CBOR content blob on the dataset entity.
+
+### CBOR encoding profile
+
+Embedding dataset content slots use this project-specific
+deterministic CBOR profile:
+
+- Maps, arrays, strings, integers, booleans, nulls, and generic
+  JSON-compatible payload values follow RFC 8949 §4.2.1 Core
+  Deterministic Encoding.
+- Corpus vectors use RFC 8746 typed-array tags, specifically
+  tag 81 (`IEEE 754 binary32, big endian, Typed Array`) for each
+  `Vec<f32>`. This makes the density claim concrete instead of
+  relying on generic CBOR float arrays, and it gives deterministic
+  encoders exactly one vector representation.
+- API responses decode storage blobs back to JSON-compatible
+  transport shapes. For example, `GET .../corpus` returns
+  `vector` as a JSON number array even though storage uses the
+  compact typed-array representation.
 
 ### Dataset lifecycle
 
@@ -85,8 +99,8 @@ served to workflows.
 
 Embedding datasets store noticeably larger content blobs than
 other entities. A dataset with 10,000 items and 1,024-dimension
-`f32` vectors is ~40 MB of vector data alone (CBOR-encoded),
-plus payloads. The current MySQL substrate stores content blobs
+`f32` vectors is ~40 MB of vector bytes alone before CBOR item
+overhead, plus payloads. The current MySQL substrate stores content blobs
 in `MEDIUMBLOB`, capped at 16 MB per blob — too small.
 
 **Required substrate change** (prerequisite for this feature):
@@ -141,8 +155,8 @@ New entity kind in `philharmonic-policy`.
 | Slot | Type | Description |
 |------|------|-------------|
 | `display_name` | UTF-8 text | Admin-visible name. |
-| `source_items` | CBOR array | `[{id, text, payload?}]` — the raw input. Deterministic CBOR (RFC 8949 §4.2.1). Plaintext (not SCK-encrypted); same model as workflow inputs. |
-| `corpus` | CBOR array | `CorpusItem[]` — the embedded output. Deterministic CBOR. Absent on the very first revision until the first embed completes. **Carried forward** to subsequent revisions during re-embeds so the engine can keep reading the latest revision. |
+| `source_items` | CBOR array | `[{id, text, payload?}]` — the raw input. Deterministic CBOR per the encoding profile above. `payload` is JSON-compatible. Plaintext (not SCK-encrypted); same model as workflow inputs. |
+| `corpus` | CBOR array | `CorpusItem[]` — the embedded output. Deterministic CBOR per the encoding profile above; each vector uses RFC 8746 tag 81. Absent on the very first revision until the first embed completes. **Carried forward** to subsequent revisions during re-embeds so the engine can keep reading the latest revision. |
 | `embed_endpoint_id` | UTF-8 text | Public UUID of the `TenantEndpointConfig` to use for embedding. Stored as a content slot (not entity ref) for consistency with `WorkflowTemplate.config` and to give latest-revision behavior — endpoint rotations propagate to the next re-embed automatically. |
 
 **Scalar slots:**

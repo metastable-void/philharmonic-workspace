@@ -19,8 +19,8 @@
 # adoption) print `-` for stats and `Δ -` for the delta.
 #
 # Delta convention: each commit's delta is `current - immediate
-# predecessor in the log range` (i.e. what this commit changed).
-# The oldest commit shown has no predecessor, so its delta is
+# predecessor` when that predecessor is available in the fetched
+# history. If either side lacks a Code-stats trailer, the delta is
 # `Δ -`.
 #
 # POSIX sh only — see CONTRIBUTING.md §6.
@@ -125,9 +125,10 @@ fi
 # Field 3: author display ("Name <email>")
 # Field 4: Code-stats trailer (single line; empty if absent)
 #
-# We pull `count + 1` commits so the oldest *displayed* commit
-# can still compute a delta against its predecessor. The awk
-# below drops the extra trailing commit from output.
+# We pull `count + 1` commits so the oldest displayed commit can
+# still compute a delta against its predecessor when enough
+# history exists. The awk below drops the extra trailing commit
+# from output.
 
 fetch=$(( count + 1 ))
 

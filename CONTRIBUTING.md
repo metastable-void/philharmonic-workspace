@@ -535,8 +535,11 @@ from `./scripts/tokei.sh`). Per-commit deltas are not stored —
 each trailer is an absolute snapshot — but
 `./scripts/stats-log.sh` walks the log and computes deltas
 against each commit's predecessor for at-a-glance growth
-review. Submodule commits do not get this trailer (it's a
-parent-level summary).
+review. Because `commit-all.sh` uses one shared commit-message
+file for its submodule-first walk and the parent commit,
+submodule commits made by that invocation carry the same
+`Code-stats:` trailer too; the numbers are still a parent
+workspace snapshot, not per-submodule counts.
 
 Older history predating the trailer adoption shows `-` for
 both stats and delta in `stats-log.sh` output; that's
