@@ -256,13 +256,22 @@ settled.
 
 ### Encryption
 
-- **Substrate at-rest encryption**: whole-blob SCK encryption
-  of `TenantEndpointConfig.encrypted_config`. Operators with
-  `endpoint:read_decrypted` permission can retrieve decrypted contents
-  via the API for verification.
-- **Lowerer transformation**: pure byte forwarding.
-  Decrypts SCK ciphertext, re-encrypts byte-identical to
-  realm KEM. Only the `realm` field is inspected.
+- **Substrate at-rest encryption**: SCK encryption of
+  `TenantEndpointConfig.encrypted_config` (the
+  connector-implementation-specific config only — credentials,
+  base URL, model, etc.). The `implementation` name and
+  `display_name` are plaintext content slots. Operators with
+  `endpoint:read_decrypted` permission can retrieve decrypted
+  contents via the API for verification.
+- **Lowerer transformation**: payload assembly, not byte
+  forwarding. The lowerer reads plaintext `implementation`,
+  resolves a realm via deployment config, decrypts SCK
+  ciphertext, assembles `{realm, impl, config}`, and
+  COSE_Encrypt0-encrypts that assembled payload to the realm
+  KEM. (Earlier drafts described byte-identical re-encryption;
+  that model was abandoned when `implementation` moved to a
+  plaintext content slot — see doc 09 §"The lowerer's policy
+  consultation".)
 - **Credential encryption key management**: deployment-level
   shared SCK. Per-tenant keys deferred; envelope encryption
   with KMS is a deployment option.

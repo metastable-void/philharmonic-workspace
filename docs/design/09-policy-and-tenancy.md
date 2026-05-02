@@ -553,10 +553,17 @@ impl Entity for TenantEndpointConfig {
     const NAME: &'static str = "tenant_endpoint_config";
     const CONTENT_SLOTS: &'static [ContentSlot] = &[
         ContentSlot::new("display_name"),
+        ContentSlot::new("implementation"),
+        // Plaintext UTF-8 implementation name
+        // (e.g. "llm_openai_compat"). Used by the API to
+        // pick the connector realm, by the lowerer to assemble
+        // the encrypted payload's `impl` field, and by
+        // operator UIs to render endpoint kind.
         ContentSlot::new("encrypted_config"),
-        // AES-256-GCM ciphertext of the full config blob
-        // (including realm, impl, and credentials).
-        // Substrate never sees plaintext.
+        // AES-256-GCM ciphertext of the connector-specific
+        // config object (e.g. base_url, credentials, model).
+        // The realm and implementation name are NOT inside
+        // this ciphertext — they live elsewhere (see below).
     ];
     const ENTITY_SLOTS: &'static [EntitySlot] = &[
         EntitySlot::of::<Tenant>("tenant", SlotPinning::Pinned),
@@ -570,49 +577,66 @@ impl Entity for TenantEndpointConfig {
 }
 ```
 
-Notable absences:
+Notable absences and presences:
 
 - **No `endpoint_name_id` scalar.** Configs are identified by
   entity UUID. Templates reference them by UUID in their
   abstract config maps. Display names live in the
   `display_name` content slot and aren't required to be
   unique.
-- **No `impl_ref` or `realm_ref` cleartext slots.** The
-  implementation name and destination realm are inside the
-  encrypted blob; the substrate learns neither. An operator
-  inspecting the raw substrate sees "tenant X has a config"
-  and not what kind of config or what external service it
-  targets.
+- **`implementation` is plaintext.** The implementation name
+  was originally inside the encrypted blob; current code
+  stores it as a separate plaintext content slot so the API
+  can validate it on submit, the WebUI can render it without
+  decrypting, and the lowerer can pick a realm without
+  reading credentials. Substrate operators see "tenant X has
+  an `llm_openai_compat` endpoint" — the *kind* of external
+  service is not a secret in the threat model. Credentials
+  remain encrypted.
+- **No `realm_ref` cleartext slot.** Realm is derived from
+  `implementation` via the deployment's connector-router
+  configuration (the "implementation → realm" map), not
+  carried on the entity.
 
-### The encrypted blob
+### The encrypted config blob
 
-The blob is free-form JSON submitted by an admin. The
-conventional top-level shape is:
+`encrypted_config` holds connector-implementation-specific
+config only — a JSON object with whatever fields the
+implementation expects:
 
 ```json
 {
-  "realm": "llm",
-  "impl": "llm_openai_compat",
-  "config": {
-    "base_url": "https://api.openai.com/v1",
-    "api_key": "sk-...",
-    "model": "gpt-4o",
-    ...
-  }
+  "base_url": "https://api.openai.com/v1",
+  "api_key": "sk-...",
+  "model": "gpt-4o"
 }
 ```
 
 The API layer encrypts this on submit using the substrate
 credential key (SCK) and stores the ciphertext in
 `encrypted_config`. The API layer can decrypt for operators
-with `endpoint:read_decrypted` permission (they can see what they
-committed; see below). The lowerer decrypts at step-execution
-time to re-encrypt toward a connector realm.
+with `endpoint:read_decrypted` permission (they can see what
+they committed; see below). The lowerer decrypts at
+step-execution time and assembles the encrypted-payload object
+the connector service expects:
 
-v1 does not validate the blob's shape at the API layer. If an
-operator writes `"lm_openai_compat"` (typo), the call fails
-at the connector service with "unknown impl" on first use —
-loud, late, safe. Schema-driven admin UI is a later feature.
+```json
+{
+  "realm": "<derived from implementation>",
+  "impl": "<from the plaintext content slot>",
+  "config": <the decrypted blob above>
+}
+```
+
+That assembled object is then re-encrypted via COSE_Encrypt0
+to the realm's KEM key (see "The lowerer's policy
+consultation").
+
+v1 does not validate the inner blob's shape at the API layer
+beyond the implementation-name lookup. If an operator's blob
+is missing fields the implementation expects, the call fails
+at the connector service on first use — loud, late, safe.
+Schema-driven admin UI is a later feature.
 
 ### Operator visibility
 
@@ -651,27 +675,36 @@ template's abstract config:
    depth; the API layer should have enforced this at template
    creation time).
 5. Verify `config.is_retired == false`. If retired, deny.
-6. Decrypt `encrypted_config` with the substrate credential
-   key.
-7. Parse the decrypted JSON; read the `realm` field.
-8. Look up the realm KEM public key in the realm registry.
-9. Re-encrypt the decrypted blob — **byte-identical** — to the
-   realm's KEM public key via COSE_Encrypt0.
-10. Mint the COSE_Sign1 connector authorization token with
+6. Read the plaintext `implementation` content slot.
+7. Resolve the realm for that implementation via the
+   deployment's connector-router configuration (the
+   `implementation → realm` map).
+8. Decrypt `encrypted_config` with the substrate credential
+   key (SCK). The decrypted blob is the connector-specific
+   config object only.
+9. Assemble the connector payload object
+   `{realm, impl: implementation, config: decrypted_blob}`.
+10. Look up the realm KEM public key in the realm registry.
+11. COSE_Encrypt0-encrypt the assembled payload to the realm's
+    KEM public key.
+12. Mint the COSE_Sign1 connector authorization token with
     claims `iss, exp, kid, realm, tenant, inst, step,
     config_uuid, payload_hash`.
-11. Add a `MechanicsConfig` entry keyed by the script-name,
+13. Add a `MechanicsConfig` entry keyed by the script-name,
     with URL = realm connector router, headers = token +
     encrypted payload.
 
-The lowerer's only transformation is encryption-boundary
-translation: SCK-ciphertext-at-rest → plaintext-in-memory →
-realm-KEM-ciphertext-in-transit. No field extraction,
-substitution, synthesis, or reshaping. The bytes the admin
-submitted are the payload bytes the implementation receives.
+The lowerer's transformation is **payload assembly**, not byte
+forwarding: it reads plaintext metadata (`implementation`),
+decrypts the credential blob, assembles the
+`{realm, impl, config}` object the connector service expects,
+and re-encrypts to the realm KEM. Earlier drafts of this
+design described it as byte-identical re-encryption; that
+model was abandoned when `implementation` moved to a plaintext
+content slot.
 
-Plaintext exists in the lowerer's memory between steps 6 and 9
-and not elsewhere in the process.
+Plaintext credentials exist in the lowerer's memory between
+steps 8 and 11 and not elsewhere in the process.
 
 ## Tenant suspension
 

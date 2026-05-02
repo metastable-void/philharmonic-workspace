@@ -70,6 +70,9 @@ Content-Type: application/json
     "endpoint": {
       "method": "post",
       "url_template": "https://api.example.com/v1/{resource}",
+      "url_param_specs": {
+        "resource": {}
+      },
       "headers": { "Authorization": "Bearer ..." },
       "response_body_type": "json",
       "response_max_bytes": 1048576
@@ -80,7 +83,11 @@ Content-Type: application/json
 
 The `endpoint` field is a `mechanics-config` `HttpEndpoint`
 definition (see `mechanics-core/ts-types/mechanics-json-shapes.d.ts`
-for the full TypeScript shape).
+for the full TypeScript shape). Every `{name}` placeholder in
+`url_template` must have a matching entry in `url_param_specs`
+— validation rejects templates with missing specs. The script
+later supplies values via the `urlParams` option to
+`endpoint(...)`.
 
 #### SQL (PostgreSQL / MySQL)
 
@@ -212,16 +219,36 @@ import endpoint from "mechanics:endpoint";
 
 export default async function(arg) {
   const response = await endpoint("my-llm", {
-    body: { model: "gpt-4", messages: [{ role: "user", content: arg.input.question }] }
+    body: {
+      model: "gpt-4o-mini",
+      messages: [
+        { role: "user", content: arg.input.question }
+      ],
+      output_schema: {
+        type: "object",
+        properties: { answer: { type: "string" } },
+        required: ["answer"],
+        additionalProperties: false
+      }
+    }
   });
 
   return {
-    output: { answer: response.body },
+    output: { answer: response.body.output.answer },
     context: arg.context,
     done: true
   };
 }
 ```
+
+Note: the `llm_generate` capability returns a normalized
+`{output, stop_reason, usage}` shape and **requires**
+`output_schema` in the request — see the connector
+architecture for the full wire protocol. The transport
+envelope (`{body, headers, status, ok}` returned by
+`endpoint(...)`) wraps that response, so the script reads the
+LLM's structured result via `response.body.output.<field>`,
+not provider-native fields like `choices[0].message`.
 
 The first argument is the endpoint name (must match a key in the
 abstract config). The second argument is an options object:
@@ -452,14 +479,23 @@ export default async function(arg) {
   messages.push({ role: "user", content: arg.input.message });
 
   const response = await endpoint("llm", {
-    body: { model: "default", messages }
+    body: {
+      model: "default",
+      messages,
+      output_schema: {
+        type: "object",
+        properties: { reply: { type: "string" } },
+        required: ["reply"],
+        additionalProperties: false
+      }
+    }
   });
 
-  const reply = response.body.choices[0].message;
-  messages.push(reply);
+  const replyText = response.body.output.reply;
+  messages.push({ role: "assistant", content: replyText });
 
   return {
-    output: { reply: reply.content },
+    output: { reply: replyText },
     context: { messages },
     done: arg.input.finish === true
   };

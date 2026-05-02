@@ -155,10 +155,14 @@ Five crates plus per-implementation crates:
   per-realm hybrid PQC KEM (ML-KEM-768 + X25519 +
   AES-256-GCM).
 - Substrate at-rest encryption for `TenantEndpointConfig`
-  blobs under a deployment-level substrate credential key
-  (SCK); whole blob encrypted, including realm and impl.
-- Lowerer as pure byte forwarder — decrypts SCK blob,
-  re-encrypts byte-identical to realm KEM.
+  credential blobs under a deployment-level substrate
+  credential key (SCK). `display_name` and `implementation`
+  are plaintext content slots; `encrypted_config` holds the
+  connector-implementation-specific config only.
+- Lowerer as payload assembler — reads plaintext
+  `implementation`, resolves a realm via deployment config,
+  decrypts SCK blob, assembles `{realm, impl, config}`, and
+  COSE_Encrypt0-encrypts that to the realm KEM.
 - Per-realm static binary for connector services, bundling
   the service framework plus the implementations configured
   for that realm.
@@ -247,10 +251,13 @@ crates (split, settled):
 - `Principal` entity kind (long-lived API token credential,
   SHA-256 hashed in substrate; `epoch` scalar reserved for
   future self-contained-token migration, unused in v1).
-- `TenantEndpointConfig` entity kind — minimal: tenant slot,
-  `display_name`, `encrypted_config`, `key_version`,
-  `is_retired`. Realm, impl name, and credentials all inside
-  the encrypted blob.
+- `TenantEndpointConfig` entity kind — tenant slot,
+  `display_name`, `implementation`, `encrypted_config`,
+  `key_version`, `is_retired`. The `implementation` name is a
+  plaintext content slot; only credentials and connector-
+  specific config are inside the encrypted blob; realm is
+  derived from `implementation` via the deployment's
+  connector-router map.
 - `RoleDefinition` entity kind (tenant-scoped).
 - `RoleMembership` entity kind.
 - `MintingAuthority` entity kind (tenant-scoped, with

@@ -25,15 +25,19 @@ Admin-submitted raw data. Each item has:
 
 - `id` — stable string identifier (tenant-chosen).
 - `text` — the text to embed.
-- `payload` — optional free-form JSON echoed through to
+- `payload` — optional free-form CBOR/JSON echoed through to
   `vector_search` results (e.g. the full answer text, a URL,
   metadata).
 
-Source items are stored as a JSON content blob on the dataset
-entity. They are **not** encrypted — they contain corpus
-content, not credentials or capability-bearing URLs. If a
-future use case requires encrypted source items, that would be
-a separate content slot with SCK, not a change to this design.
+Source items are stored as a deterministic CBOR (RFC 8949
+§4.2.1 "Core Deterministic Encoding") content blob on the
+dataset entity. CBOR is used (rather than JSON) because vector
+arrays and large repetitive payload structures encode much
+more densely as CBOR. They are **not** encrypted — they contain
+corpus content, not credentials or capability-bearing URLs. If
+a future use case requires encrypted source items, that would
+be a separate content slot with SCK, not a change to this
+design.
 
 ### Corpus
 
@@ -51,7 +55,10 @@ pub struct CorpusItem {
 Each corpus item corresponds to one source item. The `id` and
 `payload` are carried through from the source; the `vector` is
 the embedding produced by the `embed` connector. Stored as a
-JSON content blob on the dataset entity.
+deterministic CBOR content blob on the dataset entity (same
+encoding as source items; vectors of `f32` benefit
+particularly from CBOR's compact tagged-array encoding compared
+to JSON-encoded float arrays).
 
 ### Dataset lifecycle
 
@@ -72,6 +79,55 @@ Created ──→ Embedding ──→ Ready
 Retired datasets are excluded from all queries and are not
 served to workflows.
 
+## Storage substrate prerequisites
+
+### Content blob size
+
+Embedding datasets store noticeably larger content blobs than
+other entities. A dataset with 10,000 items and 1,024-dimension
+`f32` vectors is ~40 MB of vector data alone (CBOR-encoded),
+plus payloads. The current MySQL substrate stores content blobs
+in `MEDIUMBLOB`, capped at 16 MB per blob — too small.
+
+**Required substrate change** (prerequisite for this feature):
+
+- Migrate the `content` table's blob column from `MEDIUMBLOB`
+  to `LONGBLOB` (cap 4 GB per blob) in
+  `philharmonic-store-sqlx-mysql`.
+- The migration runs automatically on startup if the column
+  type does not match. Idempotent.
+- The SQLite substrate uses untyped `BLOB` already and needs
+  no migration.
+
+### Hard limits enforced by the API
+
+Even with `LONGBLOB`, runaway dataset sizes hurt API memory
+use, transfer time, and the workflow engine. The API enforces:
+
+| Limit | Default | Notes |
+|------|---------|-------|
+| Items per dataset | 10,000 | Server-side cap; rejected at create/update with 400. |
+| Bytes per `text` | 64 KiB | Per source item. |
+| Bytes per `payload` (JSON) | 64 KiB | Per source item. |
+| Total source-items blob | 256 MiB | After CBOR encoding. |
+| Total corpus blob | 1 GiB | After CBOR encoding; bounds vector dim × item count. |
+
+Operators can adjust these limits via deployment config; the
+defaults exist so a misconfigured tenant cannot fill the
+substrate.
+
+### Read-path paging
+
+The corpus is delivered to workflow scripts in a single
+`data.embed_datasets.<name>` array — no in-engine paging.
+Operators sizing for very large corpora (>100k items) should
+either chunk corpora across multiple datasets or wait for a
+future paged read API; v1 keeps the read shape simple.
+
+The corpus REST endpoint (`GET .../corpus`) is also
+single-response v1; if it becomes a problem we add cursor
+paging later without breaking the workflow read path.
+
 ## Entity schema
 
 ### `EmbeddingDataset`
@@ -82,10 +138,10 @@ New entity kind in `philharmonic-policy`.
 
 | Slot | Type | Description |
 |------|------|-------------|
-| `display_name` | JSON string | Admin-visible name |
-| `source_items` | JSON array | `[{id, text, payload?}]` — the raw input. Plaintext (not SCK-encrypted); same model as workflow inputs. |
-| `corpus` | JSON array | `CorpusItem[]` — the embedded output. Absent on the very first revision until the first embed completes. **Carried forward** to subsequent revisions during re-embeds so the engine can keep reading the latest revision. |
-| `embed_endpoint_id` | JSON string | Public UUID of the `TenantEndpointConfig` to use for embedding. Stored as a content slot (not entity ref) for consistency with `WorkflowTemplate.config` and to give latest-revision behavior — endpoint rotations propagate to the next re-embed automatically. |
+| `display_name` | UTF-8 text | Admin-visible name. |
+| `source_items` | CBOR array | `[{id, text, payload?}]` — the raw input. Deterministic CBOR (RFC 8949 §4.2.1). Plaintext (not SCK-encrypted); same model as workflow inputs. |
+| `corpus` | CBOR array | `CorpusItem[]` — the embedded output. Deterministic CBOR. Absent on the very first revision until the first embed completes. **Carried forward** to subsequent revisions during re-embeds so the engine can keep reading the latest revision. |
+| `embed_endpoint_id` | UTF-8 text | Public UUID of the `TenantEndpointConfig` to use for embedding. Stored as a content slot (not entity ref) for consistency with `WorkflowTemplate.config` and to give latest-revision behavior — endpoint rotations propagate to the next re-embed automatically. |
 
 **Scalar slots:**
 
@@ -268,22 +324,50 @@ embed runs as a background tokio task, and the user polls
 The script is authored by Codex, compiled into the API binary
 as a static string, and not exposed to users. It handles:
 
-- Batching texts into groups respecting the embed connector's
-  `max_batch_size` (read from the lowered config or defaulting
-  to a sensible batch size).
+- Batching texts into groups according to a `max_batch_size`
+  value passed in `arg` (see below).
 - Mapping embed responses back to source item IDs.
 - Assembling `CorpusItem[]` with `{id, vector, payload}`.
 - Error handling: if any batch fails, the entire job fails.
 
+**`max_batch_size` is not visible to JS via lowered
+`MechanicsConfig`** — the connector implementation's private
+config (`philharmonic-connector-impl-embed/src/config.rs`) sits
+inside the COSE_Encrypt0 payload and is not exposed to
+mechanics. Instead, the API server reads `max_batch_size` from
+the decrypted endpoint config server-side (it has the SCK), and
+includes it in the embed job's `arg`:
+
+```json
+{ "items": [{"id": "...", "text": "...", "payload": ...}],
+  "max_batch_size": 32 }
+```
+
+If `max_batch_size` is absent in the endpoint config, the API
+server passes a conservative default (e.g. 8) so the script
+never has to guess.
+
 ### Lowerer integration — the `instance_id` problem
 
 The `ConfigLowerer` trait currently requires
-`instance_id: EntityId<WorkflowInstance>` (used in the
-COSE_Sign1 token's `inst` claim and in AEAD AAD bindings). The
-embed job has no workflow instance — it's not a workflow.
+`instance_id: EntityId<WorkflowInstance>` and `step_seq: u64`
+(used in the COSE_Sign1 token's `inst` and `step` claims and in
+COSE_Encrypt0 AEAD AAD bindings — see
+`philharmonic-workflow/src/lowerer.rs`,
+`philharmonic-connector-common/src/lib.rs`,
+`bins/philharmonic-api-server/src/lowerer.rs`). The embed job
+has no workflow instance — it's not a workflow.
 
-**Resolution**: extend the lowerer trait to accept either a
-step scope or an ephemeral scope:
+This intersects with crypto-bound semantics: `inst`, `step`,
+`config_uuid`, and `payload_hash` are signed claims and AEAD
+AAD inputs. Changing what `inst` means — even just relaxing
+"this is always a workflow instance UUID" — is a
+crypto-sensitive design change and **must clear Yuka's two-gate
+crypto review (`crypto-review-protocol`) before
+implementation**. Two approaches are on the table; the choice
+is up to Gate 1.
+
+**Approach A (preferred long-term): `LowerScope` enum.**
 
 ```rust
 pub enum LowerScope {
@@ -302,39 +386,63 @@ pub trait ConfigLowerer: Send + Sync {
 }
 ```
 
-The `inst` claim in the COSE_Sign1 token is filled with either
-the workflow instance UUID or a freshly-minted ephemeral job
-UUID. The connector service doesn't validate `inst` against any
-substrate registry — it's a binding identifier, not a foreign
-key — so an unrecorded UUID is acceptable.
+The `inst` claim is filled with either the workflow instance
+UUID or a freshly-minted ephemeral job UUID, and a new claim or
+discriminator distinguishes the two so the connector service
+cannot be confused into accepting an ephemeral token where a
+step token is expected (or vice versa). `philharmonic-workflow`
+gets a minor-or-major version bump; existing `StepRecord`
+schema is unaffected. Connector-common's
+`ConnectorCallContext.instance_id` and the corresponding token
+claim documentation must be updated to reflect the dual
+meaning.
 
-This is a breaking change to `philharmonic-workflow`'s public
-trait. Bump major or minor version accordingly. The existing
-`StepRecord` schema is unaffected.
+**Approach B (v1-fallback): synthesize a non-persisted instance UUID.**
 
-**Alternative considered**: synthesize a non-persisted
-`EntityId<WorkflowInstance>` for embed jobs without changing
-the trait. Rejected because it muddles the semantics — the
-type says "this is a workflow instance ID" and the embed job
-isn't a workflow.
+Mint a fresh `EntityId<WorkflowInstance>` per embed job, do
+not insert it into the substrate, and pass it through the
+existing trait. The connector service does not validate `inst`
+against any registry, so an unrecorded UUID is accepted.
+Trait, AEAD, and signed-claim shape are unchanged — Gate 1
+becomes a "we are reusing the existing claim shape; here is
+why that is safe" memo rather than a structural change.
+Tradeoff: the type system says "workflow instance" but for
+embed jobs that is no longer literally true.
+
+**Recommendation**: ship Approach B for v1 (no crypto-shape
+change, lowest risk), and revisit Approach A when a second
+ephemeral job source appears. Either way, **Gate 1 must clear
+before any code lands**.
 
 ### Timeout
 
-Embed jobs use a long timeout (configurable, default 30
-minutes) because embedding large corpora involves many
-sequential connector calls. The timeout is set on the
-`MechanicsJob`, not on the mechanics worker's global config.
+Embed jobs need a long timeout (default 30 minutes) because
+embedding large corpora involves many sequential connector
+calls. `MechanicsJob` and `MechanicsPool` today expose only a
+pool-wide `run_timeout` (`mechanics-core/src/internal/pool/`),
+which is sized for ordinary user steps. Two options:
+
+1. **Per-job timeout on `MechanicsJob`** — extend
+   `MechanicsJob` with an optional `run_timeout` override that
+   `MechanicsPool` honors when set. Backward-compatible
+   `Option<Duration>`. This is a small, contained
+   `mechanics-core` change.
+2. **Dedicated long-job pool** — the API server holds a
+   second `MechanicsPool` instance configured with a long
+   `run_timeout`, used only for embed jobs. No mechanics
+   change; more deployment configuration.
+
+V1 picks (1): one pool, per-job overrides. The "no mechanics
+worker change" claim in earlier drafts of this doc was
+incorrect — mechanics-core gains the per-job timeout knob.
 
 ### Concurrency
 
 One embed job per dataset at a time. If an update arrives
-while an embed job is running, the API queues the update —
-the new source items are stored, and a new embed job starts
-after the current one completes (or is abandoned on timeout).
-
-Implementation note: the simplest v1 approach is to reject
-updates while `status=Embedding` with a 409 Conflict. More
-sophisticated queuing can come later.
+while an embed job is running, the API rejects it with **409
+Conflict** until `status` leaves `Embedding`. Queuing updates
+across embed jobs is a future enhancement; v1 keeps the model
+simple so the revision log stays linear.
 
 ## API endpoints
 
@@ -357,8 +465,8 @@ All require `Principal` authentication and tenant scope.
 
 - `GET /v1/embed-datasets/{id}` — read dataset detail.
   Requires `embed_dataset:read`.
-  Returns metadata + status. Does not include corpus (use
-  the corpus endpoint for that).
+  Returns metadata + status only. Does **not** include source
+  items or corpus (use the dedicated endpoints below).
 
 - `POST /v1/embed-datasets/{id}/update` — update items.
   Requires `embed_dataset:update`.
@@ -369,10 +477,18 @@ All require `Principal` authentication and tenant scope.
 - `POST /v1/embed-datasets/{id}/retire` — retire dataset.
   Requires `embed_dataset:retire`.
 
+- `GET /v1/embed-datasets/{id}/source-items` — read raw source
+  items for the WebUI Source Items tab and for admin export.
+  Requires `embed_dataset:read`.
+  Returns `[{id, text, payload?}]` (CBOR decoded to JSON for
+  transport). Always present once the dataset is created.
+
 - `GET /v1/embed-datasets/{id}/corpus` — read corpus.
   Requires `embed_dataset:read`.
-  Returns the `CorpusItem[]` JSON array (the embedded output).
-  Returns 404 if no corpus is available yet.
+  Returns the `CorpusItem[]` JSON array (the embedded output —
+  CBOR decoded to JSON for transport).
+  Returns 404 if no corpus is available yet (dataset is
+  `Created`, first-ever `Embedding`, or first-ever `Failed`).
 
 ### Template data config
 
@@ -395,18 +511,30 @@ New atoms added to `ALL_ATOMS` in `philharmonic-policy`:
 | Atom | Description |
 |------|-------------|
 | `embed_dataset:create` | Create embedding datasets |
-| `embed_dataset:read` | List/read datasets and corpora |
+| `embed_dataset:read` | List/read datasets, source items, and corpora |
 | `embed_dataset:update` | Update dataset items (triggers re-embed) |
 | `embed_dataset:retire` | Retire datasets |
 
-These go in the `deployment` permission group in the WebUI
-(alongside the existing deployment atoms), or a new `data`
-group if the UI benefits from the separation.
+The `embed_dataset` prefix forms its own permission group in
+the WebUI — embedding datasets are tenant resources, not
+operator-scope deployment plumbing, so they should not share a
+group with `deployment:*`. The WebUI permission grouping logic
+(`philharmonic/webui/src/components/permissions.ts`) already
+groups by `<prefix>:` so a new "Embedding Datasets" group
+falls out of the existing logic without code changes; only the
+i18n labels and any group ordering need updating.
 
 ## WebUI
 
 New "Embedding Datasets" navigation item between "Authorities"
 and "Audit" in the sidebar.
+
+**Friendly UI, not raw JSON.** Per workspace direction
+(HUMANS.md), embedding datasets get a structured editor — not
+the raw JSON textarea pattern used elsewhere in the v0 admin
+UI. Datasets are larger and more repetitive than typical
+endpoint configs, and a raw JSON editor for `[{id, text,
+payload?}]` is unusable in practice.
 
 ### List page
 
@@ -417,57 +545,129 @@ with spinner text), Ready (good), Failed (bad).
 ### Create form
 
 Fields: Display Name (text), Embed Endpoint (dropdown of
-active `embed`-implementation endpoints), Items (JSON editor
-for the `[{id, text, payload?}]` array — or a structured
-table editor if UX warrants it).
+active `embed`-implementation endpoints), Items (structured
+table editor with one row per item: `id` text input, `text`
+multiline input, `payload` collapsed JSON editor that
+defaults to empty). Add/remove rows, paste-import from CSV
+or JSON, and per-row schema validation with the failing item
+index in errors. A raw-JSON view is available behind a
+toggle for power users / batch import, but is not the
+default.
 
 ### Detail page
 
 Metadata grid (ID, display name, status, item count, embed
-endpoint, timestamps). Tabs: Source Items (JSON viewer),
-Corpus (JSON viewer — `CorpusItem[]`), with a refresh button
-for polling status during embedding.
+endpoint, timestamps). Tabs:
+
+- **Source Items** — same structured table as Create
+  (read-only when not `Ready`/`Failed`; editable triggers an
+  Update call). Backed by
+  `GET /v1/embed-datasets/{id}/source-items`.
+- **Corpus** — table view with one row per item. Columns: `id`,
+  `payload` (collapsed/expandable), and a "vector"
+  expand-on-click showing dimensionality and the first few
+  components. The full `f32` array stays collapsed by default
+  because rendering a 1024-element float array per row crashes
+  the page. Backed by `GET /v1/embed-datasets/{id}/corpus`.
+
+A polling refresh button is available on the detail page for
+observing `status` transitions during embedding. Clear UI
+states for: "first embed in progress" (no fallback corpus
+visible), "re-embed in progress with previous corpus served",
+"failed with previous corpus served", and "failed without
+fallback corpus".
+
+Server-side limits (item count, per-item bytes, blob size —
+see "Storage substrate prerequisites") are surfaced inline in
+the editor so the user sees caps before submission, not after
+the API rejects.
 
 ### i18n
 
 Both `en.ts` and `ja.ts` need the `embedDatasets` translation
 section.
 
-## What doesn't change
+## What does and doesn't change
 
 - **Connector layer**: no changes. The `embed` and
   `vector_search` connectors already support the needed
   request/response formats.
-- **Mechanics worker**: no changes. It runs the built-in embed
-  script the same way it runs user scripts.
-- **Lowerer**: no changes. The embed job uses the same
-  lowering pipeline as regular workflow steps.
+- **Mechanics worker (`mechanics` bin)**: no changes. It runs
+  the built-in embed script the same way it runs user scripts.
+- **Mechanics core (`mechanics-core` crate)**: small change —
+  add an optional per-job `run_timeout` override on
+  `MechanicsJob` so embed jobs can run longer than the pool
+  default (see "Timeout"). Backward-compatible
+  `Option<Duration>`.
+- **Lowerer (`philharmonic-workflow` + `philharmonic-api-server`
+  lowerer)**: small change — accommodate ephemeral jobs (see
+  "Lowerer integration"). Approach A is a public-trait change
+  on `philharmonic-workflow`; Approach B is implementation-only
+  inside the API server. **Either approach is crypto-sensitive
+  and gated on Yuka's two-gate review (`crypto-review-protocol`)
+  before any code lands.**
+- **Storage substrate**: small change — `philharmonic-store-sqlx-mysql`
+  migrates the content blob column from `MEDIUMBLOB` to
+  `LONGBLOB` (auto-applied on startup). SQLite substrate
+  unaffected.
 - **Encrypted config model**: datasets are not encrypted.
   Source items and corpora are plaintext content blobs.
-  The `embed_endpoint` reference points at an encrypted
-  `TenantEndpointConfig` which the lowerer decrypts at
-  job time — the dataset itself never holds credentials.
+  `embed_endpoint_id` is a plaintext content slot pointing at
+  an encrypted `TenantEndpointConfig` which the lowerer
+  decrypts at job time — the dataset itself never holds
+  credentials.
 
 ## Implementation order
 
-1. Entity schema (`EmbeddingDataset` in `philharmonic-policy`).
-2. Permission atoms.
-3. API routes (CRUD + corpus read).
-4. Template `data_config` content slot + API validation.
-5. Workflow engine `data` assembly in `execute_step`.
-6. **Lowerer trait change**: introduce `LowerScope` enum;
-   migrate `ConnectorConfigLowerer` and `StubLowerer` to the
-   new signature; update the workflow engine's call site to
-   pass `LowerScope::Step{...}`. This is a breaking change to
-   `philharmonic-workflow` — bump version and update the
-   `philharmonic-api-server` lowerer accordingly.
-7. Ephemeral embed job (built-in script + background tokio task
-   in API server, calling the lowerer with
-   `LowerScope::Ephemeral{...}` and the executor directly).
-8. WebUI pages + i18n.
+0. **Crypto Gate 1 proposal** for the lowerer ephemeral-job
+   approach (A or B — see "Lowerer integration"). No code
+   touching the lowerer or connector token lands before sign-off.
+1. **Substrate migration**: `MEDIUMBLOB` → `LONGBLOB` in
+   `philharmonic-store-sqlx-mysql` with idempotent startup
+   migration. Land first; everything else stores blobs that
+   may exceed the old cap.
+2. **Mechanics per-job timeout**: optional `run_timeout`
+   override on `MechanicsJob`, honored by `MechanicsPool`.
+3. Entity schema (`EmbeddingDataset` in `philharmonic-policy`)
+   with deterministic-CBOR-encoded content slots.
+4. Permission atoms (`embed_dataset:*`).
+5. API routes (CRUD + source-items read + corpus read), with
+   server-side caps enforced.
+6. Template `data_config` content slot + API validation.
+7. Workflow engine `data` assembly in `execute_step`.
+8. **Lowerer ephemeral support** (per Gate 1 outcome): either
+   the `LowerScope` enum (Approach A) or the synthesized-UUID
+   path (Approach B). Migrate `ConnectorConfigLowerer` and
+   `StubLowerer`; if Approach A, bump
+   `philharmonic-workflow` and update the `philharmonic-api-server`
+   lowerer accordingly.
+9. Ephemeral embed job (built-in script + background tokio task
+   in API server, using the chosen lowerer path and the
+   executor directly).
+10. WebUI pages + i18n (structured editor; no raw-JSON-only
+    dataset UI).
 
-Steps 1–5 can land without the embed job — datasets would
+Steps 3–7 can land without the embed job — datasets would
 accept admin-supplied corpus directly (a development-only API
-mode) for testing the read path. Step 6 lands as a separable
-refactor. Step 7 closes the loop. Step 8 is parallel-safe
-after step 3.
+mode) for testing the read path. Steps 8 and 9 close the loop.
+Step 10 is parallel-safe after step 5.
+
+## Crypto-review note
+
+Approaches A and B both touch crypto-bound semantics:
+
+- COSE_Sign1 token's `inst` and `step` claims (signed).
+- COSE_Encrypt0 AEAD AAD (which binds those claims into the
+  encrypted payload).
+- `payload_hash` claim (binds COSE_Encrypt0 ciphertext bytes
+  into the signed envelope).
+- Connector-common documentation of `ConnectorCallContext`
+  semantics.
+
+Per `CLAUDE.md` and `crypto-review-protocol`, this is on
+Yuka's personal review path. The Gate 1 proposal must state:
+which approach (A or B), what `inst`/`step` mean for ephemeral
+jobs, whether a discriminator is added to distinguish ephemeral
+vs step tokens, and how connector-service verification handles
+the new shape. No implementation prompts (Codex or otherwise)
+should be written before Gate 1 clears.

@@ -1,10 +1,9 @@
 # Execution Substrate
 
-Three crates after the planned schema extraction:
-`mechanics-config` (Boa-free schema types), `mechanics-core`
-(Rust library wrapping Boa), and `mechanics` (HTTP service).
-Core is published at 0.2.2; HTTP service is published too.
-`mechanics-config` doesn't exist yet — extraction is pending.
+Three published crates: `mechanics-config` (Boa-free schema
+types), `mechanics-core` (Rust library wrapping Boa), and
+`mechanics` (HTTP service). Use `./scripts/crate-version.sh
+--all` for current versions.
 
 ## `mechanics-config`
 
@@ -212,37 +211,43 @@ adding it later is a pure addition.
 The executor is, structurally, the simplest layer of the system:
 inputs in, computation, outputs out, no memory of either.
 
-## Schema extraction (settled)
+## Schema extraction (history)
 
-**Decision**: extract `MechanicsConfig`, `HttpEndpoint`, and
-supporting types to a new `mechanics-config` crate. Keep the Boa
-GC trait impls in `mechanics-core` via wrapper newtypes. Pure
-structural validation logic moves with the types.
+The schema types (`MechanicsConfig`, `HttpEndpoint`, supporting
+URL/header/retry types, and their structural validation logic)
+originally lived in `mechanics-core`. They were extracted to
+`mechanics-config` so consumers that need the schema but not
+the JS runtime — notably the lowerer in
+`philharmonic-api-server`, which produces `MechanicsConfig`
+values from `TenantEndpointConfig` decryption — could depend on
+the schema without pulling in Boa.
 
-**Why**: the `philharmonic-connector-client` crate needs to
-produce `MechanicsConfig` values. If the schema types live in
-`mechanics-core`, the lowerer transitively depends on Boa, which
-is a heavyweight dependency for code that never runs JavaScript.
-Extraction lets the lowerer stay Boa-free.
+The split that landed:
 
-**Migration plan**:
+- `mechanics-config` owns the data types and structural
+  validation. No Boa, no GC traits, no philharmonic-specific
+  knowledge.
+- `mechanics-core` depends on `mechanics-config` and adds the
+  Boa GC wrapper newtypes (`BoaMechanicsConfig`,
+  `BoaHttpEndpoint`) that integrate with the realm.
+- The lowerer depends on `mechanics-config` directly and never
+  pulls in Boa.
 
-1. Create the `mechanics-config` crate with the extracted types
-   and validation logic.
-2. Update `mechanics-core` to depend on `mechanics-config` and
-   re-export the extracted types for backward compatibility.
-3. Add wrapper newtypes in `mechanics-core` that implement Boa's
-   GC traits over the `mechanics-config` types.
-4. Consumers of the schema (notably the lowerer, not yet
-   implemented) depend on `mechanics-config` directly.
-
-**Doesn't require a breaking release of `mechanics-core`** —
-re-exports keep existing consumers working without code changes.
+This is a settled, shipped split — the rest of this document
+describes the current state of the three crates.
 
 ## Status
 
-`mechanics-core` and `mechanics` are published and functional.
-`mechanics-config` extraction is pending. Extraction should
-happen before or alongside the connector client implementation;
-it doesn't block the connector layer's design work but does
-block its implementation.
+All three crates are published and in production use:
+
+- `mechanics-config` — schema types and validation. Stable
+  surface; revisions add fields rather than reshape.
+- `mechanics-core` — Boa-backed runtime library. Used by the
+  `mechanics` bin and not depended on directly by any
+  philharmonic crate (philharmonic talks to mechanics over
+  HTTP, see "`mechanics` (HTTP service)").
+- `mechanics` — the HTTP worker binary. Bundles a static asset
+  set and is one of the three deployment binaries.
+
+Use `./scripts/crate-version.sh --all` to read current
+versions; this document does not pin them.
