@@ -4,7 +4,7 @@ Captured-from-real-API fixtures for the `openai_native` and
 `tool_call_fallback` dialects of the upcoming
 `philharmonic-connector-impl-llm-openai-compat` crate (Phase 6
 Task 2) — see
-[`ROADMAP.md`](../../../ROADMAP.md#phase-6--first-implementations)
+[`ROADMAP.md`](../../../docs/ROADMAP.md#phase-6--first-implementations)
 §"Phase 6 → Task 2 → Testing discipline".
 
 ## Why real-API capture?
@@ -147,17 +147,17 @@ the **request** body only.
     --model gpt-4o-mini \
     --system-prompt "Return an employee profile as JSON." \
     --prompt "Give an example employee profile." \
-    --output-schema docs/upstream-fixtures/openai-chat/sample_json_schema.json \
-    --capture-dir docs/upstream-fixtures/openai-chat/openai_native/
+    --output-schema tests/fixtures/upstream/openai-chat/sample_json_schema.json \
+    --capture-dir tests/fixtures/upstream/openai-chat/openai_native/
 
 # tool_call_fallback
 ./scripts/xtask.sh openai-chat -- \
     --model gpt-4o-mini \
     --system-prompt "Return an employee profile as JSON." \
     --prompt "Give an example employee profile." \
-    --output-schema docs/upstream-fixtures/openai-chat/sample_json_schema.json \
+    --output-schema tests/fixtures/upstream/openai-chat/sample_json_schema.json \
     --tool-call-fallback \
-    --capture-dir docs/upstream-fixtures/openai-chat/tool_call_fallback/
+    --capture-dir tests/fixtures/upstream/openai-chat/tool_call_fallback/
 ```
 
 Both commands require `OPENAI_API_KEY` in `./.env` (or the

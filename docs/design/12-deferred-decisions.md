@@ -349,9 +349,9 @@ complexity (one key per tenant to rotate; per-tenant HSM slots
 if HSM-backed).
 
 **Door stays open**: the `key_version` scalar on
-`TenantCredential` already generalizes to "which key encrypted
-this." Extending to "which tenant-specific key" is a per-tenant
-key registry plus per-key rotation procedures.
+`TenantEndpointConfig` already generalizes to "which key
+encrypted this." Extending to "which tenant-specific key" is
+a per-tenant key registry plus per-key rotation procedures.
 
 ### OAuth 2.0 / OIDC federation
 

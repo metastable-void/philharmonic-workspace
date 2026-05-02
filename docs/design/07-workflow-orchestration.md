@@ -1,9 +1,10 @@
 # Workflow Orchestration
 
 `philharmonic-workflow` — the orchestration layer. Published
-as `philharmonic-workflow` 0.1.0 (2026-04-22). Depends on
-`philharmonic-policy` for the `Tenant` entity marker (workflow
-templates and instances are tenant-scoped).
+on crates.io. Depends on `philharmonic-policy` for the
+`Tenant` entity marker (workflow templates and instances are
+tenant-scoped). Use `./scripts/crate-version.sh
+philharmonic-workflow` for the current local version.
 
 ## Three entity kinds
 
@@ -469,7 +470,9 @@ from earlier drafts:
 - `ConfigLowerer` trait takes subject context (for future
   capability implementations that may consume it).
 
-**Implemented.** Published as `philharmonic-workflow` 0.1.0
-(2026-04-22). Real `ConfigLowerer` (COSE_Sign1 + COSE_Encrypt0)
-and `StepExecutor` (HTTP dispatch) landed in Phase 9
-(2026-04-30) inside the `philharmonic` meta-crate bin targets.
+**Implemented.** `philharmonic-workflow` is published on
+crates.io. Real `ConfigLowerer` (COSE_Sign1 + COSE_Encrypt0
+payload assembly from plaintext `implementation` slot and
+decrypted SCK blob) and `StepExecutor` (HTTP dispatch to the
+mechanics worker) live in the API server binary
+(`bins/philharmonic-api-server`).

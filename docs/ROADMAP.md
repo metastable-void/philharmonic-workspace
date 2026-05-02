@@ -107,7 +107,7 @@ MySQL-family database.
 
 ### Layered architecture
 
-Six layers, each with a clean dependency boundary upward:
+Seven layers, each with a clean dependency boundary upward:
 
 1. **Cornerstone** (`philharmonic-types`) — shared vocabulary types.
 2. **Storage substrate** (`philharmonic-store`, backends) —
@@ -164,7 +164,7 @@ decision:
   observability, error envelope.
 - `12-deferred-decisions.md` — what's intentionally out of scope.
 - `13-conventions.md` — redirect stub (development conventions
-  moved to [`/CONTRIBUTING.md`](CONTRIBUTING.md) at the repo
+  moved to [`/CONTRIBUTING.md`](../CONTRIBUTING.md) at the repo
   root).
 - `14-open-questions.md` — still-open design questions.
 - `15-v1-scope.md` — what ships with v1.
@@ -196,7 +196,7 @@ commit. The parent's Git config should have
 `scripts/` (`status.sh`, `pull-all.sh`, `commit-all.sh`,
 `push-all.sh`). They encode the submodule-first ordering and the
 signoff rule. If a script doesn't do what you need, extend it
-first and update [`CONTRIBUTING.md §4`](CONTRIBUTING.md#4-git-workflow).
+first and update [`CONTRIBUTING.md §4`](../CONTRIBUTING.md#4-git-workflow).
 
 **Every commit is signed off *and* signed.** Commits in the
 parent and every submodule must carry both a `Signed-off-by:`
@@ -222,7 +222,7 @@ them for speed, step 3 exercises them per-modified-crate. Don't
 run raw `cargo fmt/check/clippy/test` when the scripts cover
 the case. Clippy runs with `-D warnings` — fix the root cause,
 don't silence at crate scope. See
-[`CONTRIBUTING.md §11`](CONTRIBUTING.md#11-pre-landing-checks).
+[`CONTRIBUTING.md §11`](../CONTRIBUTING.md#11-pre-landing-checks).
 
 **Follow append-only discipline.** The substrate has no `UPDATE`
 or `DELETE` semantics. Entity state changes are new revisions;
@@ -421,7 +421,7 @@ file inventory):
   `web-fetch` (`ureq` + `rustls`, replaces the old shell
   curl/wget/fetch/ftp fallback chain). Invoked via
   `./scripts/xtask.sh <tool> -- <args>`. See
-  [`CONTRIBUTING.md §8`](CONTRIBUTING.md#8-in-tree-workspace-tooling-xtask).
+  [`CONTRIBUTING.md §8`](../CONTRIBUTING.md#8-in-tree-workspace-tooling-xtask).
 - `.github/workflows/ci.yml` at the parent level — runs
   `setup.sh` + `pre-landing.sh` on push/PR (workspace-level; the
   `--ignored` phase runs contributor-side only).
@@ -1192,7 +1192,7 @@ subsection.
        is the contract.
      - Fixture provenance — extracted from upstream to our
        tree as pure JSON (no Python); commit under
-       [`docs/upstream-fixtures/vllm/`](docs/upstream-fixtures/vllm/)
+       [`tests/fixtures/upstream/vllm/`](../tests/fixtures/upstream/vllm/)
        with pinned SHAs + license attribution in the
        directory's `README.md`:
        - `vllm_native` — extracted from vLLM's own test
@@ -1249,7 +1249,7 @@ subsection.
   shape too, not just round-trips). ✓ _(both impl crates;
   llm_openai_compat's dialect translation is anchored against
   the pinned vLLM upstream fixture + real-OpenAI captures
-  under `docs/upstream-fixtures/`)_
+  under `tests/fixtures/upstream/`)_
 - [x] Both impl crates publish as `0.1.0`. ✓ _(http_forward +
   llm_openai_compat, both 2026-04-24)_
 - [ ] End-to-end flow works: create tenant endpoint config for
@@ -1321,9 +1321,9 @@ implementation's wire protocol.
     + `PHILHARMONIC_EMBED_DEFAULT_REVISION` env vars and
     by `--no-default-features` for offline / packaging
     builds. Round-03 prompt at
-    [`docs/codex-prompts/2026-04-27-0001-phase-7-embed-tract-03.md`](docs/codex-prompts/2026-04-27-0001-phase-7-embed-tract-03.md);
+    [`docs/codex-prompts/2026-04-27-0001-phase-7-embed-tract-03.md`](codex-prompts/2026-04-27-0001-phase-7-embed-tract-03.md);
     architecture-decision note at
-    [`docs/notes-to-humans/2026-04-27-0002-phase-7-embed-default-bundled-model-architecture.md`](docs/notes-to-humans/2026-04-27-0002-phase-7-embed-default-bundled-model-architecture.md).
+    [`docs/notes-to-humans/2026-04-27-0002-phase-7-embed-default-bundled-model-architecture.md`](notes-to-humans/2026-04-27-0002-phase-7-embed-default-bundled-model-architecture.md).
 
   Wave 1 (the three publish-ready crates) shipped on
   2026-04-27 morning rather than co-landing with the embed
@@ -1341,7 +1341,7 @@ implementation's wire protocol.
   `.lbss.<name>`. Intended for any future ELF-target
   workspace member that needs to embed multi-GB blobs;
   consumed today only by `philharmonic-connector-impl-embed`.
-  See [`inline-blob/README.md`](inline-blob/README.md).
+  See [`inline-blob/README.md`](../inline-blob/README.md).
 
 - **Tier 2 — SMTP** (do after Tier 1):
   - `philharmonic-connector-impl-email-smtp`
@@ -1409,7 +1409,7 @@ implementation's wire protocol.
 **Sat 2026-05-02**, alongside Phase 9 task 2 (test WebUI +
 binary targets) so end-to-end exercise is in shape before
 Yuka returns from Golden Week. See
-[`docs/notes-to-humans/2026-04-28-0002-pre-gw-target-may-2-end-to-end.md`](docs/notes-to-humans/2026-04-28-0002-pre-gw-target-may-2-end-to-end.md)
+[`docs/notes-to-humans/2026-04-28-0002-pre-gw-target-may-2-end-to-end.md`](notes-to-humans/2026-04-28-0002-pre-gw-target-may-2-end-to-end.md)
 for the working calendar, what gets cut first if the
 target slips, and what stays in regardless (the three
 crypto-review gates B/E/G; the 0.1.0 publish; the
@@ -1507,15 +1507,15 @@ for a single user is the deployment's choice; the framework
 does not prescribe.
 
 **Sub-phase plan** (A→I; see
-[`docs/notes-to-humans/2026-04-27-0003-phase-8-design-and-decisions.md`](docs/notes-to-humans/2026-04-27-0003-phase-8-design-and-decisions.md)
+[`docs/notes-to-humans/2026-04-27-0003-phase-8-design-and-decisions.md`](notes-to-humans/2026-04-27-0003-phase-8-design-and-decisions.md)
 for the rationale). Each sub-phase is one Codex round (or
 Claude housekeeping for I) with pre-landing-green at each
 cut. Sub-phases B/E/G are crypto-touching — code-level
 crypto review (per
-[`crypto-review-protocol`](.claude/skills/crypto-review-protocol/SKILL.md))
+[`crypto-review-protocol`](../.claude/skills/crypto-review-protocol/SKILL.md))
 fires before each is merged. Approach gate already approved
 2026-04-28 (recorded in
-[`docs/notes-to-humans/2026-04-28-0001-phase-8-decisions-confirmed.md`](docs/notes-to-humans/2026-04-28-0001-phase-8-decisions-confirmed.md)).
+[`docs/notes-to-humans/2026-04-28-0001-phase-8-decisions-confirmed.md`](notes-to-humans/2026-04-28-0001-phase-8-decisions-confirmed.md)).
 
 - **A — Skeleton.** ✅ Done 2026-04-28. axum app,
   `RequestScopeResolver` trait + middleware, request context
@@ -1617,9 +1617,9 @@ Phase 8 completed 2026-04-28; the remaining window is for
 Phase 9 work only. The chat-app-shaped ephemeral-token flow,
 the `install` subcommand, musl cross-compilation, and Docker
 compose can slip past 5/2 if scope pressure forces a cut. See
-[`docs/notes-to-humans/2026-04-28-0002-pre-gw-target-may-2-end-to-end.md`](docs/notes-to-humans/2026-04-28-0002-pre-gw-target-may-2-end-to-end.md)
+[`docs/notes-to-humans/2026-04-28-0002-pre-gw-target-may-2-end-to-end.md`](notes-to-humans/2026-04-28-0002-pre-gw-target-may-2-end-to-end.md)
 for the earlier cut-order and
-[`docs/notes-to-humans/2026-04-29-0001-phase-9-integration-sketch.md`](docs/notes-to-humans/2026-04-29-0001-phase-9-integration-sketch.md)
+[`docs/notes-to-humans/2026-04-29-0001-phase-9-integration-sketch.md`](notes-to-humans/2026-04-29-0001-phase-9-integration-sketch.md)
 for the full integration sketch and open questions.
 
 **Architecture** (per HUMANS.md §Integration):
@@ -1677,7 +1677,7 @@ similar — exact location TBD):
   headers**, no `libssl-dev` / `openssl-devel` packages.
   The build must succeed with only a Rust toolchain + a C
   compiler (for the vendored C in aws-lc-rs / ring). See
-  [`CONTRIBUTING.md §10.9`](CONTRIBUTING.md#109-http-client-runtime-stack-vs-tooling-stack)
+  [`CONTRIBUTING.md §10.9`](../CONTRIBUTING.md#109-http-client-runtime-stack-vs-tooling-stack)
   for the full TLS-stack rule.
 - SIGHUP signal handler (re-read config + refresh certs).
 - TOML config loader (primary file + `.d/*.toml` overlay,

@@ -26,8 +26,7 @@ the connector layer mediates all external I/O under per-realm
 isolation with hybrid post-quantum cryptography.
 
 See the design documentation for the full architectural picture.
-Start with `docs/01-project-overview.md` (to be published alongside the
-crates; currently in the design repo).
+Start with [`docs/design/01-project-overview.md`](docs/design/01-project-overview.md).
 
 ## Notes for humans
 Notes for humans live at HUMANS.md. Claude Code can and must

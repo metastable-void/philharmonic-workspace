@@ -229,7 +229,7 @@ applies if you touch shell scripts:
 - **Invoke by path**: `./scripts/foo.sh`, not `bash foo.sh`.
 - **Validate with `./scripts/test-scripts.sh`** after any
   change. CI runs the same check.
-- **POSIX checklist**: [`POSIX_CHECKLIST.md`](POSIX_CHECKLIST.md)
+- **POSIX checklist**: [`docs/POSIX_CHECKLIST.md`](docs/POSIX_CHECKLIST.md)
   enumerates non-POSIX constructs to avoid.
 
 ### Rust bins, not Python / Perl / jq / curl

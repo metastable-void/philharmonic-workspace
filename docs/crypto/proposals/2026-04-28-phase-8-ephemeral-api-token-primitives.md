@@ -104,7 +104,7 @@ A new module **`philharmonic-policy::api_token`** introducing:
 
 - `EphemeralApiTokenClaims` — the CBOR-serialized claim
   struct, fields per
-  [`docs/design/09-policy-and-tenancy.md` §"Ephemeral token claims"](../09-policy-and-tenancy.md#ephemeral-token-claims).
+  [`docs/design/09-policy-and-tenancy.md` §"Ephemeral token claims"](../../design/09-policy-and-tenancy.md#ephemeral-token-claims).
 - `ApiSigningKey` — wraps a 32-byte Ed25519 seed in
   `Zeroizing<[u8; 32]>` plus a `kid: String`. Same shape as
   `LowererSigningKey` in `philharmonic-connector-client`,
@@ -259,7 +259,7 @@ This is the standard bearer-token tradeoff. We take it
 deliberately for v1. Mitigations layered against it:
 
 - **Short `exp`.** The system maximum is 24h per
-  [doc 11 §"Ephemeral API tokens"](../11-security-and-cryptography.md#ephemeral-api-tokens);
+  [doc 11 §"Ephemeral API tokens"](../../design/11-security-and-cryptography.md#ephemeral-api-tokens);
   per-authority configuration goes shorter. The verify
   primitive enforces `exp - iat ≤ MAX_TOKEN_LIFETIME_MILLIS`
   (24h) so even a buggy mint can't issue longer-lived tokens.
@@ -357,7 +357,7 @@ unaffected; B0 is sign-only, parallel to Wave A.)
 
 The COSE_Sign1 payload is a CBOR encoding of
 `EphemeralApiTokenClaims`. Field set adapted from
-[`docs/design/09-policy-and-tenancy.md` §"Ephemeral token claims"](../09-policy-and-tenancy.md#ephemeral-token-claims),
+[`docs/design/09-policy-and-tenancy.md` §"Ephemeral token claims"](../../design/09-policy-and-tenancy.md#ephemeral-token-claims),
 with the additions tagged below:
 
 ```rust

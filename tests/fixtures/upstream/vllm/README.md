@@ -5,7 +5,7 @@ are the authoritative source for the `vllm_native` dialect's
 wire-shape tests in the upcoming
 `philharmonic-connector-impl-llm-openai-compat` crate (Phase 6
 Task 2) — see
-[`ROADMAP.md`](../../../ROADMAP.md#phase-6--first-implementations)
+[`ROADMAP.md`](../../../docs/ROADMAP.md#phase-6--first-implementations)
 §"Phase 6 → Task 2 → Testing discipline".
 
 ## Why vLLM upstream?
