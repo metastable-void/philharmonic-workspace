@@ -24,7 +24,13 @@ sidebar viewport regardless of scroll position.
 
 ## Outcome
 
-Pending ��� will be updated after Codex run.
+Completed cleanly. Codex modified Layout.tsx (wrapped
+language-switcher + session-box in `sidebar-footer` div) and
+app.css (added `.sidebar-footer` sticky rule, `overflow-y: auto`
+on `.sidebar`, removed `margin-top: auto` from `.session-box`,
+mobile override). Production build succeeded. Commit failed in
+sandbox (`.git` lock); Claude committed as `3cb0402` (philharmonic
+submodule) + `eacab96` (parent).
 
 ---
 
