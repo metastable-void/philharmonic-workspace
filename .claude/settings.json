@@ -31,7 +31,8 @@
       "Bash(./scripts/pre-landing.sh philharmonic-connector-impl-sql-postgres *)",
       "Bash(./scripts/push-all.sh)",
       "Bash(./scripts/status.sh)",
-      "Bash(./scripts/webui-build.sh --production)"
+      "Bash(./scripts/webui-build.sh --production)",
+      "Bash(./scripts/setup.sh)"
     ],
     "additionalDirectories": [
       "/tmp"
