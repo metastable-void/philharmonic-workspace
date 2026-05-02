@@ -31,6 +31,7 @@ set -eu
 
 . "$(dirname -- "$0")/lib/colors.sh"
 . "$(dirname -- "$0")/lib/workspace-cd.sh"
+. "$(dirname -- "$0")/lib/cargo-noise-filter.sh"
 
 dry_run=0
 no_verify=0
@@ -163,7 +164,7 @@ fi
 # Sanity: always run --dry-run first (unless --no-verify skips it).
 if [ "$no_verify" -eq 0 ]; then
     printf '%s=== cargo pub-fresh --dry-run -p %s ===%s\n' "$C_HEADER" "$crate" "$C_RESET"
-    cargo pub-fresh --dry-run -p "$crate"
+    run_with_cargo_noise_filter cargo --color=always pub-fresh --dry-run -p "$crate"
 fi
 
 if [ "$dry_run" -eq 1 ]; then
@@ -174,7 +175,7 @@ fi
 # shellcheck disable=SC2086
 printf '%s=== cargo pub-fresh %s -p %s ===%s\n' "$C_HEADER" "$verify_flag" "$crate" "$C_RESET"
 # shellcheck disable=SC2086
-cargo pub-fresh $verify_flag -p "$crate"
+run_with_cargo_noise_filter cargo --color=always pub-fresh $verify_flag -p "$crate"
 
 # Tag inside the submodule's own repo. Signed annotated tag matches
 # the workspace commit-signing rule.

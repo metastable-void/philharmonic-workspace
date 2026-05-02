@@ -44,6 +44,7 @@ set -eu
 
 . "$(dirname -- "$0")/lib/workspace-cd.sh"
 . "$(dirname -- "$0")/lib/cargo-target-dir.sh"
+. "$(dirname -- "$0")/lib/cargo-noise-filter.sh"
 
 if [ $# -lt 1 ] || [ $# -gt 2 ] || [ -z "$1" ]; then
     echo "Usage: $0 <crate> [<baseline-version>]" >&2
@@ -69,9 +70,10 @@ fi
 if [ -n "$baseline_version" ]; then
     printf '=== cargo semver-checks check-release -p %s --baseline-version %s ===\n' \
         "$crate" "$baseline_version"
-    exec cargo semver-checks check-release \
+    run_with_cargo_noise_filter cargo --color=always semver-checks check-release \
         -p "$crate" \
         --baseline-version "$baseline_version"
+    exit $?
 fi
 
 # No explicit baseline: the tool queries crates.io for the newest
@@ -79,4 +81,4 @@ fi
 # crate has never been published (no baseline to compare against).
 printf '=== cargo semver-checks check-release -p %s (baseline = latest on crates.io) ===\n' \
     "$crate"
-exec cargo semver-checks check-release -p "$crate"
+run_with_cargo_noise_filter cargo --color=always semver-checks check-release -p "$crate"

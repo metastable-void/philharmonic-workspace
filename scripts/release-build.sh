@@ -24,6 +24,7 @@ set -eu
 
 . "$(dirname -- "$0")/lib/colors.sh"
 . "$(dirname -- "$0")/lib/workspace-cd.sh"
+. "$(dirname -- "$0")/lib/cargo-noise-filter.sh"
 
 CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-target-release}"
 export CARGO_TARGET_DIR
@@ -103,7 +104,7 @@ printf '%s    target: %s%s\n' "$C_NOTE" "$TARGET" "$C_RESET"
 # bleed into the other bins via the shared philharmonic dependency.
 for pkg in $bin_args; do
     printf '%s    building %s ...%s\n' "$C_NOTE" "$pkg" "$C_RESET"
-    cargo build --release --target "$TARGET" -p "$pkg" --bins
+    run_with_cargo_noise_filter cargo --color=always build --release --target "$TARGET" -p "$pkg" --bins
 done
 
 out_dir="$CARGO_TARGET_DIR/$TARGET/release"

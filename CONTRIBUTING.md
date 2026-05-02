@@ -200,6 +200,74 @@ submodule: `Cargo.toml`, `README.md`, `CHANGELOG.md`,
 refactors require coordinated commits across repos;
 cornerstone-versioning discipline absorbs most of this.
 
+### 3.1 Submodules must build independently
+
+Every submodule-backed crate must build standalone — cloned
+on its own, outside this workspace, with `cargo build` /
+`cargo test` working against its own `Cargo.toml` and the
+crate's own `[profile.dev]` / `[profile.release]` (and any
+other profile customisations) applied.
+
+This is not optional. Each submodule has its own crates.io
+release cycle; a downstream consumer reaching the crate via
+`cargo add <crate>` or `cargo install <crate>`, or via a
+fresh `git clone` of the submodule's own repo, must get the
+same compile / link / panic / opt settings the crate
+expects, without depending on the parent workspace's
+`Cargo.toml`. A submodule that only builds *inside* this
+workspace is a bug.
+
+#### `[profile.*]` blocks in member `Cargo.toml`s are load-bearing
+
+Most submodule crates carry their own `[profile.dev]`,
+`[profile.release]`, and similar blocks. When cargo loads
+the parent workspace it ignores those blocks (the workspace
+root's profiles win for in-workspace builds) and emits a
+three-line warning per affected member:
+
+```
+warning: profiles for the non root package will be ignored, ...
+package:   /<workspace>/<crate>/Cargo.toml
+workspace: /<workspace>/Cargo.toml
+```
+
+The warning is **expected and harmless**. The blocks have to
+stay — they're what makes the standalone build produce the
+right binary. The warning simply fires on every workspace
+build because the blocks exist.
+
+`scripts/lib/cargo-noise-filter.sh` strips this noise from
+the build / test / lint / publish scripts that invoke cargo
+against the workspace (`rust-lint.sh`, `rust-test.sh`,
+`miri-test.sh`, `release-build.sh`, `musl-build.sh`,
+`publish-crate.sh`, `check-api-breakage.sh`, and the
+stderr-only variant in `xtask.sh`). New scripts that invoke
+cargo against the workspace should source the filter and
+route cargo through `run_with_cargo_noise_filter` (or
+`run_with_cargo_noise_filter_stderr` for tool wrappers whose
+stdout is captured by callers).
+
+#### Forbidden: deleting `[profile.*]` to silence the warning
+
+Do not remove `[profile.*]` sections from a submodule's
+`Cargo.toml` to make the warning go away. That silently
+breaks the standalone-build contract: a downstream user
+building the published crate (or a `git clone` of the
+submodule on its own) then gets cargo's *defaults* —
+different panic strategy, optimisation level, debug-info,
+strip-symbols, codegen-units, LTO settings — than the crate
+was tested with. The warning we strip exists because cargo
+deliberately ignores the section *only in workspace mode*;
+the section is still authoritative outside the workspace.
+
+If a profile setting genuinely belongs at the workspace
+level (applies uniformly across every member during
+in-workspace builds), add it to the parent `Cargo.toml`'s
+`[profile.*]` blocks *in addition to* the per-crate setting,
+not in place of it. The two coexist by design: the workspace
+block governs in-workspace builds, the per-crate block
+governs standalone builds.
+
 ---
 
 ## 4. Git workflow

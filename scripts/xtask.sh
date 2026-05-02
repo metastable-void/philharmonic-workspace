@@ -33,6 +33,7 @@
 
 set -eu
 . "$(dirname -- "$0")/lib/workspace-cd.sh"
+. "$(dirname -- "$0")/lib/cargo-noise-filter.sh"
 
 bins_dir="xtask/src/bin"
 
@@ -109,4 +110,15 @@ fi
 CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-target-xtask}"
 export CARGO_TARGET_DIR
 
-exec cargo xtask "$tool" -- "$@"
+# Run with stderr-only filtering: cargo's submodule-profile noise
+# trio (CONTRIBUTING.md §3.1) lands on stderr, while the bin's
+# stdout is what callers like `print-audit-info.sh` capture
+# (`sysres=$(./scripts/xtask.sh system-resources)`). Filtering only
+# stderr keeps the captured stdout pristine while still hiding the
+# cargo noise from the user's terminal. Exit status is preserved by
+# the wrapper.
+#
+# We can't `exec` the cargo invocation here — `run_with_cargo_noise
+# _filter_stderr` is a shell function, so the script process must
+# stay alive to manage the FIFO + filter subprocess.
+run_with_cargo_noise_filter_stderr cargo --color=always xtask "$tool" -- "$@"

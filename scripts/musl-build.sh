@@ -28,6 +28,7 @@ set -eu
 . "$(dirname -- "$0")/lib/colors.sh"
 . "$(dirname -- "$0")/lib/workspace-cd.sh"
 . "$(dirname -- "$0")/lib/cargo-target-dir.sh"
+. "$(dirname -- "$0")/lib/cargo-noise-filter.sh"
 
 TARGET="x86_64-unknown-linux-musl"
 bin_args=""
@@ -92,7 +93,7 @@ printf '%s    target: %s%s\n' "$C_NOTE" "$TARGET" "$C_RESET"
 # Build each bin SEPARATELY — see release-build.sh for rationale.
 for pkg in $bin_args; do
     printf '%s    building %s ...%s\n' "$C_NOTE" "$pkg" "$C_RESET"
-    cargo build --target "$TARGET" -p "$pkg"
+    run_with_cargo_noise_filter cargo --color=always build --target "$TARGET" -p "$pkg"
 done
 
 out_dir="$CARGO_TARGET_DIR/$TARGET/debug"

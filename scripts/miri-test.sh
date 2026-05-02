@@ -53,6 +53,7 @@
 set -eu
 . "$(dirname -- "$0")/lib/workspace-cd.sh"
 . "$(dirname -- "$0")/lib/cargo-target-dir.sh"
+. "$(dirname -- "$0")/lib/cargo-noise-filter.sh"
 
 no_isolation=0
 while [ $# -gt 0 ]; do
@@ -140,15 +141,15 @@ if [ "$1" = "--workspace" ]; then
         exit 2
     fi
     echo "=== cargo +nightly miri test --workspace ==="
-    cargo +nightly miri test --workspace
+    run_with_cargo_noise_filter cargo +nightly --color=always miri test --workspace
 else
     crate="$1"
     shift
     if [ $# -eq 0 ]; then
         printf '=== cargo +nightly miri test -p %s ===\n' "$crate"
-        cargo +nightly miri test -p "$crate"
+        run_with_cargo_noise_filter cargo +nightly --color=always miri test -p "$crate"
     else
         printf '=== cargo +nightly miri test -p %s -- %s ===\n' "$crate" "$*"
-        cargo +nightly miri test -p "$crate" -- "$@"
+        run_with_cargo_noise_filter cargo +nightly --color=always miri test -p "$crate" -- "$@"
     fi
 fi

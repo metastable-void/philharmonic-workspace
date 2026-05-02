@@ -51,6 +51,7 @@
 set -eu
 . "$(dirname -- "$0")/lib/colors.sh"
 . "$(dirname -- "$0")/lib/workspace-cd.sh"
+. "$(dirname -- "$0")/lib/cargo-noise-filter.sh"
 
 # Parse --xtask early so we can pin CARGO_TARGET_DIR=target-xtask
 # *before* sourcing cargo-target-dir.sh (which only sets the
@@ -89,24 +90,24 @@ if [ "$xtask_only" -eq 1 ] || [ "${1:-}" = "xtask" ]; then
     printf '%s=== rust-lint scope: xtask only (CARGO_TARGET_DIR=%s) ===%s\n' \
         "$C_HEADER" "$CARGO_TARGET_DIR" "$C_RESET"
     printf '%s--- cargo fmt -p xtask --check ---%s\n' "$C_DIM" "$C_RESET"
-    cargo fmt -p "$crate" --check
+    run_with_cargo_noise_filter cargo --color=always fmt -p "$crate" --check
     printf '%s--- cargo check -p xtask ---%s\n' "$C_DIM" "$C_RESET"
-    cargo check -p "$crate"
+    run_with_cargo_noise_filter cargo --color=always check -p "$crate"
     printf '%s--- cargo clippy -p xtask --all-targets -- -D warnings ---%s\n' "$C_DIM" "$C_RESET"
-    cargo clippy -p "$crate" --all-targets -- -D warnings
+    run_with_cargo_noise_filter cargo --color=always clippy -p "$crate" --all-targets -- -D warnings
     printf '%s--- cargo doc -p xtask (missing_docs) ---%s\n' "$C_DIM" "$C_RESET"
-    RUSTDOCFLAGS="-D missing_docs" cargo doc --no-deps -p "$crate"
+    RUSTDOCFLAGS="-D missing_docs" run_with_cargo_noise_filter cargo --color=always doc --no-deps -p "$crate"
 elif [ $# -eq 1 ]; then
     crate=$1
     printf '%s=== rust-lint scope: crate %s ===%s\n' "$C_HEADER" "$crate" "$C_RESET"
     printf '%s--- cargo fmt -p %s --check ---%s\n' "$C_DIM" "$crate" "$C_RESET"
-    cargo fmt -p "$crate" --check
+    run_with_cargo_noise_filter cargo --color=always fmt -p "$crate" --check
     printf '%s--- cargo check -p %s ---%s\n' "$C_DIM" "$crate" "$C_RESET"
-    cargo check -p "$crate"
+    run_with_cargo_noise_filter cargo --color=always check -p "$crate"
     printf '%s--- cargo clippy -p %s --all-targets -- -D warnings ---%s\n' "$C_DIM" "$crate" "$C_RESET"
-    cargo clippy -p "$crate" --all-targets -- -D warnings
+    run_with_cargo_noise_filter cargo --color=always clippy -p "$crate" --all-targets -- -D warnings
     printf '%s--- cargo doc -p %s (missing_docs) ---%s\n' "$C_DIM" "$crate" "$C_RESET"
-    RUSTDOCFLAGS="-D missing_docs" cargo doc --no-deps -p "$crate"
+    RUSTDOCFLAGS="-D missing_docs" run_with_cargo_noise_filter cargo --color=always doc --no-deps -p "$crate"
 else
     # Workspace mode — exclude xtask. fmt has no `--exclude` flag,
     # so enumerate non-xtask workspace members and pass one
@@ -127,14 +128,14 @@ else
     printf '%s=== rust-lint scope: workspace (excluding xtask) ===%s\n' "$C_HEADER" "$C_RESET"
     printf '%s--- cargo fmt%s --check ---%s\n' "$C_DIM" "$fmt_pkgs" "$C_RESET"
     # shellcheck disable=SC2086
-    cargo fmt $fmt_pkgs --check
+    run_with_cargo_noise_filter cargo --color=always fmt $fmt_pkgs --check
     printf '%s--- cargo check --workspace --exclude xtask ---%s\n' "$C_DIM" "$C_RESET"
-    cargo check --workspace --exclude xtask
+    run_with_cargo_noise_filter cargo --color=always check --workspace --exclude xtask
     printf '%s--- cargo clippy --workspace --exclude xtask --all-targets -- -D warnings ---%s\n' \
         "$C_DIM" "$C_RESET"
-    cargo clippy --workspace --exclude xtask --all-targets -- -D warnings
+    run_with_cargo_noise_filter cargo --color=always clippy --workspace --exclude xtask --all-targets -- -D warnings
     printf '%s--- cargo doc --workspace --exclude xtask (missing_docs) ---%s\n' "$C_DIM" "$C_RESET"
-    RUSTDOCFLAGS="-D missing_docs" cargo doc --no-deps --workspace --exclude xtask
+    RUSTDOCFLAGS="-D missing_docs" run_with_cargo_noise_filter cargo --color=always doc --no-deps --workspace --exclude xtask
 fi
 
 printf '%s=== rust-lint: clean ===%s\n' "$C_OK" "$C_RESET"
