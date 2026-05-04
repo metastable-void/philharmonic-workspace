@@ -443,6 +443,10 @@ change, lowest risk), and revisit Approach A when a second
 ephemeral job source appears. Either way, **Gate 1 must clear
 before any code lands**.
 
+The Gate-1 proposal recommending Approach B is filed at
+[`docs/crypto/proposals/2026-05-04-post-v1-embed-dataset-lowerer-ephemeral.md`](../crypto/proposals/2026-05-04-post-v1-embed-dataset-lowerer-ephemeral.md);
+update this section's wording once Yuka signs off.
+
 ### Timeout
 
 Embed jobs need a long timeout (default 30 minutes) because
