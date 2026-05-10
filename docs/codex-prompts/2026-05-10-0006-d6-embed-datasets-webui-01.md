@@ -114,7 +114,86 @@ committed artifacts.
 
 ## Outcome
 
-Pending — will be updated after Codex run.
+**Completed 2026-05-10** — all six surfaces (A/B/C/D/E/F)
+landed; commits `b581b50` (parent) + `04708c3`
+(`philharmonic` submodule, WebUI inside).
+
+`./scripts/pre-landing.sh` GREEN end-to-end on Claude's
+independent re-run. Codex's own pre-landing pass was also
+green on first attempt for the **fifth** consecutive round.
+The pre-landing-sh hygiene preamble (TS typecheck before
+webpack) carried over reliably to the WebUI dispatch.
+
+**Codex's deliverable choices**:
+
+- Extracted `SourceItemsEditor.tsx` as a shared component
+  (used by both Create form and Detail Source-Items tab).
+  Cleaner than inlining; the prompt allowed extraction at
+  Codex's discretion.
+- Bulk-import modal lives inside `EmbedDatasets.tsx` rather
+  than as a separate component (single-purpose, doesn't
+  warrant extraction).
+- CSV vs JSON auto-detect: parse JSON first, fall back to
+  CSV with header row.
+- "Edit as JSON" toggle reuses D10's existing `CodeEditor.tsx`
+  (CodeMirror 6 wrapper) — no new editor introduced.
+- Polling refresh: ~5 second interval while
+  `status=Embedding`, stops when status changes; toast on
+  completion.
+- All four design-16 detail UI states represented (first-
+  embed-in-progress, re-embed-with-prior-corpus, failed-
+  with-prior-corpus, failed-without-fallback).
+
+**Permissions.ts patch (Claude follow-up)**: Codex correctly
+flagged in residual risks that the prompt's `<action_safety>`
+deny-listed `components/permissions.ts` based on a wrong
+assumption ("the `<prefix>:` group split picks up
+`embed_dataset:*` automatically since round 01"). The split
+is automatic at the group-rendering level, but
+`permissions.ts` has an explicit `permissionAtoms` list that
+the role-permissions checklist UI iterates. Claude added the
+four `embed_dataset:create|read|update|retire` atoms to
+`permissionAtoms` and `embed_dataset` to `permissionGroups`,
+keeping both arrays consistent with `philharmonic-policy
+0.2.2`. Then re-ran `tsc --noEmit` (clean), `webui-build.sh
+--production` (regenerated `main.js`), and `pre-landing.sh`
+(green) before committing. The patch is in the same commit
+as Codex's WebUI work.
+
+**Bundle delta**: Codex's measurement was +6.9 KiB gzipped
+(`main.js` 259491 → 266231 + `main.css` 2264 → 2606). The
+post-permissions.ts re-build produced a slightly different
+`main.js` but the size delta is negligible.
+
+**Structured-output-contract honored** for the **fifth**
+consecutive round (rounds 02 / 03 / D12 / D6 all emitted
+the six-section report with `RUN STATUS: COMPLETE` token
+before `task_complete`). The contract has settled into
+reliable convention.
+
+**Open questions Codex surfaced** (carried forward):
+
+1. **JP translation review** (Yuka). Terms for "Source
+   Items", "Corpus", "Embedding Datasets" follow surrounding
+   WebUI style; if the team has established preferred forms
+   elsewhere, those should override.
+2. **Cap-display drift**: WebUI hardcodes the four caps at
+   API defaults. Deployment-config overrides on the API
+   side (round-03 caps wire-up) can drift the UI display.
+   Resolves once a `/v1/_meta/limits` endpoint exists.
+3. **Source Items read-only during Embedding**: design-16
+   v1 limitation. Future improvement could queue updates
+   rather than 409-reject.
+
+**Day's dispatch arc complete**: D1/D2/D3/D4/D5/D6/D10/D12
+done plus Gate 1 approved. Remaining post-v1 work: D7
+(SMTP), D8 (Anthropic), D9 (Gemini dual-mode AI Studio +
+Vertex AI per ROADMAP §3.B), D11 (workflow authoring guide
+rewrite), plus the cross-cutting follow-ups
+(`/v1/_meta/limits`, JP translation review, the round-03
+operational follow-ups). The embedding-datasets feature is
+shippable end-to-end pending Yuka's Gate-2 review of D4's
+synthesized-inst diff.
 
 ---
 
