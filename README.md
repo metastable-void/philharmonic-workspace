@@ -155,8 +155,11 @@ files tracked directly in the parent repo):
   emit an SVG line chart of total/code/docs lines over time
   via the `poloto` crate; pipelined by
   `./scripts/update-stats-graph.sh` into `docs/stats.svg`,
-  embedded in `docs/README.md`), `tar-archive` (create tar
-  archives), and `tokei-stats` (per-language file-size
+  embedded in `docs/README.md`), `tar-archive` (create a gzip-
+  or zstd-compressed tar archive), `tar-concatenate` (combine
+  multiple tar archives into one with optional gzip/zstd
+  compression; consumed by `scripts/archive-all.sh`), and
+  `tokei-stats` (per-language file-size
   distribution via the tokei library crate). See
   [§xtask and KIND UUID generation](#xtask-and-kind-uuid-generation)
   below.
@@ -713,6 +716,26 @@ Invoke by path (`./scripts/foo.sh`), not via `bash`.
   into `philharmonic-<hash>.tar.gz`. Requires `musl-tools`.
   Builds each bin separately to prevent Cargo feature
   unification (connector's 2.28 GB embed weights stay isolated).
+- `./scripts/archive-all.sh` — bundle the parent + every
+  submodule's `HEAD` tree into a single zstd-compressed tarball
+  at `archives/philharmonic-workspace-<HEAD_SHA>.tar.zst`.
+  Pipeline: `git archive HEAD` for the parent (prefixed
+  `philharmonic-workspace-<HEAD_SHA>/`), then `git submodule
+  foreach --recursive` running `git archive HEAD` per submodule
+  (prefixed `philharmonic-workspace-<HEAD_SHA>/<displaypath>/`),
+  then concatenation through the `tar-concatenate` xtask bin
+  with `--zstd`. All intermediate tempfiles come from
+  `scripts/mktemp.sh` and are removed on any exit path.
+  Read-only with respect to git state; aborts early on
+  uninitialized submodules. **HEAD-only** — uncommitted
+  working-tree changes are not captured. **Submodule `HEAD` ≠
+  parent gitlink** in principle: archives the submodule's own
+  `HEAD`, which matches the parent's pin right after
+  `pull-all.sh` / `setup.sh` but can diverge if you've manually
+  checked out something else inside a submodule. Output dir
+  (`archives/`) is tracked via [`archives/README.md`](archives/README.md);
+  generated `*.tar.gz` and `*.tar.zst` inside it are
+  git-ignored.
 - `./scripts/build-status.sh` — show what `rustc`/`rust-lld`/
   `clippy`/`miri` are currently processing. Use when cargo
   appears stuck. `watch -n 2 ./scripts/build-status.sh` for
@@ -933,6 +956,26 @@ Current bins:
   blocks in [`CLAUDE.md`](CLAUDE.md) and
   [`AGENTS.md`](AGENTS.md) plus
   [`CONTRIBUTING.md §8`](CONTRIBUTING.md#8-in-tree-workspace-tooling-xtask).
+- **`tar-archive`** — create a gzip- or zstd-compressed tar
+  archive from a list of input files. Usage:
+  `./scripts/xtask.sh tar-archive -- -o out.tar.gz --gzip f1
+  f2 ...` (or `--zstd` for `out.tar.zst`). Files are stored
+  under their basename (no directory prefix); duplicate
+  basenames are rejected. Fast Rust replacement for `tar |
+  gzip` — parallel zstd uses `NbWorkers = available_parallelism`.
+  Used for ad-hoc release-artefact bundling (release-build
+  artefacts, log captures, hand-curated payloads).
+- **`tar-concatenate`** — concatenate multiple input tar
+  archives into a single output, optionally compressing the
+  output with gzip or zstd. Usage:
+  `./scripts/xtask.sh tar-concatenate -- [--gzip|--zstd] -o
+  <out> <tar1> [<tar2> ...]`. Re-emits each input entry via
+  `tar::Archive::entries()` + `Builder::append_data` so PAX
+  long-path extensions are regenerated correctly and the result
+  ends with a single, well-formed EOF marker. Default output
+  is plain tar; `--gzip` and `--zstd` are mutually exclusive.
+  Overwrites the output path; never reads it. Primary caller:
+  `scripts/archive-all.sh` (workspace `HEAD` snapshot bundles).
 - **`tokei-stats`** — per-language file-size distribution
   statistics. Usage: `./scripts/xtask.sh tokei-stats`. For each
   language detected in the current directory, prints file count

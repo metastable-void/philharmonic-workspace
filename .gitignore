@@ -10,6 +10,7 @@ target-xtask/
 target-publish/
 target-main/
 target-release/
+
 **/*.rs.bk
 *.swp
 *.swo
@@ -42,3 +43,6 @@ book/
 
 # .env files
 .env
+
+/archives/*.tar.gz
+/archives/*.tar.zst

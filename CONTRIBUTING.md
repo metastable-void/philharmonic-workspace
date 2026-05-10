@@ -358,6 +358,21 @@ for history browsing; the prohibition is on state changes.
 - `check-detached.sh` — fails non-zero if any submodule is in
   detached HEAD. Pre-flight for `commit-all.sh`.
 - `show-dirty.sh` — one-per-line list of dirty submodule names.
+- `archive-all.sh` — bundle the parent + every submodule's
+  `HEAD` tree into a single zstd-compressed tarball at
+  `archives/philharmonic-workspace-<HEAD_SHA>.tar.zst`. Read-only
+  with respect to git state — runs `git archive HEAD` for the
+  parent and `git submodule foreach --recursive` for each
+  submodule, prefixes every entry with `philharmonic-workspace-
+  <HEAD_SHA>/<displaypath>/`, and concatenates the per-tree
+  uncompressed tarballs into one zstd-compressed output via the
+  `tar-concatenate` xtask bin. Tempfiles come from
+  `scripts/mktemp.sh` and are removed on any exit path. Aborts
+  early on uninitialized submodules (a partial bundle would be
+  silently incomplete). HEAD-only — uncommitted working-tree
+  changes are not captured. Output dir is tracked
+  (`archives/README.md`); generated `*.tar.gz` and `*.tar.zst`
+  inside it are git-ignored.
 
 **Invoke by path, not by interpreter.** Run
 `./scripts/commit-all.sh "msg"`, never `bash scripts/commit-all.sh`
@@ -1177,6 +1192,16 @@ xtask/
         │                         # into `docs/stats.svg`, embedded
         │                         # in `docs/README.md`
         ├── web-post.rs           # HTTP POST JSON payload (ureq + rustls)
+        ├── tar-archive.rs        # create a gzip- or zstd-compressed
+        │                         # tar of named files (basename-stored,
+        │                         # duplicate-basename rejected); fast
+        │                         # Rust replacement for `tar | gzip`,
+        │                         # parallel zstd via NbWorkers
+        ├── tar-concatenate.rs    # concatenate multiple input tar
+        │                         # archives into one (overwriting the
+        │                         # output, never reading it) with
+        │                         # optional --gzip / --zstd compression;
+        │                         # consumed by scripts/archive-all.sh
         └── tokei-stats.rs        # per-language file-size distribution
                                   # (N, min, Q1, Q2, Q3, max, avg,
                                   # stddev) via the tokei library crate
