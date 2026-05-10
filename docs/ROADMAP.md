@@ -46,8 +46,23 @@ active work now lives in the post-v1 dispatch plan (§3 below).
   shipped 2026-05-10 (`10acd7f`). 530 → 1350 lines
   reflecting current implementation reality, three
   load-bearing recipes (D13 chat, embedding-datasets,
-  combined RAG). JP mirror regeneration is a Claude
-  follow-up.
+  combined RAG).
+- **D11 follow-ups** all shipped 2026-05-10:
+  - **JP mirror** of the workflow authoring guide
+    regenerated to match the new English version
+    (`docs-jp/ワークフロー作成ガイド.md`, 406 → 1368
+    lines; `e159e88` docs-jp + `6913a9d` parent).
+  - **WebUI template-form `data_config` editor** —
+    structured embedding-dataset binding editor on
+    Create + Edit forms with binding-name validation,
+    retired/missing warning badges, friendly-UI per
+    HUMANS.md (Codex r01 `f040dce` philharmonic +
+    `db9f737` parent).
+  - **Design-doc reconciliation** — `design/07`
+    script-arg shape five-field `{context, args,
+    input, subject, data}` with full `data` semantics;
+    `design/10` template body + PATCH semantics
+    extended with `data_config` (`4b6a122`).
 - Yuka was on Golden Week 2026-04-29 → 2026-05-06 plus a
   personal vacation 2026-05-07 / 05-08; first regular working
   day back is Mon 2026-05-11.
