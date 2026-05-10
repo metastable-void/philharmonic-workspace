@@ -117,10 +117,14 @@ production path from API server to mechanics worker, connector
 router, connector service, and an OpenAI-compatible upstream LLM
 via `llm_openai_compat`.
 
-Current active work is post-v1 scope: embedding datasets, the
-remaining Phase 7 Tier 2/3 connector implementations (SMTP,
-Anthropic, Gemini), and WebUI/docs follow-through. The
-authoritative task list lives in [`docs/ROADMAP.md` §3](docs/ROADMAP.md#3-post-v1-dispatch-plan).
+The **embedding-datasets feature** is fully shipped end-to-end
+as of 2026-05-10 — data layer, workflow-engine integration,
+API CRUD, WebUI, both crypto gates cleared. Remaining post-v1
+scope: Phase 7 Tier 2/3 connector implementations (SMTP,
+Anthropic, Gemini — D7/D8/D9), a chat-style testing UI on the
+WebUI (D13), and the workflow authoring guide rewrite (D11).
+The authoritative task list lives in
+[`docs/ROADMAP.md` §3](docs/ROADMAP.md#3-post-v1-dispatch-plan).
 
 All 25 crate names are reserved on crates.io. Foundational, API,
 connector-triangle, and Phase 6/7 Tier 1 implementation crates

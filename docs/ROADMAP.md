@@ -19,14 +19,20 @@ active work now lives in the post-v1 dispatch plan (§3 below).
   **D2** (`MechanicsJob.run_timeout` override), **D10**
   (CodeMirror 6 in the WebUI) landed in unified Codex dispatch
   on 2026-05-02 (`ee2bd61`).
-- Gate-1 proposal for embedding-datasets ephemeral lowering:
-  **APPROVED 2026-05-10** (Approach B — synthesized non-persisted
-  `EntityId<WorkflowInstance>`, no public-trait change, no
-  crypto-shape change). Approval at
-  [`docs/crypto/approvals/2026-05-04-post-v1-embed-dataset-lowerer-ephemeral.md`](crypto/approvals/2026-05-04-post-v1-embed-dataset-lowerer-ephemeral.md);
-  proposal at
-  [`docs/crypto/proposals/2026-05-04-post-v1-embed-dataset-lowerer-ephemeral.md`](crypto/proposals/2026-05-04-post-v1-embed-dataset-lowerer-ephemeral.md).
-  **D4 and D5 unblocked.**
+- **Embedding-datasets feature: shipped end-to-end 2026-05-10.**
+  Both crypto gates cleared. **Gate 1** (Approach B —
+  synthesized non-persisted `EntityId<WorkflowInstance>`, no
+  public-trait change, no crypto-shape change) approved at
+  [`crypto/approvals/2026-05-04-post-v1-embed-dataset-lowerer-ephemeral.md`](crypto/approvals/2026-05-04-post-v1-embed-dataset-lowerer-ephemeral.md).
+  **Gate 2** approved at
+  [`crypto/approvals/2026-05-04-post-v1-embed-dataset-lowerer-ephemeral-gate-2.md`](crypto/approvals/2026-05-04-post-v1-embed-dataset-lowerer-ephemeral-gate-2.md).
+  Implementation: D3 round 01 (`bbc26f9` data layer) + D3
+  round 02 (`b134d44` workflow-engine `data` assembly + 7 API
+  routes + template `data_config`) + D4+D5+caps+409
+  (`e37f956`) + Gate-2 hardening (`e845101` + `1a6b4c8`
+  deferred-tasks cleanup) + D6 WebUI (`b581b50`).
+- **D12** (`llm-openai-compat` `custom_headers` knob, Hugging
+  Face `X-HF-Bill-To` driver) shipped 2026-05-10 (`2fff3bb`).
 - Yuka was on Golden Week 2026-04-29 → 2026-05-06 plus a
   personal vacation 2026-05-07 / 05-08; first regular working
   day back is Mon 2026-05-11.
@@ -104,8 +110,9 @@ The single `(Gate 1)` item is **not** a Codex dispatch — Claude
 drafts the proposal, Yuka reviews per the two-gate crypto-review
 protocol (§2).
 
-Total: **13 Codex dispatches plus 1 Gate-1 proposal.** D1, D2,
-D10 are done; Gate 1 is approved.
+Total: **13 Codex dispatches plus 1 Gate-1 proposal.**
+**D1, D2, D3, D4, D5, D6, D10, D12 are done** (8 of 13). Gate
+1 and Gate 2 both approved. Remaining: D7, D8, D9, D11, D13.
 
 ### A. Embedding datasets (6 dispatches + 1 Gate-1)
 
@@ -113,41 +120,48 @@ Authoritative design:
 [`docs/design/16-embedding-datasets.md`](design/16-embedding-datasets.md).
 
 - **(Gate 1)** Lowerer ephemeral support — **APPROVED
-  2026-05-10**, Approach B (synthesized non-persisted
+  2026-05-10** (`0772184` after self-review revision
+  `81936f2`). Approach B chosen: synthesized non-persisted
   `EntityId<WorkflowInstance>` per embed job, no public-trait
-  change). D4 and D5 were gated on this; both now unblocked.
+  change.
+- **(Gate 2)** Implementation review on the embed-job
+  dispatcher — **APPROVED 2026-05-10** (`354e82d`) after
+  Codex pre-review surfaced 3 findings, all addressed in
+  `e845101`; deferred items (HTTP-response-size cap +
+  duplicate-/unknown-ID rejection + parse-fn unit tests)
+  closed in `1a6b4c8`.
 - **D1** Substrate `MEDIUMBLOB → LONGBLOB` migration in
   `philharmonic-store-sqlx-mysql`. **DONE 2026-05-02 (`ee2bd61`).**
 - **D2** `mechanics-core`: optional `MechanicsJob.run_timeout`
   override. **DONE 2026-05-02 (`ee2bd61`).**
-- **D3** Embedding-datasets backend:
-  - `EmbeddingDataset` entity + scalar/content slots in
-    `philharmonic-policy`.
-  - Permission atoms (`embed_dataset:create|read|update|retire`).
-  - API CRUD endpoints + source-items + corpus endpoints in
-    `philharmonic-api`.
-  - `WorkflowTemplate.data_config` content slot + API validation.
-  - Workflow engine `data` assembly in `execute_step`
-    (`philharmonic-workflow`).
-
-  Cross-crate but cohesive feature surface; one dispatch.
-  Independent of Gate 1. If Codex hits scope limits, split into
-  "policy entity + atoms" round-01 and "API + workflow data
-  assembly" round-02.
-- **D4** Lowerer ephemeral support per Approach B — touches the
-  API server lowerer only (no public-trait change to
-  `philharmonic-workflow`). **Unblocked.**
-- **D5** Ephemeral embed job: built-in JS embed script (Codex-
-  authored, compiled into the API binary as a static string)
-  plus the background tokio task in `philharmonic-api-server`
-  that lowers the embed endpoint, dispatches the mechanics job,
-  and appends `Ready` / `Failed` revisions. **Gated on D4.**
-- **D6** Embedding-datasets WebUI: structured table editor for
-  source items, Import modal for CSV/JSON bulk import,
-  collapsed-by-default vector view, i18n for `en.ts` / `ja.ts`.
-  Depends on D3's API endpoints; can run in parallel with D4/D5.
-  Per the HUMANS.md erratum, **no persistent raw-JSON view of
-  the dataset itself**.
+- **D3** Embedding-datasets backend (split at dispatch into
+  two rounds): `EmbeddingDataset` entity + permission atoms +
+  deterministic-CBOR codec in `philharmonic-policy` +
+  `WorkflowTemplate.data_config` slot in `philharmonic-workflow`
+  (round 01); workflow-engine `data` assembly in `execute_step`
+  + 7 API CRUD/read routes + template `data_config`
+  request/response (round 02). **DONE 2026-05-10**: round 01
+  `bbc26f9`, round 02 `b134d44`.
+- **D4** Lowerer ephemeral support per Approach B — touches
+  the API server lowerer only (no public-trait change to
+  `philharmonic-workflow`). **DONE 2026-05-10** (fused with
+  D5 in `e37f956`).
+- **D5** Ephemeral embed job: built-in JS embed script
+  (Codex-authored, compiled into the API binary via
+  `include_str!`) plus the background tokio task in
+  `philharmonic-api-server` that lowers the embed endpoint,
+  dispatches the mechanics job, and appends `Ready` / `Failed`
+  revisions. Includes round-02 follow-ups: `EmbedDatasetCaps`
+  wired through `ApiConfig` and the new `ApiError::Conflict`
+  variant for 409-on-Embedding. **DONE 2026-05-10** (`e37f956`,
+  with Gate-2 hardening in `e845101` + `1a6b4c8`).
+- **D6** Embedding-datasets WebUI: structured-table source-
+  items editor, CSV/JSON bulk-import modal, collapsed-by-
+  default corpus vector view, polling refresh, i18n
+  (en/ja). **DONE 2026-05-10** (`b581b50`). The
+  `permissions.ts` follow-up to register the four
+  `embed_dataset:*` atoms (Codex flagged in residuals,
+  Claude patched) is in the same commit.
 
 ### B. Phase 7 Tier 2/3 connector implementations (3 dispatches)
 
@@ -304,18 +318,21 @@ parallel.
 ### Suggested sequencing
 
 1. **D1, D2, D10** — DONE 2026-05-02 (`ee2bd61`).
-2. **Gate 1** — APPROVED 2026-05-10 (`0772184`, after Claude's
-   self-review revision `81936f2`). Approach B chosen.
-3. **Embedding datasets feature**: D3 → D4 → D5; D6 in parallel
-   after D3. With Gate 1 now cleared, the full chain is
-   dispatchable as bandwidth allows.
-4. **D12 first** (small, unblocks production HF Inference
-   org-billing now): custom-headers knob on the existing
-   `llm-openai-compat` impl.
-5. **Tier 2/3 connectors after D12**: D7 / D8 / D9 — Anthropic,
-   Gemini, SMTP. Independent of one another and of section A;
-   safe to run in parallel after D12 lands.
-6. **Anytime**: D11 (independent of everything else).
+2. **Gate 1** — APPROVED 2026-05-10 (`0772184`).
+3. **Embedding-datasets feature** — DONE 2026-05-10
+   (end-to-end). D3 r01 (`bbc26f9`) → D3 r02 (`b134d44`) →
+   D4+D5+caps+409 (`e37f956`) → Gate 2 fix (`e845101`) →
+   Gate-2 deferred cleanup (`1a6b4c8`) → D6 WebUI
+   (`b581b50`). Gate 2 approved (`354e82d`).
+4. **D12** custom-headers knob — DONE 2026-05-10
+   (`2fff3bb`).
+5. **Next dispatchable**: D7 / D8 / D9 (Tier 2/3
+   connectors — SMTP, Anthropic, Gemini); D9 carries
+   the dual-mode AI Studio + Vertex AI requirement. All
+   three are independent and parallel-safe.
+6. **Anytime**: D13 (chat-style testing UI — independent of
+   D7-9, builds on D6 which is done) and D11 (workflow
+   authoring guide rewrite — independent of everything).
 
 ### Dispatch discipline reminder
 
