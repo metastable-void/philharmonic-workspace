@@ -82,7 +82,20 @@ ps -eo pid,etime,args 2>/dev/null | grep '[r]ustdoc' | grep -v 'grep' | while IF
         "$C_DIM" "$C_RESET" "$C_BOLD" "${crate:-unknown}" "$C_RESET" "$pid" "$etime"
 done
 
+# build-script-build: a running build.rs executable (e.g. aws-lc-sys's
+# C build can stall for minutes with no other Rust process active).
+# Cargo invokes it from target/<dir>/build/<crate>-<hash>/build-script-build.
+ps -eo pid,etime,args 2>/dev/null | grep '[b]uild-script-build' | grep -v 'grep' | while IFS= read -r line; do
+    found=1
+    pid=$(printf '%s' "$line" | awk '{print $1}')
+    etime=$(printf '%s' "$line" | awk '{print $2}')
+    raw=$(printf '%s' "$line" | sed -n 's|.*/build/\([^/]*\)/build-script-build.*|\1|p')
+    crate=$(printf '%s' "$raw" | sed 's/-[0-9a-f][0-9a-f]*$//')
+    printf '%s  build-script%s running %s%s%s (pid %s, elapsed %s)\n' \
+        "$C_WARN" "$C_RESET" "$C_BOLD" "${crate:-unknown}" "$C_RESET" "$pid" "$etime"
+done
+
 # If nothing found
-if ! ps -eo args 2>/dev/null | grep -qE 'rustc|rust-lld|clippy-driver|rustfmt|rustdoc|cargo.*(test|miri)' 2>/dev/null; then
+if ! ps -eo args 2>/dev/null | grep -qE 'rustc|rust-lld|clippy-driver|rustfmt|rustdoc|cargo.*(test|miri)|build-script-build' 2>/dev/null; then
     printf '%s  (no active Rust build processes)%s\n' "$C_DIM" "$C_RESET"
 fi
