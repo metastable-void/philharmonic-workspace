@@ -263,20 +263,31 @@ Require `Principal` authentication unless noted.
 
 - `POST /v1/workflows/templates` — create workflow template.
   Requires `workflow:template_create`. Request body:
-  `{script_source, abstract_config, display_name}`. The
-  abstract_config is a `{script_name: config_uuid}` map; the
-  API validates that every referenced `config_uuid` exists
-  within the tenant and is not retired.
+  `{script_source, abstract_config, display_name,
+  data_config?}`. The abstract_config is a
+  `{script_name: config_uuid}` map; the API validates that
+  every referenced `config_uuid` exists within the tenant
+  and is not retired. The optional `data_config` declares
+  workflow-bound data — currently
+  `data_config.embed_datasets: {<binding_name>:
+  <embedding_dataset_uuid>}`. The API validates that every
+  referenced dataset exists in the tenant and is not
+  retired; binding names must match
+  `^[A-Za-z_$][A-Za-z0-9_$]{0,63}$`. Omitting `data_config`
+  leaves the template without bindings.
 - `GET /v1/workflows/templates` — list templates in the tenant.
   Requires `workflow:template_read`.
 - `GET /v1/workflows/templates/{id}` — read template.
   Requires `workflow:template_read`.
 - `PATCH /v1/workflows/templates/{id}` — append a new revision
-  to an existing template (new script source, new abstract
-  config, or both). Requires `workflow:template_create`.
-  Same template UUID; new revision. Running instances stay
-  bound to their pinned template revision; new instances use
-  the latest.
+  to an existing template (any subset of `display_name`,
+  `script_source`, `abstract_config`, `data_config`).
+  Requires `workflow:template_create`. Same template UUID;
+  new revision. Omitted fields preserve their prior value;
+  sending `data_config` replaces the whole bindings object
+  (sending `{embed_datasets: {}}` explicitly clears all
+  bindings). Running instances stay bound to their pinned
+  template revision; new instances use the latest.
 - `POST /v1/workflows/templates/{id}/retire` — retire template.
   Requires `workflow:template_retire`.
 - `POST /v1/workflows/instances` — create instance. Requires

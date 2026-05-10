@@ -239,8 +239,8 @@ pub enum StepExecutionError {
 ```
 
 The `arg` parameter is the full script argument:
-`{context, args, input, subject}`. The engine assembles this
-before calling the executor.
+`{context, args, input, subject, data}`. The engine assembles
+this before calling the executor.
 
 Two error variants distinguish retryable-inconclusive
 (`Transport`) from recorded-failure (`ScriptError`).
@@ -279,19 +279,39 @@ handles all capability-specific and policy-specific concerns.
 
 ## Script argument
 
-The workflow script receives a four-field argument:
+The workflow script receives a five-field argument:
 
 ```javascript
-export default async function main({context, args, input, subject}) {
+export default async function main({context, args, input, subject, data}) {
     // context: threaded state, evolves step by step (content-
     //          addressed across revisions)
     // args:    per-instance arguments, set at creation,
     //          immutable
     // input:   per-step input value, varies per invocation
     // subject: authenticated caller context (see below)
+    // data:    workflow-bound data, always present (see below)
     return {context: newContext, output: stepOutput, done: true};
 }
 ```
+
+The `data` field is always populated by the engine. It is `{}`
+when the template has no `data_config` content slot. When the
+template's `data_config` declares `embed_datasets.<name> =
+<dataset-uuid>` bindings, the engine looks up each referenced
+dataset under the instance's tenant and populates
+`data.embed_datasets.<name>` with its current `CorpusItem[]`.
+Datasets that are first-embedding (no prior `Ready` corpus),
+that failed before any successful embed, or that are retired
+are **omitted** from `data.embed_datasets`; scripts must
+defensively check key presence (`arg.data.embed_datasets?.
+<name>` returning `undefined` is normal). Datasets that are
+re-embedding or that failed after a prior success keep
+serving the previous corpus until a new embed succeeds. The
+authoritative implementation is `build_script_data` in
+`philharmonic-workflow/src/engine.rs`; see also
+[design 16](16-embedding-datasets.md) for the dataset
+lifecycle and [the workflow authoring guide](../guide/workflow-authoring.md)
+for the runtime states scripts encounter.
 
 The `subject` field shape matches `SubjectContext` serialized to
 JSON:
@@ -330,7 +350,12 @@ application. Philharmonic doesn't validate claim shape.
 3. Fetch script bytes and abstract config bytes from content
    store.
 4. Read latest context and args from content store.
-5. Assemble executor arg: `{context, args, input, subject}`.
+5. Assemble executor arg: `{context, args, input, subject,
+   data}`. `data` is built from the template's optional
+   `data_config` content slot — currently
+   `data.embed_datasets.<name>: CorpusItem[]` per binding.
+   Bindings that don't have a `Ready` corpus available (or
+   a prior corpus to carry forward) are omitted.
 6. Call lowerer with abstract config, instance/step context,
    and subject; get concrete config.
 7. Submit job to executor with script, arg, and concrete
