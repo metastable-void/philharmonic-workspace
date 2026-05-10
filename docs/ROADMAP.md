@@ -104,7 +104,7 @@ The single `(Gate 1)` item is **not** a Codex dispatch — Claude
 drafts the proposal, Yuka reviews per the two-gate crypto-review
 protocol (§2).
 
-Total: **12 Codex dispatches plus 1 Gate-1 proposal.** D1, D2,
+Total: **13 Codex dispatches plus 1 Gate-1 proposal.** D1, D2,
 D10 are done; Gate 1 is approved.
 
 ### A. Embedding datasets (6 dispatches + 1 Gate-1)
@@ -233,7 +233,7 @@ parallel.
   Tier 2/3 implementations (Anthropic / Gemini / SMTP) are
   larger and don't unblock anything for HF users.
 
-### D. WebUI infrastructure and docs (2 dispatches)
+### D. WebUI infrastructure, features, and docs (3 dispatches)
 
 - **D10** CodeMirror 6 in the WebUI. **DONE 2026-05-02
   (`ee2bd61`).**
@@ -246,6 +246,42 @@ parallel.
   is **not** a Codex dispatch — `docs-jp/README.md` reserves
   that submodule to Claude Code. Claude regenerates the JP
   guide after D11 lands.
+- **D13** Chat-style testing UI in `philharmonic/webui` for
+  workflows that accept `{"content": "<user_input>"}` as
+  input and return `{"messages": [<turns>]}` as output
+  (OpenAI-style chat-completion turn shape). Per
+  [`HUMANS.md` §"Chat UI for easy testing"](../HUMANS.md).
+
+  Detection: schema-based on the workflow template's I/O
+  contract. Templates that don't expose the
+  content-in / messages-out shape get a clean
+  "not chat-compatible" error rather than a broken UI.
+
+  **One-click create-and-chat from the template page**
+  (per Yuka's directive): a "Test in chat" button on
+  `TemplateDetail` (and where convenient on `Templates`'s
+  list rows) creates a new instance with empty args and
+  navigates to the instance's chat tab in a single click,
+  ready to receive the first user turn.
+
+  **Chat tab on `InstanceDetail`**: alternating
+  user/assistant chat bubbles, autoscroll, in-flight
+  indicator, send-on-Enter, error toasts on transport
+  failures. Backed by the existing
+  `POST /v1/workflows/instances/{id}/execute` endpoint —
+  no backend changes. POST `{"content": "<user msg>"}` adds
+  a turn; POST `{}` (empty content) just fetches the
+  current transcript without adding a turn (the
+  workflow's script handles the empty-content branch
+  client-side).
+
+  LocalStorage for transient client state (last-used
+  instance per template, scroll position) — no persistent
+  storage beyond that.
+
+  Independent of D11 and D7-9; can dispatch any time after
+  D6 (which it builds on). i18n entries in `en.ts` + `ja.ts`
+  alongside the existing `embedDatasets.*` namespace.
 
 ### Suggested sequencing
 
