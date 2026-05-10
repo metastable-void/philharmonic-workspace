@@ -16,12 +16,17 @@
 #   <hash> <ISO> <author> | <files>F <lines>L (<code>C <docs>D) | Δ +<files>F +<lines>L (+<code>C +<docs>D)
 #
 # Commits without a Code-stats trailer (older than the trailer
-# adoption) print `-` for stats and `Δ -` for the delta.
+# adoption) fall back to the sidecar cache at
+# `docs/stats-cache.tsv` (populated by `scripts/backfill-stats.sh`);
+# rows still missing from the cache print `-` for stats and `Δ -`
+# for the delta. Cache fallback is parent-repo only — when a
+# submodule path is passed, no cache is consulted (parent SHAs
+# don't match submodule SHAs).
 #
 # Delta convention: each commit's delta is `current - immediate
 # predecessor` when that predecessor is available in the fetched
-# history. If either side lacks a Code-stats trailer, the delta is
-# `Δ -`.
+# history. If either side has no Code-stats data (trailer or
+# cached), the delta is `Δ -`.
 #
 # POSIX sh only — see CONTRIBUTING.md §6.
 
@@ -121,9 +126,10 @@ fi
 
 # Format: tab-separated fields.
 # Field 1: short hash
-# Field 2: ISO 8601 date to seconds (TZ=Asia/Tokyo)
-# Field 3: author display ("Name <email>")
-# Field 4: Code-stats trailer (single line; empty if absent)
+# Field 2: full hash (used to look up sidecar cache)
+# Field 3: ISO 8601 date to seconds (TZ=Asia/Tokyo)
+# Field 4: author display ("Name <email>")
+# Field 5: Code-stats trailer (single line; empty if absent)
 #
 # We pull `count + 1` commits so the oldest displayed commit can
 # still compute a delta against its predecessor when enough
@@ -132,13 +138,42 @@ fi
 
 fetch=$(( count + 1 ))
 
+# Cache fallback path: parent-repo only. Submodule views skip
+# the cache entirely because their SHAs don't match.
+cache_arg=""
+if [ -z "$target" ] && [ -f docs/stats-cache.tsv ]; then
+    cache_arg="docs/stats-cache.tsv"
+fi
+
 TZ=Asia/Tokyo git -C "${target:-.}" log -n "$fetch" --date=iso-strict \
-  --pretty=tformat:'%h%x09%ad%x09%an <%ae>%x09%(trailers:key=Code-stats,valueonly=true)' \
+  --pretty=tformat:'%h%x09%H%x09%ad%x09%an <%ae>%x09%(trailers:key=Code-stats,valueonly=true)' \
   | awk -F '\t' \
         -v keep="$count" \
+        -v cache="$cache_arg" \
         -v ok="$C_OK" -v warn="$C_WARN" -v err="$C_ERR" \
         -v note="$C_NOTE" -v hdr="$C_HEADER" -v dim="$C_DIM" \
         -v reset="$C_RESET" '
+    BEGIN {
+        # Load the sidecar cache (`docs/stats-cache.tsv`) into a
+        # full-SHA → Code-stats-equivalent-string map, so the
+        # parse() function below can consume it without caring
+        # whether the data came from a trailer or the cache.
+        # Comment lines (`#`) and unreproducible markers are
+        # skipped.
+        if (cache != "") {
+            while ((getline line < cache) > 0) {
+                if (line ~ /^#/) continue
+                n = split(line, parts, "\t")
+                if (n >= 5 && parts[1] != "" && parts[2] != "") {
+                    cache_map[parts[1]] = sprintf( \
+                        "%s files, %s total lines (%s code lines, %s docs lines)", \
+                        parts[2], parts[3], parts[4], parts[5])
+                }
+            }
+            close(cache)
+        }
+    }
+
     # Skip blank lines that the trailer placeholder leaves
     # between commits in tformat output.
     /^[[:space:]]*$/ { next }
@@ -147,9 +182,13 @@ TZ=Asia/Tokyo git -C "${target:-.}" log -n "$fetch" --date=iso-strict \
     {
         n_rows++
         hash[n_rows]   = $1
-        iso[n_rows]    = $2
-        author[n_rows] = $3
-        stats[n_rows]  = $4
+        iso[n_rows]    = $3
+        author[n_rows] = $4
+        stats[n_rows]  = $5
+        # Cache fallback when the trailer is absent.
+        if (stats[n_rows] == "" && ($2 in cache_map)) {
+            stats[n_rows] = cache_map[$2]
+        }
     }
 
     function parse(s, out) {
@@ -190,9 +229,13 @@ TZ=Asia/Tokyo git -C "${target:-.}" log -n "$fetch" --date=iso-strict \
             parse(stats[i],   curr)
             parse(stats[i+1], prev)
 
+            # Keep the iso-strict timezone offset intact: `Z` for
+            # UTC, `+HH:MM` / `-HH:MM` otherwise. The stats-graph
+            # xtask bin parses this output via the chrono RFC 3339
+            # path, which requires a timezone — stripping it
+            # silently drops every plot point for commits whose
+            # author/committer offset is not `Z`.
             iso_t = iso[i]
-            sub(/\+.*$/, "", iso_t)
-            sub(/-[0-9][0-9]:[0-9][0-9]$/, "", iso_t)
 
             if (curr["have"]) {
                 stats_str = sprintf("%dF %dL (%dC %dD)",

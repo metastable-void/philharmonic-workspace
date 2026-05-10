@@ -736,6 +736,26 @@ Invoke by path (`./scripts/foo.sh`), not via `bash`.
   (`archives/`) is tracked via [`archives/README.md`](archives/README.md);
   generated `*.tar.gz` and `*.tar.zst` inside it are
   git-ignored.
+- `./scripts/backfill-stats.sh [--allow-partial] [--dry-run] [-n <N>]` —
+  one-shot backfill of `Code-stats:`-equivalent rows for parent
+  commits older than the trailer's adoption (everything before
+  `46a7d29`). Reads-only on the working tree: reconstructs each
+  pre-trailer commit by `git archive`-ing the parent and every
+  gitlink-pinned submodule SHA into a `/tmp` scratch dir, runs
+  `tokei`, and appends a sha-keyed row to
+  [`docs/stats-cache.tsv`](docs/stats-cache.tsv) (the tracked
+  sidecar that `scripts/stats-log.sh` consults as a fallback
+  when a commit's trailer is absent). Includes a rename
+  heuristic — if the recorded path is missing in the current
+  workspace, scans every initialized submodule for the SHA and
+  uses that submodule as the source while extracting under the
+  historical path; matches the workspace's append-only-history
+  rule by recording stats out-of-band rather than rewriting
+  past commits. Bails by default on unreproducible commits (no
+  match / multiple matches / force-pushed-away SHAs) with a
+  workaround pointer; `--allow-partial` records a comment-line
+  marker and continues. Resumable via the cache: rows already
+  present are skipped on rerun.
 - `./scripts/build-status.sh` — show what `rustc`/`rust-lld`/
   `clippy`/`miri` are currently processing. Use when cargo
   appears stuck. `watch -n 2 ./scripts/build-status.sh` for

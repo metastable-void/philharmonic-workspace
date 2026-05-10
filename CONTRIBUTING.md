@@ -373,6 +373,23 @@ for history browsing; the prohibition is on state changes.
   changes are not captured. Output dir is tracked
   (`archives/README.md`); generated `*.tar.gz` and `*.tar.zst`
   inside it are git-ignored.
+- `backfill-stats.sh [--allow-partial] [--dry-run] [-n <N>]` —
+  one-shot backfill of `Code-stats:`-equivalent rows for parent
+  commits older than the trailer's adoption (everything before
+  `46a7d29`). Reads-only on the working tree: reconstructs each
+  pre-trailer commit by `git archive`-ing the parent and every
+  gitlink-pinned submodule SHA into a /tmp scratch dir, runs
+  `tokei`, and appends a sha-keyed row to `docs/stats-cache.tsv`
+  (the tracked sidecar that `stats-log.sh` consults as a
+  fallback when a commit's trailer is absent). Includes a rename
+  heuristic — if the recorded path is missing in the current
+  workspace, scans every initialized submodule for the SHA and
+  uses that submodule as the source while extracting under the
+  historical path. Bails by default on truly unreproducible
+  commits (zero or multiple matches, force-pushed-away SHAs,
+  etc.) with a workaround pointer; `--allow-partial` records a
+  comment-line marker and continues. Resumable via the cache:
+  rows already present are skipped on rerun.
 
 **Invoke by path, not by interpreter.** Run
 `./scripts/commit-all.sh "msg"`, never `bash scripts/commit-all.sh`
@@ -686,8 +703,17 @@ submodule commits made by that invocation carry the same
 workspace snapshot, not per-submodule counts.
 
 Historical note: commits before the `Code-stats:` trailer was
-adopted show `-` for both stats and delta in `stats-log.sh`
-output. That's expected archival history, not missing data.
+adopted (everything before `46a7d29`) carry no in-commit stats.
+Coverage is restored out-of-band by
+[`./scripts/backfill-stats.sh`](scripts/backfill-stats.sh), which
+reconstructs each pre-trailer commit's tree (parent + every
+submodule's gitlink-pinned SHA) into a /tmp scratch dir, runs
+`tokei`, and appends a sha-keyed row to the tracked sidecar
+cache at [`docs/stats-cache.tsv`](docs/stats-cache.tsv).
+`scripts/stats-log.sh` consults that cache as a fallback when a
+commit lacks the trailer — so the SVG and the textual log carry
+real numbers + deltas across the trailer-adoption boundary
+without the append-only-history rule needing to bend.
 
 ### 4.8 GitHub-side ruleset (parent workspace repo only)
 

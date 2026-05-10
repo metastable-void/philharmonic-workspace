@@ -50,7 +50,12 @@ fi
 tmp=$("$(dirname "$0")"/mktemp.sh stats-graph)
 trap 'rm -f "$tmp"' EXIT INT HUP TERM
 
-if ! ./scripts/stats-log.sh --no-color > "$tmp.log"; then
+# `-n 1000` rather than the default 200: the workspace's history
+# is ~500 commits and growing, and `docs/stats-cache.tsv`'s
+# fallback now gives `stats-log.sh` real numbers all the way back.
+# Capping at 200 would clip the chart's left edge for no reason.
+# Revisit when commit count nears the cap.
+if ! ./scripts/stats-log.sh --no-color -n 1000 > "$tmp.log"; then
     echo "update-stats-graph.sh: stats-log.sh failed" >&2
     exit 1
 fi
