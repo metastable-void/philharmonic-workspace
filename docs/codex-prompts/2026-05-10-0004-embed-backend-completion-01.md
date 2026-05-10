@@ -137,7 +137,103 @@ and D11 (doc rewrite) for the broader post-v1 plan.
 
 ## Outcome
 
-Pending — will be updated after Codex run.
+**Completed 2026-05-10** — all three deliverables landed;
+commits `e37f956` (parent) + `cbb19f6` (`philharmonic-api`
+0.1.4 → 0.1.5). `philharmonic-workflow` and
+`philharmonic-policy` source untouched per the prompt's
+discipline.
+
+`./scripts/pre-landing.sh` re-run by Claude post-Codex was
+green end-to-end including the workspace-test phase + per-
+crate `--ignored` testcontainers MySQL phase. Codex's own
+pre-landing pass was green on first attempt. 12 new/updated
+tests in `philharmonic-api/tests/embed_datasets.rs` cover
+the Conflict envelope shape, per-cap rejection at custom
+values, and the dispatch-call assertion.
+
+**Crypto-discipline confirmed (D4)**:
+
+- `bins/philharmonic-api-server/src/lowerer.rs::lower()` body
+  bit-for-bit unchanged — verified by `git diff` returning
+  no entries for that file.
+- D4 synthesized-inst construction matches the Gate-1-
+  approved Approach B verbatim — `embed_job.rs:98-103`:
+  `Identity { internal: Uuid::now_v7(), public: Uuid::new_v4()
+  }.typed::<WorkflowInstance>().expect(...)`.
+- `SubjectContext { kind: Principal, id:
+  format!("system:embed-job:{dataset_id}"), tenant_id, .. }`
+  matches the proposal's §"Implementation sketch" pattern.
+- Audit-correlation `tracing::info!` with `synthetic_inst`
+  field present at `embed_job.rs:123`, matching Gate-1
+  Finding 3 resolution.
+- No COSE test vectors regenerated, no new `unsafe`, no
+  zeroization gaps noticed in neighbouring code.
+- Yuka Gate-2-style review on the embed-job dispatcher diff
+  is the remaining gate.
+
+**Codex's deliverable choices** (per the prompt's residual-
+risks request):
+
+- **Embed-job lowerer instance**: option (i) — a second
+  `ConnectorConfigLowerer` instance held alongside the
+  existing one, with a 30-minute lifetime via the new
+  `embed_job_token_lifetime_ms` field on `ApiConfig`. This
+  keeps `lower()`'s crypto body untouched (the alternative
+  per-call override would have required edits inside the
+  method body).
+- **JS embed script location**: `bins/philharmonic-api-server/src/embed_script.js`
+  compiled via `include_str!`. Keeps server-only mechanics
+  code out of `philharmonic-api`. 84 LOC, defensive parsing
+  for both `arg` shape and embed-response shape (handles
+  `vectors` / `embeddings` / `data[].vector` /
+  `data[].embedding` variants).
+- **Tests scope**: API-handler dispatch tests + caps tests +
+  conflict tests; did NOT add a full mechanics/lowerer/
+  revision integration test or audit-log assertion. Surfaced
+  in residual risks; tractable but lower priority — the
+  unit-style coverage exercises the dispatch path's
+  per-deliverable shape.
+- **`MAX_*` route-module constants**: kept as `pub(crate)`
+  defaults exposed through `EmbedDatasetCaps`'s associated
+  default constants. The `Caps` struct is the runtime source
+  of truth; the `pub(crate)` constants survive as the
+  default value providers and as a cross-reference for
+  reviewers.
+- **`executor.rs` change**: clean refactor that extracted
+  `execute_job(... timeout: Option<Duration>)`, kept the
+  `StepExecutor::execute` trait impl delegating with
+  `None`, added `execute_with_run_timeout` for the embed-
+  job path. Trait surface preserved; not crypto-touching.
+
+**Structured-output-contract honored** for the second
+consecutive round. The `RUN STATUS: COMPLETE` token + six
+required sections (Summary / Touched files / Verification
+results / Residual risks / Git state / Open questions) all
+emitted before `task_complete`. Codex also flagged its own
+off-hours-session note ("JST now 18:07 Sunday — out-of-
+hours/weekend session; proceeded per workspace rules.")
+matching the workspace's coupled-obligation rule.
+
+**Open questions Codex surfaced**:
+
+1. **Yuka Gate-2 review** on D4's synthesized-inst
+   construction + dispatcher diff before considering D4
+   fully done. The proposal-then-self-review-then-Approach-B
+   chain has cleared Gate 1; Gate 2 is the post-implementation
+   line-by-line review. No `cargo publish` of any crate
+   pending Gate 2.
+2. **Restart-loss recovery**: design-16 v1 limitation — a
+   server restart leaves a dataset in `status=Embedding`;
+   admin re-submits via the update endpoint. Persistent
+   job/retry semantics deferred to D6 / future operator
+   tooling.
+
+**Round 03+ readiness**: D6 (WebUI) is the natural next
+dispatch for the embedding-datasets feature; D7-9 (Tier
+2/3 connectors — SMTP, Anthropic, Gemini) and D11
+(workflow authoring guide rewrite) are independent
+batches. Each is a candidate for the next aggregate
+dispatch.
 
 ---
 
