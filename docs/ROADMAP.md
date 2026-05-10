@@ -165,17 +165,21 @@ implement the `Implementation` trait.
     (`https://generativelanguage.googleapis.com/`): API-key
     auth, simplest single-tenant deployment shape, free-
     tier-friendly.
-  - **Vertex AI on GCP**: Service Account JSON key auth,
-    with the SA JSON sourced from a deployment env var (per
-    Yuka's directive — credentials never embedded in the
-    encrypted endpoint config, kept orthogonal to per-
-    tenant config rotation). Endpoint shape under
+  - **Vertex AI on GCP**: Service Account JSON key auth.
+    The SA JSON lives **inside** the SCK-encrypted endpoint
+    config alongside the API-Studio mode's API key —
+    consistent with how `llm-openai-compat` carries its
+    `api_key` field. Encryption-at-rest is handled by the
+    existing SCK boundary; per-tenant credential rotation
+    happens via the existing endpoint-config rotation flow.
+    Endpoint shape under
     `<region>-aiplatform.googleapis.com/v1/projects/<project>/`.
 
   The runtime endpoint config carries a discriminator
   selecting which mode is active; the impl handles auth
   + endpoint construction accordingly per mode. Detailed
-  shape (discriminator field name, env-var name + format,
+  shape (discriminator field name, exact field names for
+  the Vertex mode's project / region / SA JSON,
   OAuth2 access-token caching for Vertex AI) defers to
   D9's prompt-drafting time.
 
