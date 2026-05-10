@@ -4006,7 +4006,7 @@ version = "0.0.1"
 
 [[package]]
 name = "philharmonic-connector-impl-llm-openai-compat"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "async-trait",
  "jsonschema",
