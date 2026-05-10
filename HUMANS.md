@@ -15,40 +15,9 @@ this file, but never edit this file.
   workspace repo into a reusable template/Rust crate/etc.
   this can happen after the MVP work is done.
 
-## Pseudo TTY for convenience
+## Chat UI for easy testing
 
-Equivalent Rust code for the following is required
-(POSIX.1-2001 clean):
-
-```
-int master = posix_openpt(O_RDWR | O_NOCTTY);
-grantpt(master);
-unlockpt(master);
-char *slave_name = ptsname(master);          // not thread-safe
-int slave = open(slave_name, O_RDWR | O_NOCTTY);
-// fork; child does setsid(); dup2(slave, 0/1/2); exec
-```
-
-Add an xtask that does this, and spawns a process with the arguments
-given, inside the pseudo TTY; Any writes to stdin goes to the pseodo
-TTY; any outputs from the pseudo TTY goes to the xtask's stdout.
-
-This is to force colored outputs for `git`/`cargo`/etc. cleanly
-when we actually grep them for example.
-
-Then add a grep/sed/awk (I don't know) to `pre-landing.sh`/
-`release-build.sh`/`musl-build.sh` to remove the following lines,
-via the PTY wrapper (please note that there is escape sequences
-in outputs because they carry colors):
-
-```
-warning: profiles for the non root package will be ignored, specify profiles at the workspace root
-package:   /home/<user>/philharmonic-workspace/<crate>/Cargo.toml
-workspace: /home/<user>/philharmonic-workspace/Cargo.toml
-```
-
-ofc the exact paths will differ (the developer might not clone
-the workspace repo directly under their HOME directory, etc.).
+For any workflows that accept `{"content": "<user_input>"}` as input and that return `{"messages": [<chat transcript in OpenAI-style turns>]}` as output, I want an in-WebUI Chat testing UI, with a look and feel of an AI chatbot. No persistence is required immediately beyond simple localStorage usages. Call the workflow instance with `{}` (no content) to just fetch the transcript. (handled JS-side.) Clean errors on unsupported workflows.
 
 ## Embedding DB component
 
