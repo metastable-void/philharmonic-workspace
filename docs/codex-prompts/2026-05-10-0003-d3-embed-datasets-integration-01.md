@@ -102,7 +102,81 @@ both build on round 02's API surface.
 
 ## Outcome
 
-Pending — will be updated after Codex run.
+**Completed 2026-05-10** — all four deliverables landed; commits
+`b134d44` (parent) + `5212de1` (`philharmonic-api` 0.1.3 →
+0.1.4) + `83ba10f` (`philharmonic-workflow` 0.1.3 → 0.1.4).
+`./scripts/pre-landing.sh` re-run by Claude post-Codex was green
+end-to-end including the workspace-test phase + per-crate
+`--ignored` testcontainers MySQL phase. Zero clippy warnings,
+zero rustdoc warnings on touched crates. Codex's own
+pre-landing pass was also green on **first** attempt this round
+(vs round 01's three-attempt rustfmt+rustdoc journey) — the
+prompt's "pre-landing-sh hygiene" preamble worked.
+
+**Structured-output-contract honored.** Codex emitted the full
+six-section report (Summary with `RUN STATUS: COMPLETE` token,
+Touched files, Verification results, Residual risks, Git state,
+Open questions) BEFORE issuing `task_complete` — direct contrast
+with round 01's `task_complete`-without-summary failure. The
+top-of-prompt "STRUCTURED-OUTPUT-CONTRACT — READ THIS FIRST"
+block plus the `<completeness_contract>`'s explicit "a run
+without the structured-output-contract report is incomplete"
+clause were sufficient to fix the failure mode.
+
+**Quality of the work**: high. Codex respected every prompt
+constraint:
+
+- Used `philharmonic-policy 0.2.2` re-exports (no source edits
+  to that crate).
+- Resolved public→internal via `IdentityStore::resolve_public`
+  + `Identity::typed::<EmbeddingDataset>()` for the v7+v4
+  invariant check.
+- Cross-tenant binding correctly returns `WorkflowError::DataConfigInvalid`
+  (security boundary).
+- `corpus_items_to_json` correctly emits `vector` as JSON
+  number array (not base64), payload omitted when None.
+- Added `tracing` as a direct dep on `philharmonic-workflow`
+  for the warn-and-skip on missing-public-UUID path.
+- Caps in `routes/embed_datasets.rs` as `pub const`s
+  (`MAX_ITEMS_PER_DATASET`, `MAX_TEXT_BYTES`,
+  `MAX_PAYLOAD_JSON_BYTES`, `MAX_SOURCE_ITEMS_BLOB_BYTES`).
+- Six tests for deliverable A (one-for-one with the prompt's
+  scenario list), 7 + 6 tests for deliverables B/C — total 19
+  new tests passing.
+- Off-hours-session note correctly emitted ("JST now 17:06 Sun
+  — weekend/out-of-hours session; proceeded.") matching the
+  workspace's coupled-obligation rule.
+
+**Bin wiring sanity check** (deliverable D): Codex hooked the
+new `EmbedDatasetState` through `philharmonic_api::ApiBuilder`
+in `philharmonic-api/src/lib.rs` rather than at the bin
+entry-point. The bin's `bins/philharmonic-api-server/src/main.rs`
+needed no edits because `ApiBuilder::build()` already consumed
+the merged router + state. Cleaner than my prompt suggested.
+
+**Open questions Codex surfaced** (carried into Round 03
+planning):
+
+1. **Caps → `ApiConfig` wire-up**: hardcoded as `pub const`s
+   for round 02; deployment-config wire-up deferred to D5 or a
+   separate cleanup dispatch.
+2. **`ApiError::Conflict` envelope variant**: round 02 uses
+   ad-hoc 409 emission for the update-while-Embedding case;
+   adding a standard `Conflict` variant before more 409-
+   producing routes land is reasonable.
+3. **D5 unblocks the Embedding→Ready transition**: round 02
+   correctly sets `status=Embedding` on update and carries
+   forward corpus, but the embed-job dispatcher hasn't landed.
+   Until D5+D4 land, a dataset updated once will permanently
+   reject further updates with 409 — honest current-state
+   representation but operationally blocking. D4 (Gate-1-
+   approved Approach B from `81936f2`) + D5 (embed-job
+   dispatcher) are the natural next dispatches.
+
+**Round 03 readiness**: the D4+D5 chain is fully unblocked.
+Round 02's API surface, workflow-engine read path, and template
+binding shape are all stable. D6 (WebUI) can also dispatch
+against this base.
 
 ---
 
