@@ -78,6 +78,17 @@ Content-Type: application/json
 The `implementation` field is plaintext metadata. The `config`
 blob is encrypted at rest under the substrate credential key.
 
+> **WebUI users**: the per-implementation snippets below show
+> the full API body. The WebUI's endpoint Create form has
+> separate inputs for **Display name** and **Implementation**;
+> only paste the **inner `config` object** (e.g.
+> `{"model_id": "bge-m3", ...}`, **not** the whole
+> `{"display_name": ..., "implementation": ..., "config":
+> {...}}` envelope) into the **Config JSON** editor.
+> Connectors set `#[serde(deny_unknown_fields)]` on their
+> config structs, so a doubled envelope produces an
+> `unknown field 'config'` error.
+
 ### `llm_openai_compat`
 
 Use this implementation for providers that expose an
