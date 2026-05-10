@@ -1,11 +1,67 @@
 # Gate-1 proposal: lowerer ephemeral support for embedding-dataset embed jobs
 
-**Date**: 2026-05-04
+**Date**: 2026-05-04 (revised 2026-05-10 — see "Pre-review feedback addressed" below)
 **Author**: Claude Code
 **Status**: PENDING REVIEW (Yuka)
 **Scope**: Post-v1 / post-MVP (embedding datasets feature, ROADMAP §9)
 **Crypto-sensitive paths touched**: COSE_Sign1 token claims (`inst`, `step`),
 COSE_Encrypt0 AEAD AAD, `payload_hash` binding.
+
+---
+
+## Pre-review feedback addressed (2026-05-10)
+
+Codex produced a pre-review pass at
+[`docs/codex-reports/2026-05-10-0001-embed-dataset-lowerer-ephemeral-pre-review.md`](../../codex-reports/2026-05-10-0001-embed-dataset-lowerer-ephemeral-pre-review.md)
+with four findings. All four are addressed in this revision (no
+wontfix). Summary of changes:
+
+1. **Token-lifetime mismatch** (Finding 1) — the original
+   decision 2 said the connector token is "per connector call
+   (per item batch); each call is sub-second typically". The
+   actual lowerer mints ONE token per `lower()` call (see
+   `bins/philharmonic-api-server/src/lowerer.rs:251-266`); the
+   embed script reuses the same `Authorization` /
+   `X-Encrypted-Payload` headers across every batch. Decision 2
+   below now explicitly sets the embed-job token lifetime to
+   match the embed-job's `run_timeout` (default 30 minutes via
+   D2), with the wider replay window called out in the threat
+   model.
+2. **Replay-impact understatement** (Finding 2) — the original
+   "Cross-instance replay" risk said a leaked token only allows
+   "produce identical ciphertext bytes". The encrypted payload
+   is bound by `payload_hash`, but the cleartext request body
+   is taken from the current HTTP request and forwarded to
+   `Implementation::execute` (see
+   `bins/philharmonic-connector/src/main.rs:388-426`). A leaked
+   token + lowered config = bearer access to the configured
+   tenant endpoint with attacker-chosen request bodies, until
+   `exp`. The risk text now reflects this; this is the same
+   model as v1 step tokens, but the wider lifetime from
+   Finding 1 makes it materially worse, so it gets explicit
+   threat-model treatment.
+3. **Audit-correlation contradiction** (Finding 3) — the
+   original mitigation said the synthesized `inst` UUID is
+   "recorded in the audit-info trailer of the dataset's
+   revision history", but the same proposal says the UUID is
+   not persisted and design 16 has no corresponding storage
+   field. Replaced with a structured-logging plan: the API
+   server emits one log line at embed-job dispatch carrying
+   `{tenant, dataset_id, revision_id, embed_endpoint_id,
+   config_uuid, synthetic_inst}` so incident responders can
+   join API logs with connector-service logs by SHA. Design 16
+   §"Lowerer integration" gains the same note alongside this
+   commit.
+4. **Invented `SubjectContext::system_for_tenant`** (Finding 4)
+   — the implementation sketch called a constructor that does
+   not exist; `philharmonic-workflow/src/subject.rs` only
+   exposes `SubjectKind::{Principal, Ephemeral}`. The sketch
+   now constructs `SubjectContext` inline with the existing
+   shape and notes that a proper system-actor model is a
+   separate design question (deferred — the lowerer only
+   consumes `subject.tenant_id` for tenant binding, and no
+   `StepRecord` subject is produced because ephemeral jobs
+   have no step records).
 
 ---
 
@@ -264,30 +320,61 @@ synthesized UUID. The service has no way to tell the difference
   is contained to one call site, documented in code with a
   multi-line comment, and consumed by APIs (`mint_token`,
   `encrypt_payload`) that themselves only see a `Uuid`.
-- **Audit-trail attribution**: an embed job's connector call
-  appears in connector-service logs with an `inst` UUID that
-  does not exist in `philharmonic-policy`'s substrate.
-  **Mitigation**: the `iss` (lowerer / API server identity)
-  + `tenant` + `config_uuid` claims still attribute the call
-  correctly; the embed-job code path is the only one that
-  produces non-substrate `inst` UUIDs, and it is recorded as
-  such in the audit-info trailer of the dataset's revision
-  history.
+- **Audit-trail attribution** (revised per Finding 3): an
+  embed job's connector call appears in connector-service
+  logs with an `inst` UUID that does not exist in
+  `philharmonic-policy`'s substrate. **Mitigation**: the
+  `iss` (lowerer / API server identity) + `tenant` +
+  `config_uuid` claims still attribute the call correctly at
+  the connector-service side, and the API server emits one
+  structured log line at embed-job dispatch carrying
+  `{tenant, dataset_id, revision_id, embed_endpoint_id,
+  config_uuid, synthetic_inst}` so an incident responder
+  joins API-server logs (which carry the synthetic_inst at
+  dispatch time) with connector-service logs (which carry
+  the same UUID as `inst`) by SHA. **The synthesized UUID is
+  not persisted into the workflow_instance substrate** (that
+  is the "non-persisted" claim the proposal makes), but it
+  is recorded in API-server logs and **may** also be added
+  as an optional `embed_job_inst` field on
+  `EmbeddingDatasetRevision` if Yuka wants substrate-level
+  correlation; the proposal does not require this. Design 16
+  §"Lowerer integration" gains the same logging note in the
+  same commit.
 - **Future regression risk**: if the connector service or any
   downstream code starts validating `inst` against the
   substrate registry, embed-job tokens would silently fail.
   **Mitigation**: a single integration test exercising the
   embed-job → connector path catches that immediately;
   proposed test plan below requires it.
-- **Cross-instance replay**: `inst` is signed and AEAD-bound
-  to the encrypted payload via the AAD digest, and the token
-  is short-lived (`exp` claim, default 600s per the v1
-  decision in
-  [`2026-04-30-phase-9-config-lowerer.md`](2026-04-30-phase-9-config-lowerer.md)).
-  A leaked embed-job token can be replayed only within its
-  lifetime, against the same realm/config, to produce
-  identical ciphertext bytes. **No new replay surface**
-  compared to v1 step tokens.
+- **Bearer-replay window** (revised per Finding 2):
+  `inst` is signed and AEAD-bound to the encrypted lowered
+  config via the AAD digest, and `payload_hash` binds the
+  COSE_Encrypt0 ciphertext to the COSE_Sign1 claim set. **But
+  the cleartext per-call request body is not part of either
+  binding** — the connector service receives the lowered
+  config (verified + decrypted via `verify_and_decrypt`) and
+  the current HTTP request body separately, then passes both
+  to `Implementation::execute(&payload.config, &request,
+  &verified.context)` (see
+  `bins/philharmonic-connector/src/main.rs:388-426`). So a
+  leaked token + lowered-config pair gives the attacker bearer
+  access to the configured tenant endpoint config — they can
+  send arbitrary embed requests with attacker-chosen bodies,
+  subject only to the connector implementation's normal
+  request validation, until `exp`. This is the same model as
+  v1 step tokens; Approach B does not introduce a new replay
+  *capability*, but Finding 1's resolution (embed-job tokens
+  matching the 30-minute embed-job `run_timeout` rather than
+  the v1 600-second default) materially widens the
+  *window*. **Mitigations**: the lowered config never leaves
+  the API server's mechanics-job dispatch path (no on-disk
+  cache, no log-line capture); per-step-call rate limits on
+  the connector router (existing v1 control) bound the
+  per-token request volume; structured logging at API-server
+  dispatch (see Audit-trail attribution below) lets incident
+  responders identify which dataset's job a leaked token
+  belonged to.
 
 ### Cost
 
@@ -366,11 +453,49 @@ pub async fn run_embed_job(
         embed_endpoint_id,
     ).await?;
 
-    let subject = SubjectContext::system_for_tenant(tenant_id);
+    // SubjectContext for embed-job dispatch.
+    //
+    // The lowerer reads only `subject.tenant_id` for tenant
+    // binding (see `bins/philharmonic-api-server/src/lowerer.rs`
+    // and `philharmonic-workflow/src/subject.rs`). Embed jobs
+    // produce no StepRecord, so the other fields don't reach
+    // the substrate either. We construct a minimal context
+    // inline and use the existing `SubjectKind::Principal`
+    // variant (the embed-job dispatcher is a persistent
+    // codebase component, not an ephemeral-credential caller).
+    //
+    // A proper system-actor model — likely a third
+    // `SubjectKind::System` variant — is a separate design
+    // question deferred to a follow-up review (see Finding 4
+    // resolution at the top of the Gate-1 proposal). Until
+    // then, this stub carries forward the dataset's owning
+    // tenant and a stable system identifier; nothing else
+    // crosses the lowerer boundary.
+    let subject = SubjectContext {
+        kind: SubjectKind::Principal,
+        id: format!("system:embed-job:{dataset_id}"),
+        tenant_id,
+        authority_id: None,
+        claims: serde_json::Value::Null,
+    };
 
     let lowered = api.lowerer
         .lower(&abstract_cfg, ephemeral_inst, ephemeral_step, &subject)
         .await?;
+
+    // Structured log for incident-correlation (see Audit-trail
+    // attribution risk + Finding 3 resolution at the top).
+    // Emitted at INFO. Fields: tenant, dataset_id, revision_id
+    // (resolved from `dataset_id` via the latest revision row),
+    // embed_endpoint_id, config_uuid (from `lowered`), and
+    // synthetic_inst (the UUID minted just above).
+    tracing::info!(
+        tenant = %tenant_id,
+        dataset_id = %dataset_id,
+        embed_endpoint_id = %embed_endpoint_id,
+        synthetic_inst = %ephemeral_inst.as_uuid(),
+        "embed-job lowerer dispatch"
+    );
 
     let mech_job = MechanicsJob::new(
         EMBED_SCRIPT_SRC,
@@ -539,13 +664,60 @@ unchanged from Wave B Gate-2:
 
 1. **Approach B vs Approach A for v1.** Proposal: B. (See
    "Recommendation" above.)
-2. **Embed-job token lifetime.** Proposal: same default as the
-   v1 step token — 600 seconds (10 minutes) — per the Phase 9
-   ConfigLowerer Gate-1 decision. Embed-job mechanics work can
-   take longer than 600s, but the connector token is per
-   *connector call* (per item batch); each call is sub-second
-   typically. The 30-minute embed-job timeout (D2) and the
-   600-second connector token are independent timers.
+2. **Embed-job token lifetime.** Proposal (revised per
+   Finding 1): set the embed-job lowerer's token lifetime to
+   match the embed-job's `MechanicsJob::run_timeout` —
+   default 1 800 000 ms (30 minutes per design 16) — rather
+   than the v1-step default of 600 000 ms (10 minutes per
+   the Phase 9 ConfigLowerer Gate-1 decision in
+   [`2026-04-30-phase-9-config-lowerer.md`](2026-04-30-phase-9-config-lowerer.md)).
+   The original framing — "the connector token is per
+   *connector call* (per item batch); each call is
+   sub-second typically" — was wrong: the lowerer mints
+   ONE COSE_Sign1 token per `lower()` call (see
+   `bins/philharmonic-api-server/src/lowerer.rs:251-266`),
+   embeds it into the `HttpEndpoint` headers of the lowered
+   config, and hands that static lowered config to the
+   mechanics worker. The built-in JS embed script reuses the
+   same `Authorization` and `X-Encrypted-Payload` headers
+   for every batch in the loop. With a 600-second token
+   lifetime, any embed job whose later batches start more
+   than 10 minutes after dispatch fails on `exp` even though
+   the job's own `run_timeout` is 30 minutes.
+
+   Three resolution paths considered:
+
+   - **(a) Per-batch refresh** — the embed script obtains a
+     fresh lowered config per batch via a mechanics→API
+     callback. Requires a callback channel that does not
+     exist today; large infra change. Rejected for v1.
+   - **(b) Per-batch mechanics jobs** — split the embed job
+     into N mechanics jobs (one per batch), each with its
+     own short-lived token. Keeps the 600-second default
+     but blows up coordination (N pool slots, partial
+     failures, retries). Rejected for v1; reconsider if
+     embed-job token replay risk turns out to dominate.
+   - **(c) Lifetime = embed-job run_timeout** — single
+     token lasts as long as the job. Minimum implementation
+     change; widens the bearer-replay window from 10 to 30
+     minutes. **Chosen.**
+
+   Implementation note: the API server's lowerer currently
+   takes a single `token_lifetime_ms` at construction
+   (`bins/philharmonic-api-server/src/lowerer.rs:33`). D5
+   chooses between (i) a second lowerer instance configured
+   for embed jobs, or (ii) a per-call lifetime override —
+   either is a one-line surface decision.
+
+   Threat-model implication: embed-job tokens have a
+   3× wider bearer-replay window than v1 step tokens. The
+   replay capability (per Finding 2 / "Bearer-replay window"
+   above) is unchanged in shape — same realm/config bound,
+   same `payload_hash` binding, same `Implementation::execute`
+   bypass for cleartext request bodies — but the time
+   exposure tripling deserves explicit acknowledgment, and
+   the connector-router rate limits should be sized with
+   embed-job traffic in mind.
 3. **`step` value for ephemeral jobs.** Proposal: `0`. An
    ephemeral job has one logical step; using `0` keeps the
    AAD-binding deterministic and avoids any need for a per-job

@@ -447,6 +447,38 @@ The Gate-1 proposal recommending Approach B is filed at
 [`docs/crypto/proposals/2026-05-04-post-v1-embed-dataset-lowerer-ephemeral.md`](../crypto/proposals/2026-05-04-post-v1-embed-dataset-lowerer-ephemeral.md);
 update this section's wording once Yuka signs off.
 
+**Audit-correlation logging (per the Gate-1 proposal's
+Finding 3 resolution).** The synthesized embed-job `inst`
+UUID is **not** persisted into the workflow_instance
+substrate (consistent with "non-persisted" in the proposal
+title), but the API server emits one structured log line at
+embed-job dispatch time carrying:
+
+```
+{ tenant, dataset_id, revision_id, embed_endpoint_id,
+  config_uuid, synthetic_inst }
+```
+
+Incident responders join API-server logs with
+connector-service logs by SHA — the connector side records
+the same UUID as `inst` in its per-call log entry. If
+substrate-level correlation is later wanted, an optional
+`embed_job_inst: Uuid` field can be added to
+`EmbeddingDatasetRevision`'s scalar slots, but the proposal
+does not require it for v1.
+
+**Embed-job token lifetime (per Finding 1 resolution).**
+The connector token minted by the embed-job lowerer lasts
+the full `MechanicsJob::run_timeout` (default 30 minutes
+per the §Timeout discussion above), not the v1-step default
+of 600 seconds. The lowerer mints one token per `lower()`
+call and hands it to the mechanics worker as a static
+embedded header; the JS embed script reuses the same token
+across every batch, so a shorter lifetime would cause later
+batches in a long job to fail on `exp`. The wider
+bearer-replay window is documented in the Gate-1 proposal's
+"Risks → Bearer-replay window" section.
+
 ### Timeout
 
 Embed jobs need a long timeout (default 30 minutes) because
