@@ -159,7 +159,25 @@ implement the `Implementation` trait.
 
 - **D7** `philharmonic-connector-impl-email-smtp` (Tier 2).
 - **D8** `philharmonic-connector-impl-llm-anthropic` (Tier 3).
-- **D9** `philharmonic-connector-impl-llm-gemini` (Tier 3).
+- **D9** `philharmonic-connector-impl-llm-gemini` (Tier 3) —
+  must support **both** Google API surfaces for Gemini:
+  - **Google AI Studio**
+    (`https://generativelanguage.googleapis.com/`): API-key
+    auth, simplest single-tenant deployment shape, free-
+    tier-friendly.
+  - **Vertex AI on GCP**: Service Account JSON key auth,
+    with the SA JSON sourced from a deployment env var (per
+    Yuka's directive — credentials never embedded in the
+    encrypted endpoint config, kept orthogonal to per-
+    tenant config rotation). Endpoint shape under
+    `<region>-aiplatform.googleapis.com/v1/projects/<project>/`.
+
+  The runtime endpoint config carries a discriminator
+  selecting which mode is active; the impl handles auth
+  + endpoint construction accordingly per mode. Detailed
+  shape (discriminator field name, env-var name + format,
+  OAuth2 access-token caching for Vertex AI) defers to
+  D9's prompt-drafting time.
 
 Independent of one another and of section A; safe to run in
 parallel.
