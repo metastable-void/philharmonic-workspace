@@ -32,10 +32,26 @@
       "Bash(./scripts/push-all.sh)",
       "Bash(./scripts/status.sh)",
       "Bash(./scripts/webui-build.sh --production)",
-      "Bash(./scripts/setup.sh)"
+      "Bash(./scripts/setup.sh)",
+      "Bash(./scripts/pre-landing.sh --xtask)",
+      "Bash(./scripts/heads.sh)"
     ],
     "additionalDirectories": [
       "/tmp"
+    ]
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/calendar-jp-grounding.sh",
+            "timeout": 10
+          }
+        ]
+      }
     ]
   },
   "model": "claude-opus-4-7[1m]",

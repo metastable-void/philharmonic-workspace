@@ -197,13 +197,29 @@ full in `CONTRIBUTING.md`. Read the full section before acting
   Run `./scripts/xtask.sh calendar-jp` — prints a 5-week grid
   centred on today (JST), marks weekends and Japanese public
   holidays, lists each 祝日 in the window with its Japanese
-  name, and shows the current JST wall-clock timestamp. Run
-  it at session start, **again after any significant unit of
-  work completes** (commit landed, Codex dispatch finished,
-  publish done) so your next decision uses fresh time, and
-  any time you reason about a deadline, a release window, a
-  "before Thursday" commitment, or anything else where "today"
-  and "which days are non-working" matter. Long sessions drift
+  name, and shows the current JST wall-clock timestamp.
+  **Mandatory triggers — mechanical, not judgment-based.**
+  Run it *before your next user-facing reply* after each of:
+  session start (your first action of the session);
+  `commit-all.sh` returns success; `push-all.sh` returns
+  success; `publish-crate.sh` returns success; a Codex
+  dispatch reaches `task_complete`; or you're about to reason
+  about "today" / a deadline / a release window / an
+  off-hours hand-off. The cost is one cheap subprocess;
+  "this commit was small" / "this is a one-line edit" is
+  **not** a reason to skip — the trigger is mechanical, not
+  a judgment call about significance. **Recovery clause.** If
+  you've already responded to the user one or more times this
+  session without grounding time first, run it *before your
+  next reply* and add a one-line acknowledgement (*"(grounding
+  time now — was overdue.)"*) so the transcript records the
+  drift; late is strictly better than never. **Coupled
+  obligation.** A `calendar-jp` run whose timestamp falls
+  outside the next bullet's regular-hours window
+  (10:00–19:00 JST Mon–Fri, extended to 21:00) makes the
+  off-hours note a hard requirement on the reply that
+  immediately follows — running calendar-jp and then omitting
+  the note is itself a missed obligation. Long sessions drift
   across the 10:00 / 19:00 / 21:00 thresholds and sometimes
   midnight; a stale timestamp is the failure mode. The host's
   timezone and your training-data cutoff are both unreliable;
@@ -213,6 +229,18 @@ full in `CONTRIBUTING.md`. Read the full section before acting
   is short (~15 lines) and every line matters (the grid,
   the holiday list, the timestamp). Clipping it loses
   context that agents need for correct deadline reasoning.
+  **Mechanical reinforcement.** A project-level Claude Code
+  PostToolUse hook in [`.claude/settings.json`](.claude/settings.json)
+  pipes [`.claude/hooks/calendar-jp-grounding.sh`](.claude/hooks/calendar-jp-grounding.sh)
+  output back as `additionalContext` after every
+  `./scripts/commit-all.sh*`, `./scripts/push-all.sh*`, and
+  `./scripts/publish-crate.sh*` invocation, so the calendar-jp
+  grid arrives in the next reply's context unprompted. The
+  hook is belt-and-braces — the prose rule above remains the
+  authoritative obligation, and the hook may take one
+  `/hooks` reload or session restart to start firing after
+  edits. Session start, deadline reasoning, and Codex
+  `task_complete` are still on you.
 - **Work rhythm: never refuse on time, but note out-of-hours
   sessions as commentary.** Regular hours are 10:00–19:00 JST
   Mon–Fri; extended is fine up to 21:00; nights, weekends

@@ -24,12 +24,16 @@ target-release/
 .codex/*
 !.codex/config.toml
 
-# Claude Code session-state files. Anything under .claude/ that
-# represents ephemeral per-session state (lock files, caches) is
-# ignored; committed tooling (settings.json, skills/, any local
-# settings like settings.local.json) stays tracked via the
-# negated entries below.
+# Claude Code state files under .claude/. Ignored: ephemeral
+# per-session state (lock files, caches), and per-developer
+# local overrides (settings.local.json — Claude Code's
+# standard "personal settings for this project" file, not
+# meant to travel). Tracked: settings.json (project-wide
+# Claude Code config), skills/ (committed skill definitions),
+# and hooks/ (PostToolUse / SessionStart / etc. hook scripts
+# referenced from settings.json).
 .claude/*.lock
+.claude/settings.local.json
 .claude/.cache/
 .claude/scheduled_tasks.lock
 
