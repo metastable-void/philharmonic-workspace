@@ -436,6 +436,9 @@ fn build_runtime(config: &ApiConfig, state: &LongLivedState) -> Result<Runtime, 
             max_text_bytes: config.embed_dataset_max_text_bytes,
             max_payload_bytes: config.embed_dataset_max_payload_bytes,
             max_source_items_blob_bytes: config.embed_dataset_max_source_items_blob_bytes,
+            max_corpus_items: config.embed_dataset_max_corpus_items,
+            max_corpus_vector_dimension: config.embed_dataset_max_corpus_vector_dimension,
+            max_corpus_blob_bytes: config.embed_dataset_max_corpus_blob_bytes,
         })
         .rate_limit_config(rate_limit)
         .brand_name(config.webui_brand_name.as_str());
@@ -452,6 +455,15 @@ fn build_runtime(config: &ApiConfig, state: &LongLivedState) -> Result<Runtime, 
             lowerer,
             executor,
             Arc::new(Sck::from_bytes(**sck_bytes)),
+            EmbedDatasetCaps {
+                max_items: config.embed_dataset_max_items,
+                max_text_bytes: config.embed_dataset_max_text_bytes,
+                max_payload_bytes: config.embed_dataset_max_payload_bytes,
+                max_source_items_blob_bytes: config.embed_dataset_max_source_items_blob_bytes,
+                max_corpus_items: config.embed_dataset_max_corpus_items,
+                max_corpus_vector_dimension: config.embed_dataset_max_corpus_vector_dimension,
+                max_corpus_blob_bytes: config.embed_dataset_max_corpus_blob_bytes,
+            },
         )));
     }
 

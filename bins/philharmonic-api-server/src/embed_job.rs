@@ -2,7 +2,7 @@
 
 use std::{sync::Arc, time::Duration};
 
-use philharmonic::api::{ApiStore, EmbedDatasetDispatcher};
+use philharmonic::api::{ApiStore, EmbedDatasetCaps, EmbedDatasetDispatcher};
 use philharmonic::policy::{
     CorpusItem, EmbeddingDataset, EmbeddingDatasetStatus, Sck, SourceItem, Tenant,
     TenantEndpointConfig, decode_source_items, encode_corpus, sck_decrypt,
@@ -29,6 +29,7 @@ pub(crate) struct EmbedJobDispatcher {
     lowerer: Arc<dyn ConfigLowerer>,
     executor: Arc<MechanicsWorkerExecutor>,
     sck: Arc<Sck>,
+    caps: EmbedDatasetCaps,
 }
 
 impl EmbedJobDispatcher {
@@ -37,12 +38,14 @@ impl EmbedJobDispatcher {
         lowerer: Arc<dyn ConfigLowerer>,
         executor: Arc<MechanicsWorkerExecutor>,
         sck: Arc<Sck>,
+        caps: EmbedDatasetCaps,
     ) -> Self {
         Self {
             store,
             lowerer,
             executor,
             sck,
+            caps,
         }
     }
 }
@@ -77,6 +80,26 @@ impl EmbedJobDispatcher {
         tenant_id: EntityId<Tenant>,
     ) -> Result<(), String> {
         let mut latest = latest_revision(&self.store, dataset_id).await?;
+
+        // Security pre-review 2026-05-10 Finding 2 (defence-in-depth):
+        // verify the dataset revision's stored tenant matches the
+        // dispatcher-supplied `tenant_id` before any crypto-sensitive
+        // operation (SCK decrypt of the endpoint config, lowerer call,
+        // connector-token AAD construction). HTTP routes already check
+        // tenant before dispatch, but this module crosses the SCK +
+        // lowerer boundary and shouldn't take the caller's word for it
+        // if the substrate disagrees.
+        let stored_tenant = required_entity_ref(&latest, "tenant")?;
+        if stored_tenant.target_entity_id != tenant_id.internal().as_uuid() {
+            return Err(format!(
+                "embed-job tenant mismatch: dataset {} stored tenant is {} \
+                 but dispatcher was called with tenant {}",
+                dataset_id.public().as_uuid(),
+                stored_tenant.target_entity_id,
+                tenant_id.internal().as_uuid(),
+            ));
+        }
+
         if status_from_revision(&latest)? == EmbeddingDatasetStatus::Created {
             self.append_status_revision(
                 dataset_id,
@@ -90,9 +113,16 @@ impl EmbedJobDispatcher {
 
         let source_items = load_source_items(&self.store, &latest).await?;
         let embed_endpoint_public = embed_endpoint_id(&self.store, &latest).await?;
-        let embed_endpoint_id = resolve_endpoint(&self.store, embed_endpoint_public).await?;
+
+        // Security pre-review 2026-05-10 Finding 3: revalidate the
+        // endpoint at job-execution time. Routes check tenant + retire
+        // + `implementation == "embed"` at create/update, but a queued
+        // job can race retirement or implementation changes. Validate
+        // before SCK decrypt + lowerer call.
+        let (embed_endpoint_id, endpoint_revision) =
+            validate_endpoint(&self.store, embed_endpoint_public, tenant_id).await?;
         let max_batch_size = self
-            .read_max_batch_size(&latest, tenant_id, embed_endpoint_id)
+            .read_max_batch_size(&endpoint_revision, &latest, tenant_id, embed_endpoint_id)
             .await?;
 
         let ephemeral_inst: EntityId<WorkflowInstance> = Identity {
@@ -141,7 +171,7 @@ impl EmbedJobDispatcher {
             .execute_with_run_timeout(EMBED_SCRIPT_SRC, &arg, &lowered, EMBED_JOB_TIMEOUT)
             .await;
         match result {
-            Ok(value) => match parse_corpus_output(&value) {
+            Ok(value) => match parse_corpus_output(&value, &self.caps) {
                 Ok(corpus) => {
                     self.append_status_revision(
                         dataset_id,
@@ -213,6 +243,17 @@ impl EmbedJobDispatcher {
         if let Some(corpus) = corpus {
             let encoded = encode_corpus(&corpus)
                 .map_err(|error| format!("corpus encoding failed: {error}"))?;
+            // Security pre-review 2026-05-10 Finding 1: enforce the
+            // post-encode corpus blob cap before the storage write so
+            // an unbounded mechanics / upstream-provider response
+            // cannot induce arbitrary content-store growth.
+            if encoded.len() > self.caps.max_corpus_blob_bytes {
+                return Err(format!(
+                    "encoded corpus blob is {} bytes, exceeds cap of {} bytes",
+                    encoded.len(),
+                    self.caps.max_corpus_blob_bytes,
+                ));
+            }
             revision = revision.with_content("corpus", put_bytes(&self.store, &encoded).await?);
         } else if let Some(hash) = optional_content_hash(previous, "corpus") {
             revision = revision.with_content("corpus", hash);
@@ -226,19 +267,19 @@ impl EmbedJobDispatcher {
 
     async fn read_max_batch_size(
         &self,
+        endpoint_revision: &RevisionRow,
         dataset_revision: &RevisionRow,
         tenant_id: EntityId<Tenant>,
         endpoint_id: EntityId<TenantEndpointConfig>,
     ) -> Result<usize, String> {
-        let endpoint_revision = latest_endpoint_revision(&self.store, endpoint_id).await?;
-        let encrypted_hash = required_content_hash(&endpoint_revision, "encrypted_config")?;
+        let encrypted_hash = required_content_hash(endpoint_revision, "encrypted_config")?;
         let encrypted = self
             .store
             .get(encrypted_hash)
             .await
             .map_err(|error| format!("encrypted endpoint config read failed: {error}"))?
             .ok_or_else(|| "encrypted endpoint config blob missing".to_string())?;
-        let key_version = i64_scalar(&endpoint_revision, "key_version")?;
+        let key_version = i64_scalar(endpoint_revision, "key_version")?;
         let plaintext = sck_decrypt(
             &self.sck,
             encrypted.bytes(),
@@ -307,6 +348,46 @@ async fn resolve_endpoint(
         .map_err(|error| format!("endpoint config identity type mismatch: {error}"))
 }
 
+/// Resolve and validate an embed endpoint at job-execution time.
+///
+/// Per security pre-review 2026-05-10 Finding 3: an embed-job dispatched
+/// some time after a dataset write can race the endpoint's retirement
+/// or implementation-change. Routes validate at create/update time, but
+/// the dispatcher must re-check before SCK decrypt + lowerer call.
+///
+/// Returns the resolved endpoint id and the validated revision so callers
+/// don't need to re-fetch the revision for `read_max_batch_size`.
+async fn validate_endpoint(
+    store: &Arc<dyn ApiStore>,
+    public: Uuid,
+    tenant_id: EntityId<Tenant>,
+) -> Result<(EntityId<TenantEndpointConfig>, RevisionRow), String> {
+    let endpoint_id = resolve_endpoint(store, public).await?;
+    let revision = latest_endpoint_revision(store, endpoint_id).await?;
+
+    let endpoint_tenant = required_entity_ref(&revision, "tenant")?;
+    if endpoint_tenant.target_entity_id != tenant_id.internal().as_uuid() {
+        return Err(format!(
+            "embed endpoint {public} belongs to a different tenant than the dataset"
+        ));
+    }
+    if bool_scalar(&revision, "is_retired")? {
+        return Err(format!("embed endpoint {public} is retired"));
+    }
+    let implementation_hash = required_content_hash(&revision, "implementation")?;
+    let implementation_value = load_json(store, implementation_hash).await?;
+    let implementation = implementation_value.as_str().ok_or_else(|| {
+        format!("embed endpoint {public} implementation slot must be a JSON string")
+    })?;
+    if implementation != "embed" {
+        return Err(format!(
+            "embed endpoint {public} has implementation '{implementation}', expected 'embed'"
+        ));
+    }
+
+    Ok((endpoint_id, revision))
+}
+
 async fn load_source_items(
     store: &Arc<dyn ApiStore>,
     revision: &RevisionRow,
@@ -358,13 +439,25 @@ async fn load_json(store: &Arc<dyn ApiStore>, hash: Sha256) -> Result<JsonValue,
         .map_err(|error| format!("stored JSON content is invalid: {error}"))
 }
 
-fn parse_corpus_output(value: &JsonValue) -> Result<Vec<CorpusItem>, String> {
+fn parse_corpus_output(
+    value: &JsonValue,
+    caps: &EmbedDatasetCaps,
+) -> Result<Vec<CorpusItem>, String> {
     let output = value
         .get("output")
         .ok_or_else(|| "mechanics result missing output".to_string())?;
     let items = output
         .as_array()
         .ok_or_else(|| "mechanics output must be an array".to_string())?;
+    // Security pre-review 2026-05-10 Finding 1: cap parse-time
+    // allocation. Reject before allocating the corpus Vec.
+    if items.len() > caps.max_corpus_items {
+        return Err(format!(
+            "mechanics output has {} items, exceeds corpus cap of {}",
+            items.len(),
+            caps.max_corpus_items,
+        ));
+    }
     let mut corpus = Vec::with_capacity(items.len());
     for item in items {
         let object = item
@@ -379,6 +472,15 @@ fn parse_corpus_output(value: &JsonValue) -> Result<Vec<CorpusItem>, String> {
             .get("vector")
             .and_then(JsonValue::as_array)
             .ok_or_else(|| format!("corpus item {id} vector must be an array"))?;
+        // Security pre-review 2026-05-10 Finding 1: cap per-vector
+        // allocation. Reject before allocating the f32 Vec.
+        if vector_values.len() > caps.max_corpus_vector_dimension {
+            return Err(format!(
+                "corpus item {id} vector has {} dimensions, exceeds cap of {}",
+                vector_values.len(),
+                caps.max_corpus_vector_dimension,
+            ));
+        }
         let mut vector = Vec::with_capacity(vector_values.len());
         for value in vector_values {
             let number = value
