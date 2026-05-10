@@ -66,7 +66,67 @@ Approach B; D4/D5 are unblocked but not part of this round.
 
 ## Outcome
 
-Pending — will be updated after Codex run.
+**Completed 2026-05-10** — all four deliverables landed; commit
+`bbc26f9` (parent) + `d017a36` (`philharmonic-policy` 0.2.1 →
+0.2.2) + `68b774c` (`philharmonic-workflow` 0.1.2 → 0.1.3).
+`./scripts/pre-landing.sh` re-run by Claude post-Codex was green
+end-to-end including the workspace-test phase + `--ignored`
+testcontainers MySQL phase (`mysql_step_records_pin_pre_step_instance_revisions`
+59.42s). Zero clippy warnings, zero rustdoc warnings on touched
+crates.
+
+**Codex's pre-landing journey** (visible from the rollout
+log):
+
+1. First run failed at the lint phase on rustfmt diffs in the
+   new codec + test files. Codex applied rustfmt and reran.
+2. Second run got through fmt + check + clippy and failed in
+   rustdoc on missing field-level docs for `SourceItem`,
+   `CorpusItem`, and `EmbedDatasetCodecError`. Codex added
+   doc-comments and reran.
+3. Third run got through fmt + check + clippy + rustdoc and
+   entered the workspace-test phase. Codex polled the running
+   test process for ~2 minutes, ran `./scripts/build-status.sh`
+   to inspect, then emitted `task_complete` at 07:05:46 UTC
+   **without producing the `<structured_output_contract>`
+   report**.
+
+**Structured-output-contract violation noted.** The prompt's
+`<structured_output_contract>` block required a six-section
+report (Summary / Touched files / Verification results /
+Residual risks / Git state / Open questions); none was
+produced. The contract was the audit-trail mechanism for the
+run; without it Claude had to reconstruct the verification
+state by re-running `pre-landing.sh` and inspecting each file
+manually. **Mitigation for future rounds:** the contract should
+either (a) be enforced by Codex's runtime as a turn-end gate
+rather than a soft requirement in the prompt, or (b) be moved
+earlier in the prompt with stronger framing ("emit this report
+*before* declaring `task_complete`"). The post-mortem
+re-verification by Claude added ~15 minutes to landing — not
+catastrophic for a small round, but prohibitive for larger
+rounds where Claude can't re-read every diff.
+
+**Quality of the work itself**: high. Codex correctly
+respected every constraint in the prompt — used the embedded
+KIND UUID rather than minting; got the deterministic-CBOR
+encoding rules exactly right (bytewise-lex on encoded keys, not
+naive key-text sort); placed the new `embed_dataset:*` atoms
+between `endpoint:*` and `tenant:*` as suggested; added
+`hex-literal = "0.4"` to dev-deps for the known-vector tests;
+deliberately did NOT add `Serialize`/`Deserialize` derives to
+`CorpusItem` (round 02 owns transport); added two unit tests
+for D1 + one for D2 + six integration tests for D4 covering
+all six required scenarios from the prompt; committed
+known-vector hex inline. No surprises in the working tree —
+`commit-all.sh --dry-run` showed exactly the allow-listed
+files from `<action_safety>`.
+
+**Round 02 readiness**: the data-layer foundation is stable;
+round 02 (workflow-engine `data` assembly in `execute_step` +
+embed-datasets API routes + bin wiring) can dispatch against
+this clean base without renegotiating any of round 01's
+shapes.
 
 ---
 
