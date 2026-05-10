@@ -104,7 +104,7 @@ The single `(Gate 1)` item is **not** a Codex dispatch — Claude
 drafts the proposal, Yuka reviews per the two-gate crypto-review
 protocol (§2).
 
-Total: **11 Codex dispatches plus 1 Gate-1 proposal.** D1, D2,
+Total: **12 Codex dispatches plus 1 Gate-1 proposal.** D1, D2,
 D10 are done; Gate 1 is approved.
 
 ### A. Embedding datasets (6 dispatches + 1 Gate-1)
@@ -164,7 +164,50 @@ implement the `Implementation` trait.
 Independent of one another and of section A; safe to run in
 parallel.
 
-### C. WebUI infrastructure and docs (2 dispatches)
+### C. Connector enhancements (1 dispatch)
+
+- **D12** `philharmonic-connector-impl-llm-openai-compat`:
+  add a `custom_headers: HashMap<String, String>` knob to the
+  runtime endpoint config so deployments can attach
+  provider-specific HTTP headers to upstream calls. Driven by
+  Hugging Face Inference's `X-HF-Bill-To` (org billing); also
+  covers OpenAI's `OpenAI-Organization` / `OpenAI-Project`,
+  OpenRouter's `HTTP-Referer` / `X-Title`, and similar
+  per-provider knobs across the OpenAI-compatible ecosystem.
+
+  The field belongs to the **runtime endpoint config** — i.e.
+  the impl-side decrypted-config struct in
+  `philharmonic-connector-impl-llm-openai-compat/src/config.rs`,
+  which rides inside the existing SCK-encrypted blob on
+  `TenantEndpointConfig`. `#[serde(default)]` keeps existing
+  configs valid (back-compat). The impl applies the headers
+  to its outbound reqwest builder before sending; no
+  primitive, AAD, or signed-claim change.
+
+  Reserved headers (`authorization`, `content-type`,
+  `content-length`, `host`, `transfer-encoding`,
+  `connection`, plus CRLF-injection guards on values) are
+  rejected at config-validation time rather than at request
+  time, so a bad config is caught at endpoint-config write.
+
+  Touches `philharmonic-connector-impl-llm-openai-compat`
+  only — no public-trait change, no other crate edits, no
+  crypto path touched. Bump version + CHANGELOG. Tests:
+  header pass-through to the upstream request, reserved-
+  header rejection, CRLF rejection. WebUI gets no special
+  treatment — endpoint configs are JSON-edited through the
+  existing CodeMirror 6 editor (D10) which accepts the new
+  field naturally.
+
+  Independent of everything else; small. **Lands before
+  D7/D8/D9** — production deployments hitting Hugging Face
+  Inference need the `X-HF-Bill-To` header now to bill an
+  organisation rather than the personal account, and the
+  fix is single-crate / single-config-field-sized. The
+  Tier 2/3 implementations (Anthropic / Gemini / SMTP) are
+  larger and don't unblock anything for HF users.
+
+### D. WebUI infrastructure and docs (2 dispatches)
 
 - **D10** CodeMirror 6 in the WebUI. **DONE 2026-05-02
   (`ee2bd61`).**
@@ -186,8 +229,13 @@ parallel.
 3. **Embedding datasets feature**: D3 → D4 → D5; D6 in parallel
    after D3. With Gate 1 now cleared, the full chain is
    dispatchable as bandwidth allows.
-4. **Connectors**: D7 / D8 / D9 in parallel (one crate each).
-5. **Anytime**: D11 (independent of everything else).
+4. **D12 first** (small, unblocks production HF Inference
+   org-billing now): custom-headers knob on the existing
+   `llm-openai-compat` impl.
+5. **Tier 2/3 connectors after D12**: D7 / D8 / D9 — Anthropic,
+   Gemini, SMTP. Independent of one another and of section A;
+   safe to run in parallel after D12 lands.
+6. **Anytime**: D11 (independent of everything else).
 
 ### Dispatch discipline reminder
 
