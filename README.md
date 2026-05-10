@@ -123,10 +123,13 @@ API CRUD, WebUI, both crypto gates cleared. The **chat-style
 testing UI (D13)** also landed 2026-05-10: one-click create-
 and-chat from a workflow template, in-WebUI chat tab on
 `InstanceDetail`, runtime structural detection of the OpenAI-
-style `{messages: [{role, content}, ...]}` shape. Remaining
-post-v1 scope: Phase 7 Tier 2/3 connector implementations
-(SMTP, Anthropic, Gemini — D7/D8/D9) and the workflow
-authoring guide rewrite (D11).
+style `{messages: [{role, content}, ...]}` shape. The
+**workflow authoring guide (D11)** was rewritten the same
+day to reflect current implementation reality with three
+load-bearing recipes (D13 chat, embedding-datasets,
+combined RAG). Remaining post-v1 scope: Phase 7 Tier 2/3
+connector implementations (SMTP, Anthropic, Gemini —
+D7/D8/D9).
 The authoritative task list lives in
 [`docs/ROADMAP.md` §3](docs/ROADMAP.md#3-post-v1-dispatch-plan).
 

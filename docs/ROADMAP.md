@@ -42,6 +42,12 @@ active work now lives in the post-v1 dispatch plan (§3 below).
   `{messages: [{role, content}, ...]}` shape, localStorage
   for last-used instance + scroll position. No backend
   changes.
+- **D11** (workflow authoring guide rewrite, English)
+  shipped 2026-05-10 (`10acd7f`). 530 → 1350 lines
+  reflecting current implementation reality, three
+  load-bearing recipes (D13 chat, embedding-datasets,
+  combined RAG). JP mirror regeneration is a Claude
+  follow-up.
 - Yuka was on Golden Week 2026-04-29 → 2026-05-06 plus a
   personal vacation 2026-05-07 / 05-08; first regular working
   day back is Mon 2026-05-11.
@@ -120,8 +126,9 @@ drafts the proposal, Yuka reviews per the two-gate crypto-review
 protocol (§2).
 
 Total: **13 Codex dispatches plus 1 Gate-1 proposal.**
-**D1, D2, D3, D4, D5, D6, D10, D12, D13 are done** (9 of 13).
-Gate 1 and Gate 2 both approved. Remaining: D7, D8, D9, D11.
+**D1, D2, D3, D4, D5, D6, D10, D11, D12, D13 are done**
+(10 of 13). Gate 1 and Gate 2 both approved. Remaining:
+D7, D8, D9.
 
 ### A. Embedding datasets (6 dispatches + 1 Gate-1)
 
@@ -260,15 +267,29 @@ parallel.
 
 - **D10** CodeMirror 6 in the WebUI. **DONE 2026-05-02
   (`ee2bd61`).**
-- **D11** Workflow authoring guide rewrite (English). Codex
-  re-reads the design docs + connector-architecture spec, then
-  rewrites
-  [`docs/guide/workflow-authoring.md`](guide/workflow-authoring.md)
-  from scratch to reflect current implementation reality. The
-  Japanese mirror in [`docs-jp/ワークフロー作成ガイド.md`](../docs-jp/)
+- **D11** Workflow authoring guide rewrite (English).
+  **DONE 2026-05-10** (`10acd7f`). 530 → 1350 lines
+  reflecting current implementation reality post-D3/D4/
+  D5/D6/D12/D13. Three load-bearing recipes per Yuka's
+  focus directive: D13-compat chat workflow (state-driven
+  accumulator), embedding-datasets workflow (five
+  availability states), combined chat + RAG. All three
+  copy-pasteable end-to-end with verbatim script + endpoint
+  + template JSON + WebUI behavior tables + per-recipe
+  permission lists. Wire-shape accuracy grep-verified
+  against `philharmonic-connector-impl-{vector-search,
+  embed,llm-openai-compat}/src/`,
+  `philharmonic-workflow/src/engine.rs build_script_data`,
+  `philharmonic/webui/src/api/client.ts ChatMessage`.
+  Tier 2/3 connectors flagged as reserved/pending rather
+  than fabricated. Codex flagged design-doc divergences
+  for follow-up: design/07 still shows pre-D3 4-field
+  script-arg shape; design/10 doesn't list `data_config`
+  in template body docs. The Japanese mirror in
+  [`docs-jp/ワークフロー作成ガイド.md`](../docs-jp/)
   is **not** a Codex dispatch — `docs-jp/README.md` reserves
   that submodule to Claude Code. Claude regenerates the JP
-  guide after D11 lands.
+  guide as a follow-up.
 - **D13** Chat-style testing UI in `philharmonic/webui` for
   workflows that accept `{"content": "<user_input>"}` as
   input and return `{"messages": [<turns>]}` as output
@@ -309,12 +330,13 @@ parallel.
    (`2fff3bb`).
 5. **D13** chat-style testing UI — DONE 2026-05-10
    (`ee99b79` + `58cf408`).
-6. **Next dispatchable**: D7 / D8 / D9 (Tier 2/3
+6. **D11** workflow authoring guide rewrite — DONE
+   2026-05-10 (`10acd7f`). JP mirror regeneration is a
+   Claude follow-up.
+7. **Next dispatchable**: D7 / D8 / D9 (Tier 2/3
    connectors — SMTP, Anthropic, Gemini); D9 carries
    the dual-mode AI Studio + Vertex AI requirement. All
    three are independent and parallel-safe.
-7. **Anytime**: D11 (workflow authoring guide rewrite —
-   independent of everything).
 
 ### Dispatch discipline reminder
 

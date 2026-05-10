@@ -215,7 +215,84 @@ with a corpus-grounded assistant.
 
 ## Outcome
 
-Pending — will be updated after Codex run.
+**Completed 2026-05-10** — single-file rewrite of
+`docs/guide/workflow-authoring.md` landed at commit
+`10acd7f`. 530 → 1350 lines (~4,463 words).
+
+`./scripts/test-scripts.sh` + `./scripts/check-md-bloat.sh`
+both passed. No Rust / TS / shell touched. Wire-shape
+verifications via grep all green:
+
+- `vector_search` request fields (`query_vector`,
+  `corpus`, `top_k`, `score_threshold`) match
+  `philharmonic-connector-impl-vector-search/src/request.rs`
+  lines 9-17.
+- `embed` request (`texts`) / response (`embeddings: f32[][]`)
+  match `philharmonic-connector-impl-embed/src/{lib,
+  response}.rs`.
+- `data` field assembly + carry-forward / missing-from-
+  Record states match `philharmonic-workflow/src/engine.rs`
+  `build_script_data` (line 558+).
+- D12 `custom_headers` field + reserved-header validation
+  rules match
+  `philharmonic-connector-impl-llm-openai-compat/src/config.rs`.
+- D13 chat-output detection rules match the rewrite's
+  description of the WebUI's `parseChatOutput` parser
+  in `philharmonic/webui/src/api/client.ts`.
+
+**Codex's deliverable choices**:
+
+- Three recipes implemented as the user's focus directive
+  asked: D13-compat chat (state-driven accumulator
+  pattern), embedding-datasets workflow with five
+  availability states, combined chat+RAG with a system-
+  prompt context-block pattern. All three include
+  copy-pasteable script source + template JSON +
+  endpoint setup JSON + WebUI behavior table +
+  permissions list.
+- Five (not four) availability states for embedding
+  datasets — Codex correctly added `Retired` as a
+  separate row in the visibility-states table on top
+  of the four design-16 documented states. Matches
+  `is_retired = true → omitted` per design 16.
+- Tier 2/3 connectors (email_smtp, llm_anthropic,
+  llm_gemini) flagged as "reserved / pending
+  implementation" rather than fabricated config shapes.
+- Permission atoms table extended with `embed_dataset:*`
+  atoms; existing workflow / endpoint / tenant / mint /
+  audit groups preserved.
+- Cross-references to design docs, ROADMAP, HUMANS.md,
+  and the D13 archived prompt.
+
+**Structured-output-contract honored** for the **seventh**
+consecutive round. Streak now 7/7 since the contract was
+added.
+
+**Open questions Codex surfaced** (carried forward, all
+follow-up work for Claude — not in D11 scope):
+
+1. **Design-doc divergences requiring reconciliation**:
+   - `docs/design/07-workflow-orchestration.md` still
+     documents the pre-D3 4-field script-arg shape
+     `{context, args, input, subject}`; needs the 5-field
+     `+ data` update.
+   - `docs/design/10-api-layer.md` does not list the
+     `data_config` field in template body docs added
+     in D3 round 02.
+2. **JP mirror regeneration** at
+   `docs-jp/ワークフロー作成ガイド.md` is a Claude follow-up
+   task per ROADMAP §3.D — will follow this commit.
+3. **Product gap**: WebUI template form lacks
+   `data_config` exposure (currently API-only); worth
+   tracking as a UX follow-up.
+
+**Day's dispatch arc complete**:
+D1/D2/D3/D4/D5/D6/D10/D11/D12/D13 done plus Gate 1 +
+Gate 2 approved (10 of 13). Remaining post-v1 work: D7
+(SMTP), D8 (Anthropic), D9 (Gemini dual-mode AI Studio +
+Vertex AI per ROADMAP §3.B). All three are independent
+Tier 2/3 connector implementations with no crypto path
+involvement.
 
 ---
 
