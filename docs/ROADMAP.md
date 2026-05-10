@@ -33,6 +33,15 @@ active work now lives in the post-v1 dispatch plan (§3 below).
   deferred-tasks cleanup) + D6 WebUI (`b581b50`).
 - **D12** (`llm-openai-compat` `custom_headers` knob, Hugging
   Face `X-HF-Bill-To` driver) shipped 2026-05-10 (`2fff3bb`).
+- **D13** (chat-style testing UI in WebUI per HUMANS.md §"Chat
+  UI for easy testing") shipped 2026-05-10 (`ee99b79`
+  philharmonic submodule + `58cf408` parent). One-click
+  create-and-chat from `TemplateDetail` / `Templates`,
+  third tab on `InstanceDetail` with empty-content dual-
+  purpose probe, runtime structural detection of the
+  `{messages: [{role, content}, ...]}` shape, localStorage
+  for last-used instance + scroll position. No backend
+  changes.
 - Yuka was on Golden Week 2026-04-29 → 2026-05-06 plus a
   personal vacation 2026-05-07 / 05-08; first regular working
   day back is Mon 2026-05-11.
@@ -111,8 +120,8 @@ drafts the proposal, Yuka reviews per the two-gate crypto-review
 protocol (§2).
 
 Total: **13 Codex dispatches plus 1 Gate-1 proposal.**
-**D1, D2, D3, D4, D5, D6, D10, D12 are done** (8 of 13). Gate
-1 and Gate 2 both approved. Remaining: D7, D8, D9, D11, D13.
+**D1, D2, D3, D4, D5, D6, D10, D12, D13 are done** (9 of 13).
+Gate 1 and Gate 2 both approved. Remaining: D7, D8, D9, D11.
 
 ### A. Embedding datasets (6 dispatches + 1 Gate-1)
 
@@ -263,57 +272,29 @@ parallel.
 - **D13** Chat-style testing UI in `philharmonic/webui` for
   workflows that accept `{"content": "<user_input>"}` as
   input and return `{"messages": [<turns>]}` as output
-  (OpenAI-style chat-completion turn shape). Per
-  [`HUMANS.md` §"Chat UI for easy testing"](../HUMANS.md).
-
-  Detection: schema-based on the workflow template's I/O
-  contract. Templates that don't expose the
-  content-in / messages-out shape get a clean
-  "not chat-compatible" error rather than a broken UI.
-
-  **One-click create-and-chat from the template page**
-  (per Yuka's directive): a "Test in chat" button on
-  `TemplateDetail` (and where convenient on `Templates`'s
-  list rows) creates a new instance with empty args,
-  navigates to the instance's chat tab, **and immediately
-  fires an empty-content call to fetch the assistant's
-  initial greeting** — admins land on a chat that already
-  has the opening turn from the workflow, ready to type
-  their first message.
-
-  **Chat tab on `InstanceDetail`**: alternating
-  user/assistant chat bubbles, autoscroll, in-flight
-  indicator, send-on-Enter, error toasts on transport
-  failures. Backed by the existing
-  `POST /v1/workflows/instances/{id}/execute` endpoint —
-  no backend changes.
-
-  **Empty-content POST (`{}`) is dual-purpose** (per
-  Yuka's directive):
-
-  - **On a new instance** (no prior context): bootstraps
-    the conversation by triggering the workflow's opening
-    turn — typically a greeting. The chat UI fires this
-    call automatically on first chat-tab mount so admins
-    don't have to send a dummy message to see the
-    assistant's opening.
-  - **On an existing instance**: just fetches the current
-    transcript without adding a turn. Useful for tab
-    re-opens, refresh, sharing a chat URL.
-
-  The workflow's script handles both cases — on empty
-  content with empty context it generates the greeting;
-  on empty content with populated context it returns the
-  existing transcript unchanged. Differentiation is
-  server-side via the workflow's accumulated context.
-
-  LocalStorage for transient client state (last-used
-  instance per template, scroll position) — no persistent
-  storage beyond that.
-
-  Independent of D11 and D7-9; can dispatch any time after
-  D6 (which it builds on). i18n entries in `en.ts` + `ja.ts`
-  alongside the existing `embedDatasets.*` namespace.
+  (OpenAI-style chat-completion turn shape). **DONE
+  2026-05-10** (`ee99b79` philharmonic submodule + `58cf408`
+  parent). Six surfaces landed end-to-end on Codex's first
+  attempt: types + `parseChatOutput` runtime structural
+  detector in `api/client.ts`; chat tab on `InstanceDetail`
+  with `?tab=chat` URL hook; "Test in chat" actions on
+  `TemplateDetail` (with last-used-instance shortcut) and
+  `Templates` list rows; chat UI with bubbles, autoscroll,
+  send-on-Enter, in-flight indicator, error-toast on
+  transport failures; `util/chatStorage.ts` localStorage
+  helpers (last-used instance per template, scroll
+  position); `chat.*` i18n namespace in en/ja. The
+  empty-content POST (`{}`) dual-purpose semantics are
+  delegated to the workflow's JS — UI always probes on
+  first chat-tab mount; server-side script generates a
+  greeting on empty context, returns the existing
+  transcript otherwise. No backend changes; reuses
+  `workflow:instance_create` + `workflow:instance_execute`.
+  Bundle delta ~+3.0 KiB gzipped. Open follow-ups
+  (deferred): markdown rendering in chat bubbles; full
+  instance-list dropdown for templates with many active
+  chats; JP phrasing review; optional global "resume last
+  chat" shortcut.
 
 ### Suggested sequencing
 
@@ -326,13 +307,14 @@ parallel.
    (`b581b50`). Gate 2 approved (`354e82d`).
 4. **D12** custom-headers knob — DONE 2026-05-10
    (`2fff3bb`).
-5. **Next dispatchable**: D7 / D8 / D9 (Tier 2/3
+5. **D13** chat-style testing UI — DONE 2026-05-10
+   (`ee99b79` + `58cf408`).
+6. **Next dispatchable**: D7 / D8 / D9 (Tier 2/3
    connectors — SMTP, Anthropic, Gemini); D9 carries
    the dual-mode AI Studio + Vertex AI requirement. All
    three are independent and parallel-safe.
-6. **Anytime**: D13 (chat-style testing UI — independent of
-   D7-9, builds on D6 which is done) and D11 (workflow
-   authoring guide rewrite — independent of everything).
+7. **Anytime**: D11 (workflow authoring guide rewrite —
+   independent of everything).
 
 ### Dispatch discipline reminder
 

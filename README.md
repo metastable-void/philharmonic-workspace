@@ -119,10 +119,14 @@ via `llm_openai_compat`.
 
 The **embedding-datasets feature** is fully shipped end-to-end
 as of 2026-05-10 — data layer, workflow-engine integration,
-API CRUD, WebUI, both crypto gates cleared. Remaining post-v1
-scope: Phase 7 Tier 2/3 connector implementations (SMTP,
-Anthropic, Gemini — D7/D8/D9), a chat-style testing UI on the
-WebUI (D13), and the workflow authoring guide rewrite (D11).
+API CRUD, WebUI, both crypto gates cleared. The **chat-style
+testing UI (D13)** also landed 2026-05-10: one-click create-
+and-chat from a workflow template, in-WebUI chat tab on
+`InstanceDetail`, runtime structural detection of the OpenAI-
+style `{messages: [{role, content}, ...]}` shape. Remaining
+post-v1 scope: Phase 7 Tier 2/3 connector implementations
+(SMTP, Anthropic, Gemini — D7/D8/D9) and the workflow
+authoring guide rewrite (D11).
 The authoritative task list lives in
 [`docs/ROADMAP.md` §3](docs/ROADMAP.md#3-post-v1-dispatch-plan).
 
