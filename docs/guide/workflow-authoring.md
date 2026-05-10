@@ -1,66 +1,133 @@
 # Workflow Authoring Guide
 
-This guide explains how to create, deploy, and execute workflows.
+This guide explains how to create workflow templates, bind them
+to endpoints and embedding datasets, run instances, and author
+scripts that work with the WebUI chat testing flow.
 
-## Concepts
+Implementation files are authoritative for runtime behavior. The
+main script argument is currently:
 
-A **workflow template** defines reusable automation logic. It
-consists of:
-
-- **Script source** — an ECMAScript module whose default export
-  is called for each execution step. Runs in a sandboxed Boa
-  JavaScript engine.
-- **Abstract config** — a JSON object mapping endpoint names to
-  **endpoint config UUIDs**. Each UUID references a
-  `TenantEndpointConfig` entity created via the Endpoints API.
-
-A **workflow instance** is a running copy of a template, created
-with specific **args** (input parameters). Instances maintain
-**context** (mutable state that persists across steps) and
-progress through a lifecycle: Pending → Running → Completed (or
-Failed/Cancelled).
-
-Each **step** is one execution of the script. Steps receive input
-and produce output. The script decides whether the workflow is
-done (`done: true`) or needs more steps.
-
-## Setting Up Endpoints
-
-Before creating a workflow that calls external services, configure
-the endpoint connections:
-
-### 1. Create an endpoint config
-
-The `config` JSON shape depends on which connector implementation
-will handle the endpoint. All configs are encrypted at rest using
-the SCK — API keys and secrets are never stored in plaintext.
-
-#### LLM (OpenAI-compatible)
-
-```
-POST /v1/endpoints
-Content-Type: application/json
-
+```javascript
 {
-  "display_name": "My LLM",
+  context,
+  args,
+  input,
+  subject,
+  data
+}
+```
+
+`data` is always present. It is `{}` when the template has no
+`data_config`, and it contains workflow-bound data such as
+`data.embed_datasets.<name>` when the template declares data
+bindings.
+
+## What workflows are
+
+A **workflow template** is reusable automation logic. It stores:
+
+| Field | Meaning |
+|---|---|
+| `display_name` | Admin-visible name. |
+| `script_source` | ECMAScript module source. The default export runs once per step. |
+| `abstract_config` | JSON map from script-local endpoint names to endpoint config UUIDs. |
+| `data_config` | Optional JSON data bindings, currently `embed_datasets`. |
+
+A **workflow instance** is a running copy of a template. It is
+created with immutable `args`, carries mutable `context`, and is
+bound to the template revision current at creation time. Later
+template edits do not change existing instances.
+
+A **step** is one execution of the template script. Each step
+receives `input`, returns `output`, and may update `context`.
+Successful steps write step records. Script failures write a
+failed step record and move the instance to `Failed`; executor
+transport failures are retryable and do not write records.
+
+Instance statuses are stable integer states in the workflow
+layer:
+
+| Status | Meaning |
+|---|---|
+| `Pending` | Created, no successful step has run. |
+| `Running` | At least one step ran and the instance is not terminal. |
+| `Completed` | Caller completed the instance, or a script returned `done: true`. |
+| `Failed` | Script execution failed or returned malformed output. |
+| `Cancelled` | Caller cancelled the instance. |
+
+## Setting up endpoints
+
+Endpoint configs are tenant resources created with
+`POST /v1/endpoints`. The API request shape is:
+
+```http
+POST /v1/endpoints
+Authorization: Bearer pht_<token>
+X-Tenant-Id: <tenant-uuid>
+Content-Type: application/json
+```
+
+```json
+{
+  "display_name": "Endpoint name",
+  "implementation": "llm_openai_compat",
+  "config": {}
+}
+```
+
+The `implementation` field is plaintext metadata. The `config`
+blob is encrypted at rest under the substrate credential key.
+
+### `llm_openai_compat`
+
+Use this implementation for providers that expose an
+OpenAI-compatible chat-completions API, including vLLM and
+providers that require extra fixed headers.
+
+```json
+{
+  "display_name": "Primary chat model",
   "implementation": "llm_openai_compat",
   "config": {
     "base_url": "https://api.openai.com/v1",
     "api_key": "sk-...",
     "dialect": "openai_native",
-    "timeout_ms": 60000
+    "timeout_ms": 60000,
+    "custom_headers": {
+      "OpenAI-Organization": "org_..."
+    }
   }
 }
 ```
 
-| Field | Required | Description |
+| Field | Required | Notes |
 |---|---|---|
-| `base_url` | yes | Provider base URL |
-| `api_key` | yes | Bearer token for the provider |
-| `dialect` | yes | `"openai_native"` or `"tool_call_fallback"` |
-| `timeout_ms` | no | Per-attempt timeout (default: 60000) |
+| `base_url` | yes | Provider base URL. |
+| `api_key` | yes | Sent as `Authorization: Bearer <api_key>` upstream. |
+| `dialect` | yes | `openai_native`, `vllm_native`, or `tool_call_fallback`. |
+| `timeout_ms` | no | Defaults to `60000`. |
+| `custom_headers` | no | Extra fixed upstream headers. Reserved headers such as `Authorization`, `Content-Type`, `Content-Length`, `Host`, `Transfer-Encoding`, and `Connection` are rejected. |
 
-#### HTTP Forward (generic HTTP)
+The connector normalizes successful `llm_generate` responses to:
+
+```json
+{
+  "output": {},
+  "stop_reason": "end_turn",
+  "usage": {
+    "input_tokens": 0,
+    "output_tokens": 0
+  }
+}
+```
+
+Every LLM request must include `output_schema`. Scripts read the
+structured result through `response.body.output`.
+
+### `http_forward`
+
+Use `http_forward` for generic HTTP services. Its config wraps
+the shared `mechanics-config` `HttpEndpoint` JSON shape.
 
 ```json
 {
@@ -71,44 +138,71 @@ Content-Type: application/json
       "method": "post",
       "url_template": "https://api.example.com/v1/{resource}",
       "url_param_specs": {
-        "resource": {}
+        "resource": {
+          "min_bytes": 1,
+          "max_bytes": 64
+        }
       },
-      "headers": { "Authorization": "Bearer ..." },
+      "headers": {
+        "Authorization": "Bearer service-token"
+      },
+      "overridable_request_headers": ["Idempotency-Key"],
+      "exposed_response_headers": ["X-Request-Id"],
+      "request_body_type": "json",
       "response_body_type": "json",
-      "response_max_bytes": 1048576
+      "response_max_bytes": 1048576,
+      "timeout_ms": 10000,
+      "allow_non_2xx_status": false
     }
   }
 }
 ```
 
-The `endpoint` field is a `mechanics-config` `HttpEndpoint`
-definition (see `mechanics-core/ts-types/mechanics-json-shapes.d.ts`
-for the full TypeScript shape). Every `{name}` placeholder in
-`url_template` must have a matching entry in `url_param_specs`
-— validation rejects templates with missing specs. The script
-later supplies values via the `urlParams` option to
-`endpoint(...)`.
+`response_max_bytes` is required by the implementation. Every
+`{slot}` in `url_template` must have a matching
+`url_param_specs` entry.
 
-#### SQL (PostgreSQL / MySQL)
+### `sql_postgres` and `sql_mysql`
+
+Use these implementations for SQL query endpoints.
 
 ```json
 {
-  "display_name": "Analytics DB",
+  "display_name": "Analytics PostgreSQL",
   "implementation": "sql_postgres",
   "config": {
     "connection_url": "postgres://user:pass@host/db",
     "max_connections": 10,
-    "default_timeout_ms": 30000,
-    "default_max_rows": 10000
+    "default_timeout_ms": 30000
   }
 }
 ```
 
-#### Text Embedding
+```json
+{
+  "display_name": "Analytics MySQL",
+  "implementation": "sql_mysql",
+  "config": {
+    "connection_url": "mysql://user:pass@host/db",
+    "max_connections": 10,
+    "default_timeout_ms": 30000
+  }
+}
+```
+
+| Field | Required | Notes |
+|---|---|---|
+| `connection_url` | yes | PostgreSQL accepts `postgres://` or `postgresql://`; MySQL accepts `mysql://` or `mariadb://`. |
+| `max_connections` | no | Defaults to `10`; must be greater than zero when provided. |
+| `default_timeout_ms` | no | Defaults to `30000`; must be greater than zero when provided. |
+
+### `embed`
+
+Use `embed` to turn text into embedding vectors.
 
 ```json
 {
-  "display_name": "Embedder",
+  "display_name": "BGE embedder",
   "implementation": "embed",
   "config": {
     "model_id": "bge-m3",
@@ -118,115 +212,228 @@ later supplies values via the `urlParams` option to
 }
 ```
 
-#### Vector Search
+| Field | Required | Notes |
+|---|---|---|
+| `model_id` | yes | Must match the loaded model. |
+| `max_batch_size` | no | Defaults to `32`; request validation rejects oversized batches. |
+| `timeout_ms` | no | Defaults to `10000`. |
+
+The request body is `{ "texts": ["..."] }`. The response body is
+`{ "embeddings": [[...]] }`, one vector per input text.
+
+### `vector_search`
+
+Use `vector_search` for request-local cosine nearest-neighbor
+search. It does not persist vectors; the workflow passes a
+corpus on every call.
 
 ```json
 {
-  "display_name": "Searcher",
+  "display_name": "Vector search",
   "implementation": "vector_search",
   "config": {
-    "max_corpus_size": 1000,
+    "max_corpus_size": 10000,
     "timeout_ms": 2000
   }
 }
 ```
 
-Response: `{ "endpoint_id": "<uuid>" }`
+| Field | Required | Notes |
+|---|---|---|
+| `max_corpus_size` | yes | Maximum `corpus.length` accepted per request. |
+| `timeout_ms` | no | Defaults to `2000`. |
 
-### 2. Use the endpoint UUID in abstract config
+The request body is:
 
 ```json
 {
-  "my-llm": "<endpoint-uuid-from-step-1>"
+  "query_vector": [0.1, 0.2],
+  "corpus": [
+    {
+      "id": "doc-1",
+      "vector": [0.1, 0.2],
+      "payload": {
+        "text": "Document text"
+      }
+    }
+  ],
+  "top_k": 5,
+  "score_threshold": 0.2
 }
 ```
 
-The keys (`"my-llm"`) become the endpoint names your script uses.
+The response body is `{ "results": [{ "id", "score",
+"payload" }] }`. `payload` is omitted from a result when the
+corpus item had no payload.
 
-## Creating a Template
+### Reserved connector names
 
-### Via the API
+These crates are reserved but not implemented in this workspace
+version:
 
-```
+| Implementation | State |
+|---|---|
+| `email_smtp` | Reserved / pending implementation. |
+| `llm_anthropic` | Reserved / pending implementation. |
+| `llm_gemini` | Reserved / pending implementation. |
+
+Do not create endpoint configs for these names until their
+implementation crates ship real behavior.
+
+## Creating a template
+
+Create templates through the API when you need `data_config`.
+The current WebUI template form exposes display name, script
+source, and `abstract_config`; it does not expose a structured
+`data_config` editor.
+
+```http
 POST /v1/workflows/templates
-Authorization: Bearer pht_...
+Authorization: Bearer pht_<token>
 X-Tenant-Id: <tenant-uuid>
 Content-Type: application/json
-
-{
-  "display_name": "Echo Bot",
-  "script_source": "export default function(arg) { return { output: arg.input, done: true }; }",
-  "abstract_config": {}
-}
 ```
-
-For a template that calls an endpoint:
 
 ```json
 {
-  "display_name": "LLM Chat",
-  "script_source": "...",
-  "abstract_config": {
-    "llm": "<endpoint-config-uuid>"
+  "display_name": "Echo",
+  "script_source": "export default function(arg) { return { output: arg.input, context: arg.context, done: true }; }",
+  "abstract_config": {},
+  "data_config": {
+    "embed_datasets": {}
   }
 }
 ```
 
-### Via the WebUI
+For a template that calls endpoints and reads an embedding
+dataset:
 
-Navigate to **Templates → Create**. Enter a display name, paste
-the script source, and provide the abstract config as JSON.
+```json
+{
+  "display_name": "Knowledge chat",
+  "script_source": "<script source>",
+  "abstract_config": {
+    "llm": "<llm-endpoint-uuid>",
+    "embed": "<embed-endpoint-uuid>",
+    "vector_search": "<vector-search-endpoint-uuid>"
+  },
+  "data_config": {
+    "embed_datasets": {
+      "knowledge_base": "<embedding-dataset-uuid>"
+    }
+  }
+}
+```
 
-## Writing Scripts
+Dataset binding names must be JavaScript-property-like names:
+1 to 64 bytes, starting with an ASCII letter, `_`, or `$`, and
+continuing with ASCII letters, digits, `_`, or `$`.
+
+`PATCH /v1/workflows/templates/{id}` appends a new template
+revision. Existing instances stay pinned to their original
+template revision; new instances use the latest revision.
+
+## Writing scripts
 
 Scripts are ECMAScript modules executed by the Boa JavaScript
-engine. The default export must be a function that receives a
-single argument object and returns a result object. The function
-may be `async`.
+engine. The module default export must be a function, and may
+be `async`.
+
+```javascript
+export default async function main(arg) {
+  return {
+    output: {},
+    context: arg.context,
+    done: false
+  };
+}
+```
 
 ### Script argument
 
 ```javascript
 {
-  context: { /* mutable state from previous steps */ },
-  args:    { /* instance creation arguments */ },
-  input:   { /* step-specific input */ },
-  subject: { /* caller identity information */ }
+  context: {}, // mutable state from previous successful steps
+  args: {},    // immutable instance creation arguments
+  input: {},   // per-step input
+  subject: {}, // caller identity
+  data: {}     // workflow-bound data, always present
 }
 ```
+
+`subject` serializes the authenticated caller context. Principal
+callers and ephemeral-token callers both reach scripts through
+this field; scripts that do not need caller identity can ignore
+it.
 
 ### Return value
 
 ```javascript
 {
-  output:  { /* step output (stored as a step record) */ },
-  context: { /* updated context for the next step */ },
-  done:    true | false
+  output: {},
+  context: {},
+  done: false
 }
 ```
 
-- `done: true` — marks the instance as Completed.
-- `done: false` — keeps the instance Running; another step can
-  be executed later.
+| Field | Required | Meaning |
+|---|---|---|
+| `output` | yes | Stored on the step record and returned to the caller. |
+| `context` | yes | Replaces the instance context for the next step. |
+| `done` | no | `true` completes the instance; absent or false keeps it running. |
 
-### Calling external endpoints
+Bounded workflows usually return `done: true` after producing
+their final output. Chat workflows usually keep `done: false`.
 
-Use the built-in `mechanics:endpoint` module. It exports a single
-default function:
+### Built-in modules
+
+Scripts can import only built-in modules exposed by
+`mechanics-core/ts-types/`.
+
+| Module | Exports |
+|---|---|
+| `mechanics:endpoint` | Default `endpoint(name, options)` call helper. |
+| `mechanics:base64` | `encode`, `decode`; variants `base64`, `base64url`. |
+| `mechanics:base32` | `encode`, `decode`; variants `base32`, `base32hex`. |
+| `mechanics:hex` | `encode`, `decode`. |
+| `mechanics:form-urlencoded` | `encode`, `decode`. |
+| `mechanics:rand` | Default `fillRandom(buffer)` helper. |
+| `mechanics:uuid` | Default UUID generator for `v3`, `v4`, `v5`, `v6`, `v7`, `nil`, or `max`. |
+
+### Sandbox limits
+
+Scripts run in an isolated JavaScript realm:
+
+| Limit | Current default |
+|---|---|
+| Filesystem access | None. |
+| Network access | Only through `mechanics:endpoint`. |
+| Cross-step JavaScript globals | None; persist state in `context`. |
+| Wall-clock timeout | Worker-pool or per-job configured. `mechanics-core` pool default is 30 seconds; the mechanics-worker binary can set deployment defaults. |
+| Loop iteration limit | `mechanics-core` default is `1_000_000`. |
+| Recursion depth limit | `mechanics-core` default is `512`. |
+| Stack size limit | `mechanics-core` default is `10 * 1024` bytes. |
+
+## Calling endpoints
+
+Use `mechanics:endpoint` to call script-local endpoint names
+from `abstract_config`.
 
 ```javascript
 import endpoint from "mechanics:endpoint";
 
-export default async function(arg) {
-  const response = await endpoint("my-llm", {
+export default async function main(arg) {
+  const response = await endpoint("llm", {
     body: {
-      model: "gpt-4o-mini",
+      model: "default",
       messages: [
         { role: "user", content: arg.input.question }
       ],
       output_schema: {
         type: "object",
-        properties: { answer: { type: "string" } },
+        properties: {
+          answer: { type: "string" }
+        },
         required: ["answer"],
         additionalProperties: false
       }
@@ -241,242 +448,247 @@ export default async function(arg) {
 }
 ```
 
-Note: the `llm_generate` capability returns a normalized
-`{output, stop_reason, usage}` shape and **requires**
-`output_schema` in the request — see the connector
-architecture for the full wire protocol. The transport
-envelope (`{body, headers, status, ok}` returned by
-`endpoint(...)`) wraps that response, so the script reads the
-LLM's structured result via `response.body.output.<field>`,
-not provider-native fields like `choices[0].message`.
+Endpoint options:
 
-The first argument is the endpoint name (must match a key in the
-abstract config). The second argument is an options object:
+| Option | Meaning |
+|---|---|
+| `body` | JSON value, string, or bytes depending on endpoint request mode. |
+| `headers` | Extra request headers, restricted by `overridable_request_headers`. Header matching is case-insensitive. |
+| `urlParams` | Values for declared `{slot}` URL template parameters. |
+| `queries` | Values for declared slotted query specs. |
 
-| Option | Type | Description |
-|---|---|---|
-| `body` | object \| string \| `Uint8Array` | Request body. Objects are sent as JSON. |
-| `headers` | `{ name: value }` | Extra request headers (only those in `overridable_request_headers`). |
-| `urlParams` | `{ name: value }` | Values for `{param}` placeholders in the URL template. |
-| `queries` | `{ name: value }` | Query string parameters. |
+Endpoint response:
 
-The response object:
+| Field | Meaning |
+|---|---|
+| `body` | Parsed according to endpoint `response_body_type`; empty responses are `null`. |
+| `headers` | Headers allowed by `exposed_response_headers`, normalized to lowercase names. |
+| `status` | HTTP status code. |
+| `ok` | `true` for 2xx statuses. |
 
-| Field | Type | Description |
-|---|---|---|
-| `body` | object \| string \| `Uint8Array` \| null | Response body, decoded per `response_body_type`. |
-| `headers` | `{ name: value }` | Response headers (only those in `exposed_response_headers`). |
-| `status` | number | HTTP status code. |
-| `ok` | boolean | `true` if status is 2xx. |
+## Reading embedding datasets
 
-### Built-in modules
+Embedding datasets let admins precompute vectors for a tenant
+corpus and bind the resulting corpus to workflow templates.
+Scripts then receive the corpus at step-execution time.
 
-Scripts have access to these built-in modules. Full TypeScript
-definitions are in `mechanics-core/ts-types/`.
+### Dataset setup flow
 
-#### `mechanics:endpoint`
+1. Create an `embed` endpoint.
+2. Create the embedding dataset with source items.
+3. Wait for status `Ready`, or handle absence defensively.
+4. Bind the dataset UUID in the workflow template's
+   `data_config.embed_datasets`.
+5. Re-submit items with the update endpoint when corpus content
+   changes.
 
-```typescript
-import endpoint from "mechanics:endpoint";
-const response = await endpoint("name", {
-  body?: unknown,          // JSON value, string, or ArrayBufferView
-  headers?: Record<string, string>,
-  urlParams?: Record<string, string>,
-  queries?: Record<string, string>,
-});
-// response: { body, headers, status: number, ok: boolean }
-```
+Create a dataset:
 
-#### `mechanics:base64`
-
-```typescript
-import { encode, decode } from "mechanics:base64";
-encode(buffer: ArrayBuffer | ArrayBufferView, variant?: "base64" | "base64url"): string;
-decode(encoded: string, variant?: "base64" | "base64url"): Uint8Array;
-```
-
-#### `mechanics:hex`
-
-```typescript
-import { encode, decode } from "mechanics:hex";
-encode(buffer: ArrayBuffer | ArrayBufferView): string;
-decode(encoded: string): Uint8Array;
-```
-
-#### `mechanics:base32`
-
-```typescript
-import { encode, decode } from "mechanics:base32";
-encode(buffer: ArrayBuffer | ArrayBufferView, variant?: "base32" | "base32hex"): string;
-decode(encoded: string, variant?: "base32" | "base32hex"): Uint8Array;
-```
-
-#### `mechanics:form-urlencoded`
-
-```typescript
-import { encode, decode } from "mechanics:form-urlencoded";
-encode(record: Record<string, string>): string;  // deterministic key order
-decode(params: string): Record<string, string>;  // leading '?' accepted
-```
-
-#### `mechanics:rand`
-
-```typescript
-import fillRandom from "mechanics:rand";
-fillRandom(buffer: ArrayBuffer | ArrayBufferView): void;  // fills in-place
-```
-
-#### `mechanics:uuid`
-
-```typescript
-import uuid from "mechanics:uuid";
-uuid(variant?: "v3"|"v4"|"v5"|"v6"|"v7"|"nil"|"max",
-     options?: { namespace: string, name: string }): string;
-// v3/v5 require namespace + name; default is "v4"
-```
-
-### Sandboxing
-
-Scripts run in an isolated JavaScript realm:
-
-- No filesystem or network access except through
-  `mechanics:endpoint`.
-- No cross-job state — each step starts with a fresh realm.
-- Execution limits enforced by the worker pool:
-  - Wall-clock timeout (default: 10 seconds)
-  - Loop iteration limit (default: 1,000,000)
-  - Recursion depth limit (default: 512)
-  - Stack size limit (default: 10 KB)
-
-## Running a Workflow
-
-### 1. Create an instance
-
-```
-POST /v1/workflows/instances
-Authorization: Bearer pht_...
+```http
+POST /v1/embed-datasets
+Authorization: Bearer pht_<token>
 X-Tenant-Id: <tenant-uuid>
 Content-Type: application/json
+```
 
+```json
 {
-  "template_id": "<template-uuid>",
-  "args": { "question": "Hello, world!" }
+  "display_name": "Product knowledge base",
+  "embed_endpoint_id": "<embed-endpoint-uuid>",
+  "items": [
+    {
+      "id": "returns-001",
+      "text": "Returns are accepted within 30 days with a receipt.",
+      "payload": {
+        "title": "Return policy",
+        "source_url": "https://example.test/policies/returns",
+        "chunk_index": 0,
+        "text": "Returns are accepted within 30 days with a receipt."
+      }
+    }
+  ]
 }
 ```
 
-### 2. Execute a step
+Update source items and trigger re-embed:
 
-```
-POST /v1/workflows/instances/<instance-uuid>/execute
-Authorization: Bearer pht_...
+```http
+POST /v1/embed-datasets/{id}/update
+Authorization: Bearer pht_<token>
 X-Tenant-Id: <tenant-uuid>
 Content-Type: application/json
+```
 
+```json
 {
-  "input": { "question": "What is 2+2?" }
+  "items": [
+    {
+      "id": "returns-001",
+      "text": "Returns are accepted within 45 days with a receipt.",
+      "payload": {
+        "title": "Return policy",
+        "source_url": "https://example.test/policies/returns",
+        "chunk_index": 0,
+        "text": "Returns are accepted within 45 days with a receipt."
+      }
+    }
+  ]
 }
 ```
 
-The response includes the script's output, updated context,
-and the new instance status.
+The API rejects updates with `409 Conflict` while a dataset is
+already `Embedding`.
 
-### 3. Check status
+### Runtime data shape
 
-```
-GET /v1/workflows/instances/<instance-uuid>
-Authorization: Bearer pht_...
-X-Tenant-Id: <tenant-uuid>
-```
+Template binding:
 
-### 4. View step history
-
-```
-GET /v1/workflows/instances/<instance-uuid>/steps
-Authorization: Bearer pht_...
-X-Tenant-Id: <tenant-uuid>
+```json
+{
+  "data_config": {
+    "embed_datasets": {
+      "knowledge_base": "<embedding-dataset-uuid>"
+    }
+  }
+}
 ```
 
-## Instance Lifecycle
-
-```
-Pending ──→ Running ──→ Completed
-               │
-               ├──→ Failed
-               │
-               └──→ Cancelled
-```
-
-- **Pending**: Created but no steps executed yet.
-- **Running**: At least one step executed; waiting for more.
-- **Completed**: Script returned `done: true`.
-- **Failed**: Script threw an error or the executor was
-  unreachable.
-- **Cancelled**: Cancelled via the API.
-
-## Example: Simple Echo Workflow
-
-**Template script:**
+Script access:
 
 ```javascript
-export default function(arg) {
+const corpus = arg.data.embed_datasets?.knowledge_base || [];
+```
+
+Each corpus item is:
+
+```typescript
+type CorpusItem = {
+  id: string;
+  vector: number[];
+  payload?: unknown;
+};
+```
+
+`vector` is a JSON number array of f32 components. `payload` is
+the optional JSON value from the source item and is omitted
+entirely when absent.
+
+### Availability states
+
+Any data field can be absent without failing the workflow
+engine. JavaScript decides whether absence is recoverable.
+
+| Dataset state | What the script sees |
+|---|---|
+| First embed in progress (`Created` or `Embedding`, no prior corpus) | Dataset key is omitted. |
+| Re-embed in progress with prior corpus | Previous corpus remains visible. |
+| Latest re-embed failed with prior corpus | Previous corpus remains visible indefinitely until the next success. |
+| First embed failed with no prior corpus | Dataset key is omitted. |
+| Retired dataset | Dataset key is omitted. |
+
+Defensive workflow pattern:
+
+```javascript
+function getCorpus(arg, name) {
+  const datasets = arg.data.embed_datasets || {};
+  const corpus = datasets[name];
+  return Array.isArray(corpus) ? corpus : [];
+}
+```
+
+## Authoring a chat workflow
+
+The WebUI chat tab detects compatibility at runtime. It executes
+the instance once with empty input:
+
+```json
+{
+  "input": {}
+}
+```
+
+If the returned step output has a `messages` array, and every
+message is an object with non-empty string `role` and string
+`content`, the workflow is treated as chat-compatible.
+
+The chat UI sends user turns as:
+
+```json
+{
+  "input": {
+    "content": "Hello"
+  }
+}
+```
+
+The workflow must return the full transcript every time:
+
+```javascript
+return {
+  output: {
+    messages: [
+      { role: "assistant", content: "Hello." },
+      { role: "user", content: "What can you do?" }
+    ]
+  },
+  context: { messages },
+  done: false
+};
+```
+
+`role` may be `user`, `assistant`, `system`, or another
+non-empty string. Extra per-message fields are preserved by the
+WebUI parser as opaque passthrough.
+
+### Empty-content semantics
+
+The empty input branch is dual-purpose:
+
+| Instance state | Expected behavior |
+|---|---|
+| Fresh instance with no transcript | Generate the opening turn, usually a greeting. |
+| Existing instance with transcript | Return the current transcript unchanged. |
+
+Chat workflows generally do not return `done: true`. The chat
+tab keeps the conversation open. If the conversation has a
+natural end, use the instance detail page's Complete action or
+return a final assistant message with `done: true` knowing that
+the chat tab will stop being useful after terminal state.
+
+### Full D13-compatible chat script
+
+This script uses the state-driven accumulator pattern.
+
+```javascript
+import endpoint from "mechanics:endpoint";
+
+function normalizeMessages(value) {
+  return Array.isArray(value) ? value.slice() : [];
+}
+
+function transcript(messages) {
   return {
-    output: {
-      echo: arg.input,
-      step: (arg.context.step || 0) + 1
-    },
-    context: {
-      step: (arg.context.step || 0) + 1
-    },
-    done: arg.input.finish === true
+    output: { messages },
+    context: { messages },
+    done: false
   };
 }
-```
 
-**Abstract config:** `{}`
+export default async function main(arg) {
+  const messages = normalizeMessages(arg.context.messages);
+  const content = typeof arg.input.content === "string" ? arg.input.content.trim() : "";
 
-**Usage:**
+  if (content.length === 0) {
+    if (messages.length === 0) {
+      messages.push({
+        role: "assistant",
+        content: "Hello. Ask me a question and I will answer concisely."
+      });
+    }
+    return transcript(messages);
+  }
 
-1. Create template with the script above.
-2. Create instance with `args: {}`.
-3. Execute steps with `input: { message: "hello" }`.
-4. Each step echoes the input and increments a counter.
-5. Send `input: { finish: true }` to complete the workflow.
-
-## Example: LLM Chat Workflow
-
-**Setup:**
-
-1. Create an endpoint config for your LLM service:
-   ```json
-   {
-     "display_name": "Local LLM",
-     "implementation": "llm_openai_compat",
-     "config": {
-       "base_url": "http://localhost:8080/v1",
-       "api_key": "local-dev-key",
-       "dialect": "openai_native",
-       "timeout_ms": 120000
-     }
-   }
-   ```
-
-2. Create template with the endpoint UUID:
-   ```json
-   {
-     "display_name": "LLM Chat",
-     "abstract_config": { "llm": "<endpoint-uuid>" },
-     "script_source": "..."
-   }
-   ```
-
-**Script:**
-
-```javascript
-import endpoint from "mechanics:endpoint";
-
-export default async function(arg) {
-  const messages = arg.context.messages || [];
-  messages.push({ role: "user", content: arg.input.message });
+  messages.push({ role: "user", content });
 
   const response = await endpoint("llm", {
     body: {
@@ -484,47 +696,655 @@ export default async function(arg) {
       messages,
       output_schema: {
         type: "object",
-        properties: { reply: { type: "string" } },
+        properties: {
+          reply: { type: "string" }
+        },
         required: ["reply"],
         additionalProperties: false
       }
     }
   });
 
-  const replyText = response.body.output.reply;
-  messages.push({ role: "assistant", content: replyText });
+  messages.push({
+    role: "assistant",
+    content: response.body.output.reply
+  });
+
+  return transcript(messages);
+}
+```
+
+Template:
+
+```json
+{
+  "display_name": "D13 chat",
+  "script_source": "<paste the script above>",
+  "abstract_config": {
+    "llm": "<llm-endpoint-uuid>"
+  }
+}
+```
+
+WebUI behavior:
+
+| Action | Result |
+|---|---|
+| Templates list row action, Test in chat | Creates an instance with `{}` args and opens `/instances/{id}?tab=chat`. |
+| Template detail, Test in chat | Opens the last-used chat instance or starts a new one. |
+| Chat tab mount | Executes `{input: {}}` as the probe. |
+| Output shape mismatch | Shows the not-chat-compatible empty state with observed top-level keys. |
+| Transport or script error | Shows a toast / error state and offers fallback to the normal Execute panel. |
+
+Permissions for this recipe:
+
+| Operation | Permission |
+|---|---|
+| Create LLM endpoint | `endpoint:create` |
+| Create template | `workflow:template_create` |
+| Create instance | `workflow:instance_create` |
+| Execute chat turns | `workflow:instance_execute` |
+| Read instance / steps in WebUI | `workflow:instance_read` |
+
+## Authoring an embedding-datasets workflow
+
+This recipe reads a bound corpus and runs vector search against
+a query vector. It returns a one-step answer and completes.
+
+Endpoint setup:
+
+```json
+[
+  {
+    "display_name": "BGE embedder",
+    "implementation": "embed",
+    "config": {
+      "model_id": "bge-m3",
+      "max_batch_size": 32,
+      "timeout_ms": 10000
+    }
+  },
+  {
+    "display_name": "Vector search",
+    "implementation": "vector_search",
+    "config": {
+      "max_corpus_size": 10000,
+      "timeout_ms": 2000
+    }
+  }
+]
+```
+
+Dataset creation:
+
+```json
+{
+  "display_name": "Support articles",
+  "embed_endpoint_id": "<embed-endpoint-uuid>",
+  "items": [
+    {
+      "id": "shipping-001",
+      "text": "Standard shipping takes three to five business days.",
+      "payload": {
+        "title": "Shipping",
+        "text": "Standard shipping takes three to five business days."
+      }
+    },
+    {
+      "id": "returns-001",
+      "text": "Returns require a receipt and must be started within 30 days.",
+      "payload": {
+        "title": "Returns",
+        "text": "Returns require a receipt and must be started within 30 days."
+      }
+    }
+  ]
+}
+```
+
+Full script:
+
+```javascript
+import endpoint from "mechanics:endpoint";
+
+function corpusFrom(arg, name) {
+  const datasets = arg.data.embed_datasets || {};
+  const corpus = datasets[name];
+  return Array.isArray(corpus) ? corpus : [];
+}
+
+function resultPayload(result) {
+  if (result.payload && typeof result.payload === "object") {
+    return result.payload;
+  }
+  return {};
+}
+
+export default async function main(arg) {
+  const question = typeof arg.input.question === "string" ? arg.input.question.trim() : "";
+  if (question.length === 0) {
+    return {
+      output: {
+        error: "question is required"
+      },
+      context: arg.context,
+      done: true
+    };
+  }
+
+  const corpus = corpusFrom(arg, "knowledge_base");
+  if (corpus.length === 0) {
+    return {
+      output: {
+        error: "knowledge base is not ready"
+      },
+      context: arg.context,
+      done: true
+    };
+  }
+
+  const embedResponse = await endpoint("embed", {
+    body: {
+      texts: [question]
+    }
+  });
+  const queryVector = embedResponse.body.embeddings[0];
+
+  const searchResponse = await endpoint("vector_search", {
+    body: {
+      query_vector: queryVector,
+      corpus,
+      top_k: 3
+    }
+  });
+
+  const matches = searchResponse.body.results.map((result) => {
+    const payload = resultPayload(result);
+    return {
+      id: result.id,
+      score: result.score,
+      title: typeof payload.title === "string" ? payload.title : result.id,
+      text: typeof payload.text === "string" ? payload.text : ""
+    };
+  });
 
   return {
-    output: { reply: replyText },
+    output: {
+      question,
+      matches
+    },
+    context: arg.context,
+    done: true
+  };
+}
+```
+
+Template:
+
+```json
+{
+  "display_name": "Knowledge base search",
+  "script_source": "<paste the script above>",
+  "abstract_config": {
+    "embed": "<embed-endpoint-uuid>",
+    "vector_search": "<vector-search-endpoint-uuid>"
+  },
+  "data_config": {
+    "embed_datasets": {
+      "knowledge_base": "<embedding-dataset-uuid>"
+    }
+  }
+}
+```
+
+Execute:
+
+```json
+{
+  "input": {
+    "question": "How long does shipping take?"
+  }
+}
+```
+
+WebUI behavior:
+
+| State | Result |
+|---|---|
+| Dataset first embed in progress | Dataset detail shows embedding state; workflow returns `knowledge base is not ready` from the defensive branch. |
+| Dataset ready | Workflow returns ranked matches. |
+| Dataset re-embedding | Workflow keeps using the prior corpus. |
+| Dataset failed after previous success | Workflow keeps using the prior corpus. |
+| Dataset failed before any success | Dataset key is absent; workflow returns the defensive error. |
+
+Permissions:
+
+| Operation | Permission |
+|---|---|
+| Create embed / vector endpoints | `endpoint:create` |
+| Create dataset | `embed_dataset:create` |
+| Read dataset status/source/corpus in WebUI | `embed_dataset:read` |
+| Update dataset | `embed_dataset:update` |
+| Create template | `workflow:template_create` |
+| Create / execute / read instance | `workflow:instance_create`, `workflow:instance_execute`, `workflow:instance_read` |
+
+## Authoring chat with embedding datasets
+
+This is the common RAG shape: the chat UI provides turns, the
+workflow embeds each user message, searches the bound corpus,
+and asks the LLM to answer with retrieved context.
+
+Setup requires three endpoints:
+
+```json
+[
+  {
+    "display_name": "Chat model",
+    "implementation": "llm_openai_compat",
+    "config": {
+      "base_url": "https://api.openai.com/v1",
+      "api_key": "sk-...",
+      "dialect": "openai_native",
+      "timeout_ms": 60000,
+      "custom_headers": {}
+    }
+  },
+  {
+    "display_name": "BGE embedder",
+    "implementation": "embed",
+    "config": {
+      "model_id": "bge-m3",
+      "max_batch_size": 32,
+      "timeout_ms": 10000
+    }
+  },
+  {
+    "display_name": "Vector search",
+    "implementation": "vector_search",
+    "config": {
+      "max_corpus_size": 10000,
+      "timeout_ms": 2000
+    }
+  }
+]
+```
+
+Create an embedding dataset as in the previous recipe, wait for
+`Ready` when possible, and bind it to the template as
+`knowledge_base`.
+
+Full script:
+
+```javascript
+import endpoint from "mechanics:endpoint";
+
+function normalizeMessages(value) {
+  return Array.isArray(value) ? value.slice() : [];
+}
+
+function transcript(messages) {
+  return {
+    output: { messages },
     context: { messages },
+    done: false
+  };
+}
+
+function corpusFrom(arg, name) {
+  const datasets = arg.data.embed_datasets || {};
+  const corpus = datasets[name];
+  return Array.isArray(corpus) ? corpus : [];
+}
+
+function payloadText(result) {
+  const payload = result.payload;
+  if (payload && typeof payload === "object" && typeof payload.text === "string") {
+    return payload.text;
+  }
+  return "";
+}
+
+function contextBlock(results) {
+  const lines = [];
+  for (const result of results) {
+    const text = payloadText(result);
+    if (text.length > 0) {
+      lines.push(`- ${text}`);
+    }
+  }
+  return lines.join("\n");
+}
+
+export default async function main(arg) {
+  const messages = normalizeMessages(arg.context.messages);
+  const content = typeof arg.input.content === "string" ? arg.input.content.trim() : "";
+
+  if (content.length === 0) {
+    if (messages.length === 0) {
+      messages.push({
+        role: "assistant",
+        content: "Hello. Ask me about the knowledge base."
+      });
+    }
+    return transcript(messages);
+  }
+
+  messages.push({ role: "user", content });
+
+  const corpus = corpusFrom(arg, "knowledge_base");
+  if (corpus.length === 0) {
+    messages.push({
+      role: "assistant",
+      content: "The knowledge base is still being embedded. Try again after it is ready."
+    });
+    return transcript(messages);
+  }
+
+  const embedResponse = await endpoint("embed", {
+    body: {
+      texts: [content]
+    }
+  });
+  const queryVector = embedResponse.body.embeddings[0];
+
+  const searchResponse = await endpoint("vector_search", {
+    body: {
+      query_vector: queryVector,
+      corpus,
+      top_k: 5,
+      score_threshold: 0.1
+    }
+  });
+
+  const retrievedContext = contextBlock(searchResponse.body.results);
+
+  const llmMessages = [
+    {
+      role: "system",
+      content: `Answer using the retrieved context. If the context is empty, say you do not know.\n\n${retrievedContext}`
+    },
+    ...messages
+  ];
+
+  const llmResponse = await endpoint("llm", {
+    body: {
+      model: "default",
+      messages: llmMessages,
+      output_schema: {
+        type: "object",
+        properties: {
+          reply: { type: "string" }
+        },
+        required: ["reply"],
+        additionalProperties: false
+      }
+    }
+  });
+
+  messages.push({
+    role: "assistant",
+    content: llmResponse.body.output.reply,
+    retrieved_count: searchResponse.body.results.length
+  });
+
+  return transcript(messages);
+}
+```
+
+Template:
+
+```json
+{
+  "display_name": "Knowledge chat",
+  "script_source": "<paste the script above>",
+  "abstract_config": {
+    "llm": "<llm-endpoint-uuid>",
+    "embed": "<embed-endpoint-uuid>",
+    "vector_search": "<vector-search-endpoint-uuid>"
+  },
+  "data_config": {
+    "embed_datasets": {
+      "knowledge_base": "<embedding-dataset-uuid>"
+    }
+  }
+}
+```
+
+What you will see in the WebUI:
+
+| Step | Result |
+|---|---|
+| Click Test in chat from the template list or detail page | WebUI creates or opens an instance and navigates to the Chat tab. |
+| Chat tab opens on a fresh instance | It sends `{input: {}}`; the script returns the greeting. |
+| Send a message | The UI sends `{input: {content: "..."}}`; the script returns the full transcript. |
+| Dataset absent | The script adds an assistant message saying the knowledge base is not ready, while preserving chat compatibility. |
+| Output shape drifts | The chat tab switches to not-chat-compatible state because detection is based on `output.messages`. |
+
+Permissions are the union of the chat and embedding-dataset
+recipes: endpoint create/read as needed, `embed_dataset:create`,
+`embed_dataset:read`, `embed_dataset:update` for corpus
+management, and workflow template/instance permissions for
+testing.
+
+## Running a workflow
+
+Create an instance:
+
+```http
+POST /v1/workflows/instances
+Authorization: Bearer pht_<token>
+X-Tenant-Id: <tenant-uuid>
+Content-Type: application/json
+```
+
+```json
+{
+  "template_id": "<template-uuid>",
+  "args": {}
+}
+```
+
+Execute a step:
+
+```http
+POST /v1/workflows/instances/{id}/execute
+Authorization: Bearer pht_<token>
+X-Tenant-Id: <tenant-uuid>
+Content-Type: application/json
+```
+
+```json
+{
+  "input": {
+    "content": "Hello"
+  }
+}
+```
+
+Read instance state:
+
+```http
+GET /v1/workflows/instances/{id}
+Authorization: Bearer pht_<token>
+X-Tenant-Id: <tenant-uuid>
+```
+
+Read revision history:
+
+```http
+GET /v1/workflows/instances/{id}/history
+Authorization: Bearer pht_<token>
+X-Tenant-Id: <tenant-uuid>
+```
+
+Read step records:
+
+```http
+GET /v1/workflows/instances/{id}/steps
+Authorization: Bearer pht_<token>
+X-Tenant-Id: <tenant-uuid>
+```
+
+Complete or cancel:
+
+```http
+POST /v1/workflows/instances/{id}/complete
+Authorization: Bearer pht_<token>
+X-Tenant-Id: <tenant-uuid>
+```
+
+```http
+POST /v1/workflows/instances/{id}/cancel
+Authorization: Bearer pht_<token>
+X-Tenant-Id: <tenant-uuid>
+```
+
+## Instance lifecycle
+
+```text
+Pending -> Running
+Pending -> Completed
+Pending -> Cancelled
+Pending -> Failed
+Running -> Running
+Running -> Completed
+Running -> Failed
+Running -> Cancelled
+```
+
+Terminal states have no outgoing transitions. The engine
+refuses operations on terminal instances.
+
+## Examples
+
+### Echo
+
+```javascript
+export default function main(arg) {
+  const step = typeof arg.context.step === "number" ? arg.context.step + 1 : 1;
+  return {
+    output: {
+      echo: arg.input,
+      step
+    },
+    context: {
+      step
+    },
     done: arg.input.finish === true
   };
 }
 ```
 
-**Usage:**
+Template config:
 
-1. Create instance with `args: {}`.
-2. Execute steps with `input: { message: "Hello!" }`.
-3. Each step sends the conversation history to the LLM.
-4. Send `input: { message: "Goodbye", finish: true }` to end.
+```json
+{
+  "display_name": "Echo",
+  "script_source": "<paste the script above>",
+  "abstract_config": {}
+}
+```
+
+### Basic LLM one-shot
+
+```javascript
+import endpoint from "mechanics:endpoint";
+
+export default async function main(arg) {
+  const question = typeof arg.input.question === "string" ? arg.input.question : "";
+  const response = await endpoint("llm", {
+    body: {
+      model: "default",
+      messages: [
+        { role: "user", content: question }
+      ],
+      output_schema: {
+        type: "object",
+        properties: {
+          answer: { type: "string" }
+        },
+        required: ["answer"],
+        additionalProperties: false
+      }
+    }
+  });
+
+  return {
+    output: {
+      answer: response.body.output.answer
+    },
+    context: arg.context,
+    done: true
+  };
+}
+```
+
+The full D13 chat and embedding-datasets RAG examples are in
+the recipe sections above.
 
 ## Permissions
 
-Workflow operations require these permission atoms in the
-caller's role:
+Permissions are string atoms attached to roles and ephemeral
+token claims. The current policy crate recognizes these atoms:
 
-| Operation | Permission |
-|---|---|
-| Create template | `workflow:template_create` |
-| Read templates | `workflow:template_read` |
-| Retire template | `workflow:template_retire` |
-| Create instance | `workflow:instance_create` |
-| Read instances | `workflow:instance_read` |
-| Execute step | `workflow:instance_execute` |
-| Cancel instance | `workflow:instance_cancel` |
-| Create endpoint config | `endpoint:create` |
-| View endpoint config | `endpoint:read_metadata` |
-| View decrypted config | `endpoint:read_decrypted` |
-| Rotate endpoint config | `endpoint:rotate` |
-| Retire endpoint config | `endpoint:retire` |
+| Area | Atom | Used for |
+|---|---|---|
+| Workflow | `workflow:template_create` | Create and patch templates. |
+| Workflow | `workflow:template_read` | List/read templates. |
+| Workflow | `workflow:template_retire` | Retire templates. |
+| Workflow | `workflow:instance_create` | Create instances. |
+| Workflow | `workflow:instance_read` | Read instance state, history, and steps. |
+| Workflow | `workflow:instance_execute` | Execute steps and complete instances. |
+| Workflow | `workflow:instance_cancel` | Cancel instances. |
+| Endpoint | `endpoint:create` | Create endpoint configs. |
+| Endpoint | `endpoint:rotate` | Rotate endpoint configs. |
+| Endpoint | `endpoint:retire` | Retire endpoint configs. |
+| Endpoint | `endpoint:read_metadata` | Read endpoint metadata. |
+| Endpoint | `endpoint:read_decrypted` | Read decrypted endpoint config. |
+| Embedding dataset | `embed_dataset:create` | Create datasets. |
+| Embedding dataset | `embed_dataset:read` | List/read datasets, source items, and corpus. |
+| Embedding dataset | `embed_dataset:update` | Update source items and trigger re-embed. |
+| Embedding dataset | `embed_dataset:retire` | Retire datasets. |
+| Tenant | `tenant:principal_manage` | Manage principals. |
+| Tenant | `tenant:role_manage` | Manage roles and memberships. |
+| Tenant | `tenant:minting_manage` | Manage minting authorities. |
+| Minting | `mint:ephemeral_token` | Mint ephemeral API tokens. |
+| Tenant | `tenant:settings_read` | Read tenant settings. |
+| Tenant | `tenant:settings_manage` | Update tenant settings. |
+| Audit | `audit:read` | Read tenant audit events. |
+| Deployment | `deployment:tenant_manage` | Manage tenants at operator scope. |
+| Deployment | `deployment:realm_manage` | Manage realms at operator scope. |
+| Deployment | `deployment:audit_read` | Read deployment audit events. |
+
+Long-lived API tokens use the `pht_` format and are returned
+once at creation or rotation. Ephemeral tokens are minted
+through `POST /v1/tokens/mint`; requested permissions are
+clipped to the minting authority's permission envelope.
+
+API rate limits are enforced at the API layer. Endpoint
+rotation keeps the same endpoint UUID, so templates referencing
+that UUID pick up the new endpoint revision at the next step.
+
+## Cross-references
+
+- [Workflow orchestration](../design/07-workflow-orchestration.md)
+  covers templates, instances, steps, status transitions, and
+  engine responsibilities. Its script-argument section is stale
+  for `data`; the implementation and design 16 now include it.
+- [Connector architecture](../design/08-connector-architecture.md)
+  covers capabilities, implementation dispatch, the
+  `llm_generate` normalized shape, transport envelope semantics,
+  and header allowlists.
+- [Policy and tenancy](../design/09-policy-and-tenancy.md)
+  covers permission evaluation, principals, minting authorities,
+  API token semantics, and tenant scoping.
+- [API layer](../design/10-api-layer.md) covers route families,
+  authentication, rate limiting, and endpoint rotation.
+- [Security and cryptography](../design/11-security-and-cryptography.md)
+  covers SCK encryption, COSE connector tokens, encrypted
+  payloads, and the trust boundary.
+- [Embedding datasets](../design/16-embedding-datasets.md)
+  covers dataset lifecycle, CBOR storage, carry-forward
+  behavior, and template `data_config`.
+- [ROADMAP](../ROADMAP.md) tracks pending implementation work,
+  including reserved connector implementations.
