@@ -167,14 +167,20 @@ files tracked directly in the parent repo):
 ## Status
 
 Design is substantially settled and the v1 implementation path is
-complete through Phase 9. The reference deployment is operational as of
-2026-05-02: a WebUI-created workflow has run through the full production
-path from API server to mechanics worker, connector router, connector
-service, and an OpenAI-compatible upstream LLM via `llm_openai_compat`.
+complete through Phase 9. The reference deployment is operational
+since 2026-05-02: a WebUI-created workflow has run through the full
+production path from API server to mechanics worker, connector
+router, connector service, and an OpenAI-compatible upstream LLM via
+`llm_openai_compat`.
 
-Current active work is post-v1 scope: embedding datasets, the remaining
-Phase 7 Tier 2/3 connector implementations (SMTP, Anthropic, Gemini),
-and WebUI/docs follow-through. The authoritative task list lives in
+Current active work is post-v1 scope: embedding datasets, the
+remaining Phase 7 Tier 2/3 connector implementations (SMTP, Anthropic,
+Gemini), and WebUI/docs follow-through. Three quick wins (substrate
+`LONGBLOB` migration, optional `MechanicsJob.run_timeout` override,
+CodeMirror 6 in the WebUI) landed in a single Codex dispatch on
+2026-05-02; a Gate-1 crypto proposal for embedding-dataset ephemeral
+lowering landed 2026-05-04 and is pending Yuka review. The
+authoritative task list lives in
 [`docs/ROADMAP.md` §9](docs/ROADMAP.md#9-post-v1-dispatch-plan).
 
 All 25 crate names are reserved on crates.io. Foundational, API,

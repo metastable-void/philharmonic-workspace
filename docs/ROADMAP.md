@@ -7,19 +7,36 @@ archive for Philharmonic. V1 is complete through the first working
 end-to-end deployment; active work now lives in the post-v1 dispatch
 plan below.
 
-**Current state** (2026-05-02):
+**Current state** (2026-05-10):
 
 - Design: complete.
 - v1 implementation path: **complete through Phase 9**.
-- Reference deployment: operational; a WebUI-created workflow has run
-  end-to-end through API, mechanics worker, connector router/service, and
-  an OpenAI-compatible upstream LLM via `llm_openai_compat`.
-- Completed v1 milestones are archived concisely in §4. Historical
-  implementation detail lives in dated `docs/codex-prompts/`,
-  `docs/codex-reports/`, `docs/notes-to-humans/`, and
+- Reference deployment: operational since 2026-05-02; a
+  WebUI-created workflow has run end-to-end through API,
+  mechanics worker, connector router/service, and an
+  OpenAI-compatible upstream LLM via `llm_openai_compat`.
+- Post-v1 quick wins (D1 LONGBLOB substrate migration, D2
+  `MechanicsJob.run_timeout` override, D10 CodeMirror 6 in the
+  WebUI) landed in a unified Codex dispatch on 2026-05-02
+  (commit `ee2bd61`).
+- Gate-1 proposal for embedding-datasets ephemeral lowering
+  landed 2026-05-04 (commit `e2baa69`); recommends Approach B
+  (synthesized non-persisted UUID at the API server lowerer,
+  no public-trait change). **Pending Yuka review** — D4 and D5
+  are blocked until this clears. Lives at
+  [`docs/crypto/proposals/2026-05-04-post-v1-embed-dataset-lowerer-ephemeral.md`](crypto/proposals/2026-05-04-post-v1-embed-dataset-lowerer-ephemeral.md).
+- Yuka was on Golden Week 2026-04-29 → 2026-05-06 plus a
+  personal vacation 2026-05-07 / 05-08; first regular working
+  day back is Mon 2026-05-11.
+- Completed v1 milestones are archived concisely in §4.
+  Historical implementation detail lives in dated
+  `docs/codex-prompts/`, `docs/codex-reports/`,
+  `docs/notes-to-humans/`, and
   `docs/crypto/{proposals,approvals}/` files.
-- Active post-v1 work is tracked in §9: embedding datasets, remaining
-  Phase 7 Tier 2/3 connector implementations, and WebUI/docs follow-through.
+- Active post-v1 work is tracked in §9: Gate-1 review, then
+  embedding datasets (D3 → D4 → D5; D6 in parallel after D3),
+  remaining Phase 7 Tier 2/3 connector implementations
+  (D7-D9), and the workflow authoring guide rewrite (D11).
 
 Consult the design documentation as the authoritative source for
 architectural questions — **do not invent architectural decisions**. If a
@@ -720,11 +737,21 @@ parallel.
 
 ### Suggested sequencing
 
-1. **Now-ish** (no gates, independent, small): D1, D2, D10.
-2. **Gate 1** — Claude drafts proposal; Yuka signs off.
+1. ~~Now-ish (no gates, independent, small): D1, D2, D10.~~
+   **DONE 2026-05-02** in commit `ee2bd61` (Codex round 01,
+   prompt `docs/codex-prompts/2026-05-02-0002-...`).
+2. **Gate 1** — Claude's proposal landed
+   [`2026-05-04-post-v1-embed-dataset-lowerer-ephemeral.md`](crypto/proposals/2026-05-04-post-v1-embed-dataset-lowerer-ephemeral.md)
+   (commit `e2baa69`); recommends Approach B (synthesized
+   non-persisted instance UUID, no `LowerScope` enum, no
+   public-trait churn, no crypto-shape change). **Pending
+   Yuka review.** D4 and D5 cannot start until this clears.
 3. **Embedding datasets feature**: D3 → D4 → D5; D6 in
-   parallel after D3.
-4. **Post-GW**: D7 / D8 / D9 in parallel (one crate each).
+   parallel after D3. D3 and D6 are not gated on Gate 1 and
+   can dispatch as soon as bandwidth allows.
+4. **Connectors** (was "Post-GW"; Golden Week 2026 plus
+   Yuka's 2026-05-07 / 05-08 vacation are now past):
+   D7 / D8 / D9 in parallel (one crate each).
 5. **Anytime**: D11 (independent of everything else).
 
 ### Dispatch discipline reminder
