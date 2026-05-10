@@ -260,20 +260,38 @@ parallel.
   **One-click create-and-chat from the template page**
   (per Yuka's directive): a "Test in chat" button on
   `TemplateDetail` (and where convenient on `Templates`'s
-  list rows) creates a new instance with empty args and
-  navigates to the instance's chat tab in a single click,
-  ready to receive the first user turn.
+  list rows) creates a new instance with empty args,
+  navigates to the instance's chat tab, **and immediately
+  fires an empty-content call to fetch the assistant's
+  initial greeting** — admins land on a chat that already
+  has the opening turn from the workflow, ready to type
+  their first message.
 
   **Chat tab on `InstanceDetail`**: alternating
   user/assistant chat bubbles, autoscroll, in-flight
   indicator, send-on-Enter, error toasts on transport
   failures. Backed by the existing
   `POST /v1/workflows/instances/{id}/execute` endpoint —
-  no backend changes. POST `{"content": "<user msg>"}` adds
-  a turn; POST `{}` (empty content) just fetches the
-  current transcript without adding a turn (the
-  workflow's script handles the empty-content branch
-  client-side).
+  no backend changes.
+
+  **Empty-content POST (`{}`) is dual-purpose** (per
+  Yuka's directive):
+
+  - **On a new instance** (no prior context): bootstraps
+    the conversation by triggering the workflow's opening
+    turn — typically a greeting. The chat UI fires this
+    call automatically on first chat-tab mount so admins
+    don't have to send a dummy message to see the
+    assistant's opening.
+  - **On an existing instance**: just fetches the current
+    transcript without adding a turn. Useful for tab
+    re-opens, refresh, sharing a chat URL.
+
+  The workflow's script handles both cases — on empty
+  content with empty context it generates the greeting;
+  on empty content with populated context it returns the
+  existing transcript unchanged. Differentiation is
+  server-side via the workflow's accumulated context.
 
   LocalStorage for transient client state (last-used
   instance per template, scroll position) — no persistent
