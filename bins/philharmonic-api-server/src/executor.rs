@@ -33,8 +33,9 @@ impl MechanicsWorkerExecutor {
         arg: &JsonValue,
         config: &JsonValue,
         run_timeout: Duration,
+        max_response_bytes: Option<usize>,
     ) -> Result<JsonValue, StepExecutionError> {
-        self.execute_job(script, arg, config, Some(run_timeout))
+        self.execute_job(script, arg, config, Some(run_timeout), max_response_bytes)
             .await
     }
 
@@ -44,6 +45,7 @@ impl MechanicsWorkerExecutor {
         arg: &JsonValue,
         config: &JsonValue,
         run_timeout: Option<Duration>,
+        max_response_bytes: Option<usize>,
     ) -> Result<JsonValue, StepExecutionError> {
         let mut job = json!({
             "module_source": script,
@@ -83,12 +85,50 @@ impl MechanicsWorkerExecutor {
             };
         }
 
-        response.json::<JsonValue>().await.map_err(|error| {
+        let body_bytes = match max_response_bytes {
+            Some(max) => read_capped_body(response, max).await?,
+            None => response
+                .bytes()
+                .await
+                .map_err(|error| {
+                    StepExecutionError::Transport(format!(
+                        "mechanics worker response body read failed: {error}"
+                    ))
+                })?
+                .to_vec(),
+        };
+
+        serde_json::from_slice(&body_bytes).map_err(|error| {
             StepExecutionError::Transport(format!(
                 "mechanics worker returned invalid JSON response: {error}"
             ))
         })
     }
+}
+
+/// Streaming-read a reqwest response body up to `max_bytes`. Errors with
+/// a `Transport` variant if the cumulative read exceeds the cap. Used by
+/// the embed-job path (per Gate-2 pre-review Finding 1.5) to bound
+/// transient JSON-in-memory pressure before parsing.
+async fn read_capped_body(
+    mut response: reqwest::Response,
+    max_bytes: usize,
+) -> Result<Vec<u8>, StepExecutionError> {
+    let mut buf: Vec<u8> = Vec::new();
+    while let Some(chunk) = response.chunk().await.map_err(|error| {
+        StepExecutionError::Transport(format!("mechanics worker chunk read failed: {error}"))
+    })? {
+        if buf.len().saturating_add(chunk.len()) > max_bytes {
+            return Err(StepExecutionError::Transport(format!(
+                "mechanics worker response exceeds cap of {max_bytes} bytes \
+                 (read {} bytes before next chunk of {} bytes pushed past)",
+                buf.len(),
+                chunk.len()
+            )));
+        }
+        buf.extend_from_slice(&chunk);
+    }
+    Ok(buf)
 }
 
 #[async_trait]
@@ -99,6 +139,6 @@ impl StepExecutor for MechanicsWorkerExecutor {
         arg: &JsonValue,
         config: &JsonValue,
     ) -> Result<JsonValue, StepExecutionError> {
-        self.execute_job(script, arg, config, None).await
+        self.execute_job(script, arg, config, None, None).await
     }
 }

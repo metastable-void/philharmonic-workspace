@@ -1,6 +1,6 @@
 //! Background tokio task that runs embedding jobs for datasets.
 
-use std::{sync::Arc, time::Duration};
+use std::{collections::BTreeSet, sync::Arc, time::Duration};
 
 use philharmonic::api::{ApiStore, EmbedDatasetCaps, EmbedDatasetDispatcher};
 use philharmonic::policy::{
@@ -168,10 +168,17 @@ impl EmbedJobDispatcher {
 
         let result = self
             .executor
-            .execute_with_run_timeout(EMBED_SCRIPT_SRC, &arg, &lowered, EMBED_JOB_TIMEOUT)
+            .execute_with_run_timeout(
+                EMBED_SCRIPT_SRC,
+                &arg,
+                &lowered,
+                EMBED_JOB_TIMEOUT,
+                Some(self.caps.max_mechanics_response_bytes),
+            )
             .await;
+        let source_ids: BTreeSet<&str> = source_items.iter().map(|item| item.id.as_str()).collect();
         match result {
-            Ok(value) => match parse_corpus_output(&value, &self.caps) {
+            Ok(value) => match parse_corpus_output(&value, &self.caps, &source_ids) {
                 Ok(corpus) => {
                     self.append_status_revision(
                         dataset_id,
@@ -442,6 +449,7 @@ async fn load_json(store: &Arc<dyn ApiStore>, hash: Sha256) -> Result<JsonValue,
 fn parse_corpus_output(
     value: &JsonValue,
     caps: &EmbedDatasetCaps,
+    source_ids: &BTreeSet<&str>,
 ) -> Result<Vec<CorpusItem>, String> {
     let output = value
         .get("output")
@@ -459,6 +467,7 @@ fn parse_corpus_output(
         ));
     }
     let mut corpus = Vec::with_capacity(items.len());
+    let mut seen_ids: BTreeSet<String> = BTreeSet::new();
     for item in items {
         let object = item
             .as_object()
@@ -468,6 +477,18 @@ fn parse_corpus_output(
             .and_then(JsonValue::as_str)
             .ok_or_else(|| "corpus item id must be a string".to_string())?
             .to_string();
+        // Gate-2 follow-up: reject duplicate and unknown IDs. A
+        // misbehaving embed connector / mechanics worker that returns
+        // duplicates or items not in the source set would corrupt the
+        // corpus mapping; better to fail the job than store bad data.
+        if !source_ids.contains(id.as_str()) {
+            return Err(format!(
+                "corpus item id {id:?} is not in the source-items set"
+            ));
+        }
+        if !seen_ids.insert(id.clone()) {
+            return Err(format!("corpus item id {id:?} is duplicated"));
+        }
         let vector_values = object
             .get("vector")
             .and_then(JsonValue::as_array)
@@ -544,4 +565,176 @@ fn status_from_revision(revision: &RevisionRow) -> Result<EmbeddingDatasetStatus
     let value = i64_scalar(revision, "status")?;
     EmbeddingDatasetStatus::try_from(value)
         .map_err(|_| format!("invalid embedding dataset status {value}"))
+}
+
+#[cfg(test)]
+mod tests {
+    //! Unit tests for `parse_corpus_output` covering the cap-enforcement
+    //! paths from Gate-2 pre-review Finding 1 and the dup/unknown-ID
+    //! rejection follow-ups. The dispatcher's full path (tenant
+    //! verification, endpoint validation, lowerer dispatch, mechanics
+    //! HTTP) is exercised via `philharmonic-api/tests/embed_datasets.rs`
+    //! at the API integration layer; these tests cover the
+    //! pure-function leaf in isolation.
+    use super::{EmbedDatasetCaps, parse_corpus_output};
+    use serde_json::json;
+    use std::collections::BTreeSet;
+
+    fn caps_with(max_items: usize, max_dim: usize) -> EmbedDatasetCaps {
+        EmbedDatasetCaps {
+            max_corpus_items: max_items,
+            max_corpus_vector_dimension: max_dim,
+            ..EmbedDatasetCaps::default()
+        }
+    }
+
+    fn source_set<'a>(ids: &'a [&'a str]) -> BTreeSet<&'a str> {
+        ids.iter().copied().collect()
+    }
+
+    #[test]
+    fn happy_path_two_items() {
+        let caps = EmbedDatasetCaps::default();
+        let ids = source_set(&["a", "b"]);
+        let value = json!({
+            "output": [
+                {"id": "a", "vector": [1.0, 2.0, 3.0]},
+                {"id": "b", "vector": [-4.0, 5.5], "payload": {"k": "v"}},
+            ]
+        });
+        let corpus = parse_corpus_output(&value, &caps, &ids).unwrap();
+        assert_eq!(corpus.len(), 2);
+        assert_eq!(corpus[0].id, "a");
+        assert_eq!(corpus[0].vector, vec![1.0_f32, 2.0, 3.0]);
+        assert!(corpus[0].payload.is_none());
+        assert_eq!(corpus[1].id, "b");
+        assert_eq!(corpus[1].vector, vec![-4.0_f32, 5.5]);
+        assert!(corpus[1].payload.is_some());
+    }
+
+    #[test]
+    fn rejects_item_count_over_cap() {
+        let caps = caps_with(1, 4096);
+        let ids = source_set(&["a", "b"]);
+        let value = json!({
+            "output": [
+                {"id": "a", "vector": [1.0]},
+                {"id": "b", "vector": [2.0]},
+            ]
+        });
+        let err = parse_corpus_output(&value, &caps, &ids).unwrap_err();
+        assert!(err.contains("exceeds corpus cap"), "got: {err}");
+    }
+
+    #[test]
+    fn rejects_vector_dim_over_cap() {
+        let caps = caps_with(10, 2);
+        let ids = source_set(&["a"]);
+        let value = json!({
+            "output": [
+                {"id": "a", "vector": [1.0, 2.0, 3.0]},
+            ]
+        });
+        let err = parse_corpus_output(&value, &caps, &ids).unwrap_err();
+        assert!(err.contains("dimensions"), "got: {err}");
+    }
+
+    #[test]
+    fn rejects_nan_vector_entry() {
+        let caps = EmbedDatasetCaps::default();
+        let ids = source_set(&["a"]);
+        let value = json!({
+            "output": [
+                {"id": "a", "vector": [1.0, "bad"]},
+            ]
+        });
+        let err = parse_corpus_output(&value, &caps, &ids).unwrap_err();
+        assert!(err.contains("must be a number"), "got: {err}");
+    }
+
+    #[test]
+    fn rejects_inf_vector_entry() {
+        let caps = EmbedDatasetCaps::default();
+        let ids = source_set(&["a"]);
+        // serde_json doesn't allow naked Inf, so build via a finite-but-out-of-f32-range double.
+        let value = json!({
+            "output": [
+                {"id": "a", "vector": [1.0e40_f64]},
+            ]
+        });
+        let err = parse_corpus_output(&value, &caps, &ids).unwrap_err();
+        assert!(err.contains("not finite f32"), "got: {err}");
+    }
+
+    #[test]
+    fn rejects_missing_id() {
+        let caps = EmbedDatasetCaps::default();
+        let ids = source_set(&["a"]);
+        let value = json!({
+            "output": [
+                {"vector": [1.0]},
+            ]
+        });
+        let err = parse_corpus_output(&value, &caps, &ids).unwrap_err();
+        assert!(err.contains("id"), "got: {err}");
+    }
+
+    #[test]
+    fn rejects_missing_vector() {
+        let caps = EmbedDatasetCaps::default();
+        let ids = source_set(&["a"]);
+        let value = json!({
+            "output": [
+                {"id": "a"},
+            ]
+        });
+        let err = parse_corpus_output(&value, &caps, &ids).unwrap_err();
+        assert!(err.contains("vector"), "got: {err}");
+    }
+
+    #[test]
+    fn rejects_duplicate_id() {
+        let caps = EmbedDatasetCaps::default();
+        let ids = source_set(&["a"]);
+        let value = json!({
+            "output": [
+                {"id": "a", "vector": [1.0]},
+                {"id": "a", "vector": [2.0]},
+            ]
+        });
+        let err = parse_corpus_output(&value, &caps, &ids).unwrap_err();
+        assert!(err.contains("duplicated"), "got: {err}");
+    }
+
+    #[test]
+    fn rejects_unknown_id_not_in_source_set() {
+        let caps = EmbedDatasetCaps::default();
+        let ids = source_set(&["a", "b"]);
+        let value = json!({
+            "output": [
+                {"id": "a", "vector": [1.0]},
+                {"id": "c", "vector": [2.0]},
+            ]
+        });
+        let err = parse_corpus_output(&value, &caps, &ids).unwrap_err();
+        assert!(err.contains("not in the source-items set"), "got: {err}");
+    }
+
+    #[test]
+    fn rejects_missing_output_key() {
+        let caps = EmbedDatasetCaps::default();
+        let ids = source_set(&["a"]);
+        let value = json!({"context": {}});
+        let err = parse_corpus_output(&value, &caps, &ids).unwrap_err();
+        assert!(err.contains("missing output"), "got: {err}");
+    }
+
+    #[test]
+    fn rejects_non_array_output() {
+        let caps = EmbedDatasetCaps::default();
+        let ids = source_set(&["a"]);
+        let value = json!({"output": {"not": "an array"}});
+        let err = parse_corpus_output(&value, &caps, &ids).unwrap_err();
+        assert!(err.contains("must be an array"), "got: {err}");
+    }
 }

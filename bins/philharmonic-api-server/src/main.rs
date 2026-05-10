@@ -439,6 +439,7 @@ fn build_runtime(config: &ApiConfig, state: &LongLivedState) -> Result<Runtime, 
             max_corpus_items: config.embed_dataset_max_corpus_items,
             max_corpus_vector_dimension: config.embed_dataset_max_corpus_vector_dimension,
             max_corpus_blob_bytes: config.embed_dataset_max_corpus_blob_bytes,
+            max_mechanics_response_bytes: config.embed_dataset_max_mechanics_response_bytes,
         })
         .rate_limit_config(rate_limit)
         .brand_name(config.webui_brand_name.as_str());
@@ -463,6 +464,7 @@ fn build_runtime(config: &ApiConfig, state: &LongLivedState) -> Result<Runtime, 
                 max_corpus_items: config.embed_dataset_max_corpus_items,
                 max_corpus_vector_dimension: config.embed_dataset_max_corpus_vector_dimension,
                 max_corpus_blob_bytes: config.embed_dataset_max_corpus_blob_bytes,
+                max_mechanics_response_bytes: config.embed_dataset_max_mechanics_response_bytes,
             },
         )));
     }

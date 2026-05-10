@@ -42,6 +42,8 @@ pub(crate) struct ApiConfig {
     pub(crate) embed_dataset_max_corpus_vector_dimension: usize,
     #[serde(default = "default_embed_dataset_max_corpus_blob_bytes")]
     pub(crate) embed_dataset_max_corpus_blob_bytes: usize,
+    #[serde(default = "default_embed_dataset_max_mechanics_response_bytes")]
+    pub(crate) embed_dataset_max_mechanics_response_bytes: usize,
     pub(crate) rate_limit: Option<RateLimitOverrides>,
     #[serde(default = "default_brand_name")]
     pub(crate) webui_brand_name: String,
@@ -80,6 +82,8 @@ impl Default for ApiConfig {
             embed_dataset_max_corpus_vector_dimension:
                 default_embed_dataset_max_corpus_vector_dimension(),
             embed_dataset_max_corpus_blob_bytes: default_embed_dataset_max_corpus_blob_bytes(),
+            embed_dataset_max_mechanics_response_bytes:
+                default_embed_dataset_max_mechanics_response_bytes(),
             rate_limit: None,
             webui_brand_name: default_brand_name(),
             #[cfg(feature = "https")]
@@ -176,6 +180,10 @@ pub(crate) const fn default_embed_dataset_max_corpus_vector_dimension() -> usize
 
 pub(crate) const fn default_embed_dataset_max_corpus_blob_bytes() -> usize {
     EmbedDatasetCaps::DEFAULT_MAX_CORPUS_BLOB_BYTES
+}
+
+pub(crate) const fn default_embed_dataset_max_mechanics_response_bytes() -> usize {
+    EmbedDatasetCaps::DEFAULT_MAX_MECHANICS_RESPONSE_BYTES
 }
 
 fn default_brand_name() -> String {
