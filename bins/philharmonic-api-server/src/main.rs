@@ -11,7 +11,8 @@ use axum::routing::any;
 use axum::{Router, extract::State};
 use clap::Parser;
 use philharmonic::api::{
-    PhilharmonicApiBuilder, RateLimitBucketConfig, RateLimitConfig, StubExecutor, StubLowerer,
+    EmbedDatasetCaps, PhilharmonicApiBuilder, RateLimitBucketConfig, RateLimitConfig, StubExecutor,
+    StubLowerer,
 };
 use philharmonic::connector_client::LowererSigningKey;
 use philharmonic::connector_common::{MLKEM768_PUBLIC_KEY_LEN, RealmId, RealmPublicKey};
@@ -39,12 +40,14 @@ use tower::ServiceExt;
 use zeroize::Zeroizing;
 
 mod config;
+mod embed_job;
 mod executor;
 mod lowerer;
 mod scope;
 mod security_headers;
 
 use config::ApiConfig;
+use embed_job::EmbedJobDispatcher;
 use executor::MechanicsWorkerExecutor;
 use lowerer::ConnectorConfigLowerer;
 use scope::HeaderBasedScopeResolver;
@@ -93,6 +96,11 @@ struct Runtime {
     api_router: Router,
     connector_dispatch: Option<DispatchConfig>,
     counts: RuntimeCounts,
+}
+
+struct StepExecutors {
+    workflow: Arc<dyn StepExecutor>,
+    embed_job: Option<Arc<MechanicsWorkerExecutor>>,
 }
 
 #[tokio::main]
@@ -407,25 +415,44 @@ fn build_runtime(config: &ApiConfig, state: &LongLivedState) -> Result<Runtime, 
     let registry = build_verifying_key_registry(&config.verifying_keys)?;
     let connector_dispatch = build_connector_dispatch(config)?;
     let rate_limit = build_rate_limit_config(config.rate_limit.as_ref());
-    let step_executor = build_step_executor(config)?;
+    let step_executors = build_step_executor(config)?;
     let config_lowerer = build_config_lowerer(config, state)?;
-    let store = SqlStore::new(state.pool.clone());
+    let embed_job_lowerer = build_embed_job_lowerer(config, state)?;
+    let store = Arc::new(SqlStore::new(state.pool.clone()));
 
     let mut builder = PhilharmonicApiBuilder::new()
         .request_scope_resolver(Arc::new(HeaderBasedScopeResolver::new(
             state.pool.pool().clone(),
         )))
-        .store(Arc::new(store))
+        .store(store.clone())
         .api_verifying_key_registry(registry)
         .api_signing_key(state.signing_key.clone())
         .issuer(config.issuer.clone())
-        .step_executor(step_executor)
+        .step_executor(step_executors.workflow)
         .config_lowerer(config_lowerer)
         .key_version(config.sck_key_version)
+        .embed_dataset_caps(EmbedDatasetCaps {
+            max_items: config.embed_dataset_max_items,
+            max_text_bytes: config.embed_dataset_max_text_bytes,
+            max_payload_bytes: config.embed_dataset_max_payload_bytes,
+            max_source_items_blob_bytes: config.embed_dataset_max_source_items_blob_bytes,
+        })
         .rate_limit_config(rate_limit)
         .brand_name(config.webui_brand_name.as_str());
     if let Some(sck_bytes) = &state.sck_bytes {
         builder = builder.sck(Sck::from_bytes(**sck_bytes));
+    }
+    if let (Some(executor), Some(lowerer), Some(sck_bytes)) = (
+        step_executors.embed_job,
+        embed_job_lowerer,
+        &state.sck_bytes,
+    ) {
+        builder = builder.embed_dataset_dispatcher(Arc::new(EmbedJobDispatcher::new(
+            store,
+            lowerer,
+            executor,
+            Arc::new(Sck::from_bytes(**sck_bytes)),
+        )));
     }
 
     let api = builder
@@ -480,34 +507,67 @@ fn build_config_lowerer(
     config: &ApiConfig,
     state: &LongLivedState,
 ) -> Result<Arc<dyn ConfigLowerer>, String> {
+    if !has_real_lowerer_config(config, state) {
+        report_missing_lowerer_config(config, state);
+        return Ok(Arc::new(StubLowerer));
+    }
+
+    build_connector_config_lowerer(config, state, config.lowerer_token_lifetime_ms)
+}
+
+fn build_embed_job_lowerer(
+    config: &ApiConfig,
+    state: &LongLivedState,
+) -> Result<Option<Arc<dyn ConfigLowerer>>, String> {
+    if !has_real_lowerer_config(config, state) {
+        return Ok(None);
+    }
+
+    // Option (i) from the Gate-1 proposal: keep a second lowerer instance for
+    // embed jobs so workflow token lifetime behavior remains unchanged.
+    build_connector_config_lowerer(config, state, 1_800_000).map(Some)
+}
+
+fn has_real_lowerer_config(config: &ApiConfig, state: &LongLivedState) -> bool {
+    config.lowerer_signing_key_path.is_some()
+        && config.lowerer_signing_key_kid.is_some()
+        && !config.realm_public_keys.is_empty()
+        && state.sck_bytes.is_some()
+        && config.connector_router_url.is_some()
+}
+
+fn report_missing_lowerer_config(config: &ApiConfig, state: &LongLivedState) {
     let has_path = config.lowerer_signing_key_path.is_some();
     let has_kid = config.lowerer_signing_key_kid.is_some();
     let has_realm_keys = !config.realm_public_keys.is_empty();
     let has_sck = state.sck_bytes.is_some();
     let has_router_url = config.connector_router_url.is_some();
 
-    if !(has_path && has_kid && has_realm_keys && has_sck && has_router_url) {
-        eprintln!("philharmonic-api: lowerer not fully configured, using stub lowerer");
-        if !has_path {
-            eprintln!("  missing: lowerer_signing_key_path");
-        }
-        if !has_kid {
-            eprintln!("  missing: lowerer_signing_key_kid");
-        }
-        if !has_realm_keys {
-            eprintln!("  missing: [[realm_public_keys]] (need at least one entry)");
-        }
-        if !has_sck {
-            eprintln!("  missing: sck_path (needed to decrypt endpoint configs)");
-        }
-        if !has_router_url {
-            eprintln!(
-                "  missing: connector_router_url (URL the mechanics worker uses to reach the connector router)"
-            );
-        }
-        return Ok(Arc::new(StubLowerer));
+    eprintln!("philharmonic-api: lowerer not fully configured, using stub lowerer");
+    if !has_path {
+        eprintln!("  missing: lowerer_signing_key_path");
     }
+    if !has_kid {
+        eprintln!("  missing: lowerer_signing_key_kid");
+    }
+    if !has_realm_keys {
+        eprintln!("  missing: [[realm_public_keys]] (need at least one entry)");
+    }
+    if !has_sck {
+        eprintln!("  missing: sck_path (needed to decrypt endpoint configs)");
+    }
+    if !has_router_url {
+        eprintln!(
+            "  missing: connector_router_url (URL the mechanics worker uses to reach the connector router)"
+        );
+    }
+}
 
+fn build_connector_config_lowerer(
+    config: &ApiConfig,
+    state: &LongLivedState,
+    token_lifetime_ms: u64,
+) -> Result<Arc<dyn ConfigLowerer>, String> {
     let path = config
         .lowerer_signing_key_path
         .as_deref()
@@ -540,23 +600,30 @@ fn build_config_lowerer(
         signing_key,
         realm_keys,
         issuer,
-        config.lowerer_token_lifetime_ms,
+        token_lifetime_ms,
         lowerer_store,
         sck,
         connector_router_url,
     )))
 }
 
-fn build_step_executor(config: &ApiConfig) -> Result<Arc<dyn StepExecutor>, String> {
+fn build_step_executor(config: &ApiConfig) -> Result<StepExecutors, String> {
     let Some(worker_url) = &config.mechanics_worker_url else {
         eprintln!("philharmonic-api: mechanics_worker_url not configured, using stub executor");
-        return Ok(Arc::new(StubExecutor));
+        return Ok(StepExecutors {
+            workflow: Arc::new(StubExecutor),
+            embed_job: None,
+        });
     };
 
-    Ok(Arc::new(
+    let executor = Arc::new(
         MechanicsWorkerExecutor::new(worker_url.clone(), config.mechanics_worker_token.clone())
             .map_err(|error| format!("invalid mechanics_worker_url: {error}"))?,
-    ))
+    );
+    Ok(StepExecutors {
+        workflow: executor.clone(),
+        embed_job: Some(executor),
+    })
 }
 
 fn build_realm_public_keys(

@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::path::PathBuf;
 
+use philharmonic::api::EmbedDatasetCaps;
 use philharmonic::types::UnixMillis;
 
 #[derive(Debug, serde::Deserialize)]
@@ -27,6 +28,14 @@ pub(crate) struct ApiConfig {
     pub(crate) sck_key_version: i64,
     pub(crate) connector_dispatch: HashMap<String, UpstreamConfig>,
     pub(crate) connector_domain_suffix: String,
+    #[serde(default = "default_embed_dataset_max_items")]
+    pub(crate) embed_dataset_max_items: usize,
+    #[serde(default = "default_embed_dataset_max_text_bytes")]
+    pub(crate) embed_dataset_max_text_bytes: usize,
+    #[serde(default = "default_embed_dataset_max_payload_bytes")]
+    pub(crate) embed_dataset_max_payload_bytes: usize,
+    #[serde(default = "default_embed_dataset_max_source_items_blob_bytes")]
+    pub(crate) embed_dataset_max_source_items_blob_bytes: usize,
     pub(crate) rate_limit: Option<RateLimitOverrides>,
     #[serde(default = "default_brand_name")]
     pub(crate) webui_brand_name: String,
@@ -56,6 +65,11 @@ impl Default for ApiConfig {
             sck_key_version: 1,
             connector_dispatch: HashMap::new(),
             connector_domain_suffix: "localhost".to_string(),
+            embed_dataset_max_items: default_embed_dataset_max_items(),
+            embed_dataset_max_text_bytes: default_embed_dataset_max_text_bytes(),
+            embed_dataset_max_payload_bytes: default_embed_dataset_max_payload_bytes(),
+            embed_dataset_max_source_items_blob_bytes:
+                default_embed_dataset_max_source_items_blob_bytes(),
             rate_limit: None,
             webui_brand_name: default_brand_name(),
             #[cfg(feature = "https")]
@@ -124,6 +138,22 @@ const fn default_not_after() -> UnixMillis {
 
 const fn default_lowerer_token_lifetime_ms() -> u64 {
     600_000
+}
+
+pub(crate) const fn default_embed_dataset_max_items() -> usize {
+    EmbedDatasetCaps::DEFAULT_MAX_ITEMS
+}
+
+pub(crate) const fn default_embed_dataset_max_text_bytes() -> usize {
+    EmbedDatasetCaps::DEFAULT_MAX_TEXT_BYTES
+}
+
+pub(crate) const fn default_embed_dataset_max_payload_bytes() -> usize {
+    EmbedDatasetCaps::DEFAULT_MAX_PAYLOAD_BYTES
+}
+
+pub(crate) const fn default_embed_dataset_max_source_items_blob_bytes() -> usize {
+    EmbedDatasetCaps::DEFAULT_MAX_SOURCE_ITEMS_BLOB_BYTES
 }
 
 fn default_brand_name() -> String {

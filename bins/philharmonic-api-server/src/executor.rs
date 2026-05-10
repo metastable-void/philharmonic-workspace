@@ -1,4 +1,6 @@
 use async_trait::async_trait;
+use std::time::Duration;
+
 use philharmonic::types::JsonValue;
 use philharmonic::workflow::{StepExecutionError, StepExecutor};
 use reqwest::header::{AUTHORIZATION, CONTENT_TYPE};
@@ -24,21 +26,36 @@ impl MechanicsWorkerExecutor {
             bearer_token: token,
         })
     }
-}
 
-#[async_trait]
-impl StepExecutor for MechanicsWorkerExecutor {
-    async fn execute(
+    pub(crate) async fn execute_with_run_timeout(
         &self,
         script: &str,
         arg: &JsonValue,
         config: &JsonValue,
+        run_timeout: Duration,
     ) -> Result<JsonValue, StepExecutionError> {
-        let job = json!({
+        self.execute_job(script, arg, config, Some(run_timeout))
+            .await
+    }
+
+    async fn execute_job(
+        &self,
+        script: &str,
+        arg: &JsonValue,
+        config: &JsonValue,
+        run_timeout: Option<Duration>,
+    ) -> Result<JsonValue, StepExecutionError> {
+        let mut job = json!({
             "module_source": script,
             "arg": arg,
             "config": config,
         });
+        if let Some(timeout) = run_timeout {
+            job["run_timeout"] = json!({
+                "secs": timeout.as_secs(),
+                "nanos": timeout.subsec_nanos(),
+            });
+        }
 
         let url = format!("{}/api/v1/mechanics", self.worker_url);
         let mut request = self
@@ -71,5 +88,17 @@ impl StepExecutor for MechanicsWorkerExecutor {
                 "mechanics worker returned invalid JSON response: {error}"
             ))
         })
+    }
+}
+
+#[async_trait]
+impl StepExecutor for MechanicsWorkerExecutor {
+    async fn execute(
+        &self,
+        script: &str,
+        arg: &JsonValue,
+        config: &JsonValue,
+    ) -> Result<JsonValue, StepExecutionError> {
+        self.execute_job(script, arg, config, None).await
     }
 }
