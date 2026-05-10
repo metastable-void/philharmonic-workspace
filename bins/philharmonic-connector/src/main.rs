@@ -6,7 +6,7 @@ use std::process;
 use std::sync::Arc;
 
 use axum::body::Bytes;
-use axum::extract::State;
+use axum::extract::{DefaultBodyLimit, State};
 use axum::http::{HeaderMap, StatusCode, header};
 use axum::response::{IntoResponse, Response};
 use axum::routing::post;
@@ -361,9 +361,20 @@ where
     Ok(())
 }
 
+/// Maximum request-body size accepted by the connector binary.
+///
+/// Raised from axum's 2 MiB default so that workflows passing large
+/// request bodies (notably `vector_search` corpora — a 1024-dim f32
+/// CorpusItem JSON-encodes to ~10-12 KiB, putting the practical limit
+/// around 170 items at the 2 MiB default) can land. The connector
+/// service still enforces logical caps inside each implementation;
+/// this is just the HTTP envelope ceiling.
+const MAX_REQUEST_BODY_BYTES: usize = 32 * 1024 * 1024;
+
 fn router(state: AppState) -> Router {
     Router::new()
         .route("/", post(handle_connector_request))
+        .layer(DefaultBodyLimit::max(MAX_REQUEST_BODY_BYTES))
         .with_state(state)
 }
 
