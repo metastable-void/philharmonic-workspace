@@ -25,3 +25,12 @@ flate2 = "1"
 zstd = { version = "0.13", features = ["zstdmt"] }
 poloto = "19"
 tagu = "0.1"
+
+# Used only by `xtask/src/bin/detect-virt.rs`'s CPUID-based VM
+# probe; gated to x86 / x86_64 targets so non-x86 build hosts
+# (aarch64 musl, ppc64le, etc.) don't pull or compile it. The
+# `mod cpuid` block in detect-virt.rs is gated identically; on
+# non-x86 it returns `None` immediately and never references
+# any `raw_cpuid::*` symbol.
+[target.'cfg(any(target_arch = "x86", target_arch = "x86_64"))'.dependencies]
+raw-cpuid = "11"

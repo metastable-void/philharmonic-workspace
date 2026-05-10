@@ -4602,6 +4602,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "raw-cpuid"
+version = "11.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "498cd0dc59d73224351ee52a95fee0f1a617a2eae0e7d9d720cc622c73a54186"
+dependencies = [
+ "bitflags",
+]
+
+[[package]]
 name = "rawpointer"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7657,6 +7666,7 @@ dependencies = [
  "clap",
  "flate2",
  "poloto",
+ "raw-cpuid",
  "serde",
  "serde_json",
  "sha2 0.10.9",

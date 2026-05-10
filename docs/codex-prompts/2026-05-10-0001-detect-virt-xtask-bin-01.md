@@ -57,7 +57,71 @@ Gate-1 review is needed.
 
 ## Outcome
 
-Pending — will be updated after Codex run.
+**Completed in one round.** Codex landed:
+
+- `xtask/src/bin/detect-virt.rs` (~1077 LOC) — single-file
+  binary covering all spec'd CLI flags
+  (`--vm` / `--container` / `-q` / `--list` / `--debug`,
+  mutex via `clap` `ArgGroup`), the full container probe
+  order (1-8), the full VM probe order (1-7,
+  DMI-before-CPUID), the source-of-truth id table behind
+  both `--list` and the matchers, fixture-driven `ProcFs`
+  abstraction with a `RealFs` and `FixtureFs` impl,
+  table-driven unit tests for the DMI matcher and
+  `/proc/1/environ` parser, fixtures for
+  `docker-on-kvm` / `kvm-on-amazon-ec2` / `vanilla-bare-metal`
+  / `xen-dom0` / `wsl`, smoke test for `detect(Mode::Any,
+  RealFs)`, `#![forbid(unsafe_code)]` at the bin level.
+- `xtask/tests/fixtures/detect-virt/**` — five fixture
+  trees (paths under each: `proc/1/environ`,
+  `sys/class/dmi/id/*`, `proc/sys/kernel/osrelease`,
+  `proc/xen/capabilities`, etc.).
+- `xtask/Cargo.toml` — added `raw-cpuid = "11"` dep.
+- `Cargo.lock` — picked up `raw-cpuid 11.6.0`.
+
+**Verification (Codex's own pre-landing run):**
+`./scripts/pre-landing.sh --xtask` passed clean.
+`./scripts/xtask.sh detect-virt -- --list` printed all 29
+ids ending in `none`. `./scripts/xtask.sh detect-virt --
+--debug` on the build host detected `lxc` (correct — this
+is a Linux container).
+
+**Codex's open questions (resolved by Claude in review):**
+
+1. *"Container env value `oci` was in the prompt's mapping
+   but not in the source-of-truth id list — treated as
+   no-supported-id rather than inventing one."* Correct
+   call. The spec's id table doesn't include `oci`; if
+   added later, both the table and the mapping land in the
+   same edit.
+2. *"`Cargo.lock` left dirty even though the action-safety
+   write list omitted it — required for dep resolution."*
+   Correct call. `Cargo.lock` always co-travels with a dep
+   add; the action-safety block was about SCOPE, not
+   exhaustivity.
+
+**Claude follow-up before landing (target-portability fix):**
+Codex placed `raw-cpuid = "11"` in unconditional
+`[dependencies]`, so non-x86 build hosts (aarch64 musl,
+ppc64le, etc.) would still try to pull and compile the
+crate even though every line that references `raw_cpuid::*`
+is already `cfg(any(target_arch = "x86", target_arch =
+"x86_64"))`-gated. Moved the dep to a
+`[target.'cfg(any(target_arch = "x86", target_arch =
+"x86_64"))'.dependencies]` table so the dep graph itself
+matches the source code's gating. Verified via
+`cargo tree --target x86_64-unknown-linux-gnu` (raw-cpuid
+present) vs. `--target aarch64-unknown-linux-gnu` /
+`powerpc64le-unknown-linux-gnu` (raw-cpuid absent).
+`pre-landing.sh --xtask` re-run after the fix is clean.
+
+**Residual coverage gap:** `--list` advertises 29 ids but
+the implementation can only actually emit ones reachable
+from the probes — `qnx` / `acrn` / `powervm` / `apple` /
+`sre` need s390 / arm64 / Apple Silicon / specific CPUID
+vendors that the build host lacks. This matches systemd's
+own behavior; flagged for the journal but not a fix
+target.
 
 ---
 

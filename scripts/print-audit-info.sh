@@ -80,4 +80,14 @@ sysres=$("$_here/xtask.sh" system-resources 2>/dev/null || echo "")
 cpus=$(printf '%s' "$sysres" | cut -f1)
 mem=$(printf '%s' "$sysres" | cut -f2)
 
-echo t="${t}" d="${wdir}" h="${host}" u="${user}/${uid}" g="${grp}/${gid}" 4="${v4}" 6="${v6}" k="${kern}/${krel}" a="${arch}" o="${os}" r="${rust}" c="${cpus}" m="${mem}"
+# Virtualization / container context from the `detect-virt`
+# xtask helper (id strings match systemd-detect-virt(1):
+# `kvm`, `docker`, `wsl`, `none`, …). The bin returns exit 1
+# on `none`, which is fine — we want `v=none` recorded just
+# as much as `v=kvm`; `|| true` salvages the exit code while
+# the `none` id lands on stdout. Empty if xtask isn't built
+# yet (fresh clone pre-first-build); the audit line is still
+# generated.
+virt=$("$_here/xtask.sh" detect-virt 2>/dev/null || true)
+
+echo t="${t}" d="${wdir}" h="${host}" u="${user}/${uid}" g="${grp}/${gid}" 4="${v4}" 6="${v6}" k="${kern}/${krel}" a="${arch}" o="${os}" v="${virt}" r="${rust}" c="${cpus}" m="${mem}"

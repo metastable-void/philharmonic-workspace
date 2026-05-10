@@ -664,12 +664,17 @@ their next `setup.sh` run.
 Every commit produced by `commit-all.sh` carries an
 `Audit-Info:` trailer (alongside `Signed-off-by:` and the
 GPG/SSH signature) recording the environment that produced it —
-timestamp, hostname, user/uid, group/gid, public IPv4+v6 with
-geolocation (queried once per invocation from
-`ipv4.icanhazip.com` / `ipv6.icanhazip.com`, not per submodule),
-kernel/release, arch, OS. Produced by
-`scripts/print-audit-info.sh`, parsed as a standard git trailer
-(`git log --format='%(trailers)'`).
+timestamp, working-directory absolute path, hostname,
+user/uid, group/gid, public IPv4+v6 with geolocation (queried
+once per invocation from `ipv4.icanhazip.com` /
+`ipv6.icanhazip.com`, not per submodule), kernel/release,
+arch, OS, virtualization id (`v=` field — output of the
+`detect-virt` xtask bin; `kvm`, `docker`, `lxc`, `wsl`,
+`none`, etc., matching systemd-detect-virt(1)'s vocabulary),
+Rust toolchain version, CPU thread count, and
+available/total memory bytes. Produced by
+`scripts/print-audit-info.sh`, parsed as a standard git
+trailer (`git log --format='%(trailers)'`).
 
 Pass `--anonymize` to `commit-all.sh` to replace the IPv4 and
 IPv6 fields with `hidden/ZZ` while keeping the rest. Host, user,

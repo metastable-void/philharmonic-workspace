@@ -814,15 +814,23 @@ Shape of the line (wrapped for readability; one physical line in
 the commit message):
 
 ```
-Audit-Info: t=<unix-ts> h=<hostname> u=<user>/<uid> g=<group>/<gid> \
+Audit-Info: t=<unix-ts> d=<wdir-absolute-path> h=<hostname> \
+            u=<user>/<uid> g=<group>/<gid> \
             4=<ipv4>/<geo> 6=<ipv6>/<geo> k=<kernel>/<release> \
-            a=<arch> o=<os-id>_<version-id> r=<rustc-version>
+            a=<arch> o=<os-id>_<version-id> v=<virt-id> \
+            r=<rustc-version> c=<cpu-threads> \
+            m=<mem-avail-bytes>/<mem-total-bytes>
 ```
 
 `r=` is the output of `rustc --version | awk '{print $2}'` (e.g.
 `1.95.0`). Empty if `rustc` isn't on `PATH` — rare, but possible
 for a docs-only commit on a machine without rustup; that case
 doesn't fail the commit.
+
+`v=` is the output of `./scripts/xtask.sh detect-virt` (id
+strings match systemd-detect-virt(1): `kvm`, `docker`, `lxc`,
+`wsl`, `none`, …). Empty if xtask isn't built yet on a fresh
+clone — the audit line still gets generated.
 
 Query trailers across history with git's native tools:
 
