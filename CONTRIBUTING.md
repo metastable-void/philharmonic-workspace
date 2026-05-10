@@ -805,6 +805,40 @@ output when anything changes.
   (and update this file) rather than reaching for raw git. This
   is the whole point of the wrapper-only rule.
 
+### 4.10 Commit message format
+
+Standard git format. Mandatory for both human-authored and
+agent-authored commits.
+
+- **First line: concise executive summary, ≤ 72 characters.**
+  Imperative voice (`add X`, `fix Y`, `update Z`), no trailing
+  period. The subject is what shows up in
+  `./scripts/heads.sh`, `git log --oneline`, GitHub PR titles,
+  Slack webhook digests, and the LLM summarizers — long subject
+  lines waste tokens and bury the headline. If you need more
+  than 72 chars to express the change, split into subject +
+  body.
+- **Blank line separating subject from body.**
+- **Body wraps at ≈ 72 columns.** No 1000-character paragraphs
+  on a single physical line. Hard-wrap by hand or in your
+  editor; the goal is readable `git log` / `git show` output
+  in a standard 80-column terminal.
+- **Body covers what's not in the subject** — per-file scope,
+  rationale, threat model implications, residual risks, links
+  to design docs / Codex prompt files / ROADMAP §s. Bullets
+  are fine; prose is fine; the only fixed shape is the wrap
+  width.
+
+The `Signed-off-by:` and `Audit-Info:` trailers (added by the
+hooks; see §4.3 + §4.6) live at the bottom, separated from
+the body by a blank line. The `Code-stats:` trailer (§4.7)
+sits next to the audit trailer.
+
+Why this matters: the workspace's auto-grounding hook,
+push-time LLM summarizers, and human reviewers all read
+subjects first; long single-line bodies-as-subjects defeat
+every one of them and burn context tokens unnecessarily.
+
 ---
 
 ## 5. Script wrappers over raw `cargo`

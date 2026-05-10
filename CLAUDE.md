@@ -264,6 +264,17 @@ full in `CONTRIBUTING.md`. Read the full section before acting
   outside the scripts. Every commit is `-s` sign-off + `-S`
   signature + `Audit-Info:` trailer; hooks enforce this.
   ([§4](CONTRIBUTING.md#4-git-workflow))
+- **Commit messages: subject ≤ 72 chars, blank line, body
+  wrapped at ≈ 72 cols.** Standard git format — first line is
+  a concise executive summary in the imperative, body covers
+  per-file scope / rationale / residual risks. Long
+  subject-as-body single lines waste tokens for every push-
+  time LLM summarizer, the auto-grounding hook, and human
+  reviewers (`./scripts/heads.sh`, `git log --oneline`,
+  GitHub PR titles, Slack digests). When passing a HEREDOC to
+  `commit-all.sh`, hard-wrap the body by hand inside the
+  heredoc; do not let single physical lines exceed ~72
+  cols. ([§4.10](CONTRIBUTING.md#410-commit-message-format))
 - **Git history is append-only.** No amend, no rebase, no reset,
   no force-push, and no `git revert` either. Two narrow
   script-enforced exceptions — the `post-commit`
