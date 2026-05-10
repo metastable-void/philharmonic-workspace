@@ -1,6 +1,6 @@
 # Gate-1 proposal: lowerer ephemeral support for embedding-dataset embed jobs
 
-**Date**: 2026-05-04 (revised 2026-05-10 — see "Pre-review feedback addressed" below)
+**Date**: 2026-05-04 (revised 2026-05-10 — see "Pre-review feedback addressed" and "Self-review feedback addressed" below)
 **Author**: Claude Code
 **Status**: PENDING REVIEW (Yuka)
 **Scope**: Post-v1 / post-MVP (embedding datasets feature, ROADMAP §9)
@@ -62,6 +62,43 @@ wontfix). Summary of changes:
    consumes `subject.tenant_id` for tenant binding, and no
    `StepRecord` subject is produced because ephemeral jobs
    have no step records).
+
+---
+
+## Self-review feedback addressed (2026-05-10)
+
+After Yuka's Gate-1 sign-off (committed in `e36cce2`, see
+[`docs/crypto/approvals/2026-05-04-post-v1-embed-dataset-lowerer-ephemeral.md`](../approvals/2026-05-04-post-v1-embed-dataset-lowerer-ephemeral.md)),
+Claude self-reviewed the revised proposal per the approval
+condition and identified one further finding, addressed in this
+revision:
+
+5. **Synthesized `inst` UUID version + `EntityId`
+   construction** — the original implementation sketch wrote
+   `EntityId::from_uuid(Uuid::new_v4())` and
+   `ephemeral_inst.as_uuid()`, neither of which exists on
+   `EntityId<T>`; decision 4 also recorded `Uuid::new_v4()` as
+   the synthesized inst source. The wire `inst` claim is
+   sourced from `instance_id.internal().as_uuid()`
+   (`bins/philharmonic-api-server/src/lowerer.rs:74`), where
+   `InternalId<WorkflowInstance>` is UUID v7 — `InternalId::from_uuid`
+   rejects anything that isn't v7
+   (`philharmonic-types/src/id.rs:111-122`). The sketch now
+   constructs the embed-job inst via `Identity { internal:
+   Uuid::now_v7(), public: Uuid::new_v4() }.typed::<WorkflowInstance>()`
+   so both halves' v7/v4 invariants hold and the wire `inst`
+   matches the v1-step path bit-for-bit. Decision 4 and the
+   crypto-primitives table are updated accordingly. The tracing
+   line uses `.internal().as_uuid()` (the actual `EntityId`
+   accessor). This is the same shape of error as Finding 4 —
+   invented API; round-1 caught the SubjectContext call, this
+   round catches the EntityId call.
+
+   **Approval-state note**: Yuka's Gate-1 approval lives in the
+   separate file linked above. The "PENDING REVIEW" status header
+   and the Approval block at the bottom of this file are kept as
+   the proposal's own artefact; the approval file is the
+   authoritative sign-off record.
 
 ---
 
@@ -271,30 +308,41 @@ regeneration. Connector-service verification update. Roughly
 verification logic **unchanged**.
 
 The embed-job dispatch site in `philharmonic-api-server`
-mints a fresh UUID v4 per ephemeral job:
+mints a fresh `EntityId<WorkflowInstance>` per ephemeral job
+— a UUID v7 internal half (the wire `inst`) plus a UUID v4
+public half (required by `Identity::typed` but never used
+downstream):
 
 ```rust
-let ephemeral_inst: EntityId<WorkflowInstance> =
-    EntityId::from_uuid(Uuid::new_v4());
+let ephemeral_inst: EntityId<WorkflowInstance> = Identity {
+    internal: Uuid::now_v7(),
+    public: Uuid::new_v4(),
+}
+.typed()
+.expect("freshly-minted v7+v4 pair satisfies Identity::typed");
 let ephemeral_step: u64 = 0;
 let lowered = lowerer
     .lower(&abstract_cfg, ephemeral_inst, ephemeral_step, &subject)
     .await?;
 ```
 
-The lowerer pipes that UUID through to `ConnectorTokenClaims.inst`
-and `AeadAadInputs.inst` exactly as it does for real workflow
-steps. The connector service verifies the COSE_Sign1 signature,
-verifies the COSE_Encrypt0 AEAD with the same AAD shape, and
-delivers a `ConnectorCallContext` whose `instance_id` is the
-synthesized UUID. The service has no way to tell the difference
-— and no security-relevant reason to care.
+The lowerer extracts the wire `inst` from
+`instance_id.internal().as_uuid()` (the v7 half) and pipes it
+through to `ConnectorTokenClaims.inst` and `AeadAadInputs.inst`
+exactly as it does for real workflow steps. The connector service
+verifies the COSE_Sign1 signature, verifies the COSE_Encrypt0
+AEAD with the same AAD shape, and delivers a
+`ConnectorCallContext` whose `instance_id` is the synthesized
+v7 UUID. The service has no way to tell the difference — and no
+security-relevant reason to care.
 
 ### What changes
 
 - **`bins/philharmonic-api-server/src/`** (only): the embed-job
-  dispatch site mints a UUID v4 per job. One isolated module
-  edit, ~10 lines plus a clearly-marked code comment.
+  dispatch site mints a fresh `EntityId<WorkflowInstance>` per
+  job (UUID v7 internal + UUID v4 public via `Identity::typed`).
+  One isolated module edit, ~10 lines plus a clearly-marked
+  code comment.
 - **`docs/design/16-embedding-datasets.md`**: update the
   "Lowerer integration" section to reflect Approach B as the
   chosen path (already drafted as one of the two approaches).
@@ -440,12 +488,27 @@ pub async fn run_embed_job(
     max_batch_size: usize,
     tenant_id: EntityId<Tenant>,
 ) -> Result<Vec<CorpusItem>, EmbedJobError> {
-    // Synthesize a non-persisted WorkflowInstance UUID.
+    // Synthesize a non-persisted WorkflowInstance EntityId.
     // This is intentional — see Gate-1 proposal cited above.
-    // The UUID is unique per job and is not inserted into the
+    // The pair is unique per job and is not inserted into the
     // workflow_instance store.
-    let ephemeral_inst: EntityId<WorkflowInstance> =
-        EntityId::from_uuid(Uuid::new_v4());
+    //
+    // The wire `inst` claim is sourced from
+    // `instance_id.internal().as_uuid()` in the lowerer
+    // (`bins/philharmonic-api-server/src/lowerer.rs:74`), where
+    // `InternalId<WorkflowInstance>` is UUID v7. We mint v7 for
+    // the internal half (the half that reaches the wire) and v4
+    // for the public half (required by the `Identity::typed`
+    // v4-public-half invariant; never used downstream because
+    // the embed job has no substrate row to externalise).
+    // `Identity::typed` succeeds on a freshly-minted v7+v4 pair
+    // by construction, so the `expect` is infallible.
+    let ephemeral_inst: EntityId<WorkflowInstance> = Identity {
+        internal: Uuid::now_v7(),
+        public: Uuid::new_v4(),
+    }
+    .typed()
+    .expect("freshly-minted v7+v4 pair satisfies Identity::typed");
     let ephemeral_step: u64 = 0;
 
     let abstract_cfg = build_abstract_cfg_for_endpoint(
@@ -493,7 +556,7 @@ pub async fn run_embed_job(
         tenant = %tenant_id,
         dataset_id = %dataset_id,
         embed_endpoint_id = %embed_endpoint_id,
-        synthetic_inst = %ephemeral_inst.as_uuid(),
+        synthetic_inst = %ephemeral_inst.internal().as_uuid(),
         "embed-job lowerer dispatch"
     );
 
@@ -514,7 +577,9 @@ pub async fn run_embed_job(
 ### What this adds
 
 - One module under `bins/philharmonic-api-server/src/`.
-- One UUID v4 mint per embed-job dispatch.
+- One fresh `EntityId<WorkflowInstance>` mint per embed-job
+  dispatch (UUID v7 internal half = wire `inst`; UUID v4 public
+  half = unused but required by `Identity::typed`).
 - Existing lowerer trait, claims, AAD, and connector-service
   verification all unchanged.
 
@@ -540,7 +605,8 @@ Identical to the v1 step lowerer (Phase 9 Gate-1 approved
 | HKDF-SHA256 | `hkdf` + `sha2` | 0.13 / 0.11 | Wave B Gate-2 ✅ |
 | AES-256-GCM (COSE_Encrypt0) | `aes-gcm` | 0.10 | Wave B Gate-2 ✅ |
 | SHA-256 (payload hash + AAD digest) | `sha2` | 0.11 | Phase 2 Gate-2 ✅ |
-| UUID v4 (ephemeral inst) | `uuid` (`v4` feature) | 1.x | not crypto-bound; UUID v4 is randomly generated |
+| UUID v7 (ephemeral inst — wire `inst` half) | `uuid` (`v7` feature) | 1.x | not crypto-bound; v7 timestamp prefix + 62 random bits — collision-free at workspace scale |
+| UUID v4 (ephemeral inst — `Identity` public half) | `uuid` (`v4` feature) | 1.x | not crypto-bound and not on the wire; minted only to satisfy `Identity::typed`'s v4-public-half invariant |
 
 **No new primitives, no new constructions, no new library
 dependencies, no `unsafe` blocks.**
@@ -555,9 +621,11 @@ realm public keys (`RealmPublicKey`, no zeroization needed
 — public material) are loaded at API-server startup and
 reused for every lowering call (step or ephemeral).
 
-The synthesized UUID v4 is **not** key material; it is a
-public binding identifier sourced from `OsRng` via `uuid`'s
-`v4` feature.
+The synthesized inst (UUID v7 + UUID v4 pair) is **not** key
+material; it is a public binding identifier sourced from
+timestamp + `OsRng` via `uuid`'s `v7` and `v4` features. Only
+the v7 internal half reaches the wire as `inst`; the v4 public
+half is local to the API server.
 
 ---
 
@@ -609,9 +677,9 @@ The embed-job code path needs:
 
 3. **Negative test** — assert that an embed-job token does
    not collide with any in-flight workflow-step token by
-   construction (UUID v4 randomness; verify in a probabilistic
-   property test that 1 000 ephemeral UUIDs don't collide with
-   1 000 instance UUIDs).
+   construction (UUID v7 timestamp + 62 random bits; verify in
+   a probabilistic property test that 1 000 ephemeral v7 UUIDs
+   don't collide with 1 000 v7 workflow-instance UUIDs).
 
 No fresh COSE_Sign1 / COSE_Encrypt0 hex-byte vectors are
 generated; the existing committed vectors continue to pin the
@@ -722,10 +790,19 @@ unchanged from Wave B Gate-2:
    ephemeral job has one logical step; using `0` keeps the
    AAD-binding deterministic and avoids any need for a per-job
    step counter.
-4. **Synthesized UUID source.** Proposal: `uuid::Uuid::new_v4()`
-   (RFC 4122 random). UUID v4 collision probability is
-   negligible at workspace scale; no central registry is
-   required.
+4. **Synthesized UUID source.** Proposal (revised per
+   self-review Finding 5): `Identity { internal: Uuid::now_v7(),
+   public: Uuid::new_v4() }.typed::<WorkflowInstance>()`. The
+   wire `inst` is the v7 internal half (`bins/philharmonic-
+   api-server/src/lowerer.rs:74` extracts it via
+   `instance_id.internal().as_uuid()`); the v4 public half is
+   minted only because `Identity::typed` validates both halves
+   and is never used downstream. UUID v7 has a millisecond
+   timestamp prefix + 62 random bits, providing collision-free
+   identifiers at workspace scale with no central registry.
+   (The original proposal said `uuid::Uuid::new_v4()`;
+   `InternalId::from_uuid` rejects v4 with `IdKindError`, so
+   that wording would have failed at construction.)
 5. **Documentation.** Proposal: a multi-line code comment at
    the synthesis site citing this Gate-1 file by path; design
    16's "Lowerer integration" section updated to mark
