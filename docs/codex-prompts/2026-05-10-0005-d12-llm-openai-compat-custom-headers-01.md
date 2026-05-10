@@ -58,7 +58,79 @@ D12 adds a generic `custom_headers` map.
 
 ## Outcome
 
-Pending — will be updated after Codex run.
+**Completed 2026-05-10** — single deliverable landed; commits
+`2fff3bb` (parent) + `3fef1f4`
+(`philharmonic-connector-impl-llm-openai-compat` 0.1.0 →
+0.1.1).
+
+`./scripts/pre-landing.sh` GREEN end-to-end on Claude's
+independent re-run. Codex's own pre-landing pass was also
+green on first attempt — the "pre-landing-sh hygiene"
+preamble (cargo fmt + rustdoc upfront) has reliably worked
+for four consecutive rounds now.
+
+**Spot-checks passed**:
+
+- `client.rs:31-34` — existing `Authorization: Bearer
+  <api_key>` and `Content-Type: application/json` lines
+  preserved bit-for-bit. Custom-header iteration attaches
+  AFTER those two.
+- `config.rs:11` — `#[serde(try_from = "LlmOpenaiCompatConfigRaw")]`
+  shim wires validate-at-deserialize-time semantics
+  exactly as the prompt prescribed.
+- `config.rs:48-49` — `TryFrom<Raw>::try_from` calls
+  `validate_custom_headers` first thing.
+- 17 config-level test scenarios + 1 wiremock-based
+  client-level test (`execute_one_attempt_applies_custom_headers`).
+- `retry.rs` touched only because the exhaustive `Error`
+  match needed the new `InvalidCustomHeader` variant marked
+  non-retryable — legitimate same-crate consequence, not
+  scope creep.
+- No edits to any other crate. No edits to
+  `philharmonic-connector-common`,
+  `philharmonic-connector-impl-api`, etc.
+
+**Codex's deliverable choices** (per the prompt's residual-
+risks request):
+
+- Validation runs at deserialize-time via `#[serde(try_from
+  = "LlmOpenaiCompatConfigRaw")]`. No execute-time-only
+  fallback.
+- Wiremock client-level test present (the crate already
+  had wiremock as a dev-dep, no new dep added).
+- Defensive runtime `HeaderName::try_from` /
+  `HeaderValue::try_from` fallback maps to
+  `Error::Internal` — should be unreachable since validate-
+  time rejected anything reqwest would refuse, but guards
+  against manually-constructed configs that bypass serde.
+
+**ROADMAP §3.C discrepancy fixed in same parent-only
+commit**: the §3.C entry initially said `HashMap`, but the
+prompt and implementation correctly used `BTreeMap` for
+deterministic ordering. ROADMAP entry updated to match what
+landed; rationale documented inline.
+
+**Open questions Codex surfaced**:
+
+1. Per-impl validation hook at the API layer
+   (`philharmonic-api/src/routes/endpoints.rs::validate_abstract_config`)
+   so bad configs are rejected at endpoint-config write
+   time rather than at first decrypt — out of D12 scope.
+   Reasonable D13/D14 follow-up.
+2. Dedicated `custom_headers` WebUI editor vs. JSON-edited
+   through CodeMirror 6. Probably stays JSON-edited for
+   v1; flagged for D6 / WebUI-pass consideration.
+
+**Structured-output-contract honored** for the fourth
+consecutive round (rounds 02 / 03 / 04 / D12 all emitted
+the six-section report with `RUN STATUS: COMPLETE` token
+before `task_complete`). The contract has settled into
+reliable convention.
+
+D12 was the smallest dispatch of the day (~6 minutes Codex
+time vs round 02's 18 min and round 03's 12 min) and lands
+the production HF Inference org-billing unblocker before
+D7/D8/D9 per Yuka's directive.
 
 ---
 

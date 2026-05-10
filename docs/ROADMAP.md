@@ -167,13 +167,17 @@ parallel.
 ### C. Connector enhancements (1 dispatch)
 
 - **D12** `philharmonic-connector-impl-llm-openai-compat`:
-  add a `custom_headers: HashMap<String, String>` knob to the
-  runtime endpoint config so deployments can attach
+  add a `custom_headers: BTreeMap<String, String>` knob to
+  the runtime endpoint config so deployments can attach
   provider-specific HTTP headers to upstream calls. Driven by
   Hugging Face Inference's `X-HF-Bill-To` (org billing); also
   covers OpenAI's `OpenAI-Organization` / `OpenAI-Project`,
   OpenRouter's `HTTP-Referer` / `X-Title`, and similar
   per-provider knobs across the OpenAI-compatible ecosystem.
+  `BTreeMap` (not `HashMap`) for deterministic-fixture
+  comparisons + sorted serialised keys matching the
+  workspace's canonical-JSON / deterministic-CBOR discipline.
+  **DONE 2026-05-10 (`2fff3bb`).**
 
   The field belongs to the **runtime endpoint config** — i.e.
   the impl-side decrypted-config struct in
