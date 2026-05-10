@@ -151,7 +151,7 @@ files tracked directly in the parent repo):
   `system-resources` (machine-readable thread count + memory
   stats consumed by `Audit-Info:` trailer generation — not
   for day-to-day status checks; use `resource-pressure` for
-  that), `stats-graph` (read `stats-log.sh` lines from stdin,
+  that), `stats-graph` (read `log.sh --stats` lines from stdin,
   emit an SVG line chart of total/code/docs lines over time
   via the `poloto` crate; pipelined by
   `./scripts/update-stats-graph.sh` into `docs/stats.svg`,
@@ -379,7 +379,7 @@ commit without a valid GPG/SSH signature), `non_fast_forward`
 append-only rule), and `deletion` (branches cannot be removed).
 DCO sign-off is intentionally **not** part of the server-side
 ruleset — GitHub's native ruleset grammar has no DCO rule type;
-sign-offs remain a local-hook + `scripts/git-log.sh` review
+sign-offs remain a local-hook + `scripts/log.sh` review
 concern. Submodule repositories do not carry matching rulesets
 today; the local hook layer is the defence line there. See
 [`CONTRIBUTING.md §4.8`](CONTRIBUTING.md#48-github-side-ruleset-parent-workspace-repo-only)
@@ -524,28 +524,49 @@ Invoke by path (`./scripts/foo.sh`), not via `bash`.
   `push-all.sh` to verify every commit carries a cryptographic
   signature. Canonical replacement for raw `git log -n 1` across
   repos.
-- `./scripts/git-log.sh [-n <N>|--count <N>] [<submodule-path>]` —
-  pretty-print a repo's git log (default last 500 commits) with
-  DCO sign-off and GPG/SSH signature status per commit.
+- `./scripts/log.sh [--history|--audit|--stats] [-n <N>|--count <N>] [--no-color] [<submodule-path>]` —
+  unified pretty-printed git-log front-end with three modes
+  (mutually exclusive; `--history` is the default). Replaces
+  the retired `git-log.sh` / `audit-log.sh` / `stats-log.sh`.
   Default target is the parent workspace repo; pass a submodule
   path relative to the workspace root (e.g. `mechanics-core`,
   `philharmonic-types`) to inspect that submodule's own
-  history. Columns: short SHA, date, `%G?` signature, sign-off
-  label (`[signed-off]` / `[unknown sign-off]` / `[NOT
-  signed-off]`), author, subject. The sign-off label matches
-  `Signed-off-by:` trailers against the commit's author email
-  (`%ae`), so imported patches and co-author-only sign-offs are
-  surfaced distinctly from violations of the DCO rule. Useful
-  for auditing history — e.g. `./scripts/git-log.sh | grep -E
-  '\[(N|NOT signed-off)\]'` finds parent-repo commits that
-  escaped the signing / DCO invariants; loop over submodule
-  names (or run across every submodule via `git submodule
-  foreach 'cd $toplevel && ./scripts/git-log.sh "$name"'`) to
-  audit the whole workspace. Rejects paths that aren't a repo
-  root (subdirectories of the parent and the in-tree `xtask/`
-  member are not submodules — their history is the parent's).
-  Requires git ≥ 2.32 (uses `valueonly=true` and
-  `separator=%x1f` on `%(trailers:key=…)`).
+  history. Modes:
+  - `--history` (default; was `git-log.sh`) — columns:
+    short SHA, date, `%G?` signature, sign-off label
+    (`[signed-off]` / `[unknown sign-off]` / `[NOT
+    signed-off]`), author, subject. Default count: 500.
+    Sign-off label matches `Signed-off-by:` trailers against
+    author email (`%ae`), so imported patches and
+    co-author-only sign-offs are surfaced distinctly from
+    DCO violations. Useful for auditing history — e.g.
+    `./scripts/log.sh | grep -E '\[(N|NOT signed-off)\]'`
+    finds parent-repo commits that escaped the signing / DCO
+    invariants; loop over submodule names (or
+    `git submodule foreach 'cd $toplevel && ./scripts/log.sh
+    "$name"'`) to audit the whole workspace.
+  - `--audit` (was `audit-log.sh`) — columns: short SHA,
+    ISO time, `%G?`, sign-off label, author, diffstat
+    (`-<del> +<ins>`), and the `Audit-Info:` trailer body.
+    Default count: 200. The trailer carries timestamp,
+    workspace-dir, host, user/uid, group/gid, public IPv4+v6
+    with geo, kernel/release, arch, OS, virtualization id,
+    Rust version, CPU thread count, and memory.
+  - `--stats` (was `stats-log.sh`) — columns: short SHA,
+    ISO time (with timezone preserved), author,
+    `Code-stats:` trailer body (`<files>F <lines>L (<code>C
+    <docs>D)`), per-commit delta vs. predecessor (`Δ`).
+    Default count: 200. Falls back to
+    [`docs/stats-cache.tsv`](docs/stats-cache.tsv) for
+    parent-repo commits whose trailer is absent
+    (pre-trailer-adoption history). Cache fallback is
+    parent-repo only — submodule views skip it because the
+    SHAs do not match.
+  Rejects paths that aren't a repo root (subdirectories of
+  the parent and the in-tree `xtask/` member are not
+  submodules — their history is the parent's). Requires git
+  ≥ 2.32 (uses `valueonly=true` and `separator=%x1f` on
+  `%(trailers:key=…)`).
 - `./scripts/rust-lint.sh [--xtask | <crate>]` — workspace-wide
   (or per-crate) `cargo fmt --check` + `cargo check` + `cargo
   clippy --all-targets -- -D warnings` + `cargo doc --no-deps`
@@ -630,7 +651,7 @@ Invoke by path (`./scripts/foo.sh`), not via `bash`.
 - `./scripts/project-status.sh [-n <log-lines>] [--model <model>]` —
   generate an LLM-written summary of the workspace's development
   history and current status. Assembles `README.md`, `docs/ROADMAP.md`,
-  and `./scripts/git-log.sh -n <N>` (default 500) into a single
+  and `./scripts/log.sh --history -n <N>` (default 500) into a single
   prompt payload, pipes it through
   `./scripts/xtask.sh openai-chat --`, and **writes the model's
   reply to a timestamped file under
@@ -750,7 +771,7 @@ Invoke by path (`./scripts/foo.sh`), not via `bash`.
   gitlink-pinned submodule SHA into a `/tmp` scratch dir, runs
   `tokei`, and appends a sha-keyed row to
   [`docs/stats-cache.tsv`](docs/stats-cache.tsv) (the tracked
-  sidecar that `scripts/stats-log.sh` consults as a fallback
+  sidecar that `scripts/log.sh --stats` consults as a fallback
   when a commit's trailer is absent). Includes a rename
   heuristic — if the recorded path is missing in the current
   workspace, scans every initialized submodule for the SHA and
@@ -766,11 +787,6 @@ Invoke by path (`./scripts/foo.sh`), not via `bash`.
   `clippy`/`miri` are currently processing. Use when cargo
   appears stuck. `watch -n 2 ./scripts/build-status.sh` for
   continuous monitoring.
-- `./scripts/audit-log.sh [-n <count>] [--no-color] [<submodule>]`
-  — pretty-print the commit audit trail (`Audit-Info:` trailers)
-  with signature status, sign-off, and diffstat.
-- `./scripts/stats-log.sh [-n <count>] [--no-color] [<submodule>]`
-  — pretty-print `Code-stats:` trailers with per-commit deltas.
 - `./scripts/new-submodule.sh --name <N> --remote-url <URL>
   [--description <D>] [--before <M>] [--skip-workspace-member]
   [--adopt-existing] [--dry-run]` — scaffold a new submodule

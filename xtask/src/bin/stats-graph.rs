@@ -1,7 +1,7 @@
 //! stats-graph — render an SVG line graph of workspace size over
-//! time from `stats-log.sh`-formatted stdin.
+//! time from `log.sh --stats`-formatted stdin.
 //!
-//! Reads `./scripts/stats-log.sh`-style lines on stdin (one commit
+//! Reads `./scripts/log.sh --stats`-style lines on stdin (one commit
 //! per line, with the `Code-stats:` trailer parsed out), and
 //! writes an SVG line chart to stdout with three series:
 //!
@@ -30,7 +30,7 @@
 //! sparse chart isn't silent about its sparseness.
 //!
 //! Usage:
-//!   ./scripts/stats-log.sh --no-color | ./scripts/xtask.sh stats-graph
+//!   ./scripts/log.sh --stats --no-color | ./scripts/xtask.sh stats-graph
 //!
 //! Typically wrapped by `./scripts/update-stats-graph.sh` which
 //! pipes the log into this bin and redirects the result to
@@ -223,7 +223,7 @@ fn move_x_axis_name(svg: String, new_y: &str) -> String {
     out
 }
 
-/// Parse one stats-log.sh line; returns None for lines without
+/// Parse one `log.sh --stats` line; returns None for lines without
 /// a parseable `Code-stats:` payload.
 ///
 /// Expected line shape:
@@ -308,7 +308,7 @@ fn main() -> Result<()> {
         );
     }
 
-    // stats-log.sh emits newest-first; plot wants oldest-first.
+    // log.sh --stats emits newest-first; plot wants oldest-first.
     samples.sort_by(|a, b| {
         a.t_unix
             .partial_cmp(&b.t_unix)

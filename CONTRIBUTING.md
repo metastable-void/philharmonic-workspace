@@ -335,26 +335,39 @@ for history browsing; the prohibition is on state changes.
 - `heads.sh` — short-SHA / `%G?` / subject for parent +
   every submodule in one pass. Canonical replacement for raw
   `git log -n 1` across repos.
-- `git-log.sh [-n <N>|--count <N>] [<submodule-path>]` —
-  pretty-print a repo's git log (default last 500 commits) with
-  DCO sign-off and GPG/SSH signature status per commit. Default
-  target is the parent workspace repo; pass a submodule path
-  relative to the workspace root (e.g. `mechanics-core`,
-  `philharmonic-types`) to inspect that submodule's own
-  history. Emits columns `<sha> <date> [<%G?>]
-  [<sign-off-label>] <author> | <subject>`; the sign-off label
-  matches `Signed-off-by:` trailers against the commit's author
-  email (`%ae`) so imported patches, co-author-only sign-offs,
-  and genuine DCO violations are distinguishable. Useful for
-  auditing commit history against §4.3's sign-off + signature
-  invariants — `./scripts/git-log.sh | grep -E '\[(N|NOT
-  signed-off)\]'` for the parent; loop over submodule names (or
-  `git submodule foreach 'cd $toplevel && ./scripts/git-log.sh
-  "$name"'`) to audit the whole workspace. Rejects paths that
-  aren't a git-repo root, so subdirectories of the parent and
-  the in-tree `xtask/` member (which share the parent's
-  history) don't accidentally masquerade as submodules.
-  Requires git ≥ 2.32.
+- `log.sh [--history|--audit|--stats] [-n <N>|--count <N>] [<submodule-path>]` —
+  unified pretty-printed git-log front-end, three modes
+  (mutually exclusive; `--history` is the default). Replaces
+  the retired `git-log.sh` / `audit-log.sh` / `stats-log.sh`.
+  Default target is the parent workspace repo; pass a
+  submodule path relative to the workspace root (e.g.
+  `mechanics-core`, `philharmonic-types`) to inspect that
+  submodule's own history.
+  - `--history` (default; previously `git-log.sh`): columns
+    `<sha> <date> [<%G?>] [<sign-off-label>] <author> |
+    <subject>`. Default count: 500. Sign-off label matches
+    `Signed-off-by:` trailers against author email (`%ae`)
+    so imported patches, co-author-only sign-offs, and
+    genuine DCO violations are distinguishable. Audit the
+    sign-off + signature invariants from §4.3 with
+    `./scripts/log.sh | grep -E '\[(N|NOT signed-off)\]'`
+    for the parent; loop over submodule names (or
+    `git submodule foreach 'cd $toplevel && ./scripts/log.sh
+    "$name"'`) to cover the whole workspace.
+  - `--audit` (previously `audit-log.sh`): columns
+    `<sha> <ISO> [<%G?>] [<sign-off-label>] <author>
+    | -<del> +<ins> | <Audit-Info trailer>`. Default count: 200.
+  - `--stats` (previously `stats-log.sh`): columns
+    `<sha> <ISO-with-tz> <author> | <files>F <lines>L
+    (<code>C <docs>D) | Δ +<files>F +<lines>L (+<code>C
+    +<docs>D)`. Default count: 200. Falls back to
+    `docs/stats-cache.tsv` for parent-repo commits whose
+    `Code-stats:` trailer is absent (pre-trailer-adoption
+    history).
+  Rejects paths that aren't a git-repo root, so subdirectories
+  of the parent and the in-tree `xtask/` member (which share
+  the parent's history) don't accidentally masquerade as
+  submodules. Requires git ≥ 2.32.
 - `check-detached.sh` — fails non-zero if any submodule is in
   detached HEAD. Pre-flight for `commit-all.sh`.
 - `show-dirty.sh` — one-per-line list of dirty submodule names.
@@ -380,7 +393,7 @@ for history browsing; the prohibition is on state changes.
   pre-trailer commit by `git archive`-ing the parent and every
   gitlink-pinned submodule SHA into a /tmp scratch dir, runs
   `tokei`, and appends a sha-keyed row to `docs/stats-cache.tsv`
-  (the tracked sidecar that `stats-log.sh` consults as a
+  (the tracked sidecar that `log.sh --stats` consults as a
   fallback when a commit's trailer is absent). Includes a rename
   heuristic — if the recorded path is missing in the current
   workspace, scans every initialized submodule for the SHA and
@@ -683,7 +696,7 @@ is cross-checking "which machine produced this" against a
 local-state map. It's not a substitute for the DCO or the
 signature.
 
-Inspect with `./scripts/audit-log.sh` (one line per commit —
+Inspect with `./scripts/log.sh --audit` (one line per commit —
 hash, timestamp, signature/sign-off verdicts, author, diffstat,
 and the Audit-Info trailer).
 
@@ -699,7 +712,7 @@ Code-stats: 812 files, 135719 total lines (68821 code lines, 48917 docs lines)
 Produced from `./scripts/stats.sh` (which parses the Total row
 from `./scripts/tokei.sh`). Per-commit deltas are not stored —
 each trailer is an absolute snapshot — but
-`./scripts/stats-log.sh` walks the log and computes deltas
+`./scripts/log.sh --stats` walks the log and computes deltas
 against each commit's predecessor for at-a-glance growth
 review. Because `commit-all.sh` uses one shared commit-message
 file for its submodule-first walk and the parent commit,
@@ -715,7 +728,7 @@ reconstructs each pre-trailer commit's tree (parent + every
 submodule's gitlink-pinned SHA) into a /tmp scratch dir, runs
 `tokei`, and appends a sha-keyed row to the tracked sidecar
 cache at [`docs/stats-cache.tsv`](docs/stats-cache.tsv).
-`scripts/stats-log.sh` consults that cache as a fallback when a
+`scripts/log.sh --stats` consults that cache as a fallback when a
 commit lacks the trailer — so the SVG and the textual log carry
 real numbers + deltas across the trailer-adoption boundary
 without the append-only-history rule needing to bend.
@@ -756,7 +769,7 @@ Three GitHub-native rules are on:
   grammar has no DCO rule type. A GitHub Actions DCO check exists
   but is not installed — the workspace relies on `commit-msg` +
   `pre-push` for sign-off enforcement, and the trailer is verified
-  post-landing via `scripts/git-log.sh`'s `[signed-off]` /
+  post-landing via `scripts/log.sh`'s `[signed-off]` /
   `[NOT signed-off]` labelling (see §4.5 and the script's header).
   If sign-off enforcement ever needs a server-side backstop, it
   will be a workflow / app addition, not a ruleset rule.
@@ -1213,7 +1226,7 @@ xtask/
         │                         # pre-flight before pre-landing.sh,
         │                         # a Codex dispatch, or any
         │                         # resource-heavy operation
-        ├── stats-graph.rs        # read stats-log.sh lines from
+        ├── stats-graph.rs        # read log.sh --stats lines from
         │                         # stdin, emit SVG line chart of
         │                         # total/code/docs lines over time
         │                         # via the `poloto` crate.

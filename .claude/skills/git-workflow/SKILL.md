@@ -144,28 +144,43 @@ good, `U` = good+untrusted; anything else on a pushed commit is a
 problem). Canonical replacement for ad-hoc `git log -n 1` across
 repos — do not invoke raw `git log -n 1` for HEAD-state queries.
 
-### `scripts/git-log.sh [-n <N>|--count <N>] [<submodule-path>]`
-Pretty-prints a repo's git log (default last 500 commits) with
-DCO sign-off + GPG/SSH signature status per commit. Default
-target is the parent workspace repo; pass a submodule path
-relative to the workspace root (e.g. `mechanics-core`,
-`philharmonic-types`) to inspect that submodule's own history.
-Columns: short SHA, date, `%G?`, sign-off label, author,
-subject. The sign-off label matches `Signed-off-by:` trailers
-against the commit's author email (`%ae`), distinguishing
-`[signed-off]` (author's own sign-off present), `[unknown
-sign-off]` (trailers exist but none match the author), and
-`[NOT signed-off]` (no trailer — DCO violation). Use for
-auditing history against the sign-off + signature invariants
-— `./scripts/git-log.sh | grep -E '\[(N|NOT signed-off)\]'`
-for the parent; loop over submodule names (or `git submodule
-foreach 'cd $toplevel && ./scripts/git-log.sh "$name"'`) to
-audit the whole workspace. Rejects paths that aren't a git-repo
-root, so subdirectories and the in-tree `xtask/` member (both
-share the parent's history) don't accidentally masquerade as
-submodules. Sources `workspace-cd.sh`, so the positional path
-is always resolved from the workspace root. Requires git ≥
-2.32.
+### `scripts/log.sh [--history|--audit|--stats] [-n <N>|--count <N>] [<submodule-path>]`
+Unified pretty-printed git-log front-end with three modes
+(replaces the retired `git-log.sh` / `audit-log.sh` /
+`stats-log.sh`). Default target is the parent workspace repo;
+pass a submodule path relative to the workspace root (e.g.
+`mechanics-core`, `philharmonic-types`) to inspect that
+submodule's own history.
+
+Modes (mutually exclusive; `--history` is the default):
+- `--history` — short SHA, date, `%G?`, sign-off label, author,
+  subject. Default count: 500. Use for auditing the sign-off +
+  signature invariants:
+  `./scripts/log.sh | grep -E '\[(N|NOT signed-off)\]'` for
+  the parent; loop over submodule names (or
+  `git submodule foreach 'cd $toplevel && ./scripts/log.sh
+  "$name"'`) to audit the whole workspace.
+- `--audit` — short SHA, ISO time, `%G?`, sign-off label,
+  author, diffstat (`-<del> +<ins>`), and the `Audit-Info:`
+  trailer body. Default count: 200.
+- `--stats` — short SHA, ISO time (with timezone preserved),
+  author, `Code-stats:` trailer body, and per-commit delta
+  vs. predecessor. Default count: 200. Falls back to
+  `docs/stats-cache.tsv` for parent-repo commits whose
+  trailer is absent (pre-trailer-adoption history).
+
+The sign-off label (used by `--history` and `--audit`) matches
+`Signed-off-by:` trailers against the commit's author email
+(`%ae`), distinguishing `[signed-off]` (author's own sign-off
+present), `[unknown sign-off]` (trailers exist but none match
+the author), and `[NOT signed-off]` (no trailer — DCO
+violation).
+
+Rejects paths that aren't a git-repo root, so subdirectories
+and the in-tree `xtask/` member (both share the parent's
+history) don't accidentally masquerade as submodules. Sources
+`workspace-cd.sh`, so the positional path is always resolved
+from the workspace root. Requires git ≥ 2.32.
 
 ### `scripts/check-api-breakage.sh <crate> [<baseline-version>]`
 Runs `cargo semver-checks check-release -p <crate>` against a

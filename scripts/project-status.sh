@@ -6,7 +6,7 @@
 # Assembles a single prompt payload from
 #   - top-level README.md         (executive summary)
 #   - top-level ROADMAP.md        (plans)
-#   - `./scripts/git-log.sh -n N` (recent parent-repo history)
+#   - `./scripts/log.sh --history -n N` (recent parent-repo history)
 # and pipes it through the `openai-chat` xtask bin. The model's
 # reply is written to
 #   docs/project-status-reports/YYYY-MM-DD-hh-mm-ss.md
@@ -25,8 +25,8 @@
 #   ./scripts/project-status.sh [-n <log-lines>] [--model <model>]
 #
 # Options:
-#   -n <N>          Lines of `git-log.sh` output to include
-#                   (default 500, same as git-log.sh's default).
+#   -n <N>          Lines of `log.sh --history` output to include
+#                   (default 500, same as log.sh --history's default).
 #   --model <M>     Override the model forwarded to OpenAI
 #                   (default: whatever openai-chat's default is).
 #   -h, --help      Show this message.
@@ -45,7 +45,7 @@ usage() {
     cat >&2 <<EOF
 Usage: $0 [-n <log-lines>] [--model <model>]
 
-  -n <N>          Lines of git-log.sh output to include (default 500).
+  -n <N>          Lines of log.sh --history output to include (default 500).
   --model <M>     Override OpenAI model identifier.
   -h, --help      Show this message.
 
@@ -119,8 +119,8 @@ trap 'rm -f "$prompt_tmp" "$output_tmp"' EXIT INT HUP TERM
     cat ./README.md
     printf '\n\n=== ROADMAP.md ===\n\n'
     cat ./docs/ROADMAP.md
-    printf '\n\n=== ./scripts/git-log.sh -n %s (parent workspace) ===\n\n' "$log_lines"
-    ./scripts/git-log.sh -n "$log_lines"
+    printf '\n\n=== ./scripts/log.sh --history -n %s (parent workspace) ===\n\n' "$log_lines"
+    ./scripts/log.sh --history -n "$log_lines"
 } > "$prompt_tmp"
 
 system_prompt='You are summarising the development history and current status of a Rust workspace project named Philharmonic, given its README.md (executive summary), ROADMAP.md (plans), and recent parent-repo git log output. The output will be committed as a Markdown file in the project'\''s `docs/project-status-reports/` archive. Produce a Markdown report using headings (`##` level) with these sections, in order: Overall status — one short paragraph; Recent work — bulleted list drawn from the git log, citing short commit SHAs where useful; What is next — short paragraph grounded in ROADMAP.md; Notable concerns or blockers — omit this section entirely if none are evident. No code fences around the whole document; be specific and concise; do not speculate beyond what the inputs support.'

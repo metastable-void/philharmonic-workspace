@@ -22,7 +22,7 @@ mk_prompt () {
 	echo
 	echo "===Latest Git commits==="
 	echo
-	./scripts/git-log.sh -n 50
+	./scripts/log.sh --history -n 50
 }
 
 ./scripts/stats.sh --japanese > "$tmp"
