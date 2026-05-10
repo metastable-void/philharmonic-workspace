@@ -3,7 +3,7 @@
 **Date**: 2026-05-04 (revised 2026-05-10 — see "Pre-review feedback addressed" and "Self-review feedback addressed" below)
 **Author**: Claude Code
 **Status**: PENDING REVIEW (Yuka)
-**Scope**: Post-v1 / post-MVP (embedding datasets feature, ROADMAP §9)
+**Scope**: Post-v1 / post-MVP (embedding datasets feature, ROADMAP §3 — was §9 prior to the 2026-05-10 ROADMAP trim)
 **Crypto-sensitive paths touched**: COSE_Sign1 token claims (`inst`, `step`),
 COSE_Encrypt0 AEAD AAD, `payload_hash` binding.
 
@@ -586,7 +586,7 @@ pub async fn run_embed_job(
 ### What this requires from D2 (mechanics per-job timeout)
 
 `MechanicsJob::with_run_timeout(Duration)` is the per-job
-timeout knob from D2 (ROADMAP §9 A.D2). D2 ships before D5;
+timeout knob from D2 (ROADMAP §3 A.D2 — was §9 prior to the 2026-05-10 ROADMAP trim). D2 ships before D5;
 the embed job sets `run_timeout` to the configured embed-job
 default (default 30 minutes per design 16).
 
@@ -826,6 +826,6 @@ Notes:
 ```
 
 Once approved, this file is referenced by the embed-job code
-comment, the embed-job Codex prompt (D5 in ROADMAP §9), and
+comment, the embed-job Codex prompt (D5 in ROADMAP §3 — was §9 prior to the 2026-05-10 ROADMAP trim), and
 the eventual Gate-2 code review of the embed-job
 implementation.

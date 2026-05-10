@@ -1563,7 +1563,7 @@ narrow exceptions.
   end-to-end, `debug_assert!` is acceptable; for external inputs
   validate with a `Result`-returning helper.
 - **`unsafe` blocks** — separately banned workspace-wide in
-  crypto-sensitive crates (see `docs/ROADMAP.md §5` and
+  crypto-sensitive crates (see `.claude/skills/crypto-review-protocol/SKILL.md` and
   `docs/design/11-security-and-cryptography.md`). No library
   crate takes `unsafe` dependencies on invariants the type
   system can't express.

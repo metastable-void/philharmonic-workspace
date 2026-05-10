@@ -61,7 +61,9 @@ Developer: Yuka MORI.
   COSE_Encrypt0, hybrid KEM, payload-hash, `pht_` tokens — all
   trigger Yuka's two-gate personal review protocol via the
   `crypto-review-protocol` skill. See
-  [`ROADMAP.md §5`](docs/ROADMAP.md) and the skill.
+  [`crypto-review-protocol` skill](.claude/skills/crypto-review-protocol/SKILL.md) (authoritative) and
+  [`docs/ROADMAP.md §2`](docs/ROADMAP.md#2-crypto-review-protocol-pointer)
+  (cross-reference).
 
 ## Claude vs. Codex division of labour
 

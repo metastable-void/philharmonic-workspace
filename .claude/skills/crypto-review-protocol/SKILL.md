@@ -12,7 +12,8 @@ never caught by tests that aren't *specifically* designed for
 correctness-vs-a-reference, and the pre-approval gate is the
 cheapest place to catch misuse.
 
-Authoritative source: `docs/ROADMAP.md` §5 "Crypto review protocol".
+Authoritative source: this file (the protocol). Cross-referenced
+from `docs/ROADMAP.md` §2 and `CONTRIBUTING.md`.
 Also relevant: `docs/design/11-security-and-cryptography.md`
 (threat model, construction specifics).
 

@@ -26,7 +26,9 @@
 #
 # Options:
 #   -n <N>          Lines of `log.sh --history` output to include
-#                   (default 500, same as log.sh --history's default).
+#                   (default 100; log.sh --history's own default is
+#                   higher, but project-status payloads are read by
+#                   an LLM and longer logs balloon token cost).
 #   --model <M>     Override the model forwarded to OpenAI
 #                   (default: whatever openai-chat's default is).
 #   -h, --help      Show this message.
@@ -37,7 +39,7 @@ set -eu
 
 . "$(dirname -- "$0")/lib/workspace-cd.sh"
 
-log_lines=500
+log_lines=100
 model=
 reports_dir="docs/project-status-reports"
 
@@ -45,7 +47,7 @@ usage() {
     cat >&2 <<EOF
 Usage: $0 [-n <log-lines>] [--model <model>]
 
-  -n <N>          Lines of log.sh --history output to include (default 500).
+  -n <N>          Lines of log.sh --history output to include (default 100).
   --model <M>     Override OpenAI model identifier.
   -h, --help      Show this message.
 

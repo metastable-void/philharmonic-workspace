@@ -16,13 +16,13 @@ mk_prompt () {
 	echo
 	cat README.md
 	echo
-	echo "===ROADMAP.md==="
+	echo "===docs/ROADMAP.md==="
 	echo
-	cat ROADMAP.md
+	cat docs/ROADMAP.md
 	echo
 	echo "===Latest Git commits==="
 	echo
-	./scripts/log.sh --history -n 50
+	./scripts/log.sh --history -n 20
 }
 
 ./scripts/stats.sh --japanese > "$tmp"
