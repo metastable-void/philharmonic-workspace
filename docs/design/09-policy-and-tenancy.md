@@ -774,6 +774,99 @@ impl Entity for AuditEvent {
 }
 ```
 
+### `event_type` canonical discriminants
+
+`event_type` is an `i64` stored on the entity. To keep
+historical rows interpretable across consumers, the
+`philharmonic-policy` crate pins one stable value per
+documented audit-event category in
+[`philharmonic-policy/src/audit_event_type.rs`](https://github.com/metastable-void/philharmonic-policy/blob/main/src/audit_event_type.rs)
+(landed in 0.2.3). Numbering is append-only with per-
+category gaps so additions to one category don't force
+renumbering elsewhere:
+
+- `1-9` — principals (`PRINCIPAL_CREATED`,
+  `PRINCIPAL_CREDENTIAL_ROTATED`, `PRINCIPAL_RETIRED`).
+- `10-19` — roles + memberships (`ROLE_CREATED`,
+  `ROLE_MODIFIED`, `ROLE_RETIRED`,
+  `ROLE_MEMBERSHIP_CREATED`, `ROLE_MEMBERSHIP_REMOVED`).
+- `20-29` — endpoint configs (`ENDPOINT_CREATED`,
+  `ENDPOINT_ROTATED`, `ENDPOINT_RETIRED`).
+- `30-39` — minting authorities (`AUTHORITY_CREATED`,
+  `AUTHORITY_MODIFIED`, `AUTHORITY_RETIRED`,
+  `AUTHORITY_EPOCH_BUMPED`).
+- `40-49` — token minting (`TOKEN_MINTED`).
+- `50-59` — tenant lifecycle (`TENANT_STATUS_CHANGED`).
+
+Producers reference the constants; the read endpoint
+treats `event_type` as opaque and exposes it as a number
+in the response. The `audit_event_type::name(i64)` helper
+maps known values to canonical snake_case labels for
+logging; it returns `None` for unknown values so consumers
+stay forward-compatible with discriminants added in newer
+producer versions.
+
+### `event_data` JSON schema convention
+
+Every `event_data` JSON object includes three contextual
+fields the read endpoint and downstream operator tooling
+rely on:
+
+- **`principal_id`** (UUID string) — the principal that
+  initiated the change. Extracted by the read endpoint's
+  filter on `?principal_id=...`. Required for every
+  event written by an authenticated mutation route. For
+  events triggered by deployment-scoped operators (no
+  tenant principal), this field is the operator's
+  principal ID.
+- **`route`** (string) — the API method and path that
+  handled the request, e.g. `"POST /v1/principals"`.
+  Useful for distinguishing similar `event_type`s with
+  different code paths (e.g. modify vs. retire).
+- **`correlation_id`** (UUID string) — the request
+  correlation ID, for tracing across structured logs.
+
+Per-event-type optional fields:
+
+- **`target_entity_id`** (UUID string) — the entity the
+  event applies to, when distinct from the initiator.
+  Required for any event acting on a specific
+  principal/role/endpoint/authority/membership.
+- **`subject`** (object) — used by `TOKEN_MINTED`
+  only: `{"subject_id": "...", "authority_id": "..."}`.
+  Token-mint events **never** record the injected claims
+  themselves; the audit row carries only the subject
+  identifier and which minting authority signed.
+
+Token-mint payload restriction is by design and
+load-bearing: the audit trail is operator-visible, and
+injected claims are tenant-private application data
+(per-end-user identifiers, account tiers, locale).
+Persisting them in the audit log would leak that
+private data into the audit-read surface that
+`audit:read` exposes to operators. Producers MUST
+strip claims before writing the event.
+
+### Audit-write failure semantics
+
+When a mutation route succeeds but the subsequent
+`write_audit_event` call fails, the route **logs a
+warning** at error level (with the full `event_data`
+the producer was attempting to write) and **returns
+success** to the caller. Returning a 500 would couple
+every mutation's availability and latency to the audit
+substrate's; the workspace prefers a small risk of
+audit-trail gaps (recoverable via structured logs) over
+hard audit coupling at every write.
+
+When the substrate evolves to support transactional
+multi-entity writes (currently out of scope), the
+audit append should move inside the mutation's
+transaction and the log-and-return path retired.
+Until then, **log-and-return-success is the
+documented behavior** and the deployment's structured
+log is the recovery path for audit-trail gaps.
+
 ## Relationship to other layers
 
 - **Substrate**: policy entities are stored here and queried
@@ -809,8 +902,22 @@ impl Entity for AuditEvent {
 
 ## Status
 
-**Implemented.** Published as `philharmonic-policy` 0.1.0
-(2026-04-22), bumped to 0.2.0 (2026-04-28) for ephemeral API
-token primitives (COSE_Sign1 minting + 14-step verification).
-All seven entity kinds, permission evaluation, SCK encryption,
-`pht_` token format, and audit events are shipped.
+**Implemented except audit producers.** Published as
+`philharmonic-policy` 0.1.0 (2026-04-22), 0.2.0 (2026-04-28)
+for ephemeral API token primitives (COSE_Sign1 minting +
+14-step verification), 0.2.2 (2026-05-10) for embedding-
+datasets entity + CBOR codec, 0.2.3 (2026-05-11) for the
+canonical `event_type` discriminants module above. All
+seven entity kinds, permission evaluation, SCK encryption,
+`pht_` token format, and the `AuditEvent` substrate + read
+endpoint are shipped.
+
+**Producer-side wiring is still landing**: as of 2026-05-11,
+no production `philharmonic-api` mutation route writes an
+`AuditEvent` — the route handlers return success without
+calling `write_audit_event`. Tracking commit and Codex
+dispatch in
+[`docs/notes-to-humans/2026-05-11-0001-audit-event-producer-gap.md`](../notes-to-humans/2026-05-11-0001-audit-event-producer-gap.md);
+the contract above (event-type discriminants,
+`event_data` schema, failure semantics) is the lock-in for
+the producer dispatch.
