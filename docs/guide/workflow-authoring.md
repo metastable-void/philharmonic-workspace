@@ -1353,6 +1353,15 @@ testing.
 
 ## Running a workflow
 
+For the integrator-side flow (creating instances on behalf
+of end users, minting a workflow-run-only ephemeral token
+bound to the instance, and re-minting on session resume
+beyond 24 hours) see
+[`end-user-session-tokens.md`](end-user-session-tokens.md).
+The summary below covers the bare API shapes; the linked
+guide covers the credential separation, instance scoping,
+and re-mint flow.
+
 Create an instance:
 
 ```http
