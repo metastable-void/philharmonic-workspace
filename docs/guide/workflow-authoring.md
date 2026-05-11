@@ -855,6 +855,16 @@ return {
 non-empty string. Extra per-message fields are preserved by the
 WebUI parser as opaque passthrough.
 
+One extra field has special UI treatment: on **assistant**
+turns, a `name` field (OpenAI-style assistant-persona
+identifier) — when present and a non-empty string — is
+rendered as the bubble's role label in place of the generic
+"Assistant" / "アシスタント" string. Other roles' `name`
+fields are kept in the transcript object but not surfaced in
+the bubble label. Use this when the workflow distinguishes
+multiple assistant personas, e.g. a triage agent vs. a
+specialist agent in a multi-step bot.
+
 ### Empty-content semantics
 
 The empty input branch is dual-purpose:
