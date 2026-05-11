@@ -172,54 +172,20 @@ D7, D8, D9 (Tier 2/3 connectors), plus D14, D15, D16
 added 2026-05-11 from
 [`HUMANS.md` §"Follow-up tasks from 2026-05-10 work"](../HUMANS.md).
 
-### A. Embedding datasets (6 dispatches + 1 Gate-1)
+### A. Embedding datasets (6 dispatches + 1 Gate-1) — DONE
 
 Authoritative design:
 [`docs/design/16-embedding-datasets.md`](design/16-embedding-datasets.md).
 
-- **(Gate 1)** Lowerer ephemeral support — **APPROVED
-  2026-05-10** (`0772184` after self-review revision
-  `81936f2`). Approach B chosen: synthesized non-persisted
-  `EntityId<WorkflowInstance>` per embed job, no public-trait
-  change.
-- **(Gate 2)** Implementation review on the embed-job
-  dispatcher — **APPROVED 2026-05-10** (`354e82d`) after
-  Codex pre-review surfaced 3 findings, all addressed in
-  `e845101`; deferred items (HTTP-response-size cap +
-  duplicate-/unknown-ID rejection + parse-fn unit tests)
-  closed in `1a6b4c8`.
-- **D1** Substrate `MEDIUMBLOB → LONGBLOB` migration in
-  `philharmonic-store-sqlx-mysql`. **DONE 2026-05-02 (`ee2bd61`).**
-- **D2** `mechanics-core`: optional `MechanicsJob.run_timeout`
-  override. **DONE 2026-05-02 (`ee2bd61`).**
-- **D3** Embedding-datasets backend (split at dispatch into
-  two rounds): `EmbeddingDataset` entity + permission atoms +
-  deterministic-CBOR codec in `philharmonic-policy` +
-  `WorkflowTemplate.data_config` slot in `philharmonic-workflow`
-  (round 01); workflow-engine `data` assembly in `execute_step`
-  + 7 API CRUD/read routes + template `data_config`
-  request/response (round 02). **DONE 2026-05-10**: round 01
-  `bbc26f9`, round 02 `b134d44`.
-- **D4** Lowerer ephemeral support per Approach B — touches
-  the API server lowerer only (no public-trait change to
-  `philharmonic-workflow`). **DONE 2026-05-10** (fused with
-  D5 in `e37f956`).
-- **D5** Ephemeral embed job: built-in JS embed script
-  (Codex-authored, compiled into the API binary via
-  `include_str!`) plus the background tokio task in
-  `philharmonic-api-server` that lowers the embed endpoint,
-  dispatches the mechanics job, and appends `Ready` / `Failed`
-  revisions. Includes round-02 follow-ups: `EmbedDatasetCaps`
-  wired through `ApiConfig` and the new `ApiError::Conflict`
-  variant for 409-on-Embedding. **DONE 2026-05-10** (`e37f956`,
-  with Gate-2 hardening in `e845101` + `1a6b4c8`).
-- **D6** Embedding-datasets WebUI: structured-table source-
-  items editor, CSV/JSON bulk-import modal, collapsed-by-
-  default corpus vector view, polling refresh, i18n
-  (en/ja). **DONE 2026-05-10** (`b581b50`). The
-  `permissions.ts` follow-up to register the four
-  `embed_dataset:*` atoms (Codex flagged in residuals,
-  Claude patched) is in the same commit.
+Both gates approved and all six dispatches landed
+2026-05-10: D1 LONGBLOB substrate migration, D2
+`MechanicsJob.run_timeout` override, D3 backend (two
+rounds — entity + codec, then engine `data` assembly +
+API routes), D4 lowerer ephemeral support per Approach B,
+D5 ephemeral embed job + caps + 409-on-Embedding, D6
+WebUI surface end-to-end. Per-dispatch detail and commit
+SHAs preserved verbatim at
+[`docs/archive/2026-05-11-roadmap-completed-arc-trim.md`](archive/2026-05-11-roadmap-completed-arc-trim.md).
 
 ### B. Phase 7 Tier 2/3 connector implementations (3 dispatches)
 
@@ -260,50 +226,15 @@ parallel.
 
 ### C. Connector enhancements (2 dispatches)
 
-- **D12** `philharmonic-connector-impl-llm-openai-compat`:
-  add a `custom_headers: BTreeMap<String, String>` knob to
-  the runtime endpoint config so deployments can attach
-  provider-specific HTTP headers to upstream calls. Driven by
-  Hugging Face Inference's `X-HF-Bill-To` (org billing); also
-  covers OpenAI's `OpenAI-Organization` / `OpenAI-Project`,
-  OpenRouter's `HTTP-Referer` / `X-Title`, and similar
-  per-provider knobs across the OpenAI-compatible ecosystem.
-  `BTreeMap` (not `HashMap`) for deterministic-fixture
-  comparisons + sorted serialised keys matching the
-  workspace's canonical-JSON / deterministic-CBOR discipline.
-  **DONE 2026-05-10 (`2fff3bb`).**
-
-  The field belongs to the **runtime endpoint config** — i.e.
-  the impl-side decrypted-config struct in
-  `philharmonic-connector-impl-llm-openai-compat/src/config.rs`,
-  which rides inside the existing SCK-encrypted blob on
-  `TenantEndpointConfig`. `#[serde(default)]` keeps existing
-  configs valid (back-compat). The impl applies the headers
-  to its outbound reqwest builder before sending; no
-  primitive, AAD, or signed-claim change.
-
-  Reserved headers (`authorization`, `content-type`,
-  `content-length`, `host`, `transfer-encoding`,
-  `connection`, plus CRLF-injection guards on values) are
-  rejected at config-validation time rather than at request
-  time, so a bad config is caught at endpoint-config write.
-
-  Touches `philharmonic-connector-impl-llm-openai-compat`
-  only — no public-trait change, no other crate edits, no
-  crypto path touched. Bump version + CHANGELOG. Tests:
-  header pass-through to the upstream request, reserved-
-  header rejection, CRLF rejection. WebUI gets no special
-  treatment — endpoint configs are JSON-edited through the
-  existing CodeMirror 6 editor (D10) which accepts the new
-  field naturally.
-
-  Independent of everything else; small. **Lands before
-  D7/D8/D9** — production deployments hitting Hugging Face
-  Inference need the `X-HF-Bill-To` header now to bill an
-  organisation rather than the personal account, and the
-  fix is single-crate / single-config-field-sized. The
-  Tier 2/3 implementations (Anthropic / Gemini / SMTP) are
-  larger and don't unblock anything for HF users.
+- **D12** `llm_openai_compat` `custom_headers` knob —
+  **DONE 2026-05-10 (`2fff3bb`).** Per-provider header
+  pass-through (Hugging Face `X-HF-Bill-To`, OpenAI
+  `OpenAI-Organization`, OpenRouter `HTTP-Referer`, etc.)
+  in the runtime endpoint config, with reserved-header
+  rejection and CRLF guards at config-validation time.
+  Full per-dispatch rationale and shape detail preserved
+  at
+  [`docs/archive/2026-05-11-roadmap-completed-arc-trim.md`](archive/2026-05-11-roadmap-completed-arc-trim.md).
 
 - **D16** `philharmonic-connector-impl-llm-openai-compat`:
   add a `tool_choice: "auto"` option to the
@@ -341,58 +272,32 @@ parallel.
 
 ### D. WebUI infrastructure, features, and docs (5 dispatches)
 
-- **D10** CodeMirror 6 in the WebUI. **DONE 2026-05-02
+Three landed:
+
+- **D10** CodeMirror 6 in the WebUI — **DONE 2026-05-02
   (`ee2bd61`).**
-- **D11** Workflow authoring guide rewrite (English).
-  **DONE 2026-05-10** (`10acd7f`). 530 → 1350 lines
-  reflecting current implementation reality post-D3/D4/
-  D5/D6/D12/D13. Three load-bearing recipes per Yuka's
-  focus directive: D13-compat chat workflow (state-driven
-  accumulator), embedding-datasets workflow (five
-  availability states), combined chat + RAG. All three
-  copy-pasteable end-to-end with verbatim script + endpoint
-  + template JSON + WebUI behavior tables + per-recipe
-  permission lists. Wire-shape accuracy grep-verified
-  against `philharmonic-connector-impl-{vector-search,
-  embed,llm-openai-compat}/src/`,
-  `philharmonic-workflow/src/engine.rs build_script_data`,
-  `philharmonic/webui/src/api/client.ts ChatMessage`.
-  Tier 2/3 connectors flagged as reserved/pending rather
-  than fabricated. Codex flagged design-doc divergences
-  for follow-up: design/07 still shows pre-D3 4-field
-  script-arg shape; design/10 doesn't list `data_config`
-  in template body docs. The Japanese mirror in
-  [`docs-jp/ワークフロー作成ガイド.md`](../docs-jp/)
-  is **not** a Codex dispatch — `docs-jp/README.md` reserves
-  that submodule to Claude Code. Claude regenerates the JP
-  guide as a follow-up.
+- **D11** Workflow authoring guide rewrite (English) —
+  **DONE 2026-05-10 (`10acd7f`).** 530 → 1350 lines with
+  three load-bearing recipes (D13 chat, embedding-datasets,
+  combined RAG). JP mirror regenerated same day (`e159e88`
+  docs-jp + `6913a9d` parent).
 - **D13** Chat-style testing UI in `philharmonic/webui` for
-  workflows that accept `{"content": "<user_input>"}` as
-  input and return `{"messages": [<turns>]}` as output
-  (OpenAI-style chat-completion turn shape). **DONE
-  2026-05-10** (`ee99b79` philharmonic submodule + `58cf408`
-  parent). Six surfaces landed end-to-end on Codex's first
-  attempt: types + `parseChatOutput` runtime structural
-  detector in `api/client.ts`; chat tab on `InstanceDetail`
-  with `?tab=chat` URL hook; "Test in chat" actions on
-  `TemplateDetail` (with last-used-instance shortcut) and
-  `Templates` list rows; chat UI with bubbles, autoscroll,
-  send-on-Enter, in-flight indicator, error-toast on
-  transport failures; `util/chatStorage.ts` localStorage
-  helpers (last-used instance per template, scroll
-  position); `chat.*` i18n namespace in en/ja. The
-  empty-content POST (`{}`) dual-purpose semantics are
-  delegated to the workflow's JS — UI always probes on
-  first chat-tab mount; server-side script generates a
-  greeting on empty context, returns the existing
-  transcript otherwise. No backend changes; reuses
-  `workflow:instance_create` + `workflow:instance_execute`.
-  Bundle delta ~+3.0 KiB gzipped. Open follow-ups:
-  markdown rendering in chat bubbles → **promoted to D14**
-  per HUMANS.md 2026-05-11 follow-up directive; full
-  instance-list dropdown for templates with many active
-  chats (deferred); JP phrasing review (deferred); optional
-  global "resume last chat" shortcut (deferred).
+  `{content}` → `{messages}` workflows — **DONE 2026-05-10
+  (`ee99b79` philharmonic submodule + `58cf408` parent).**
+  One-click "Test in chat" from `TemplateDetail`/`Templates`,
+  chat tab on `InstanceDetail` with empty-content dual-
+  purpose probe, runtime structural detection via
+  `parseChatOutput`. Markdown rendering in bubbles
+  promoted to D14 below; remaining D13 deferred follow-ups
+  (instance-list dropdown for templates with many active
+  chats, JP phrasing review, optional global "resume last
+  chat" shortcut) listed in the archive.
+
+Per-dispatch rationale and shape detail for the above
+three preserved at
+[`docs/archive/2026-05-11-roadmap-completed-arc-trim.md`](archive/2026-05-11-roadmap-completed-arc-trim.md).
+
+Two pending:
 
 - **D14** Markdown parsing and rendering in WebUI chat
   bubbles, with **DOMPurify hardening** (or equivalent
@@ -465,36 +370,29 @@ parallel.
 
 ### Suggested sequencing
 
-1. **D1, D2, D10** — DONE 2026-05-02 (`ee2bd61`).
-2. **Gate 1** — APPROVED 2026-05-10 (`0772184`).
-3. **Embedding-datasets feature** — DONE 2026-05-10
-   (end-to-end). D3 r01 (`bbc26f9`) → D3 r02 (`b134d44`) →
-   D4+D5+caps+409 (`e37f956`) → Gate 2 fix (`e845101`) →
-   Gate-2 deferred cleanup (`1a6b4c8`) → D6 WebUI
-   (`b581b50`). Gate 2 approved (`354e82d`).
-4. **D12** custom-headers knob — DONE 2026-05-10
-   (`2fff3bb`).
-5. **D13** chat-style testing UI — DONE 2026-05-10
-   (`ee99b79` + `58cf408`).
-6. **D11** workflow authoring guide rewrite — DONE
-   2026-05-10 (`10acd7f`). JP mirror regeneration is a
-   Claude follow-up.
-7. **Next dispatchable**: D7 / D8 / D9 (Tier 2/3
-   connectors — SMTP, Anthropic, Gemini); D9 carries
-   the dual-mode AI Studio + Vertex AI requirement. All
-   three are independent and parallel-safe.
-8. **Newly added 2026-05-11** from HUMANS.md follow-up
-   directive: **D14** (markdown rendering in chat with
-   DOMPurify hardening, promoted from D13's deferred
-   list), **D15** (`abstract_config` structured editor
-   in the WebUI), **D16** (`tool_choice: "auto"` for
-   `llm_openai_compat`'s `tool_call_fallback` dialect).
-   D14 and D15 are independent WebUI work; D16 is an
-   independent single-crate connector enhancement.
-   Recommended ordering: D16 first (unblocks providers
-   currently rejecting forced tool_choice) → D15 (UX
-   smoothing that reduces config-paste support burden) →
-   D14 (chat UX polish, biggest bundle impact).
+**Steps 1-6 (completed work, 2026-05-02 through 2026-05-10):**
+D1+D2+D10 → Gate 1 → embedding-datasets feature end-to-end
+(D3 r01 → r02 → D4+D5+caps+409 → Gate 2 → D6 WebUI) → D12 →
+D13 → D11 (+ JP mirror). Per-step commit SHAs preserved at
+[`docs/archive/2026-05-11-roadmap-completed-arc-trim.md`](archive/2026-05-11-roadmap-completed-arc-trim.md).
+
+**Step 7 — next dispatchable**: D7 / D8 / D9 (Tier 2/3
+connectors — SMTP, Anthropic, Gemini); D9 carries the
+dual-mode AI Studio + Vertex AI requirement. All three are
+independent and parallel-safe.
+
+**Step 8 — newly added 2026-05-11** from HUMANS.md
+follow-up directive: **D14** (markdown rendering in chat
+with DOMPurify hardening, promoted from D13's deferred
+list), **D15** (`abstract_config` structured editor in the
+WebUI), **D16** (`tool_choice: "auto"` for
+`llm_openai_compat`'s `tool_call_fallback` dialect). D14
+and D15 are independent WebUI work; D16 is an independent
+single-crate connector enhancement. Recommended ordering:
+D16 first (unblocks providers currently rejecting forced
+tool_choice) → D15 (UX smoothing that reduces config-paste
+support burden) → D14 (chat UX polish, biggest bundle
+impact).
 
 ### Dispatch discipline reminder
 
