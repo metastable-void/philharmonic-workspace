@@ -117,6 +117,23 @@ production path from API server to mechanics worker, connector
 router, connector service, and an OpenAI-compatible upstream LLM
 via `llm_openai_compat`.
 
+**End-to-end PoC milestone — 2026-05-11**: a complete chatbot
+use-case ran successfully across the full stack: an embedding
+dataset + `embed` + `vector_search` retrieval path, a
+`sql_postgres` DB connector endpoint, and an OpenAI-compatible
+LLM (OVHCloud HF-endpoint serving `Qwen/Qwen3-32B`) — all in
+one workflow, all through the production API + mechanics + connector
+chain. This is the first full real-world chatbot RAG flow on the
+platform; the platform's stated use-case (RAG-grounded chat
+backed by a vector index and a relational DB, served by a
+self-or-partner-hosted LLM) is now verified end-to-end against an
+actual deployment, not just integration tests. The deployment-time
+fixes that landed earlier in the day (mechanics-core 0.4.0
+unhandled-rejection runtime fix, WebUI permission-aware
+nav/buttons, audit-log producer gap close, connector body cap
+2 MiB → 32 MiB) all surfaced from and were validated against
+this same PoC session.
+
 The **embedding-datasets feature** is fully shipped end-to-end
 as of 2026-05-10 — data layer, workflow-engine integration,
 API CRUD, WebUI, both crypto gates cleared. The **chat-style

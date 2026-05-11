@@ -131,6 +131,36 @@ active work now lives in the post-v1 dispatch plan (§3 below).
   day back was Mon 2026-05-11. Real deployment-time
   testing started this week and has been the source of
   the post-D15 polish work above.
+- **End-to-end PoC milestone — 2026-05-11 evening**: a
+  complete chatbot use-case ran successfully on the
+  deployment, exercising the full retrieval + DB +
+  LLM stack in a single workflow:
+  - **Retrieval**: embedding dataset (`embed_datasets`
+    feature, D3/D4/D5/D6) + `embed` connector
+    (`philharmonic-connector-impl-embed`, BGE-M3 via
+    tract/ONNX, inline-blob model bundling) + `vector_search`
+    connector (`philharmonic-connector-impl-vector-search`,
+    stateless).
+  - **Relational data**: `sql_postgres` connector
+    (`philharmonic-connector-impl-sql-postgres`).
+  - **LLM**: `llm_openai_compat` connector pointing at
+    OVHCloud's Hugging Face Inference Provider endpoint
+    serving `Qwen/Qwen3-32B`; uses D12's `custom_headers`
+    knob for the HF billing header.
+  - **Path**: API server → mechanics worker → connector
+    router → connector service → external upstreams, with
+    workflow steps composed in the workflow script using
+    today's per-connector wire-shape documentation (en/jp).
+  - All deployment-time fixes that landed earlier 2026-05-11
+    (mechanics-core 0.4.0 unhandled-rejection,
+    permission-aware WebUI, audit-log producer wiring,
+    connector body cap 2 MiB → 32 MiB) were either
+    triggered by or validated against this PoC session.
+  - This is the **first full real-world chatbot RAG flow**
+    on the platform — proves the platform's stated use-case
+    (RAG-grounded chat over a vector index + relational DB,
+    served by a self-or-partner-hosted LLM) is now real,
+    not just integration-test scaffolding.
 
 Authoritative sources for things this file used to restate but
 now cross-references:

@@ -44,3 +44,4 @@
 - [2026-05-02 (morning)](project-status-reports/2026-05-02-11-25-52.md)
 - [2026-05-02 (afternoon)](project-status-reports/2026-05-02-14-08-24.md)
 - [2026-05-10](project-status-reports/2026-05-10-21-47-26.md)
+- [2026-05-11 (end-to-end PoC milestone)](project-status-reports/2026-05-11-19-50-15.md)
