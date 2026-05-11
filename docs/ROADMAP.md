@@ -237,38 +237,35 @@ parallel.
   [`docs/archive/2026-05-11-roadmap-completed-arc-trim.md`](archive/2026-05-11-roadmap-completed-arc-trim.md).
 
 - **D16** `philharmonic-connector-impl-llm-openai-compat`:
-  add a `tool_choice: "auto"` option to the
-  `tool_call_fallback` dialect (the path the connector uses
-  to coerce structured `output_schema` outputs on
-  providers that don't natively support OpenAI's structured-
-  output mode). Some OpenAI-compatible inference providers
-  — notably some local LLM server implementations and some
-  Hugging Face Inference Providers — reject a forced
-  `tool_choice: {type: "function", function: {name: ...}}`
-  and need `tool_choice: "auto"` (with the script-supplied
+  add a new dialect variant `tool_call_fallback_auto`
+  alongside the existing `tool_call_fallback`. Shipping
+  the auto variant rather than a per-request flag on the
+  forced variant keeps the dialect enum a clean
+  discriminator (decision locked 2026-05-11: option (a)
+  per [`HUMANS.md` §"Follow-up tasks from 2026-05-10 work"](../HUMANS.md)
+  + this conversation). The new variant carries the same
+  tools-array shape but sends `tool_choice: "auto"`
+  instead of the forced
+  `{type: "function", function: {name: "emit_output"}}`.
+  Some OpenAI-compatible inference providers — notably
+  some local LLM server implementations and some Hugging
+  Face Inference Providers — reject the forced form and
+  need `tool_choice: "auto"` (with the script-supplied
   tool still being the only one offered, so the model
-  effectively must pick it). Added 2026-05-11 from
-  [`HUMANS.md` §"Follow-up tasks from 2026-05-10 work"](../HUMANS.md).
-
-  Shape candidates (decide at prompt-drafting time):
-  (a) A new dialect variant `tool_call_fallback_auto`
-      alongside the existing `tool_call_fallback`; clean
-      separation, no per-request flag.
-  (b) A sub-option flag on the existing
-      `tool_call_fallback` dialect (e.g. `tool_choice_mode:
-      "forced" | "auto"`, defaulting to `forced` for
-      back-compat); fewer enum variants but mixes a config
-      knob into a dialect enum that's otherwise discriminator-
-      only.
+  effectively must pick it).
 
   Touches `philharmonic-connector-impl-llm-openai-compat`
   only — no public-trait change, no other crate edits, no
-  crypto path touched. Tests: dialect dispatch, the
-  generated upstream request shape, end-to-end success when
-  the upstream rejects forced tool_choice. WebUI gets no
-  special treatment — endpoint configs are JSON-edited
-  through the existing CodeMirror 6 editor (D10).
-  Independent of everything else; small.
+  crypto path touched. Bump version 0.1.1 → 0.1.2 +
+  CHANGELOG entry. Tests: dialect dispatch, the generated
+  upstream request shape, response extraction (which
+  should still parse `choices[0].message.tool_calls[0].
+  function.arguments` exactly as `tool_call_fallback`
+  does), reuse of the existing tool_call_fallback
+  extraction path. WebUI gets no special treatment —
+  endpoint configs are JSON-edited through the existing
+  CodeMirror 6 editor (D10). Independent of everything
+  else; small.
 
 ### D. WebUI infrastructure, features, and docs (5 dispatches)
 
