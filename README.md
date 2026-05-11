@@ -129,7 +129,11 @@ day to reflect current implementation reality with three
 load-bearing recipes (D13 chat, embedding-datasets,
 combined RAG). Remaining post-v1 scope: Phase 7 Tier 2/3
 connector implementations (SMTP, Anthropic, Gemini —
-D7/D8/D9).
+D7/D8/D9) plus three follow-up tasks added 2026-05-11
+from HUMANS.md (D14 markdown rendering with DOMPurify in
+the chat UI; D15 `abstract_config` structured editor in
+the workflow template form; D16 `tool_choice: "auto"`
+option in `llm_openai_compat`).
 The authoritative task list lives in
 [`docs/ROADMAP.md` §3](docs/ROADMAP.md#3-post-v1-dispatch-plan).
 

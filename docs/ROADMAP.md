@@ -63,9 +63,34 @@ active work now lives in the post-v1 dispatch plan (§3 below).
     input, subject, data}` with full `data` semantics;
     `design/10` template body + PATCH semantics
     extended with `data_config` (`4b6a122`).
+- **Late-Sunday fix-its (2026-05-10 evening)**:
+  - `scripts/build-status.sh` extended to detect
+    running `build-script-build` executables (previously
+    reported "no active Rust build processes" when a
+    build.rs was the only thing running; `86c7312`).
+  - Workflow authoring guide (en + jp) now flags the
+    WebUI config-paste UX trap — `display_name` /
+    `implementation` go in form fields; only the inner
+    `config` value goes in the Config JSON editor
+    (`48fe697`).
+  - **Connector-path body cap raised 2 MiB → 32 MiB**
+    (`philharmonic-connector-router` 0.1.1 → 0.1.2;
+    `85e2ad8`). The previous 2 MiB axum default rejected
+    `vector_search` corpus bodies over ~170 items at
+    1024-dim with an HTTP 413 propagated up as a generic
+    internal-error envelope. No crypto-shape change.
+- **New follow-up tasks 2026-05-11** per
+  [`HUMANS.md` §"Follow-up tasks from 2026-05-10 work"](../HUMANS.md):
+  D14 (markdown rendering in chat with DOMPurify
+  hardening), D15 (workflow-template `abstract_config`
+  structured editor — pull-down endpoint selector), D16
+  (`tool_choice: "auto"` option for
+  `llm_openai_compat`'s `tool_call_fallback` dialect).
+  See §3.C and §3.D below for the full entries.
 - Yuka was on Golden Week 2026-04-29 → 2026-05-06 plus a
   personal vacation 2026-05-07 / 05-08; first regular working
-  day back is Mon 2026-05-11.
+  day back is Mon 2026-05-11. Real deployment-time
+  testing begins this week.
 
 Authoritative sources for things this file used to restate but
 now cross-references:
@@ -140,10 +165,12 @@ The single `(Gate 1)` item is **not** a Codex dispatch — Claude
 drafts the proposal, Yuka reviews per the two-gate crypto-review
 protocol (§2).
 
-Total: **13 Codex dispatches plus 1 Gate-1 proposal.**
+Total: **16 Codex dispatches plus 1 Gate-1 proposal.**
 **D1, D2, D3, D4, D5, D6, D10, D11, D12, D13 are done**
-(10 of 13). Gate 1 and Gate 2 both approved. Remaining:
-D7, D8, D9.
+(10 of 16). Gate 1 and Gate 2 both approved. Remaining:
+D7, D8, D9 (Tier 2/3 connectors), plus D14, D15, D16
+added 2026-05-11 from
+[`HUMANS.md` §"Follow-up tasks from 2026-05-10 work"](../HUMANS.md).
 
 ### A. Embedding datasets (6 dispatches + 1 Gate-1)
 
@@ -231,7 +258,7 @@ implement the `Implementation` trait.
 Independent of one another and of section A; safe to run in
 parallel.
 
-### C. Connector enhancements (1 dispatch)
+### C. Connector enhancements (2 dispatches)
 
 - **D12** `philharmonic-connector-impl-llm-openai-compat`:
   add a `custom_headers: BTreeMap<String, String>` knob to
@@ -278,7 +305,41 @@ parallel.
   Tier 2/3 implementations (Anthropic / Gemini / SMTP) are
   larger and don't unblock anything for HF users.
 
-### D. WebUI infrastructure, features, and docs (3 dispatches)
+- **D16** `philharmonic-connector-impl-llm-openai-compat`:
+  add a `tool_choice: "auto"` option to the
+  `tool_call_fallback` dialect (the path the connector uses
+  to coerce structured `output_schema` outputs on
+  providers that don't natively support OpenAI's structured-
+  output mode). Some OpenAI-compatible inference providers
+  — notably some local LLM server implementations and some
+  Hugging Face Inference Providers — reject a forced
+  `tool_choice: {type: "function", function: {name: ...}}`
+  and need `tool_choice: "auto"` (with the script-supplied
+  tool still being the only one offered, so the model
+  effectively must pick it). Added 2026-05-11 from
+  [`HUMANS.md` §"Follow-up tasks from 2026-05-10 work"](../HUMANS.md).
+
+  Shape candidates (decide at prompt-drafting time):
+  (a) A new dialect variant `tool_call_fallback_auto`
+      alongside the existing `tool_call_fallback`; clean
+      separation, no per-request flag.
+  (b) A sub-option flag on the existing
+      `tool_call_fallback` dialect (e.g. `tool_choice_mode:
+      "forced" | "auto"`, defaulting to `forced` for
+      back-compat); fewer enum variants but mixes a config
+      knob into a dialect enum that's otherwise discriminator-
+      only.
+
+  Touches `philharmonic-connector-impl-llm-openai-compat`
+  only — no public-trait change, no other crate edits, no
+  crypto path touched. Tests: dialect dispatch, the
+  generated upstream request shape, end-to-end success when
+  the upstream rejects forced tool_choice. WebUI gets no
+  special treatment — endpoint configs are JSON-edited
+  through the existing CodeMirror 6 editor (D10).
+  Independent of everything else; small.
+
+### D. WebUI infrastructure, features, and docs (5 dispatches)
 
 - **D10** CodeMirror 6 in the WebUI. **DONE 2026-05-02
   (`ee2bd61`).**
@@ -326,11 +387,81 @@ parallel.
   greeting on empty context, returns the existing
   transcript otherwise. No backend changes; reuses
   `workflow:instance_create` + `workflow:instance_execute`.
-  Bundle delta ~+3.0 KiB gzipped. Open follow-ups
-  (deferred): markdown rendering in chat bubbles; full
+  Bundle delta ~+3.0 KiB gzipped. Open follow-ups:
+  markdown rendering in chat bubbles → **promoted to D14**
+  per HUMANS.md 2026-05-11 follow-up directive; full
   instance-list dropdown for templates with many active
-  chats; JP phrasing review; optional global "resume last
-  chat" shortcut.
+  chats (deferred); JP phrasing review (deferred); optional
+  global "resume last chat" shortcut (deferred).
+
+- **D14** Markdown parsing and rendering in WebUI chat
+  bubbles, with **DOMPurify hardening** (or equivalent
+  HTML sanitiser) — the assistant's reply content is
+  workflow-script-generated and the script can be
+  authored by anyone with `workflow:template_create`, so
+  the chat tab must treat the content as untrusted and
+  sanitise after parse, before render. Added 2026-05-11
+  from
+  [`HUMANS.md` §"Follow-up tasks from 2026-05-10 work"](../HUMANS.md).
+
+  Lives in `philharmonic/webui/src/pages/InstanceDetail.tsx`
+  (the chat tab) plus likely a new
+  `components/MarkdownView.tsx` for reuse. New npm
+  dependencies: a markdown parser (e.g. `marked` or
+  `markdown-it`) plus `dompurify`. Bundle-size delta will
+  not be trivial; surface in the prompt's residual risks.
+
+  Sanitiser configuration must drop `script`, inline-event
+  handlers (`onclick`, etc.), `javascript:` / `data:` URIs
+  on links, and `iframe` / `object` / `embed`. Code blocks
+  (\`\`\` fenced) should render with monospaced styling
+  but no syntax highlighting in v1 (highlight.js adds
+  significant bundle weight; defer). Tables, lists,
+  headings, links (`http(s):` only), `code`, `pre`,
+  `blockquote`, bold/italic/strikethrough are kept.
+
+  Touches WebUI only; no backend changes. The chat-
+  detection rules in `parseChatOutput` are unchanged —
+  detection still uses the literal `content: string`
+  shape. Markdown is a rendering concern, not a wire-
+  format concern.
+
+- **D15** Workflow-template `abstract_config` structured
+  editor in the WebUI — replace the current raw-JSON
+  CodeMirror 6 editor for `abstract_config` with a
+  pull-down-menu-based UI: one row per (script-side
+  endpoint name, endpoint UUID) binding, with the endpoint
+  UUID column populated by a dropdown of active tenant
+  endpoints. Added 2026-05-11 from
+  [`HUMANS.md` §"Follow-up tasks from 2026-05-10 work"](../HUMANS.md).
+
+  Structurally analogous to the `DataConfigEditor` shipped
+  as the D11 follow-up on 2026-05-10 (`f040dce`
+  philharmonic submodule). Differences:
+  - Source for the dropdown is *all* active endpoints
+    (filtered for `is_retired === false`), not just embed
+    endpoints.
+  - Binding-name validation rule is the same script-side
+    name regex (`^[A-Za-z_$][A-Za-z0-9_$]{0,63}$`) — the
+    abstract name becomes the JS-property the script uses
+    in `endpoint("<name>", ...)`.
+  - Retired-bound and missing-bound rows should surface
+    the same warning badges to avoid silently dropping user
+    data.
+
+  Once D15 lands, the raw-JSON `abstract_config` editor
+  goes away; both Create and Edit forms use the structured
+  editor only. The friendly-UI mandate per HUMANS.md
+  "Embedding DB component" final erratum applies
+  transitively to `abstract_config` for the same reason it
+  applies to `data_config`.
+
+  Touches `philharmonic/webui` only (Templates.tsx,
+  TemplateDetail.tsx, a new `components/
+  AbstractConfigEditor.tsx`, `api/client.ts` type
+  refinements, `templates.abstractConfig.*` i18n strings).
+  No backend changes — the API already accepts the same
+  `{<name>: <uuid>}` shape on Create and PATCH.
 
 ### Suggested sequencing
 
@@ -352,6 +483,18 @@ parallel.
    connectors — SMTP, Anthropic, Gemini); D9 carries
    the dual-mode AI Studio + Vertex AI requirement. All
    three are independent and parallel-safe.
+8. **Newly added 2026-05-11** from HUMANS.md follow-up
+   directive: **D14** (markdown rendering in chat with
+   DOMPurify hardening, promoted from D13's deferred
+   list), **D15** (`abstract_config` structured editor
+   in the WebUI), **D16** (`tool_choice: "auto"` for
+   `llm_openai_compat`'s `tool_call_fallback` dialect).
+   D14 and D15 are independent WebUI work; D16 is an
+   independent single-crate connector enhancement.
+   Recommended ordering: D16 first (unblocks providers
+   currently rejecting forced tool_choice) → D15 (UX
+   smoothing that reduces config-paste support burden) →
+   D14 (chat UX polish, biggest bundle impact).
 
 ### Dispatch discipline reminder
 

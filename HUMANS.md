@@ -37,5 +37,5 @@ in the future.
 ## Keep the workflow authoring guide up-to-date
 
 Re-read the docs/codex of everything related, and re-write
-workflow authoring guides in en/jp to reflect the facts\
+workflow authoring guides in en/jp to reflect the facts
 on any surface changes.
