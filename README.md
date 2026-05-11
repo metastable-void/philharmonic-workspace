@@ -125,17 +125,39 @@ and-chat from a workflow template, in-WebUI chat tab on
 `InstanceDetail`, runtime structural detection of the OpenAI-
 style `{messages: [{role, content}, ...]}` shape. The
 **workflow authoring guide (D11)** was rewritten the same
-day to reflect current implementation reality with three
-load-bearing recipes (D13 chat, embedding-datasets,
-combined RAG). The three 2026-05-11 follow-ups from
-HUMANS.md (D14 markdown rendering with DOMPurify in the
+day with three load-bearing recipes (D13 chat,
+embedding-datasets, combined RAG); 2026-05-11 added
+per-connector request/response shape tables across all
+shipped connectors. The three 2026-05-11 HUMANS.md
+follow-ups (D14 markdown rendering with DOMPurify in the
 chat UI; D15 `abstract_config` structured editor; D16
-`tool_choice: "auto"` option in `llm_openai_compat`)
-all landed the same day. Remaining post-v1 scope: just
-Phase 7 Tier 2/3 connector implementations (SMTP,
-Anthropic, Gemini — D7/D8/D9).
+`tool_choice: "auto"` for `llm_openai_compat`) all landed
+that day.
+
+**Deployment-time testing on 2026-05-11** drove additional
+fixes that aren't numbered Codex dispatches but are
+worth knowing about: `mechanics-core` 0.4.0 (runtime no
+longer overrides `main`-fulfilled success with
+"unhandled promise rejection" for workflows whose
+`try { await endpoint(...) } catch { }` correctly handled
+the error); WebUI permission-aware navigation + disabled
+non-actionable buttons + sticky sidebar footer
+(`philharmonic-api` 0.1.8 `WhoamiResponse` extended with
+`permissions: Vec<String>`); audit-log producer gap
+closed (`philharmonic-policy` 0.2.3
+`audit_event_type` module with 17 canonical
+discriminants; `philharmonic-api` wired 19 producer
+call sites with privacy-restricted token-mint payloads
+enforced by absence-assertion tests); connector-path
+body cap raised 2 MiB → 32 MiB
+(`philharmonic-connector-router` 0.1.2).
+
+Remaining post-v1 scope: Phase 7 Tier 2/3 connector
+implementations (SMTP, Anthropic, Gemini — D7/D8/D9).
 The authoritative task list lives in
-[`docs/ROADMAP.md` §3](docs/ROADMAP.md#3-post-v1-dispatch-plan).
+[`docs/ROADMAP.md` §3](docs/ROADMAP.md#3-post-v1-dispatch-plan)
+with the verbatim pre-trim ROADMAP content at
+[`docs/archive/2026-05-11-roadmap-completed-arc-trim.md`](docs/archive/2026-05-11-roadmap-completed-arc-trim.md).
 
 All 25 crate names are reserved on crates.io. Foundational, API,
 connector-triangle, and Phase 6/7 Tier 1 implementation crates

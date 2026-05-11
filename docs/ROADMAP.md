@@ -7,7 +7,7 @@ repo.
 V1 is complete through the first working end-to-end deployment;
 active work now lives in the post-v1 dispatch plan (§3 below).
 
-**Current state** (2026-05-10):
+**Current state** (2026-05-11):
 
 - Design: complete.
 - v1 implementation path: **complete through Phase 9.**
@@ -47,50 +47,90 @@ active work now lives in the post-v1 dispatch plan (§3 below).
   reflecting current implementation reality, three
   load-bearing recipes (D13 chat, embedding-datasets,
   combined RAG).
-- **D11 follow-ups** all shipped 2026-05-10:
-  - **JP mirror** of the workflow authoring guide
-    regenerated to match the new English version
-    (`docs-jp/ワークフロー作成ガイド.md`, 406 → 1368
-    lines; `e159e88` docs-jp + `6913a9d` parent).
-  - **WebUI template-form `data_config` editor** —
-    structured embedding-dataset binding editor on
-    Create + Edit forms with binding-name validation,
-    retired/missing warning badges, friendly-UI per
-    HUMANS.md (Codex r01 `f040dce` philharmonic +
-    `db9f737` parent).
-  - **Design-doc reconciliation** — `design/07`
-    script-arg shape five-field `{context, args,
-    input, subject, data}` with full `data` semantics;
-    `design/10` template body + PATCH semantics
-    extended with `data_config` (`4b6a122`).
-- **Late-Sunday fix-its (2026-05-10 evening)**:
-  - `scripts/build-status.sh` extended to detect
-    running `build-script-build` executables (previously
-    reported "no active Rust build processes" when a
-    build.rs was the only thing running; `86c7312`).
-  - Workflow authoring guide (en + jp) now flags the
-    WebUI config-paste UX trap — `display_name` /
-    `implementation` go in form fields; only the inner
-    `config` value goes in the Config JSON editor
-    (`48fe697`).
-  - **Connector-path body cap raised 2 MiB → 32 MiB**
-    (`philharmonic-connector-router` 0.1.1 → 0.1.2;
-    `85e2ad8`). The previous 2 MiB axum default rejected
-    `vector_search` corpus bodies over ~170 items at
-    1024-dim with an HTTP 413 propagated up as a generic
-    internal-error envelope. No crypto-shape change.
-- **New follow-up tasks 2026-05-11** per
-  [`HUMANS.md` §"Follow-up tasks from 2026-05-10 work"](../HUMANS.md):
-  D14 (markdown rendering in chat with DOMPurify
-  hardening), D15 (workflow-template `abstract_config`
-  structured editor — pull-down endpoint selector), D16
-  (`tool_choice: "auto"` option for
-  `llm_openai_compat`'s `tool_call_fallback` dialect).
-  See §3.C and §3.D below for the full entries.
+- **D11 follow-ups + Late-Sunday fix-its** all landed
+  2026-05-10 (JP mirror regeneration, WebUI
+  `data_config` structured editor, design/07 + /10
+  reconciliation, `scripts/build-status.sh` extension,
+  config-paste UX guide callout, connector-path body cap
+  2 MiB → 32 MiB). Verbatim detail + commit SHAs
+  preserved at
+  [`docs/archive/2026-05-11-roadmap-completed-arc-trim.md`](archive/2026-05-11-roadmap-completed-arc-trim.md).
+- **2026-05-11 HUMANS.md follow-up dispatches done**:
+  D16 (`tool_call_fallback_auto` dialect — `e523238`
+  submodule + `b368c4b` parent); D14 (markdown rendering
+  in chat with DOMPurify) + D15 (`abstract_config`
+  structured editor) — bundled in `f750b4a` philharmonic
+  submodule + `c1fbff7` parent. All from
+  [`HUMANS.md` §"Follow-up tasks from 2026-05-10 work"](../HUMANS.md).
+- **2026-05-11 deployment-time polish** (not numbered
+  Codex dispatches; surfaced during real testing):
+  - `mechanics-core` **0.3.2 → 0.4.0** (`5cbe72c` +
+    `6ed5ee2`) — runtime stopped overriding `main`'s
+    fulfilled-promise success with "Unhandled promise
+    rejection" engine errors. Boa's
+    `NativeFunction::from_async_fn` rejection-tracker
+    didn't balance reliably across the await-wrapper
+    chain; the strict check produced false-positives
+    for any workflow with `try { await endpoint(...) }
+    catch (e) { ... }`. Module-evaluation-time check
+    kept strict.
+  - `philharmonic-api` **0.1.7 → 0.1.8** (`ab7bc25` +
+    `d19cc76`) — `WhoamiResponse` extended with
+    `permissions: Vec<String>` (effective atom set
+    after envelope clipping). Powers the WebUI nav /
+    button filtering below; additive on the wire.
+  - **WebUI permission-aware nav + disabled
+    non-actionable buttons + sticky sidebar footer**
+    (Codex r01) — sidebar hides routes the caller has
+    no read permission for; action buttons across all
+    15 pages render `disabled` with title-attribute
+    tooltips naming the missing atom instead of letting
+    users click into a 403; `usePermissions` hook reads
+    from `authSlice.permissions`. Server-side route-
+    protector enforcement unchanged (still the security
+    boundary). Sticky-footer fix via `.sidebar
+    position: sticky; max-height: 100vh`.
+  - **Assistant `name` field bubble surfacing**
+    (`afbc660` + `0c95618`) — D13 chat tab renders an
+    OpenAI-style assistant `name` (non-empty string) as
+    the bubble role label in place of the generic
+    "Assistant" / "アシスタント".
+  - **Workflow authoring guide per-connector
+    request/response shapes** (`9f96e2d`) — every
+    shipped connector subsection in `docs/guide/
+    workflow-authoring.md` (en + jp) now has explicit
+    Request body + Response body tables;
+    `http_forward`'s `response.body.body` double-nest
+    semantics called out.
+  - **Audit-log producer gap closed** —
+    `philharmonic-policy` 0.2.2 → 0.2.3 (`b37f894`)
+    ships the `audit_event_type` module with 17
+    canonical i64 discriminants;
+    `docs/design/09-policy-and-tenancy.md §Audit trail`
+    contract lock-in (`1ce191a`) covers the `event_data`
+    JSON schema, token-mint payload privacy restriction
+    (subject_id + authority_id only; never injected
+    claims), and the audit-write failure semantics (log
+    warn + return success on underlying mutation);
+    `philharmonic-api` (`881c48a` + `8d20d1d`) wires 19
+    producer call sites across 7 route files
+    (principals, roles, memberships, endpoints,
+    authorities, mint, operator) using a shared
+    `emit_audit_event` helper, with 7 e2e tests
+    (mint.rs's enforces the privacy restriction by
+    absence-assertion). Open follow-up design questions
+    queued: separate `AUTHORITY_ROTATED = 34`
+    discriminant?, future `TENANT_MODIFIED` for
+    non-status updates?, `GET /v1/audit` response
+    surfacing canonical names via
+    `audit_event_type::name`?
+  - Pre-D15 detail and per-day work preserved in the
+    archive linked above.
 - Yuka was on Golden Week 2026-04-29 → 2026-05-06 plus a
   personal vacation 2026-05-07 / 05-08; first regular working
-  day back is Mon 2026-05-11. Real deployment-time
-  testing begins this week.
+  day back was Mon 2026-05-11. Real deployment-time
+  testing started this week and has been the source of
+  the post-D15 polish work above.
 
 Authoritative sources for things this file used to restate but
 now cross-references:
@@ -234,25 +274,16 @@ parallel.
   at
   [`docs/archive/2026-05-11-roadmap-completed-arc-trim.md`](archive/2026-05-11-roadmap-completed-arc-trim.md).
 
-- **D16** `philharmonic-connector-impl-llm-openai-compat`
-  `tool_call_fallback_auto` dialect variant — **DONE
-  2026-05-11** (`e523238` submodule + `b368c4b` parent;
-  Codex r01 under prompt
-  `2026-05-11-0001-d16-llm-openai-compat-tool-call-fallback-auto-01`).
-  Sub-shape 1 chosen: `tool_call_fallback.rs` exposes a
-  shared `pub(crate) translate_request_with_tool_choice`
-  helper that both variants call; the new module supplies
-  `json!("auto")` and delegates response extraction
-  directly. Version 0.1.1 → 0.1.2 (patch bump per pre-1.0
-  SemVer; semver-checks flagged the public-enum-variant
-  addition as breaking — anticipated, surfaced in
-  residuals). Existing `tool_call_fallback` tests remain
-  green byte-for-byte (back-compat guarantee).
-  Structured-output-contract resume needed (original
-  background task died post-verification; rescue spawn
-  emitted the six-section report against the
-  working-tree state). Streak now 9/9 since the contract
-  was added.
+- **D16** `llm_openai_compat` `tool_call_fallback_auto`
+  dialect variant — **DONE 2026-05-11** (`e523238`
+  submodule + `b368c4b` parent). New variant alongside
+  the existing `tool_call_fallback`; sends
+  `tool_choice: "auto"` instead of the forced
+  function-name literal, for providers that reject the
+  forced form. `philharmonic-connector-impl-llm-openai-compat`
+  0.1.1 → 0.1.2 (patch bump per pre-1.0 SemVer). Full
+  shape detail at
+  [`docs/archive/2026-05-11-roadmap-completed-arc-trim.md`](archive/2026-05-11-roadmap-completed-arc-trim.md).
 
 ### D. WebUI infrastructure, features, and docs (5 dispatches)
 
@@ -281,87 +312,49 @@ Per-dispatch rationale and shape detail for the above
 three preserved at
 [`docs/archive/2026-05-11-roadmap-completed-arc-trim.md`](archive/2026-05-11-roadmap-completed-arc-trim.md).
 
-Two pending:
+Two more landed 2026-05-11 (bundled Codex r01):
 
-- **D14** Markdown parsing and rendering in WebUI chat
-  bubbles with DOMPurify hardening — **DONE 2026-05-11**
-  (`f750b4a` philharmonic submodule + `c1fbff7` parent;
-  bundled with D15 in Codex r01 under prompt
-  `2026-05-11-0002-d14-d15-...-01`). New
-  `components/MarkdownView.tsx` (122 LOC): `marked` +
-  `dompurify` with a strict ALLOWED_TAGS allowlist (block
-  elements + inline emphasis + tables + http(s)-only
-  `<a><img>`), ALLOWED_ATTR limited to alt/href/src/title,
-  FORBID_TAGS for scripts/iframes/forms/styles/etc., and
-  an `afterSanitizeAttributes` hook that removes on*
-  handlers, strips non-http(s) href/src, and hardens
-  surviving `<a>` with target=_blank +
-  rel=noopener noreferrer nofollow. `useMemo` on source
-  prevents per-bubble re-parse on chat-tab re-render. The
-  chat tab on `InstanceDetail.tsx` wraps each bubble's
-  content with `<MarkdownView className="chat-markdown"
-  source={message.content} />` inside the existing
-  chat-bubble div — bubble layout unchanged. Codex's
-  informal XSS sanity check via throwaway /tmp jsdom
-  harness confirmed the sanitiser drops scripts /
-  onclick / javascript: / data: and hardens https:
-  links as specified. `parseChatOutput` detection rules
-  unchanged. Bundle delta +22,480 B gzipped.
-
+- **D14** Markdown rendering in WebUI chat bubbles with
+  DOMPurify hardening — **DONE 2026-05-11** (`f750b4a` +
+  `c1fbff7`). `MarkdownView.tsx` with `marked` +
+  `dompurify`, strict allowlist, link-target hardening
+  (`target=_blank rel=noopener noreferrer nofollow`),
+  `useMemo` for per-bubble efficiency. Bundle delta
+  +22,480 B gzipped.
 - **D15** Workflow-template `abstract_config` structured
-  editor — **DONE 2026-05-11** (`f750b4a` philharmonic
-  submodule + `c1fbff7` parent; bundled with D14 in the
-  same Codex r01). New
-  `components/AbstractConfigEditor.tsx` (317 LOC) mirrors
-  the `DataConfigEditor.tsx` 315 LOC precedent from D11
-  follow-up #3: per-row binding-name validation against
-  `/^[A-Za-z_$][A-Za-z0-9_$]{0,63}$/`, duplicate-name
-  detection, dropdown filtered for `is_retired=false`,
-  retired-bound / missing-bound warning badges so user
-  data is never silently dropped, disabled mode for
-  save-in-flight. `api/client.ts` adds an `AbstractConfig`
-  type alias + a `listEndpoints` helper with a
-  cursor-walking auto-loader (handles >100-endpoint
-  tenants cleanly without truncation, Codex's call vs.
-  the prompt's truncate-with-hint alternative). Both
-  Templates.tsx Create and TemplateDetail.tsx Edit forms
-  now use the structured editor; the raw-JSON CodeMirror
-  abstract_config editor and its `configText` state slot
-  are removed entirely (no fallback). New
-  `templates.abstractConfig.*` i18n namespace in en + ja
-  mirroring `templates.dataConfig.*` shape. No new
-  permission atoms — reuses `endpoint:read_metadata` +
-  `workflow:template_create`. Bundle delta +828 B
-  gzipped. Combined D14+D15 bundle delta +23,308 B
-  (~+22.8 KiB) gzipped.
+  editor — **DONE 2026-05-11** (`f750b4a` + `c1fbff7`).
+  `AbstractConfigEditor.tsx` mirrors the
+  `DataConfigEditor.tsx` precedent; binding-name validation
+  + retired/missing warning badges + cursor-walking
+  endpoint loader. Raw-JSON `abstract_config` editor
+  removed entirely. Bundle delta +828 B gzipped.
+
+Per-dispatch rationale, sub-shape decisions, and the
+verbose post-completion descriptions for D14 / D15 / D16
+are at
+[`docs/archive/2026-05-11-roadmap-completed-arc-trim.md`](archive/2026-05-11-roadmap-completed-arc-trim.md)
+under "Evening trim — 2026-05-11".
 
 ### Suggested sequencing
 
-**Steps 1-6 (completed work, 2026-05-02 through 2026-05-10):**
-D1+D2+D10 → Gate 1 → embedding-datasets feature end-to-end
-(D3 r01 → r02 → D4+D5+caps+409 → Gate 2 → D6 WebUI) → D12 →
-D13 → D11 (+ JP mirror). Per-step commit SHAs preserved at
+**Completed work (2026-05-02 through 2026-05-11):** D1 +
+D2 + D10 → Gate 1 → embedding-datasets feature end-to-end
+(D3 r01 → r02 → D4+D5+caps+409 → Gate 2 → D6 WebUI) → D12
+→ D13 → D11 (+ JP mirror) → D16 → D14 + D15. Per-step
+commit SHAs and per-dispatch shape detail preserved at
 [`docs/archive/2026-05-11-roadmap-completed-arc-trim.md`](archive/2026-05-11-roadmap-completed-arc-trim.md).
+Additional 2026-05-11 deployment-time polish (not
+numbered Codex dispatches — mechanics-core 0.4.0,
+philharmonic-api 0.1.8, WebUI permission-aware UI,
+assistant `name` field surfacing, connector wire-shape
+guide expansion, audit-log producer gap closed)
+summarised in the Current state preamble at the top of
+this file with the same archive pointer.
 
-**Step 7 — next dispatchable**: D7 / D8 / D9 (Tier 2/3
-connectors — SMTP, Anthropic, Gemini); D9 carries the
-dual-mode AI Studio + Vertex AI requirement. All three are
-independent and parallel-safe.
-
-**Step 8 — newly added 2026-05-11** from HUMANS.md
-follow-up directive (all three now done): **D16**
-`tool_choice: "auto"` for `llm_openai_compat` — DONE
-2026-05-11 (`e523238` submodule + `b368c4b` parent);
-**D14** markdown rendering in chat with DOMPurify
-hardening — DONE 2026-05-11 (bundled with D15 in
-`f750b4a` philharmonic submodule + `c1fbff7` parent);
-**D15** `abstract_config` structured editor — DONE
-2026-05-11 (same Codex r01 as D14).
-
-**Step 9 — next dispatchable** (everything else done):
-D7 / D8 / D9 remain. Tier 2/3 connector implementations
-— SMTP, Anthropic, Gemini (dual-mode AI Studio +
-Vertex AI). All three are independent and parallel-safe.
+**Next dispatchable**: D7 / D8 / D9 (Tier 2/3 connector
+implementations — SMTP, Anthropic, Gemini). D9 carries
+the dual-mode AI Studio + Vertex AI requirement. All
+three are independent and parallel-safe.
 
 ### Dispatch discipline reminder
 

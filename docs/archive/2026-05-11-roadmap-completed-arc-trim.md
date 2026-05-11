@@ -227,3 +227,209 @@ Authoritative design:
   `vector_search` corpus bodies over ~170 items at 1024-dim
   with an HTTP 413 propagated up as a generic internal-error
   envelope. No crypto-shape change.
+
+---
+
+# Evening trim — 2026-05-11
+
+Pre-trim verbatim text of the D14 / D15 / D16 verbose §3.C
+and §3.D entries plus the Suggested-sequencing steps 7-9
+from the 2026-05-11 evening trim. Trimmed once all three
+were done and the section-3 verbose-description form had
+served its planning purpose.
+
+## §3.C D16 — `tool_call_fallback_auto` dialect — DONE 2026-05-11
+
+- **D16** `philharmonic-connector-impl-llm-openai-compat`
+  `tool_call_fallback_auto` dialect variant — **DONE
+  2026-05-11** (`e523238` submodule + `b368c4b` parent;
+  Codex r01 under prompt
+  `2026-05-11-0001-d16-llm-openai-compat-tool-call-fallback-auto-01`).
+  Sub-shape 1 chosen: `tool_call_fallback.rs` exposes a
+  shared `pub(crate) translate_request_with_tool_choice`
+  helper that both variants call; the new module supplies
+  `json!("auto")` and delegates response extraction
+  directly. Version 0.1.1 → 0.1.2 (patch bump per pre-1.0
+  SemVer; semver-checks flagged the public-enum-variant
+  addition as breaking — anticipated, surfaced in
+  residuals). Existing `tool_call_fallback` tests remain
+  green byte-for-byte (back-compat guarantee).
+  Structured-output-contract resume needed (original
+  background task died post-verification; rescue spawn
+  emitted the six-section report against the
+  working-tree state). Streak now 9/9 since the contract
+  was added.
+
+## §3.D D14 — markdown rendering in chat with DOMPurify — DONE 2026-05-11
+
+- **D14** Markdown parsing and rendering in WebUI chat
+  bubbles with DOMPurify hardening — **DONE 2026-05-11**
+  (`f750b4a` philharmonic submodule + `c1fbff7` parent;
+  bundled with D15 in Codex r01 under prompt
+  `2026-05-11-0002-d14-d15-...-01`). New
+  `components/MarkdownView.tsx` (122 LOC): `marked` +
+  `dompurify` with a strict ALLOWED_TAGS allowlist (block
+  elements + inline emphasis + tables + http(s)-only
+  `<a><img>`), ALLOWED_ATTR limited to alt/href/src/title,
+  FORBID_TAGS for scripts/iframes/forms/styles/etc., and
+  an `afterSanitizeAttributes` hook that removes on*
+  handlers, strips non-http(s) href/src, and hardens
+  surviving `<a>` with target=_blank +
+  rel=noopener noreferrer nofollow. `useMemo` on source
+  prevents per-bubble re-parse on chat-tab re-render. The
+  chat tab on `InstanceDetail.tsx` wraps each bubble's
+  content with `<MarkdownView className="chat-markdown"
+  source={message.content} />` inside the existing
+  chat-bubble div — bubble layout unchanged. Codex's
+  informal XSS sanity check via throwaway /tmp jsdom
+  harness confirmed the sanitiser drops scripts /
+  onclick / javascript: / data: and hardens https:
+  links as specified. `parseChatOutput` detection rules
+  unchanged. Bundle delta +22,480 B gzipped.
+
+## §3.D D15 — `abstract_config` structured editor — DONE 2026-05-11
+
+- **D15** Workflow-template `abstract_config` structured
+  editor — **DONE 2026-05-11** (`f750b4a` philharmonic
+  submodule + `c1fbff7` parent; bundled with D14 in the
+  same Codex r01). New
+  `components/AbstractConfigEditor.tsx` (317 LOC) mirrors
+  the `DataConfigEditor.tsx` 315 LOC precedent from D11
+  follow-up #3: per-row binding-name validation against
+  `/^[A-Za-z_$][A-Za-z0-9_$]{0,63}$/`, duplicate-name
+  detection, dropdown filtered for `is_retired=false`,
+  retired-bound / missing-bound warning badges so user
+  data is never silently dropped, disabled mode for
+  save-in-flight. `api/client.ts` adds an `AbstractConfig`
+  type alias + a `listEndpoints` helper with a
+  cursor-walking auto-loader (handles >100-endpoint
+  tenants cleanly without truncation, Codex's call vs.
+  the prompt's truncate-with-hint alternative). Both
+  Templates.tsx Create and TemplateDetail.tsx Edit forms
+  now use the structured editor; the raw-JSON CodeMirror
+  abstract_config editor and its `configText` state slot
+  are removed entirely (no fallback). New
+  `templates.abstractConfig.*` i18n namespace in en + ja
+  mirroring `templates.dataConfig.*` shape. No new
+  permission atoms — reuses `endpoint:read_metadata` +
+  `workflow:template_create`. Bundle delta +828 B
+  gzipped. Combined D14+D15 bundle delta +23,308 B
+  (~+22.8 KiB) gzipped.
+
+## Suggested-sequencing steps 7-9 — completed-work history
+
+7. **D16** `tool_call_fallback_auto` for `llm_openai_compat`
+   — DONE 2026-05-11 (`e523238` submodule + `b368c4b`
+   parent).
+8. **D14** markdown rendering in chat with DOMPurify
+   hardening — DONE 2026-05-11 (bundled with D15 in
+   `f750b4a` philharmonic submodule + `c1fbff7` parent).
+9. **D15** `abstract_config` structured editor — DONE
+   2026-05-11 (same Codex r01 as D14).
+
+## 2026-05-11 post-D15 deployment-time polish (NOT numbered Codex dispatches)
+
+Beyond the three numbered dispatches D14/D15/D16, the
+2026-05-11 deployment-time testing surfaced a series of
+fixes and polish items that landed the same day. None of
+these were on the original ROADMAP §3 dispatch plan; they
+were testing-time observations promoted to small fixes:
+
+- **`mechanics-core` 0.3.2 → 0.4.0** (`5cbe72c` mechanics-core
+  submodule + `6ed5ee2` parent) — runtime stopped overriding
+  `main`'s fulfilled-promise success with "Unhandled promise
+  rejection" engine errors. Boa's `NativeFunction::from_async_fn`
+  rejects an inner promise that the await-chain machinery
+  wraps in an outer continuation promise; the spec-compliant
+  `promise_rejection_tracker` fires `Reject` on the inner
+  rejection (no handlers at that moment) but the matching
+  `Handle` event doesn't reliably propagate to the inner
+  promise when the await's handler attaches to the wrapper.
+  Counter ended positive even when every JS-visible
+  rejection got caught. The strict check produced
+  false-positive step failures for any workflow with
+  `try { await endpoint(...) } catch (e) { ... }`. Module-
+  evaluation-time check kept strict; trade-off accepts
+  silently-misbehaving fire-and-forget rejections (rare in
+  practice) over breaking the common correct pattern.
+- **`philharmonic-api` 0.1.7 → 0.1.8** (`ab7bc25`
+  philharmonic-api + `d19cc76` parent) — `WhoamiResponse`
+  extended with `permissions: Vec<String>` (effective atom
+  set after envelope clipping). Principal-auth path joins
+  role-membership permissions; ephemeral-auth path clones
+  token's clipped claims. Sort + dedup. Additive field;
+  older clients ignore it.
+- **WebUI permission-aware nav + disabled non-actionable
+  buttons + sticky sidebar footer** (`eb9184d` philharmonic
+  submodule, same parent commit as above) — Codex r01 under
+  prompt
+  `2026-05-11-0003-webui-permission-aware-ui-and-sidebar-sticky-01`.
+  Sidebar hides routes the caller has no read permission
+  for; action buttons across all 15 pages render `disabled`
+  with `title="Missing permission: <atom>"` tooltips
+  instead of letting users click into a 403; sidebar
+  `position: sticky; top: 0; align-self: start;
+  max-height: 100vh` so the language switcher / token /
+  logout footer stays reachable regardless of nav-list
+  length. Server-side route-protector enforcement
+  unchanged (still the security boundary; the WebUI just
+  stops users from hitting it accidentally). `usePermissions`
+  hook reads from `authSlice.permissions`, populated from
+  `WhoamiResponse` on login.
+- **Chat bubble assistant `name` field surfacing**
+  (`afbc660` philharmonic submodule + `0c95618` parent) —
+  D13 chat tab now renders an assistant turn's optional
+  OpenAI-style `name` field (non-empty string) as the bubble
+  role label in place of the generic "Assistant" /
+  "アシスタント" string. Other roles unchanged. Workflow
+  authoring guide (en + jp) describes the special-case UI
+  surfacing.
+- **Workflow authoring guide per-connector request/response
+  shapes** (`9f96e2d` parent) — each shipped connector
+  subsection in `docs/guide/workflow-authoring.md` (en + jp)
+  gained a Request body + Response body description so
+  workflow authors don't reverse-engineer the wire shapes
+  from the connector crate source. Universal mechanics-core
+  transport envelope (response = `{body, headers, status,
+  ok}`) disambiguated from connector-specific
+  `response.body` shapes; `http_forward`'s double-nest
+  semantics (`response.body.body` for upstream body)
+  explicitly called out.
+- **Audit-log producer gap closed** (`b37f894`
+  philharmonic-policy + `1ce191a` parent + `881c48a`
+  philharmonic-api + `8d20d1d` parent) — three-piece fix:
+  - philharmonic-policy 0.2.2 → 0.2.3: new
+    `audit_event_type` module with 17 canonical i64
+    discriminants for every audit-event category (1-9
+    principals, 10-19 roles/memberships, 20-29 endpoints,
+    30-39 authorities, 40-49 token mint, 50-59 tenant
+    lifecycle); `name(i64) -> Option<&'static str>` for
+    canonical snake_case labels; append-only numbering
+    rule.
+  - `docs/design/09-policy-and-tenancy.md §Audit trail`
+    contract lock-in: `event_data` JSON schema convention
+    (`principal_id` + `route` + `correlation_id` required;
+    `target_entity_id` + `subject` per-event optional);
+    token-mint payload privacy restriction (subject_id +
+    authority_id only; never injected claims); audit-write
+    failure semantics (log warn + return success on
+    underlying mutation). Status block corrected from
+    "audit events are shipped" to acknowledge the producer
+    gap.
+  - philharmonic-api 0.1.8 (no version bump): 19 producer
+    call sites across 7 route files (principals, roles,
+    memberships, endpoints, authorities, mint, operator),
+    all using a shared `pub(crate) emit_audit_event`
+    helper that wraps `write_audit_event` with the
+    locked failure pattern (warn + continue). mint.rs's
+    privacy restriction enforced by absence-assertions
+    in `tests/audit_producers.rs` (7 e2e tests, all green).
+    Open follow-up design questions queued (separate
+    `AUTHORITY_ROTATED = 34` discriminant?, future
+    `TENANT_MODIFIED` event for non-status updates?,
+    `GET /v1/audit` response surfacing canonical names
+    via `audit_event_type::name`?).
+
+Per-piece commit threads + structured-output-contract
+streak (now 11/11) preserved in the Codex prompt outcomes
+under `docs/codex-prompts/2026-05-11-{0001,0002,0003,0004}-*.md`.

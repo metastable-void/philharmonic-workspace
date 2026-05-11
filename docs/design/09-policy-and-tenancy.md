@@ -902,22 +902,38 @@ log is the recovery path for audit-trail gaps.
 
 ## Status
 
-**Implemented except audit producers.** Published as
-`philharmonic-policy` 0.1.0 (2026-04-22), 0.2.0 (2026-04-28)
-for ephemeral API token primitives (COSE_Sign1 minting +
-14-step verification), 0.2.2 (2026-05-10) for embedding-
-datasets entity + CBOR codec, 0.2.3 (2026-05-11) for the
-canonical `event_type` discriminants module above. All
-seven entity kinds, permission evaluation, SCK encryption,
-`pht_` token format, and the `AuditEvent` substrate + read
-endpoint are shipped.
+**Fully implemented.** Published as `philharmonic-policy`
+0.1.0 (2026-04-22), 0.2.0 (2026-04-28) for ephemeral API
+token primitives (COSE_Sign1 minting + 14-step
+verification), 0.2.2 (2026-05-10) for embedding-datasets
+entity + CBOR codec, 0.2.3 (2026-05-11) for the canonical
+`event_type` discriminants module above. All seven entity
+kinds, permission evaluation, SCK encryption, `pht_`
+token format, and the `AuditEvent` substrate + read
+endpoint + producers are shipped.
 
-**Producer-side wiring is still landing**: as of 2026-05-11,
-no production `philharmonic-api` mutation route writes an
-`AuditEvent` — the route handlers return success without
-calling `write_audit_event`. Tracking commit and Codex
-dispatch in
-[`docs/notes-to-humans/2026-05-11-0001-audit-event-producer-gap.md`](../notes-to-humans/2026-05-11-0001-audit-event-producer-gap.md);
-the contract above (event-type discriminants,
-`event_data` schema, failure semantics) is the lock-in for
-the producer dispatch.
+**Audit producer wiring landed 2026-05-11** (`881c48a`
+philharmonic-api + `8d20d1d` parent) — 19 producer call
+sites across 7 mutation route files (principals, roles,
+memberships, endpoints, authorities, mint, operator),
+all using a shared `pub(crate) emit_audit_event` helper
+that wraps `write_audit_event` with the locked
+failure-semantics pattern (log warn + return success on
+underlying mutation). Token-mint privacy restriction
+(subject_id + authority_id only; never injected claims)
+enforced by absence-assertion tests in
+`philharmonic-api/tests/audit_producers.rs`. The
+read-side audit log now populates as mutation routes are
+exercised; the previously-empty WebUI Audit Logs page
+is no longer empty by construction.
+
+Three follow-up design questions are open (Yuka's call,
+not blocking): whether authority key rotation should get
+a distinct `AUTHORITY_ROTATED = 34` discriminant rather
+than sharing `AUTHORITY_MODIFIED`; whether tenant
+non-status updates (display_name etc.) should produce a
+future `TENANT_MODIFIED` event in a follow-up
+`philharmonic-policy` 0.2.4 patch; whether
+`GET /v1/audit` should surface canonical event-type
+names via `audit_event_type::name` in the response
+rather than only opaque `i64` values.

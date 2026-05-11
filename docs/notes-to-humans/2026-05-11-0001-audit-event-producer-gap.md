@@ -223,3 +223,72 @@ until the contract is locked.
 Reporting only. No code changes proposed in this note — the
 plan above is for Yuka to approve, modify, or reject before any
 work starts.
+
+### Resolution (2026-05-11 evening)
+
+Yuka approved the plan; all three pieces landed the same day.
+
+1. **Piece 1** — `philharmonic-policy` 0.2.2 → 0.2.3
+   (`b37f894` philharmonic-policy submodule + `1ce191a`
+   parent). New `audit_event_type` module with 17 canonical
+   `i64` discriminants (per-category gaps for headroom),
+   append-only numbering, `name(i64) -> Option<&'static str>`
+   helper. Bumped patch rather than minor (per workspace D12 /
+   D3 r01 precedent for additive changes) to avoid cascading
+   the caret pin on philharmonic-api / philharmonic-workflow /
+   philharmonic meta-crate.
+2. **Piece 2** — design/09 contract lock-in (same parent
+   commit `1ce191a`). §"`event_type` canonical discriminants",
+   §"`event_data` JSON schema convention" (principal_id +
+   route + correlation_id required; target_entity_id +
+   subject per-event optional; token-mint payload restriction
+   spelled out as load-bearing privacy decision), and
+   §"Audit-write failure semantics" (log warn + return
+   success on the underlying mutation; transactional
+   multi-entity writes deferred until substrate support).
+   §Status block corrected from the false "audit events are
+   shipped" claim.
+3. **Piece 3** — `philharmonic-api` audit producer wiring
+   (`881c48a` philharmonic-api submodule + `8d20d1d` parent;
+   Codex r01 under prompt
+   `docs/codex-prompts/2026-05-11-0004-audit-event-producers-01.md`).
+   19 producer call sites across 7 mutation route files
+   (principals, roles, memberships, endpoints, authorities,
+   mint, operator) using a shared `pub(crate)
+   emit_audit_event` helper extracted in `audit.rs`. 7 e2e
+   tests in new `tests/audit_producers.rs`, all green;
+   mint.rs's test enforces the privacy restriction by
+   absence-assertion on the keys `claims`, `permissions`,
+   `token`, `token_hex`, `lifetime`, `expiry`. Routes use
+   their actual paths (`/v1/role-memberships`,
+   `/v1/minting-authorities`, `/v1/tenant`, operator
+   `/unsuspend`) rather than the prompt's table's guesses
+   — Codex correctly used the real paths and surfaced the
+   divergence in residuals.
+
+The producer wiring is **PARTIAL** in only one respect:
+`tenant.rs`'s self-service `PATCH /v1/tenant` doesn't
+currently expose a status-change branch, so
+`TENANT_STATUS_CHANGED` fires only via the operator-scoped
+`/v1/operator/tenants/{id}/{suspend,unsuspend}` routes.
+Codex correctly chose not to invent a new API surface;
+self-service tenant status changes can be added in a
+future patch if/when the PATCH handler gains that branch.
+
+Three open follow-up design questions queued (Yuka's call,
+not blocking):
+
+- Should authority key rotation get a distinct
+  `AUTHORITY_ROTATED = 34` discriminant rather than
+  sharing `AUTHORITY_MODIFIED`?
+- Should tenant non-status updates (display_name etc.)
+  produce a future `TENANT_MODIFIED` event in a follow-up
+  `philharmonic-policy` 0.2.4 patch?
+- Should `GET /v1/audit` surface canonical event-type
+  names via `audit_event_type::name` in the response,
+  rather than only opaque `i64` values?
+
+This note's TL;DR ("empty by construction") is now stale.
+The audit log read-side will populate as mutation routes
+get exercised in the deployment. Note kept as historical
+record of the gap and the three-piece fix sequence.
