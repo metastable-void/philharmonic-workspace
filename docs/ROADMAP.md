@@ -166,11 +166,9 @@ drafts the proposal, Yuka reviews per the two-gate crypto-review
 protocol (§2).
 
 Total: **16 Codex dispatches plus 1 Gate-1 proposal.**
-**D1, D2, D3, D4, D5, D6, D10, D11, D12, D13, D16 are done**
-(11 of 16). Gate 1 and Gate 2 both approved. Remaining:
-D7, D8, D9 (Tier 2/3 connectors), plus D14, D15 from the
-2026-05-11
-[`HUMANS.md` §"Follow-up tasks from 2026-05-10 work"](../HUMANS.md).
+**D1, D2, D3, D4, D5, D6, D10, D11, D12, D13, D14, D15, D16
+are done** (13 of 16). Gate 1 and Gate 2 both approved.
+Remaining: D7, D8, D9 (Tier 2/3 connectors).
 
 ### A. Embedding datasets (6 dispatches + 1 Gate-1) — DONE
 
@@ -286,73 +284,56 @@ three preserved at
 Two pending:
 
 - **D14** Markdown parsing and rendering in WebUI chat
-  bubbles, with **DOMPurify hardening** (or equivalent
-  HTML sanitiser) — the assistant's reply content is
-  workflow-script-generated and the script can be
-  authored by anyone with `workflow:template_create`, so
-  the chat tab must treat the content as untrusted and
-  sanitise after parse, before render. Added 2026-05-11
-  from
-  [`HUMANS.md` §"Follow-up tasks from 2026-05-10 work"](../HUMANS.md).
-
-  Lives in `philharmonic/webui/src/pages/InstanceDetail.tsx`
-  (the chat tab) plus likely a new
-  `components/MarkdownView.tsx` for reuse. New npm
-  dependencies: a markdown parser (e.g. `marked` or
-  `markdown-it`) plus `dompurify`. Bundle-size delta will
-  not be trivial; surface in the prompt's residual risks.
-
-  Sanitiser configuration must drop `script`, inline-event
-  handlers (`onclick`, etc.), `javascript:` / `data:` URIs
-  on links, and `iframe` / `object` / `embed`. Code blocks
-  (\`\`\` fenced) should render with monospaced styling
-  but no syntax highlighting in v1 (highlight.js adds
-  significant bundle weight; defer). Tables, lists,
-  headings, links (`http(s):` only), `code`, `pre`,
-  `blockquote`, bold/italic/strikethrough are kept.
-
-  Touches WebUI only; no backend changes. The chat-
-  detection rules in `parseChatOutput` are unchanged —
-  detection still uses the literal `content: string`
-  shape. Markdown is a rendering concern, not a wire-
-  format concern.
+  bubbles with DOMPurify hardening — **DONE 2026-05-11**
+  (`f750b4a` philharmonic submodule + `c1fbff7` parent;
+  bundled with D15 in Codex r01 under prompt
+  `2026-05-11-0002-d14-d15-...-01`). New
+  `components/MarkdownView.tsx` (122 LOC): `marked` +
+  `dompurify` with a strict ALLOWED_TAGS allowlist (block
+  elements + inline emphasis + tables + http(s)-only
+  `<a><img>`), ALLOWED_ATTR limited to alt/href/src/title,
+  FORBID_TAGS for scripts/iframes/forms/styles/etc., and
+  an `afterSanitizeAttributes` hook that removes on*
+  handlers, strips non-http(s) href/src, and hardens
+  surviving `<a>` with target=_blank +
+  rel=noopener noreferrer nofollow. `useMemo` on source
+  prevents per-bubble re-parse on chat-tab re-render. The
+  chat tab on `InstanceDetail.tsx` wraps each bubble's
+  content with `<MarkdownView className="chat-markdown"
+  source={message.content} />` inside the existing
+  chat-bubble div — bubble layout unchanged. Codex's
+  informal XSS sanity check via throwaway /tmp jsdom
+  harness confirmed the sanitiser drops scripts /
+  onclick / javascript: / data: and hardens https:
+  links as specified. `parseChatOutput` detection rules
+  unchanged. Bundle delta +22,480 B gzipped.
 
 - **D15** Workflow-template `abstract_config` structured
-  editor in the WebUI — replace the current raw-JSON
-  CodeMirror 6 editor for `abstract_config` with a
-  pull-down-menu-based UI: one row per (script-side
-  endpoint name, endpoint UUID) binding, with the endpoint
-  UUID column populated by a dropdown of active tenant
-  endpoints. Added 2026-05-11 from
-  [`HUMANS.md` §"Follow-up tasks from 2026-05-10 work"](../HUMANS.md).
-
-  Structurally analogous to the `DataConfigEditor` shipped
-  as the D11 follow-up on 2026-05-10 (`f040dce`
-  philharmonic submodule). Differences:
-  - Source for the dropdown is *all* active endpoints
-    (filtered for `is_retired === false`), not just embed
-    endpoints.
-  - Binding-name validation rule is the same script-side
-    name regex (`^[A-Za-z_$][A-Za-z0-9_$]{0,63}$`) — the
-    abstract name becomes the JS-property the script uses
-    in `endpoint("<name>", ...)`.
-  - Retired-bound and missing-bound rows should surface
-    the same warning badges to avoid silently dropping user
-    data.
-
-  Once D15 lands, the raw-JSON `abstract_config` editor
-  goes away; both Create and Edit forms use the structured
-  editor only. The friendly-UI mandate per HUMANS.md
-  "Embedding DB component" final erratum applies
-  transitively to `abstract_config` for the same reason it
-  applies to `data_config`.
-
-  Touches `philharmonic/webui` only (Templates.tsx,
-  TemplateDetail.tsx, a new `components/
-  AbstractConfigEditor.tsx`, `api/client.ts` type
-  refinements, `templates.abstractConfig.*` i18n strings).
-  No backend changes — the API already accepts the same
-  `{<name>: <uuid>}` shape on Create and PATCH.
+  editor — **DONE 2026-05-11** (`f750b4a` philharmonic
+  submodule + `c1fbff7` parent; bundled with D14 in the
+  same Codex r01). New
+  `components/AbstractConfigEditor.tsx` (317 LOC) mirrors
+  the `DataConfigEditor.tsx` 315 LOC precedent from D11
+  follow-up #3: per-row binding-name validation against
+  `/^[A-Za-z_$][A-Za-z0-9_$]{0,63}$/`, duplicate-name
+  detection, dropdown filtered for `is_retired=false`,
+  retired-bound / missing-bound warning badges so user
+  data is never silently dropped, disabled mode for
+  save-in-flight. `api/client.ts` adds an `AbstractConfig`
+  type alias + a `listEndpoints` helper with a
+  cursor-walking auto-loader (handles >100-endpoint
+  tenants cleanly without truncation, Codex's call vs.
+  the prompt's truncate-with-hint alternative). Both
+  Templates.tsx Create and TemplateDetail.tsx Edit forms
+  now use the structured editor; the raw-JSON CodeMirror
+  abstract_config editor and its `configText` state slot
+  are removed entirely (no fallback). New
+  `templates.abstractConfig.*` i18n namespace in en + ja
+  mirroring `templates.dataConfig.*` shape. No new
+  permission atoms — reuses `endpoint:read_metadata` +
+  `workflow:template_create`. Bundle delta +828 B
+  gzipped. Combined D14+D15 bundle delta +23,308 B
+  (~+22.8 KiB) gzipped.
 
 ### Suggested sequencing
 
@@ -368,16 +349,19 @@ dual-mode AI Studio + Vertex AI requirement. All three are
 independent and parallel-safe.
 
 **Step 8 — newly added 2026-05-11** from HUMANS.md
-follow-up directive: **D14** (markdown rendering in chat
-with DOMPurify hardening, promoted from D13's deferred
-list), **D15** (`abstract_config` structured editor in the
-WebUI), **D16** (`tool_choice: "auto"` for
-`llm_openai_compat`). D16 — **DONE 2026-05-11** (`e523238`
-submodule + `b368c4b` parent). D14 and D15 remain;
-recommended ordering D15 (UX smoothing that reduces
-config-paste support burden) → D14 (chat UX polish,
-biggest bundle impact). Both independent and parallel-safe
-WebUI work.
+follow-up directive (all three now done): **D16**
+`tool_choice: "auto"` for `llm_openai_compat` — DONE
+2026-05-11 (`e523238` submodule + `b368c4b` parent);
+**D14** markdown rendering in chat with DOMPurify
+hardening — DONE 2026-05-11 (bundled with D15 in
+`f750b4a` philharmonic submodule + `c1fbff7` parent);
+**D15** `abstract_config` structured editor — DONE
+2026-05-11 (same Codex r01 as D14).
+
+**Step 9 — next dispatchable** (everything else done):
+D7 / D8 / D9 remain. Tier 2/3 connector implementations
+— SMTP, Anthropic, Gemini (dual-mode AI Studio +
+Vertex AI). All three are independent and parallel-safe.
 
 ### Dispatch discipline reminder
 

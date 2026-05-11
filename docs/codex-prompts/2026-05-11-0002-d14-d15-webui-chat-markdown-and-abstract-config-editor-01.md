@@ -123,7 +123,86 @@ fine. **Do not** ship a half-working version of either.
 
 ## Outcome
 
-Pending — will be updated after Codex run.
+**Completed 2026-05-11** — both D14 and D15 landed at
+`f750b4a` (philharmonic submodule) + `c1fbff7` (parent)
+in a single Codex r01. Structured-output-contract streak
+now **10/10** (Codex emitted the report cleanly without
+a resume; unlike D16's r01 which died post-verification).
+
+**Codex's choices**:
+
+- **D14 markdown parser**: `marked` (^18.0.3) over
+  `markdown-it` for the simpler GFM use case.
+- **D14 sanitiser config**: stricter than the prompt's
+  "default allowlist" wording — `ALLOWED_ATTR` limited
+  to `alt`, `href`, `src`, `title` only, with the
+  `afterSanitizeAttributes` hook handling the
+  non-http(s) URL stripping and `<a>` link hardening.
+  Matches the spec's intent; flagged in residuals.
+- **D14 bubble integration**: MarkdownView slots
+  **inside** the existing chat-bubble div with its own
+  `chat-markdown` class — slight departure from the
+  prompt's literal "swap the div" wording but cleaner.
+  Keeps the role-styling classes (chat-bubble user,
+  chat-bubble assistant) independent of markdown
+  content styling.
+- **D14 informal XSS check**: ran via throwaway /tmp
+  jsdom harness (DOMPurify.isSupported is false under
+  plain Node). Confirmed: `<script>` dropped, `onclick`
+  dropped, `javascript:` href removed, https: link
+  gained `target=_blank` + `rel="noopener noreferrer
+  nofollow"`, `data:` image src removed, https: image
+  src kept. No test artifacts committed; the harness
+  was uninstalled after the check.
+- **D15 >100-endpoint handling**: Codex chose to
+  cursor-walk all pages rather than truncate with a
+  hint. Cleaner UX, no "more not shown" copy needed.
+  Flagged in residuals in case Yuka prefers paginated
+  UI for very large tenants.
+- **D15 raw-JSON CodeMirror fallback**: removed entirely
+  (no fallback option) per prompt directive.
+
+**Verification (Codex's run, all green)**:
+
+- `cd philharmonic/webui && npx tsc --noEmit` — passed
+  (ran after D15 and again after D14).
+- `./scripts/webui-build.sh --production` — passed.
+- `./scripts/pre-landing.sh` — passed (rustup probe
+  reported a read-only-temp-file warning but the script
+  continued and ended green).
+
+**Bundle delta** (gzipped, Codex's measurement against
+pre-change `dist/`):
+
+- D14: +22,480 B (main.js +22,192 B; main.css +288 B).
+- D15: +828 B (main.js +803 B; main.css +25 B).
+- **Total: +23,308 B (~+22.8 KiB) gzipped.**
+
+**Open follow-ups Codex flagged** (Yuka's call, not
+blocking):
+
+1. **Syntax highlighting** in markdown code blocks
+   remains deferred (highlight.js bundle cost would
+   dwarf the +22.8 KiB delta from this dispatch).
+2. **`<img>` in chat**: current allowlist keeps it
+   with http(s)-only `src`. Some deployments may
+   prefer to drop inline images entirely. Trivial
+   one-line change to the ALLOWED_TAGS array if Yuka
+   wants that policy.
+3. **>100-endpoint dropdown UX**: the cursor walker
+   currently loads every page. For very-large tenants
+   this could slow the editor's first mount. Tracked
+   as a possible follow-up if production deployments
+   surface the latency.
+4. **JP translation review**: especially
+   "エンドポイントバインディング" and surrounding
+   strings.
+
+**Status**: **13 of 16 post-v1 dispatches done**
+(D1-D6, D10, D11, D12, D13, D14, D15, D16) plus both
+crypto gates approved. Remaining: D7 / D8 / D9
+(Tier 2/3 connectors — SMTP, Anthropic, Gemini
+dual-mode). Single section §3.B unfinished.
 
 ---
 
