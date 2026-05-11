@@ -135,6 +135,53 @@ The connector normalizes successful `llm_generate` responses to:
 Every LLM request must include `output_schema`. Scripts read the
 structured result through `response.body.output`.
 
+**Request body** (passed as the `body` option to
+`endpoint(...)`):
+
+```json
+{
+  "model": "string",
+  "messages": [
+    { "role": "system", "content": "string" },
+    { "role": "user", "content": "string" },
+    { "role": "assistant", "content": "string" }
+  ],
+  "output_schema": { },
+  "max_output_tokens": 0,
+  "temperature": 0.0,
+  "top_p": 0.0,
+  "stop": ["string"]
+}
+```
+
+| Field | Required | Notes |
+|---|---|---|
+| `model` | yes | Provider model identifier. |
+| `messages` | yes | Chronological conversation. Allowed roles: `system`, `user`, `assistant` only. |
+| `output_schema` | yes | JSON Schema. The connector enforces structured output via the dialect's native or fallback path. |
+| `max_output_tokens` | no | Generation token cap. |
+| `temperature` | no | Sampling temperature. |
+| `top_p` | no | Nucleus-sampling parameter. |
+| `stop` | no | Stop sequences. |
+| any other field | — | Rejected at deserialize time (`deny_unknown_fields`). |
+
+**Response body** (read as `response.body`):
+
+```json
+{
+  "output": { },
+  "stop_reason": "end_turn",
+  "usage": { "input_tokens": 0, "output_tokens": 0 }
+}
+```
+
+| Field | Notes |
+|---|---|
+| `output` | JSON value matching the request's `output_schema`. |
+| `stop_reason` | One of `end_turn`, `max_tokens`, `stop_sequence`, `content_filter`, `error`. |
+| `usage.input_tokens` | Prompt tokens reported by the provider (u32; `0` if the provider omitted it). |
+| `usage.output_tokens` | Completion tokens reported by the provider (u32). |
+
 ### `http_forward`
 
 Use `http_forward` for generic HTTP services. Its config wraps
@@ -173,6 +220,42 @@ the shared `mechanics-config` `HttpEndpoint` JSON shape.
 `{slot}` in `url_template` must have a matching
 `url_param_specs` entry.
 
+**Request body**: the script's `body` option becomes the
+**upstream** HTTP request body, encoded per the endpoint
+config's `request_body_type`:
+
+- `json` (default): serialised as JSON.
+- `utf8`: passed as a UTF-8 string.
+- `bytes`: passed as raw bytes (`Uint8Array`).
+
+URL slot values come from `urlParams`, query parameters from
+`queries`, request headers from `headers` (subject to
+`overridable_request_headers`). `http_forward` is the only
+connector for which `headers`, `urlParams`, and `queries`
+are meaningful — the other connectors ignore them.
+
+**Response body** (`response.body`): for `http_forward`,
+this is the `HttpForwardResponse` envelope wrapping the
+upstream response — i.e. **double-nested** relative to the
+mechanics-core transport envelope. Access the upstream's
+body via `response.body.body`, not `response.body`.
+
+```json
+{
+  "status": 200,
+  "ok": true,
+  "headers": { "x-trace-id": "..." },
+  "body": { }
+}
+```
+
+| Field | Notes |
+|---|---|
+| `body` | Upstream response body. Decoded per `response_body_type` (`json` → JSON value, `utf8` → string, `bytes` → `Uint8Array`, empty → `null`). |
+| `headers` | Upstream response headers, filtered by `exposed_response_headers`; names lowercased. |
+| `status` | Upstream HTTP status code. |
+| `ok` | `true` if the upstream returned a 2xx status. |
+
 ### `sql_postgres` and `sql_mysql`
 
 Use these implementations for SQL query endpoints.
@@ -207,6 +290,48 @@ Use these implementations for SQL query endpoints.
 | `max_connections` | no | Defaults to `10`; must be greater than zero when provided. |
 | `default_timeout_ms` | no | Defaults to `30000`; must be greater than zero when provided. |
 
+**Request body** (passed as the `body` option to
+`endpoint(...)`):
+
+```json
+{
+  "sql": "SELECT name FROM users WHERE id = $1",
+  "params": ["u_12345"],
+  "max_rows": 1000,
+  "timeout_ms": 30000
+}
+```
+
+| Field | Required | Notes |
+|---|---|---|
+| `sql` | yes | SQL text. PostgreSQL uses `$1`, `$2`, ... positional placeholders; MySQL uses `?` positional placeholders. |
+| `params` | no | Positional parameter values (JSON array). Defaults to `[]`. |
+| `max_rows` | no | Per-request row cap; the effective cap is the lower of this and the endpoint's `default_max_rows` (PostgreSQL) / `max_rows` config (MySQL). |
+| `timeout_ms` | no | Per-request timeout in milliseconds; clamped to the endpoint's `default_timeout_ms`. |
+
+**Response body** (read as `response.body`):
+
+```json
+{
+  "rows": [
+    { "id": "u_1", "name": "Alice" }
+  ],
+  "row_count": 1,
+  "columns": [
+    { "name": "id", "sql_type": "text" },
+    { "name": "name", "sql_type": "text" }
+  ],
+  "truncated": false
+}
+```
+
+| Field | Notes |
+|---|---|
+| `rows` | One JSON object per row. Keys are column names; values are typed per the SQL type. Column order on the wire is not preserved in `rows`; use `columns` for the declared order. |
+| `row_count` | Number of rows returned, or affected rows for DML (UPDATE/INSERT/DELETE). |
+| `columns` | Ordered column metadata: `[{ "name", "sql_type" }]`. PostgreSQL `sql_type` is the Postgres type name; MySQL `sql_type` is normalized to lowercase. |
+| `truncated` | `true` if `max_rows` clipped at least one row from the result. |
+
 ### `embed`
 
 Use `embed` to turn text into embedding vectors.
@@ -229,8 +354,33 @@ Use `embed` to turn text into embedding vectors.
 | `max_batch_size` | no | Defaults to `32`; request validation rejects oversized batches. |
 | `timeout_ms` | no | Defaults to `10000`. |
 
-The request body is `{ "texts": ["..."] }`. The response body is
-`{ "embeddings": [[...]] }`, one vector per input text.
+**Request body** (passed as the `body` option to
+`endpoint(...)`):
+
+```json
+{ "texts": ["string", "string"] }
+```
+
+| Field | Required | Notes |
+|---|---|---|
+| `texts` | yes | Non-empty array of UTF-8 strings. Validation: length must be `1..=max_batch_size` (config-side cap). |
+| any other field | — | Rejected at deserialize time (`deny_unknown_fields`). |
+
+**Response body** (read as `response.body`):
+
+```json
+{
+  "embeddings": [[0.1, -0.2, 0.3]],
+  "model": "bge-m3",
+  "dimensions": 3
+}
+```
+
+| Field | Notes |
+|---|---|
+| `embeddings` | One vector per input text, same order as the input array. Each vector is an array of f32 components. |
+| `model` | Echoed model identifier (matches the endpoint config's `model_id`). |
+| `dimensions` | Vector dimensionality. Equal to `embeddings[i].length` for every `i`. |
 
 ### `vector_search`
 
@@ -276,6 +426,51 @@ The request body is:
 The response body is `{ "results": [{ "id", "score",
 "payload" }] }`. `payload` is omitted from a result when the
 corpus item had no payload.
+
+**Request body** (passed as the `body` option to
+`endpoint(...)`):
+
+```json
+{
+  "query_vector": [0.1, 0.2, 0.3],
+  "corpus": [
+    {
+      "id": "doc-1",
+      "vector": [0.1, 0.2, 0.3],
+      "payload": { "text": "Document text" }
+    }
+  ],
+  "top_k": 5,
+  "score_threshold": 0.2
+}
+```
+
+| Field | Required | Notes |
+|---|---|---|
+| `query_vector` | yes | Embedding to score the corpus against. Array of f32. |
+| `corpus` | yes | Per-request corpus of labeled vectors. Length must be `0..=max_corpus_size` (config-side cap). |
+| `corpus[].id` | yes | Caller-defined stable identifier. Echoed in matching results. |
+| `corpus[].vector` | yes | Candidate vector scored against `query_vector`. Must have the same dimensionality as `query_vector`. |
+| `corpus[].payload` | no | Optional JSON value echoed in matching results. Omit by leaving the field out. |
+| `top_k` | yes | Number of highest-scoring items to return. |
+| `score_threshold` | no | Lower bound for accepted cosine scores. Range `[-1.0, 1.0]`. Results below this are filtered out. |
+
+**Response body** (read as `response.body`):
+
+```json
+{
+  "results": [
+    { "id": "doc-1", "score": 0.95, "payload": { "text": "Document text" } }
+  ]
+}
+```
+
+| Field | Notes |
+|---|---|
+| `results` | Ranked nearest-neighbor matches, highest score first. May be empty. |
+| `results[].id` | The matching corpus item's `id`. |
+| `results[].score` | Cosine similarity in `[-1.0, 1.0]`. Higher = more similar. |
+| `results[].payload` | Echoed from the matching corpus item; omitted entirely when the matched item had no payload. |
 
 ### Reserved connector names
 
@@ -463,19 +658,28 @@ Endpoint options:
 
 | Option | Meaning |
 |---|---|
-| `body` | JSON value, string, or bytes depending on endpoint request mode. |
-| `headers` | Extra request headers, restricted by `overridable_request_headers`. Header matching is case-insensitive. |
-| `urlParams` | Values for declared `{slot}` URL template parameters. |
-| `queries` | Values for declared slotted query specs. |
+| `body` | The connector's typed request body for typed connectors (LLM, embed, vector_search, SQL); the upstream HTTP request body for `http_forward`. |
+| `headers` | Extra request headers; `http_forward` only — typed connectors ignore this. Restricted to the endpoint's `overridable_request_headers` allowlist. Header matching is case-insensitive. |
+| `urlParams` | URL template slot values; `http_forward` only — typed connectors ignore this. |
+| `queries` | Query string slot values; `http_forward` only — typed connectors ignore this. |
 
-Endpoint response:
+Endpoint response (mechanics-core transport envelope, identical
+shape for every connector):
 
 | Field | Meaning |
 |---|---|
-| `body` | Parsed according to endpoint `response_body_type`; empty responses are `null`. |
-| `headers` | Headers allowed by `exposed_response_headers`, normalized to lowercase names. |
-| `status` | HTTP status code. |
-| `ok` | `true` for 2xx statuses. |
+| `body` | The JSON value the connector implementation returned. **Shape is connector-specific** — see each connector's "Response body" subsection above for the contents. For typed connectors this is the typed response struct; for `http_forward` it is the `HttpForwardResponse` envelope (double-nested — see that connector's notes). |
+| `headers` | Connector-path response headers exposed by mechanics-core (lowercased names). For typed connectors, normally empty; for `http_forward`, the connector populates `response.body.headers` instead with upstream headers. |
+| `status` | HTTP status code from the **connector path** call (mechanics-worker → connector-router → connector-service). `200` on a successful call. For `http_forward`, the upstream's status is `response.body.status`, not `response.status`. |
+| `ok` | `true` if `status` is in `200..=299`. |
+
+Connector-side errors (HTTP 4xx/5xx from the connector path,
+e.g. an upstream LLM returning 400, an invalid SQL query) reach
+the script as a **rejected promise**. Use `try { await
+endpoint(...) } catch (e) { ... }` to handle them — the engine
+trusts the script's outcome once `main()` fulfills, so a
+caught rejection is genuinely caught (see `mechanics-core`
+0.4.0 release notes).
 
 ## Reading embedding datasets
 
