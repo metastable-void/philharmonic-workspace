@@ -115,7 +115,7 @@ providers that require extra fixed headers.
 |---|---|---|
 | `base_url` | yes | Provider base URL. |
 | `api_key` | yes | Sent as `Authorization: Bearer <api_key>` upstream. |
-| `dialect` | yes | `openai_native`, `vllm_native`, or `tool_call_fallback`. |
+| `dialect` | yes | `openai_native`, `vllm_native`, `tool_call_fallback`, or `tool_call_fallback_auto`. The two `tool_call_fallback*` variants both ship the same `emit_output` function-tool fallback for providers without native structured-output support; the `_auto` variant sends `tool_choice: "auto"` instead of the forced `{type: "function", function: {name: ...}}` literal, for upstreams that reject the forced form. |
 | `timeout_ms` | no | Defaults to `60000`. |
 | `custom_headers` | no | Extra fixed upstream headers. Reserved headers such as `Authorization`, `Content-Type`, `Content-Length`, `Host`, `Transfer-Encoding`, and `Connection` are rejected. |
 

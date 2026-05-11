@@ -166,10 +166,10 @@ drafts the proposal, Yuka reviews per the two-gate crypto-review
 protocol (§2).
 
 Total: **16 Codex dispatches plus 1 Gate-1 proposal.**
-**D1, D2, D3, D4, D5, D6, D10, D11, D12, D13 are done**
-(10 of 16). Gate 1 and Gate 2 both approved. Remaining:
-D7, D8, D9 (Tier 2/3 connectors), plus D14, D15, D16
-added 2026-05-11 from
+**D1, D2, D3, D4, D5, D6, D10, D11, D12, D13, D16 are done**
+(11 of 16). Gate 1 and Gate 2 both approved. Remaining:
+D7, D8, D9 (Tier 2/3 connectors), plus D14, D15 from the
+2026-05-11
 [`HUMANS.md` §"Follow-up tasks from 2026-05-10 work"](../HUMANS.md).
 
 ### A. Embedding datasets (6 dispatches + 1 Gate-1) — DONE
@@ -236,36 +236,25 @@ parallel.
   at
   [`docs/archive/2026-05-11-roadmap-completed-arc-trim.md`](archive/2026-05-11-roadmap-completed-arc-trim.md).
 
-- **D16** `philharmonic-connector-impl-llm-openai-compat`:
-  add a new dialect variant `tool_call_fallback_auto`
-  alongside the existing `tool_call_fallback`. Shipping
-  the auto variant rather than a per-request flag on the
-  forced variant keeps the dialect enum a clean
-  discriminator (decision locked 2026-05-11: option (a)
-  per [`HUMANS.md` §"Follow-up tasks from 2026-05-10 work"](../HUMANS.md)
-  + this conversation). The new variant carries the same
-  tools-array shape but sends `tool_choice: "auto"`
-  instead of the forced
-  `{type: "function", function: {name: "emit_output"}}`.
-  Some OpenAI-compatible inference providers — notably
-  some local LLM server implementations and some Hugging
-  Face Inference Providers — reject the forced form and
-  need `tool_choice: "auto"` (with the script-supplied
-  tool still being the only one offered, so the model
-  effectively must pick it).
-
-  Touches `philharmonic-connector-impl-llm-openai-compat`
-  only — no public-trait change, no other crate edits, no
-  crypto path touched. Bump version 0.1.1 → 0.1.2 +
-  CHANGELOG entry. Tests: dialect dispatch, the generated
-  upstream request shape, response extraction (which
-  should still parse `choices[0].message.tool_calls[0].
-  function.arguments` exactly as `tool_call_fallback`
-  does), reuse of the existing tool_call_fallback
-  extraction path. WebUI gets no special treatment —
-  endpoint configs are JSON-edited through the existing
-  CodeMirror 6 editor (D10). Independent of everything
-  else; small.
+- **D16** `philharmonic-connector-impl-llm-openai-compat`
+  `tool_call_fallback_auto` dialect variant — **DONE
+  2026-05-11** (`e523238` submodule + `b368c4b` parent;
+  Codex r01 under prompt
+  `2026-05-11-0001-d16-llm-openai-compat-tool-call-fallback-auto-01`).
+  Sub-shape 1 chosen: `tool_call_fallback.rs` exposes a
+  shared `pub(crate) translate_request_with_tool_choice`
+  helper that both variants call; the new module supplies
+  `json!("auto")` and delegates response extraction
+  directly. Version 0.1.1 → 0.1.2 (patch bump per pre-1.0
+  SemVer; semver-checks flagged the public-enum-variant
+  addition as breaking — anticipated, surfaced in
+  residuals). Existing `tool_call_fallback` tests remain
+  green byte-for-byte (back-compat guarantee).
+  Structured-output-contract resume needed (original
+  background task died post-verification; rescue spawn
+  emitted the six-section report against the
+  working-tree state). Streak now 9/9 since the contract
+  was added.
 
 ### D. WebUI infrastructure, features, and docs (5 dispatches)
 
@@ -383,13 +372,12 @@ follow-up directive: **D14** (markdown rendering in chat
 with DOMPurify hardening, promoted from D13's deferred
 list), **D15** (`abstract_config` structured editor in the
 WebUI), **D16** (`tool_choice: "auto"` for
-`llm_openai_compat`'s `tool_call_fallback` dialect). D14
-and D15 are independent WebUI work; D16 is an independent
-single-crate connector enhancement. Recommended ordering:
-D16 first (unblocks providers currently rejecting forced
-tool_choice) → D15 (UX smoothing that reduces config-paste
-support burden) → D14 (chat UX polish, biggest bundle
-impact).
+`llm_openai_compat`). D16 — **DONE 2026-05-11** (`e523238`
+submodule + `b368c4b` parent). D14 and D15 remain;
+recommended ordering D15 (UX smoothing that reduces
+config-paste support burden) → D14 (chat UX polish,
+biggest bundle impact). Both independent and parallel-safe
+WebUI work.
 
 ### Dispatch discipline reminder
 

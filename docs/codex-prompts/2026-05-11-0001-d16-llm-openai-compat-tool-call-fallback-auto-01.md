@@ -99,7 +99,74 @@ specific; `tool_call_fallback` is the failing one).
 
 ## Outcome
 
-Pending — will be updated after Codex run.
+**Completed 2026-05-11** — D16 landed at `e523238`
+submodule + `b368c4b` parent.
+
+**Codex's choices**:
+
+- **Sub-shape 1** taken: `tool_call_fallback.rs` exposes
+  a `pub(crate) translate_request_with_tool_choice`
+  helper that both variants call; the new module supplies
+  `json!("auto")` and delegates response extraction
+  directly to `tool_call_fallback::extract_response`.
+  Clean separation, no duplicated body construction.
+- New module `src/dialect/tool_call_fallback_auto.rs`
+  (128 lines including inline tests) covers the four
+  required test categories: basic translate-request,
+  optional fields pass-through, extract-response
+  delegation smoke test, and finish_reason mapping
+  delegation.
+- Existing `tool_call_fallback` tests remain green
+  byte-for-byte (back-compat guarantee honored).
+- Version bump 0.1.1 → 0.1.2 (patch).
+
+**Verification (Codex's first run, both green)**:
+
+- `cargo test -p philharmonic-connector-impl-llm-openai-compat`
+  passed.
+- `cargo check --workspace` passed.
+- `pre-landing.sh` green on the second invocation after a
+  rustfmt fix on the first.
+- `check-api-breakage.sh` ran (after first failing due to
+  read-only default `CARGO_HOME` during `cargo-semver-
+  checks` install; retried with writable `CARGO_HOME`) and
+  flagged the public enum-variant addition as a breaking
+  change — anticipated in the prompt's residual-risks
+  section.
+
+**Resume-needed**: The original background task
+`bfoy72dvc` died after all code work + verification
+finished but before emitting the `task_complete` /
+six-section structured-output report. A targeted resume
+spawn emitted the six-section report against the
+working-tree state (no code changes). Structured-output-
+contract streak now **9/9** since the contract was added.
+
+**Open questions Codex surfaced** (carried forward, all
+follow-ups for Claude — not blocking D16):
+
+1. **Version bump shape**: patch 0.1.1 → 0.1.2 (as
+   landed) vs. minor 0.1.1 → 0.2.0. Patch is technically
+   correct under pre-1.0 SemVer; also avoids cascading
+   to the philharmonic meta-crate's pin
+   `philharmonic-connector-impl-llm-openai-compat =
+   "0.1.0"` which is a caret requirement matching only
+   0.1.x. If Yuka wants the breaking-change signal in
+   the version itself, 0.2.0 is the move and requires
+   bumping the meta-crate's pin too.
+2. **Workflow authoring guide update**: should the new
+   dialect be documented in
+   `docs/guide/workflow-authoring.md` §`llm_openai_compat`
+   dialect table (en + jp)? Followed up in same session
+   after the D16 commit landed.
+
+**Status**: 11 of 16 post-v1 dispatches done (D1, D2, D3,
+D4, D5, D6, D10, D11, D12, D13, D16) plus both crypto
+gates approved. Remaining: D7 / D8 / D9 (Tier 2/3
+connectors), D14 (markdown rendering in chat with
+DOMPurify), D15 (`abstract_config` structured editor in
+the WebUI). D14 + D15 to be dispatched per Yuka's
+directive.
 
 ---
 
