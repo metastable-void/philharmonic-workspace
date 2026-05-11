@@ -288,15 +288,34 @@ context, not your output surface.
 See [`CLAUDE.md`](CLAUDE.md) for Claude Code rules,
 [`AGENTS.md`](AGENTS.md) for Codex rules.
 
-## Workspace conventions belong in the repo, not memory
+## Workspace conventions belong in the repo, NEVER in memory
 
-If you discover a rule that applies to *this project* — naming,
-versioning, tooling, anything a future contributor would need to
-honour — its durable home is `CONTRIBUTING.md` (or one of the
-named living docs). Don't rely on `$CODEX_HOME`-local state,
-cached project files, or in-process memory to persist such rules
-across sessions or machines. Surface the rule to Claude in your
-final summary so it can be committed to the repo properly.
+**NEVER persist any workspace knowledge in machine-local
+storage** — not `$CODEX_HOME`-local state, not cached project
+files, not in-process memory, not any file outside the repo
+checkout. Workspace knowledge means: coding conventions,
+architectural rules, project history, Yuka's stated
+preferences for this project, decisions taken in this repo,
+crate-family boundaries, anything you learned during a session
+about how this project works.
+
+**Why NEVER, not "prefer":**
+
+- Machine-local state is per-install — it doesn't travel to
+  other developers, other clones, other machines, Claude, or
+  future Codex sessions on different hosts. Saving a
+  workspace rule there is invisible everywhere else.
+- The repo is the canonical source of truth. Saving a
+  workspace rule to local state is a stealth fork — the next
+  agent to encounter the situation will reinvent the rule.
+
+If you discover a rule that applies to *this project* —
+naming, versioning, tooling, anything a future contributor
+would need to honour — surface it in your final structured-
+output report (under residuals or open questions). Claude
+then edits `CONTRIBUTING.md` (or the relevant agent-facing
+doc) and commits the rule to the repo. The commit is the
+persistence mechanism.
 
 ## Use the script wrappers, not raw cargo
 

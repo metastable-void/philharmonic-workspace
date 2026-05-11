@@ -434,19 +434,57 @@ full in `CONTRIBUTING.md`. Read the full section before acting
 
 ## Memory / persistence policy
 
-- **Workspace-scoped conventions belong in the repo, not in
-  machine-local memory.** When a rule applies to *this project*
-  ("prefer X over Y here"), its durable home is `CONTRIBUTING.md`
-  (or one of the named living docs above) — not your
-  per-agent-install memory store. Memory is per-machine and
-  doesn't travel.
-- **Machine-local memory is for genuinely machine-local facts.**
-  "On this box, rustup/gh were installed on <date>." "This box
-  is the Yuka-home WSL." That's it.
+**NEVER save anything about this workspace to machine-local
+memory.** Workspace knowledge — coding conventions,
+architectural rules, project history, Yuka's stated
+preferences for this project, decisions taken in this repo,
+crate-family boundaries, anything you "learned" during a
+session about how this project works — all of it belongs in
+the **repo**, never in your per-agent-install memory store.
+This includes feedback memories about corrections,
+project memories about ongoing work, reference memories
+pointing at this project's resources, and anything that
+mentions any file in this workspace.
 
-If you learn a repo-wide rule during a session, propose an edit
-to `CONTRIBUTING.md` (or the relevant agent-facing doc) rather
-than writing it to memory.
+**Why this is a NEVER, not a "prefer":**
+
+- Machine-local memory is per-agent-install — it doesn't
+  travel to other developers, other clones, other machines,
+  Codex, GitHub Actions, or future Claude sessions on
+  different hosts. The same convention saved to memory on
+  this machine is invisible on every other machine.
+- The repo is the canonical source of truth. Saving a
+  workspace rule to memory is a stealth fork of that source
+  of truth — the next agent to encounter the situation will
+  reinvent the rule because the repo doesn't carry it.
+- Multiple Claude installs on multiple machines will drift
+  out of sync if they each carry separate "memorised"
+  conventions. The repo never drifts from itself.
+
+**When you would have written a workspace-knowledge memory,
+do this instead:**
+
+1. Identify the right living doc: `CONTRIBUTING.md` (most
+   workspace conventions), `CLAUDE.md` (Claude-specific
+   operating rules), `AGENTS.md` (Codex-specific operating
+   rules), `docs/ROADMAP.md` (planning/state),
+   `docs/design/*.md` (architectural decisions), or
+   `HUMANS.md` (Yuka writes this, don't edit it).
+2. Edit that doc with the new rule, propose the change,
+   commit and push (via `scripts/commit-all.sh`).
+3. Do not write to memory at all for this case. The
+   commit itself is the persistence mechanism.
+
+**Machine-local memory is reserved for narrowly machine-
+local facts:** "On this box, rustup/gh were installed on
+<date>." "This box is the Yuka-home WSL." "This machine's
+Codex CLI version is X." Nothing else.
+
+If you catch yourself reaching for the Write tool with a
+path under `~/.claude/projects/-home-ubuntu-philharmonic-workspace/memory/`
+and the content references *anything* in this workspace
+beyond the host-machine facts above — **stop, close the
+draft, and write the rule to the repo instead.**
 
 ## Fresh clone
 

@@ -1920,6 +1920,71 @@ Additional crates may be added as the workspace grows. Agents
 (Claude Code and Codex) must track when the last miri run
 happened and flag when a checkpoint has been missed.
 
+### 10.12 Cross-family crate independence (mechanics-*)
+
+The `mechanics-config`, `mechanics-core`, `mechanics`, and
+`mechanics-worker` crates are a **separate, independent family**:
+a generic JavaScript-execution-with-HTTP-endpoints runtime
+designed to be usable on its own in projects completely
+unrelated to Philharmonic. They are not subordinate to the
+Philharmonic ecosystem; the Philharmonic ecosystem is one
+specific consumer of them.
+
+**Therefore, mechanics-* MUST NOT depend on, reference, or
+encode anything Philharmonic-specific.** This includes — but
+is not limited to:
+
+- `Cargo.toml` `[dependencies]`: no `philharmonic-*` crate.
+  `mechanics-core` depends on `mechanics-config` + Boa +
+  generic transport (`reqwest`, etc.); nothing else from
+  this workspace.
+- Type signatures and trait bounds: no use of
+  `philharmonic-types::*`, `philharmonic-policy::*`,
+  `philharmonic-connector-*::*`, or any other workspace type.
+- Error messages, doc comments, log lines, panic messages:
+  must be expressible in generic HTTP / JavaScript / executor
+  vocabulary. Don't say "connector path", "connector-aware
+  endpoint", "the lowerer", "SCK", "COSE", "realm", "tenant",
+  `pht_` token, or "Philharmonic". Say "endpoint", "request
+  body", "HTTP error", "JS script", "sandbox".
+- Test fixtures and integration tests: mock HTTP endpoints,
+  dummy JS scripts. No fixtures that simulate Philharmonic-
+  specific request envelopes.
+- Configuration fields: when a Philharmonic behavior needs
+  control at the mechanics layer (e.g. "require a request
+  body on this endpoint"), the field on
+  `mechanics_config::HttpEndpoint` is **generic** (e.g.
+  `require_request_body: bool`) and Philharmonic's lowerer
+  flips it per-endpoint. The field must make sense to a
+  non-Philharmonic mechanics user too.
+
+The integration boundary is the **lowerer** at
+`bins/philharmonic-api-server/src/lowerer.rs`, which builds a
+generic `mechanics_config::HttpEndpoint` from the SCK-
+decrypted endpoint config + the COSE token + the encrypted
+payload. mechanics-core only ever sees the lowered generic
+shape; it has no idea what's at the other end of the HTTP
+call.
+
+This rule also informs how agents handle bug reports: when a
+user describes a problem rooted in mechanics-core behavior
+that touches Philharmonic-specific terminology (e.g. "the
+connector path returned 400"), agents must **map the
+description back to generic vocabulary** before proposing a
+mechanics-core change. If the change cannot be expressed in
+generic terms, the change does not belong in mechanics-*.
+
+Cross-references:
+- [`docs/design/03-crates-and-ownership.md`](docs/design/03-crates-and-ownership.md)
+  §"Execution substrate" — already documents "no philharmonic
+  dependencies" at the architectural level. §10.12 here is
+  the discipline-level statement.
+- The workspace's long-term goal per
+  [`HUMANS.md`](HUMANS.md) §"Reminders" is to refactor the
+  AI-coding best practices into reusable templates;
+  `mechanics-*` is a precedent for that pattern — its
+  independence keeps the precedent intact.
+
 ---
 
 ## 11. Pre-landing checks
