@@ -46,3 +46,4 @@
 - [2026-05-02 (afternoon)](project-status-reports/2026-05-02-14-08-24.md)
 - [2026-05-10](project-status-reports/2026-05-10-21-47-26.md)
 - [2026-05-11 (end-to-end PoC milestone)](project-status-reports/2026-05-11-19-50-15.md)
+- [2026-05-12 (post-PoC arc: D17 landed, D20/D21 added, HTTPS hardening, staging deploy)](project-status-reports/2026-05-12-18-58-06.md)
