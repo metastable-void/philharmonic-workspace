@@ -306,16 +306,19 @@ The single `(Gate 1)` item is **not** a Codex dispatch — Claude
 drafts the proposal, Yuka reviews per the two-gate crypto-review
 protocol (§2).
 
-Total: **20 Codex dispatches plus 1 Gate-1 proposal.**
+Total: **21 Codex dispatches plus 1 Gate-1 proposal.**
 **D1, D2, D3, D4, D5, D6, D10, D11, D12, D13, D14, D15, D16,
-D17 are done** (14 of 20). Gate 1 and Gate 2 both approved.
+D17 are done** (14 of 21). Gate 1 and Gate 2 both approved.
 Remaining: D7, D8, D9, D19 (Tier 2/3 connectors — D19 is
 the new DNS connector surfaced 2026-05-12 via HUMANS.md), D18
 (`mechanics-core` module-surface refactor: feature gating +
 new `mime`/`url`/`console`/`html` modules), D20 (workspace-wide
 webpki-roots-only TLS trust posture surfaced 2026-05-12 — sqlx
 already aws-lc-rs+webpki-roots after the ring removal, reqwest
-still picks up platform-native via rustls-platform-verifier).
+still picks up platform-native via rustls-platform-verifier),
+D21 (`pre-landing.sh` dep-aware test filtering — skip tests for
+member crates that aren't dirty and aren't transitive reverse-
+dependencies of any dirty crate).
 
 ### A. Embedding datasets (6 dispatches + 1 Gate-1) — DONE
 
@@ -688,6 +691,55 @@ is frozen at compile time.
   No crypto-review gate — trust-store config only, no
   changes to AAD/AEAD/SCK/COSE paths.
 
+### H. Workspace tooling (1 dispatch)
+
+- **D21** `scripts/pre-landing.sh` dep-aware test filtering.
+  Today the script's `--ignored` phase only runs ignored tests
+  on auto-detected modified crates, but the default (non-
+  ignored) test phase still runs `cargo test --workspace`
+  across every member crate. After the workspace grew to ~25
+  crates with substantial Boa + crypto build costs, that's
+  several minutes of work per pre-landing run, most of it
+  re-running tests in crates that can't possibly have been
+  affected by the change. The 2026-05-12 sql-postgres
+  NUMERIC-overflow fix exposed how much latent breakage hides
+  behind always-paying-the-full-bill: tests in untouched crates
+  pass repeatedly while the modified crate's own ignored phase
+  was the first chance to catch the regression.
+
+  Locked design (2026-05-12): default pre-landing.sh to
+  **skip tests for member crates that are not dirty AND are
+  not in the transitive reverse-dependency closure of any
+  dirty crate**. Other phases (fmt, check, clippy, rustdoc)
+  stay workspace-wide — they're cheap and the
+  feature-unification surprises they catch don't respect
+  modified-crate boundaries.
+
+  Implementation sketch (your call at prompt-drafting time):
+
+  - Compute the "dirty" set from `git status --porcelain`
+    + `Cargo.toml` `[workspace] members` paths (the script
+    already does this for `--ignored`).
+  - Compute the reverse-dep closure via `cargo metadata` —
+    starting from dirty crates, walk every member that
+    transitively depends on any of them.
+  - Run `cargo test -p <name>` per crate in the union of
+    {dirty} ∪ {reverse-deps-of-dirty}, rather than
+    `cargo test --workspace`.
+  - When the workspace `Cargo.toml`, `Cargo.lock`, or any
+    file under `scripts/` is dirty, fall back to the current
+    workspace-wide behavior (those touch every crate's build
+    universe).
+  - Provide a `--full` flag to force the old behavior.
+
+  No public API surface change. Speeds up the
+  edit/pre-landing iteration loop substantially for
+  single-crate changes (common case post-v1) without
+  weakening the gate for workspace-wide changes.
+
+  Claude drafts the Codex prompt; Codex implements + tests.
+  No crypto-review gate.
+
 ### Suggested sequencing
 
 **Completed work (2026-05-02 through 2026-05-11):** D1 +
@@ -704,8 +756,8 @@ guide expansion, audit-log producer gap closed)
 summarised in the Current state preamble at the top of
 this file with the same archive pointer.
 
-**Next dispatchable**: D7 / D8 / D9 / D18 / D19 / D20, all
-six independent and parallel-safe.
+**Next dispatchable**: D7 / D8 / D9 / D18 / D19 / D20 / D21,
+all seven independent and parallel-safe.
 
 - **D7** is unblocked — the `email_send` wire shape locked
   in [`docs/design/08-connector-architecture.md` §SMTP](design/08-connector-architecture.md#smtp)
