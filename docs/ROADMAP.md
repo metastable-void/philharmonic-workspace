@@ -197,10 +197,39 @@ active work now lives in the post-v1 dispatch plan (§3 below).
   - **D19 added** — `philharmonic-connector-impl-dns`
     (Tier 2 DNS connector, new crate) surfaced via
     HUMANS.md. Spec locked into
-    [`design/08` §DNS](design/08-connector-architecture.md#dns);
-    blocked on Yuka's one-time setup (GitHub repo,
-    crates.io reservation, submodule wiring) before
-    Codex prompt drafting.
+    [`design/08` §DNS](design/08-connector-architecture.md#dns).
+    Submodule wired (`scripts/new-submodule.sh`),
+    crates.io 0.0.0 placeholder published. D19 ready
+    for prompt draft.
+  - **Ring removal** (parent `7723e1c`): switched three
+    sqlx-using crates from `runtime-tokio-rustls` (which
+    expanded to `tls-rustls-ring`) to `runtime-tokio +
+    tls-rustls-aws-lc-rs`. All three release bins
+    (`mechanics-worker`, `philharmonic-api-server`,
+    `philharmonic-connector-bin`) now show
+    `aws-lc-rs 1.16.3` as the sole runtime crypto
+    provider with no `ring` in the dep tree.
+  - **NUMERIC overflow regression fix** (parent
+    `18f1bb2`): sql-postgres now decodes NUMERIC via
+    `sqlx::types::BigDecimal` instead of `String`, so
+    `Error::IntegerOverflow → UpstreamError` actually
+    fires for `SELECT 9223372036854775808::numeric`-class
+    queries (was silently being raised as `Internal`
+    with a type-mismatch detail since cc4e991 /
+    2026-04-24, only surfaced today because pre-landing's
+    --ignored Docker phase only runs the postgres
+    connector's tests when its crate is touched).
+    `bigdecimal` added to sqlx feature list.
+  - **D20 added** — workspace-wide webpki-roots-only TLS
+    trust posture. sqlx is already
+    aws-lc-rs+webpki-roots after the ring removal;
+    reqwest (every outbound HTTP path) still picks up
+    platform-native via `rustls-platform-verifier` +
+    `rustls-native-certs`. D20 forces webpki-roots
+    everywhere via
+    `ClientBuilder::use_preconfigured_tls()` with a
+    `RootCertStore` populated from
+    `webpki_roots::TLS_SERVER_ROOTS`. See §3.G.
   - Pre-rewrite ROADMAP text preserved verbatim at
     [`docs/archive/2026-05-12-roadmap-d17-done-d7-spec-d18-added.md`](archive/2026-05-12-roadmap-d17-done-d7-spec-d18-added.md).
 
@@ -277,13 +306,16 @@ The single `(Gate 1)` item is **not** a Codex dispatch — Claude
 drafts the proposal, Yuka reviews per the two-gate crypto-review
 protocol (§2).
 
-Total: **19 Codex dispatches plus 1 Gate-1 proposal.**
+Total: **20 Codex dispatches plus 1 Gate-1 proposal.**
 **D1, D2, D3, D4, D5, D6, D10, D11, D12, D13, D14, D15, D16,
-D17 are done** (14 of 19). Gate 1 and Gate 2 both approved.
+D17 are done** (14 of 20). Gate 1 and Gate 2 both approved.
 Remaining: D7, D8, D9, D19 (Tier 2/3 connectors — D19 is
 the new DNS connector surfaced 2026-05-12 via HUMANS.md), D18
 (`mechanics-core` module-surface refactor: feature gating +
-new `mime`/`url`/`console`/`html` modules).
+new `mime`/`url`/`console`/`html` modules), D20 (workspace-wide
+webpki-roots-only TLS trust posture surfaced 2026-05-12 — sqlx
+already aws-lc-rs+webpki-roots after the ring removal, reqwest
+still picks up platform-native via rustls-platform-verifier).
 
 ### A. Embedding datasets (6 dispatches + 1 Gate-1) — DONE
 
@@ -573,6 +605,89 @@ modules.
   No crypto-review gate — runtime module surface only.
   Independent of D7-D9.
 
+### G. TLS trust posture (1 dispatch)
+
+Surfaced 2026-05-12 after the ring-removal work (commit
+`18f1bb2`): the workspace's TLS trust-store posture is
+inconsistent. sqlx (Postgres/MySQL connectors,
+philharmonic-api's MySQL substrate store) verifies against
+the bundled Mozilla CA bundle via `webpki-roots`; reqwest
+(every outbound HTTP path — mechanics-core's endpoint client,
+http_forward, llm_openai_compat, and the upcoming Tier 3 LLM
+connectors) verifies against the OS-native trust store via
+`rustls-platform-verifier` + `rustls-native-certs`. Operator
+consequences: a tenant-installed corporate CA gets picked up
+for HTTP outbound but not for SQL outbound; air-gapped
+environments need different mitigations for each path; the
+HTTP trust set drifts on OS package updates while SQL trust
+is frozen at compile time.
+
+- **D20** Force `webpki-roots` everywhere; remove the
+  reqwest → `rustls-platform-verifier` / `rustls-native-certs`
+  path. Locked design choice (2026-05-12, Yuka): the bundled
+  Mozilla bundle is the workspace's single source of CA truth.
+  No native-roots fallback.
+
+  reqwest 0.13.3 does not have a `webpki-roots`-only feature
+  variant — its `rustls` feature unconditionally enables
+  `rustls-platform-verifier` as a dep. The cleanest in-workspace
+  fix is `reqwest::ClientBuilder::use_preconfigured_tls()` with
+  a `rustls::ClientConfig` whose `RootCertStore` is populated
+  from `webpki_roots::TLS_SERVER_ROOTS`. The
+  `rustls-platform-verifier` crate stays in the dep tree
+  (binary weight cost) but is never invoked at runtime if every
+  reqwest client construction routes through the helper.
+
+  Touched call sites (4 production + 4 test, grep
+  `reqwest::Client(::|<)|reqwest::Client::new|Client::builder\(\)`):
+
+  - `mechanics-core/src/internal/pool/api.rs:119` (production)
+  - `bins/philharmonic-api-server/src/executor.rs:24` (production)
+  - `philharmonic-connector-impl-http-forward/src/client.rs:18`
+    (production)
+  - `philharmonic-connector-impl-llm-openai-compat/src/client.rs:15`
+    (production)
+  - `mechanics-core/src/internal/pool/tests/{mod,queue,lifecycle}.rs`
+    (4 sites; test-only, but update for consistency)
+
+  Per-crate Cargo.toml additions: `rustls = "0.23"` (already in
+  the tree transitively at 0.23.40) and `webpki-roots = "1"`
+  (already at 1.0.7). No feature unification surprises — the
+  existing `aws-lc-rs` provider feature stays enabled.
+
+  Codex picks: helper-function-per-crate (inline 5-6 line
+  factory) vs. shared crate. The `philharmonic-connector-common`
+  crate is one natural home for the connector-impl sites but
+  has no current HTTP-client responsibilities; mechanics-core
+  is on the wrong side of the Mechanics-Philharmonic
+  independence boundary to be a workspace-wide helper home.
+  Per-crate inline is the safest default; the dispatch may
+  choose otherwise.
+
+  Version bumps: patch bumps on every published crate the
+  dispatch touches (`mechanics-core` 0.4.1 → 0.4.2,
+  `philharmonic-connector-impl-http-forward` 0.1.0 → 0.1.1,
+  `philharmonic-connector-impl-llm-openai-compat` 0.1.2 →
+  0.1.3). `bins/philharmonic-api-server` is unpublished so
+  no bump. Pre-1.0 SemVer permits patch bump for an internal
+  behavior change of this scope.
+
+  Hard constraints:
+
+  - No native-roots fallback. Even `rustls-native-certs` /
+    `openssl-probe` should drop out of the runtime tree where
+    possible (they may remain as transitive deps of
+    `rustls-platform-verifier` which itself stays compiled —
+    that's acceptable as long as the runtime control flow
+    never touches them).
+  - aws-lc-rs stays as the sole crypto provider (no
+    re-introduction of `ring`).
+  - No HTTP wire format change. No public API surface change.
+
+  Claude drafts the Codex prompt; Codex implements + tests.
+  No crypto-review gate — trust-store config only, no
+  changes to AAD/AEAD/SCK/COSE paths.
+
 ### Suggested sequencing
 
 **Completed work (2026-05-02 through 2026-05-11):** D1 +
@@ -589,9 +704,8 @@ guide expansion, audit-log producer gap closed)
 summarised in the Current state preamble at the top of
 this file with the same archive pointer.
 
-**Next dispatchable**: D7 / D8 / D9 / D18, plus D19 once
-its setup prerequisite lands. All five independent and
-parallel-safe.
+**Next dispatchable**: D7 / D8 / D9 / D18 / D19 / D20, all
+six independent and parallel-safe.
 
 - **D7** is unblocked — the `email_send` wire shape locked
   in [`docs/design/08-connector-architecture.md` §SMTP](design/08-connector-architecture.md#smtp)
@@ -609,11 +723,10 @@ parallel-safe.
   fully spec'd from §3.F above; ready for prompt draft.
 - **D19** (DNS connector) is fully spec'd from
   [`docs/design/08-connector-architecture.md` §DNS](design/08-connector-architecture.md#dns),
-  but **blocked on Yuka's one-time setup**: create the
-  `philharmonic-connector-impl-dns` GitHub repo, reserve
-  the crate name on crates.io, wire the submodule into the
-  parent workspace. Once that lands, the prompt is
-  straightforward to draft from §DNS.
+  and setup-unblocked 2026-05-12 (submodule wired, crates.io
+  `0.0.0` placeholder published). Ready for prompt draft.
+- **D20** (webpki-roots-only TLS trust posture) is fully
+  spec'd from §3.G above; ready for prompt draft.
 
 **D17** (execution-substrate tail-promise polling) landed
 2026-05-12; no further work in this arc.
