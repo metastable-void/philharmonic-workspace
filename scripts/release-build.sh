@@ -32,6 +32,7 @@ export CARGO_TARGET_DIR
 TARGET="x86_64-unknown-linux-musl"
 bin_args=""
 archive_comp="gzip"
+with_https=1
 
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -56,9 +57,17 @@ while [ $# -gt 0 ]; do
             archive_comp="gzip"
             shift
             ;;
+        --https)
+            with_https=1
+            shift
+            ;;
+        --no-https)
+            with_https=0
+            shift
+            ;;
         --help|-h)
             cat <<EOF
-Usage: $0 [--bin <name>]... [--gzip|--zstd]
+Usage: $0 [--bin <name>]... [--gzip|--zstd] [--https|--no-https]
 
 Build release-optimised, statically-linked musl binaries.
 
@@ -69,6 +78,12 @@ Options:
   --gzip          Archive with gzip (default).
   --zstd          Archive with zstd (parallel, faster on
                   large binaries like the 2.2 GB connector).
+  --https         Build with the \`https\` feature enabled —
+                  release binaries can terminate TLS
+                  themselves. Default ON for release builds.
+  --no-https      Build without the \`https\` feature.
+                  Release binaries serve plaintext only; a
+                  reverse proxy must terminate TLS upstream.
 
 Without --bin, all three bins are built.
 
@@ -85,6 +100,12 @@ EOF
     esac
 done
 
+if [ "$with_https" = "1" ]; then
+    features_arg="--features https"
+else
+    features_arg=""
+fi
+
 if ! command -v x86_64-linux-musl-gcc >/dev/null 2>&1; then
     printf '%s!!! x86_64-linux-musl-gcc not found.%s\n' "$C_ERR" "$C_RESET" >&2
     printf '    Install musl-tools: apt install musl-tools\n' >&2
@@ -97,6 +118,13 @@ fi
 
 printf '%s=== release build (musl) ===%s\n' "$C_HEADER" "$C_RESET"
 printf '%s    target: %s%s\n' "$C_NOTE" "$TARGET" "$C_RESET"
+if [ "$with_https" = "1" ]; then
+    printf '%s    https: enabled (--features https on each bin)%s\n' \
+        "$C_NOTE" "$C_RESET"
+else
+    printf '%s    https: disabled (--no-https; TLS must be terminated upstream)%s\n' \
+        "$C_NOTE" "$C_RESET"
+fi
 
 # Build each bin SEPARATELY so Cargo doesn't unify features
 # across crates. Building together causes philharmonic-connector-bin's
@@ -104,7 +132,8 @@ printf '%s    target: %s%s\n' "$C_NOTE" "$TARGET" "$C_RESET"
 # bleed into the other bins via the shared philharmonic dependency.
 for pkg in $bin_args; do
     printf '%s    building %s ...%s\n' "$C_NOTE" "$pkg" "$C_RESET"
-    run_with_cargo_noise_filter cargo build --release --target "$TARGET" -p "$pkg" --bins
+    # shellcheck disable=SC2086
+    run_with_cargo_noise_filter cargo build --release --target "$TARGET" -p "$pkg" --bins $features_arg
 done
 
 out_dir="$CARGO_TARGET_DIR/$TARGET/release"
