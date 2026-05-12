@@ -1124,6 +1124,12 @@ to configured submission servers (port 587 / 465, never port 25).
 Transactional email providers are served by `http_forward`-
 backed configs, not distinct email implementations.
 
+All SMTP server connection parameters — hostname, port,
+credentials, connection mode, TLS strictness — live in the
+endpoint config and are decrypted only inside the connector
+service. Workflows never see them; the request body from the
+script carries only the message envelope and body.
+
 #### Connection policy
 
 - **Port 25 is rejected unconditionally**, regardless of
@@ -1131,14 +1137,29 @@ backed configs, not distinct email implementations.
   servers (RFC 6409 / RFC 8314), not MTA-to-MTA relays.
 - **Username and password are required.** Anonymous SMTP
   submission is refused at config-validation time.
-- **Port semantics**:
+- **Connection mode** is operator-controlled via the
+  endpoint config's optional `connection_mode` field:
+  - `starttls` — force STARTTLS submission regardless of
+    port.
+  - `smtps` — force implicit-TLS submission (SMTPS)
+    regardless of port.
+  - `auto` (default) — derive the mode from the port (or
+    auto-discover when no port is configured; see below).
+  When `connection_mode` is set explicitly, the operator's
+  choice wins; the connector does not second-guess
+  port/mode combinations that look unusual (a deployment
+  that, e.g., terminates STARTTLS on 465 inside a private
+  network is the operator's call to make).
+- **Port-driven defaults** (apply when `connection_mode` is
+  `auto`):
   - **587** → STARTTLS submission (RFC 3207 / RFC 8314).
   - **465** → implicit TLS submission (SMTPS, RFC 8314).
   - **Any other configured port** → STARTTLS by default
     (matches submission-server convention).
-- **Auto-discovery**: if the config omits a port, the
-  connector tries **587/STARTTLS** first, then **465/SMTPS**;
-  the first successful TLS handshake wins.
+- **Auto-discovery** (when `connection_mode` is `auto` and
+  the config omits a port): the connector tries
+  **587/STARTTLS** first, then **465/SMTPS**; the first
+  successful TLS handshake wins.
 
 #### TLS strictness
 
@@ -1171,6 +1192,7 @@ Four-valued enum, applies to both 587/STARTTLS and 465/SMTPS:
   "config": {
     "host": "smtp.example.com",
     "port": 587,
+    "connection_mode": "starttls",
     "username": "alerts@example.com",
     "password": "...",
     "tls_strictness": "strict"
@@ -1180,10 +1202,16 @@ Four-valued enum, applies to both 587/STARTTLS and 465/SMTPS:
 
 - `host` — required submission-server hostname.
 - `port` — optional; auto-discovery (587 → 465) when
-  omitted. Port 25 rejected at config validation.
+  omitted and `connection_mode` is `auto`. Port 25
+  rejected at config validation.
+- `connection_mode` — optional; one of `starttls`, `smtps`,
+  or `auto` (default). Operator override for the
+  STARTTLS-vs-SMTPS choice; when set, wins over the
+  port-driven inference. See §Connection policy above.
 - `username` / `password` — both required.
 - `tls_strictness` — one of `strict` (default), `sloppy`,
-  `opportunistic`, `opportunistic_sloppy`.
+  `opportunistic`, `opportunistic_sloppy`. Independent of
+  `connection_mode` — applies whichever transport is used.
 
 #### Request shape
 

@@ -299,18 +299,31 @@ implement the `Implementation` trait.
 - **D7** `philharmonic-connector-impl-email-smtp` (Tier 2).
   Implement per
   [`docs/design/08-connector-architecture.md` §SMTP](design/08-connector-architecture.md#smtp).
-  Hard requirements (locked 2026-05-12 via HUMANS.md): reject
-  port 25 unconditionally; require username + password;
-  port-driven TLS mode (587 → STARTTLS, 465 → SMTPS, else
-  STARTTLS); auto-discover 587-then-465 when port omitted;
-  four-valued `tls_strictness` enum (`strict` default, plus
-  `sloppy`, `opportunistic`, `opportunistic_sloppy`). Request
-  shape `{mail_from, recipients[], body}` with minimal MIME
-  envelope fixing (insert `MIME-Version` / `Date` / `Message-Id`
-  / default `Content-Type` only when the submission server
-  would reject otherwise; CRLF-normalise line endings; never
-  inject security-relevant headers). Transport: `lettre` over
-  `rustls`.
+  Hard requirements (locked 2026-05-12 via HUMANS.md):
+  - **Port 25 rejected** unconditionally.
+  - **Username + password required**; anonymous submission
+    refused at config validation.
+  - **Explicit `connection_mode` knob** in the endpoint
+    config: `starttls` / `smtps` / `auto` (default). When
+    set, wins over the port-driven inference. The full
+    SMTP server config — host, port, credentials, mode,
+    strictness — lives in the endpoint config and is
+    never visible to workflow code.
+  - **Port-driven defaults** (when `connection_mode` is
+    `auto`): 587 → STARTTLS, 465 → SMTPS, otherwise
+    STARTTLS. **Auto-discovery** (`auto` + no port):
+    try 587/STARTTLS, then 465/SMTPS.
+  - **Four-valued `tls_strictness` enum**: `strict`
+    (default), `sloppy`, `opportunistic`,
+    `opportunistic_sloppy`. Independent of
+    `connection_mode`.
+  - **Request shape** `{mail_from, recipients[], body}`
+    with minimal MIME envelope fixing (insert
+    `MIME-Version` / `Date` / `Message-Id` / default
+    `Content-Type` only when the submission server would
+    reject otherwise; CRLF-normalise line endings; never
+    inject security-relevant headers).
+  - Transport: `lettre` over `rustls`.
 - **D8** `philharmonic-connector-impl-llm-anthropic` (Tier 3).
 - **D9** `philharmonic-connector-impl-llm-gemini` (Tier 3) —
   must support **both** Google API surfaces for Gemini:
