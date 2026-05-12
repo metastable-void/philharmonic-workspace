@@ -126,6 +126,15 @@ implementation yet):
 - **`philharmonic-connector-impl-llm-anthropic`** (Tier 3).
 - **`philharmonic-connector-impl-llm-gemini`** (Tier 3).
 
+Planned (Tier 2, **not yet reserved on crates.io, no
+submodule wired into the workspace** — one-time setup is
+pending):
+
+- **`philharmonic-connector-impl-dns`** (Tier 2). Surfaced
+  via HUMANS.md on 2026-05-12; spec at
+  [`08-connector-architecture.md` §DNS](08-connector-architecture.md#dns);
+  ROADMAP entry **D19**.
+
 ### Workspace internal
 
 - **`inline-blob`** — proc-macro emitting `static [u8; N]`

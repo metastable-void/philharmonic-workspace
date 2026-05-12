@@ -190,6 +190,17 @@ active work now lives in the post-v1 dispatch plan (§3 below).
     read-only step-history probe (so terminated instances
     render correctly) and step-elapsed `"n.n s"` muted
     caption below the transcript.
+  - **WebUI CodeMirror TAB capture** wired in (HUMANS.md
+    §WebUI follow-up): TAB now indents inside the editor,
+    Shift+TAB unindents, Escape-then-TAB releases focus
+    for keyboard navigation.
+  - **D19 added** — `philharmonic-connector-impl-dns`
+    (Tier 2 DNS connector, new crate) surfaced via
+    HUMANS.md. Spec locked into
+    [`design/08` §DNS](design/08-connector-architecture.md#dns);
+    blocked on Yuka's one-time setup (GitHub repo,
+    crates.io reservation, submodule wiring) before
+    Codex prompt drafting.
   - Pre-rewrite ROADMAP text preserved verbatim at
     [`docs/archive/2026-05-12-roadmap-d17-done-d7-spec-d18-added.md`](archive/2026-05-12-roadmap-d17-done-d7-spec-d18-added.md).
 
@@ -266,10 +277,11 @@ The single `(Gate 1)` item is **not** a Codex dispatch — Claude
 drafts the proposal, Yuka reviews per the two-gate crypto-review
 protocol (§2).
 
-Total: **18 Codex dispatches plus 1 Gate-1 proposal.**
+Total: **19 Codex dispatches plus 1 Gate-1 proposal.**
 **D1, D2, D3, D4, D5, D6, D10, D11, D12, D13, D14, D15, D16,
-D17 are done** (14 of 18). Gate 1 and Gate 2 both approved.
-Remaining: D7, D8, D9 (Tier 2/3 connectors), D18
+D17 are done** (14 of 19). Gate 1 and Gate 2 both approved.
+Remaining: D7, D8, D9, D19 (Tier 2/3 connectors — D19 is
+the new DNS connector surfaced 2026-05-12 via HUMANS.md), D18
 (`mechanics-core` module-surface refactor: feature gating +
 new `mime`/`url`/`console`/`html` modules).
 
@@ -288,13 +300,15 @@ WebUI surface end-to-end. Per-dispatch detail and commit
 SHAs preserved verbatim at
 [`docs/archive/2026-05-11-roadmap-completed-arc-trim.md`](archive/2026-05-11-roadmap-completed-arc-trim.md).
 
-### B. Phase 7 Tier 2/3 connector implementations (3 dispatches)
+### B. Phase 7 Tier 2/3 connector implementations (4 dispatches)
 
-Each is one substantive crate going from `0.0.x` placeholder to
-`0.1.0` substantive implementation. None of these touch the
-crypto path; the connector-service framework already validates
-tokens and decrypts payloads — implementations only need to
-implement the `Implementation` trait.
+Three of these (D7 / D8 / D9) take an existing `0.0.x`
+placeholder to a `0.1.0` substantive implementation; D19 is
+a **new crate** (no placeholder yet on crates.io, no
+submodule wired into the workspace). None touch the crypto
+path; the connector-service framework already validates
+tokens and decrypts payloads — implementations only need
+to implement the `Implementation` trait.
 
 - **D7** `philharmonic-connector-impl-email-smtp` (Tier 2).
   Implement per
@@ -349,8 +363,51 @@ implement the `Implementation` trait.
   OAuth2 access-token caching for Vertex AI) defers to
   D9's prompt-drafting time.
 
+- **D19** `philharmonic-connector-impl-dns` (Tier 2,
+  **new crate**). Implement per
+  [`docs/design/08-connector-architecture.md` §DNS](design/08-connector-architecture.md#dns).
+  Hard requirements (locked 2026-05-12 via HUMANS.md):
+  - Arbitrary DNS querying via the system's stub
+    resolver (consults `/etc/resolv.conf`). No custom
+    recursive resolver, no caching layer beyond the OS.
+  - `IN` class only.
+  - Endpoint config carries optional `allowed_types`
+    (RR type allowlist), `allowlist_zones`, and
+    `blocklist_zones` (domain-suffix gates). When both
+    lists exist: query passes if its zone is
+    allowlisted AND not blocklisted. Blocklist is a
+    strict overlay-deny.
+  - Resolver library: `hickory-resolver` (formerly
+    `trust-dns-resolver`) in system-config mode —
+    pure-Rust, async, no `unsafe`.
+  - Capability name `dns_query`; realm `dns`. Request
+    `{name, type, timeout_ms?}`; response
+    `{records: [{type, name, ttl, data}, ...]}`. v1
+    emits rdata as presentation-format strings;
+    per-type structured objects are a sub-shape
+    decision at prompt-drafting time.
+
+  **Pre-D19 setup** (Yuka, one-time):
+  1. Create the
+     `philharmonic-connector-impl-dns` GitHub repo
+     under `metastable-void` (mirror the layout of
+     the existing connector submodules).
+  2. Reserve the crate name on crates.io by publishing a
+     `0.0.1` placeholder.
+  3. Add a submodule entry to `.gitmodules` + the
+     workspace root.
+  4. Add the crate to the workspace `Cargo.toml`
+     `[workspace] members` list.
+
+  After setup, Claude drafts the D19 prompt; Codex
+  implements + tests inside the new submodule. No
+  crypto gate — DNS connector is HTTP-realm style
+  (token + encrypted payload over the connector
+  framework); just one more `Implementation` trait
+  impl.
+
 Independent of one another and of section A; safe to run in
-parallel.
+parallel (modulo the D19 setup prerequisite).
 
 ### C. Connector enhancements (2 dispatches)
 
@@ -532,8 +589,9 @@ guide expansion, audit-log producer gap closed)
 summarised in the Current state preamble at the top of
 this file with the same archive pointer.
 
-**Next dispatchable**: D7 / D8 / D9 / D18, all four
-independent and parallel-safe.
+**Next dispatchable**: D7 / D8 / D9 / D18, plus D19 once
+its setup prerequisite lands. All five independent and
+parallel-safe.
 
 - **D7** is unblocked — the `email_send` wire shape locked
   in [`docs/design/08-connector-architecture.md` §SMTP](design/08-connector-architecture.md#smtp)
@@ -549,6 +607,13 @@ independent and parallel-safe.
   time if she has a preference.
 - **D18** (`mechanics-core` module-surface refactor) is
   fully spec'd from §3.F above; ready for prompt draft.
+- **D19** (DNS connector) is fully spec'd from
+  [`docs/design/08-connector-architecture.md` §DNS](design/08-connector-architecture.md#dns),
+  but **blocked on Yuka's one-time setup**: create the
+  `philharmonic-connector-impl-dns` GitHub repo, reserve
+  the crate name on crates.io, wire the submodule into the
+  parent workspace. Once that lands, the prompt is
+  straightforward to draft from §DNS.
 
 **D17** (execution-substrate tail-promise polling) landed
 2026-05-12; no further work in this arc.

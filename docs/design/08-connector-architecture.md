@@ -1257,6 +1257,126 @@ is planned for structured MIME composition / parsing
 for authors who want type-safe assembly rather than
 templated strings.
 
+### DNS
+
+One implementation: **`dns_query`**. Performs single DNS
+lookups via the system's stub resolver (consults
+`/etc/resolv.conf` / `nsswitch.conf`). The connector does
+**not** run its own recursive resolver and does **not**
+maintain caches beyond what the host OS provides — it's a
+thin wrapper that delegates to whatever the host is
+configured to do for normal-process DNS.
+
+All queries are `IN`-class only. Other DNS classes
+(`CH`, `HS`) are not exposed.
+
+#### Config shape
+
+```json
+{
+  "realm": "dns",
+  "impl": "dns_query",
+  "config": {
+    "allowed_types": ["A", "AAAA", "MX", "TXT"],
+    "allowlist_zones": ["example.com", "example.org"],
+    "blocklist_zones": ["secret.example.com"],
+    "default_timeout_ms": 5000
+  }
+}
+```
+
+- `allowed_types` — optional list of RR-type strings.
+  When set, only queries for these types pass the policy
+  gate. When omitted, all standard RR types are allowed.
+  Type strings match the canonical IANA names: `A`,
+  `AAAA`, `CNAME`, `MX`, `NS`, `PTR`, `SOA`, `SRV`,
+  `TXT`, `CAA`, etc.
+- `allowlist_zones` — optional list of domain suffixes.
+  When set, the queried name must fall under one of
+  these zones for the query to pass.
+- `blocklist_zones` — optional list of domain suffixes.
+  Queries whose name falls under any blocklisted zone
+  are refused, even if also covered by the allowlist.
+- `default_timeout_ms` — query-level timeout default;
+  request-level `timeout_ms` overrides it downward.
+
+**Zone matching is suffix-based.** `example.com` matches
+`example.com`, `foo.example.com`,
+`bar.foo.example.com`, but not `notexample.com`.
+Comparisons are case-insensitive (DNS names are
+case-insensitive per RFC 1035 §2.3.3).
+
+**Both-list semantics**: when both `allowlist_zones` and
+`blocklist_zones` are set, a query passes if the name
+matches at least one allowlist entry AND does not match
+any blocklist entry. The blocklist is a strict
+overlay-deny — useful for carving exceptions out of an
+otherwise-permitted allowlisted zone.
+
+#### Request shape
+
+```json
+{
+  "name": "www.example.com",
+  "type": "MX",
+  "timeout_ms": 3000
+}
+```
+
+- `name` — required. Domain name to query (idn-encoded
+  if non-ASCII).
+- `type` — required. RR type as a string; must be one of
+  the canonical IANA names. Subject to the
+  `allowed_types` policy gate.
+- `timeout_ms` — optional. Per-query timeout; falls back
+  to `default_timeout_ms` from the endpoint config.
+
+#### Response shape
+
+```json
+{
+  "records": [
+    {"type": "A", "name": "www.example.com", "ttl": 300,
+     "data": "93.184.216.34"},
+    {"type": "MX", "name": "example.com", "ttl": 3600,
+     "data": "10 mail.example.com"}
+  ]
+}
+```
+
+- `records` — array of resource records returned. Each
+  record carries `type`, `name`, `ttl`, and `data`.
+- `data` — rdata in presentation-format string by
+  default (e.g. `"10 mail.example.com"` for MX,
+  `"93.184.216.34"` for A, raw text for TXT chunks). The
+  D19 impl dispatch may decide to emit per-type
+  structured objects instead (e.g. `{priority, exchange}`
+  for MX) if structured shapes turn out cleaner for
+  workflow authors; that's a sub-shape choice at
+  prompt-drafting time.
+
+#### Error cases
+
+- Zone outside `allowlist_zones` (when set) or matching
+  `blocklist_zones`: connector-level deny **before** any
+  DNS packet leaves the process. Workflow sees a
+  structured error naming the policy violation; no
+  observable network side-effect.
+- RR type not in `allowed_types` (when set):
+  connector-level deny, same shape as zone-deny.
+- Resolver timeout / NXDOMAIN / SERVFAIL / NOTIMP /
+  REFUSED: bubble up as structured errors carrying the
+  DNS `RCODE`.
+
+#### Implementation library
+
+`hickory-resolver` (formerly `trust-dns-resolver`) in
+system-config mode. Pure-Rust, async, no `unsafe`,
+parses `/etc/resolv.conf` natively. No DoH / DoT in v1
+— if the host system is configured to use those at the
+OS level (e.g. systemd-resolved with DNSOverTLS=yes),
+the stub-resolver path picks that up transparently.
+
 ### Embedding and vector search
 
 **Decision (settled): split.** Two capabilities in separate

@@ -92,7 +92,8 @@ English-only rule per [`CONTRIBUTING.md §14.6`](CONTRIBUTING.md#146-english-as-
 
 **Connector implementations:** `philharmonic-connector-impl-` ×
 `http-forward`, `llm-openai-compat`, `llm-anthropic`, `llm-gemini`,
-`sql-postgres`, `sql-mysql`, `email-smtp`, `embed`, `vector-search`.
+`sql-postgres`, `sql-mysql`, `email-smtp`, `embed`, `vector-search`,
+`dns` (planned — see D19).
 
 **API:** `philharmonic-api`.
 
@@ -170,8 +171,10 @@ body cap raised 2 MiB → 32 MiB
 (`philharmonic-connector-router` 0.1.2).
 
 Remaining post-v1 scope: Phase 7 Tier 2/3 connector
-implementations (SMTP, Anthropic, Gemini — D7/D8/D9) plus
-a `mechanics-core` module-surface refactor (feature gating
+implementations (SMTP, Anthropic, Gemini — D7/D8/D9), a new
+DNS connector (D19, fresh crate
+`philharmonic-connector-impl-dns` — Tier 2), and a
+`mechanics-core` module-surface refactor (feature gating
 + new `mime`/`url`/`console`/`html` modules — D18). The
 2026-05-12 work — `mechanics-core` 0.4.0 → 0.4.1 with
 tail-promise polling (D17 landed) — moved the worker

@@ -93,6 +93,17 @@ in the future.
 - **Code editor**. Code editor currently doesn't capture
   TAB presses (moves to the next element); should be fixed.
 
+## New connector: DNS (Tier 2)
+
+**`philharmonic-connector-impl-dns`**:
+
+Arbitrary DNS querying connector; supports any standard
+RRs; `IN` only; uses system's resolver (consults
+`/etc/resolv.conf`). Endpoint config can limit queries
+to certain RRs only, or blocklist or allowlist (when both
+exists, allowlisted non-blocklisted ones pass, applying
+the both) zones.
+
 ## Keep the workflow authoring guide up-to-date
 
 Re-read the docs/codex of everything related, and re-write
