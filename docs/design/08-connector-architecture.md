@@ -1119,10 +1119,115 @@ For INSERT/UPDATE/DELETE: `rows` is empty, `columns` is empty,
 ### SMTP
 
 One implementation: **`email_smtp`**. Submits messages via SMTP
-to configured submission servers.
+to configured submission servers (port 587 / 465, never port 25).
 
 Transactional email providers are served by `http_forward`-
 backed configs, not distinct email implementations.
+
+#### Connection policy
+
+- **Port 25 is rejected unconditionally**, regardless of
+  config or runtime state. The connector targets *submission*
+  servers (RFC 6409 / RFC 8314), not MTA-to-MTA relays.
+- **Username and password are required.** Anonymous SMTP
+  submission is refused at config-validation time.
+- **Port semantics**:
+  - **587** → STARTTLS submission (RFC 3207 / RFC 8314).
+  - **465** → implicit TLS submission (SMTPS, RFC 8314).
+  - **Any other configured port** → STARTTLS by default
+    (matches submission-server convention).
+- **Auto-discovery**: if the config omits a port, the
+  connector tries **587/STARTTLS** first, then **465/SMTPS**;
+  the first successful TLS handshake wins.
+
+#### TLS strictness
+
+Four-valued enum, applies to both 587/STARTTLS and 465/SMTPS:
+
+- **`strict`** (default) — full TLS verification: server
+  certificate validated against the trust store and matched
+  to the configured hostname. Connection refused on any
+  failure.
+- **`sloppy`** — encryption enforced, server identity
+  verification skipped. **Vulnerable to active MITM**;
+  documented as such in tenant-facing UX. Acceptable only
+  for closed-network deployments where the operator
+  accepts the trade-off.
+- **`opportunistic`** — TLS attempted; when negotiated, full
+  verification applies. If the server doesn't advertise
+  TLS, plaintext SMTP is used. Mostly relevant to
+  legacy/non-TLS-capable submission environments.
+- **`opportunistic_sloppy`** — TLS attempted; when
+  negotiated, verification is skipped. Combines the
+  weaknesses of `opportunistic` and `sloppy`. Last-resort
+  mode.
+
+#### Config shape
+
+```json
+{
+  "realm": "email",
+  "impl": "email_smtp",
+  "config": {
+    "host": "smtp.example.com",
+    "port": 587,
+    "username": "alerts@example.com",
+    "password": "...",
+    "tls_strictness": "strict"
+  }
+}
+```
+
+- `host` — required submission-server hostname.
+- `port` — optional; auto-discovery (587 → 465) when
+  omitted. Port 25 rejected at config validation.
+- `username` / `password` — both required.
+- `tls_strictness` — one of `strict` (default), `sloppy`,
+  `opportunistic`, `opportunistic_sloppy`.
+
+#### Request shape
+
+```json
+{
+  "mail_from": "alerts@example.com",
+  "recipients": ["ops@example.com", "oncall@example.com"],
+  "body": "From: alerts@example.com\r\nTo: ops@example.com\r\nSubject: Test\r\nMIME-Version: 1.0\r\nContent-Type: text/plain; charset=utf-8\r\n\r\nHello."
+}
+```
+
+- `mail_from` — envelope sender (`MAIL FROM`). Required.
+- `recipients` — array of envelope recipients (`RCPT TO`).
+  Required, non-empty.
+- `body` — full MIME message as a string, including all
+  headers and body, CRLF-terminated per RFC 5322.
+
+#### MIME envelope fixing
+
+The implementation validates the MIME body and applies
+minimal, well-defined fixes only when the submission server
+would otherwise reject the message:
+
+- Insert `MIME-Version: 1.0` if absent.
+- Insert a `Date:` header if absent (current wall-clock).
+- Insert a `Message-Id:` header if absent (generated per
+  RFC 5322 §3.6.4 conventions).
+- Insert a default `Content-Type: text/plain; charset=utf-8`
+  if absent.
+- Normalise line endings to CRLF.
+
+When servers accept the body unmodified, the connector
+passes it through verbatim. Fixes never introduce headers
+that would weaken security guarantees (e.g. no `From:`
+rewriting, no DKIM/SPF-relevant header injection).
+
+#### MIME composition helper
+
+Workflow authors hand-write the `body` string by default.
+A non-default `mechanics:mime` module in `mechanics-core`
+is planned for structured MIME composition / parsing
+(Base64, multipart, standards-compliant output) — useful
+for authors who want type-safe assembly rather than
+templated strings.
 
 ### Embedding and vector search
 
@@ -1230,15 +1335,9 @@ later as an additive feature without rearchitecture.
 
 ## Open questions
 
-Narrow and specific:
-
-- **`email_send` wire shape.** Tier 2; the SMTP submission
-  shape (lettre-driven) is the only v1 capability still
-  pending detailed wire-protocol shaping. Sketch when the
-  impl crate starts.
-
-Everything else in this area is settled. SQL row data,
-HTTP templating syntax, embedding output format, and
-vector-search nearest-neighbor result shape were all
-locked in the Phase 6 / Phase 7 Tier 1 implementations
-that landed 2026-04-24.
+All v1 capability wire shapes are locked. SQL row data,
+HTTP templating syntax, embedding output format, vector-
+search nearest-neighbor result shape, and the SMTP
+submission shape have settled. SQL/HTTP/embedding/vector-
+search landed in Phase 6 / Phase 7 Tier 1 (2026-04-24);
+the `email_smtp` shape was locked 2026-05-12 (§SMTP above).

@@ -7,7 +7,7 @@ repo.
 V1 is complete through the first working end-to-end deployment;
 active work now lives in the post-v1 dispatch plan (§3 below).
 
-**Current state** (2026-05-11):
+**Current state** (2026-05-12):
 
 - Design: complete.
 - v1 implementation path: **complete through Phase 9.**
@@ -161,6 +161,37 @@ active work now lives in the post-v1 dispatch plan (§3 below).
     (RAG-grounded chat over a vector index + relational DB,
     served by a self-or-partner-hosted LLM) is now real,
     not just integration-test scaffolding.
+- **2026-05-12 work** (post-PoC, day-after-the-milestone):
+  - **D17 landed** — `mechanics-core` 0.4.0 → 0.4.1
+    (`0e6c3e7` submodule + `743e091` parent). Worker
+    run-job response now returns when the script's
+    top-level settles; unawaited promises, endpoint
+    calls, and `setTimeout` callbacks continue polling on
+    the worker tokio task until quiescence or
+    `max_execution_time`. Authoritative behavior spec
+    at [`design/06` §Tail-promise polling](design/06-execution-substrate.md#tail-promise-polling).
+    Codex chose sub-shape B (`RunJobsExit` enum +
+    `run_jobs_until(predicate)` helper); `tracing = "0.1"`
+    dep + `setTimeout` global builtin added.
+  - **D7 wire shape locked** — HUMANS.md surfaced a
+    complete SMTP submission spec (port-25 ban, port-driven
+    TLS, four-valued strictness enum, request shape,
+    minimal MIME envelope fixing). Locked into
+    [`design/08` §SMTP](design/08-connector-architecture.md#smtp);
+    `email_send wire shape` removed from §Open questions.
+    D7 entry in §3.B updated to point at it as the
+    authoritative spec.
+  - **D18 added** — `mechanics-core` module-surface
+    refactor: feature-gate every non-endpoint module +
+    ship four new modules (`mime` non-default; `url`,
+    `console`, `html` default). HUMANS.md §"MIME module at
+    `mechanics-core`" is the driver. New §3.F entry.
+  - **WebUI chat tab** also got two small follow-ups:
+    read-only step-history probe (so terminated instances
+    render correctly) and step-elapsed `"n.n s"` muted
+    caption below the transcript.
+  - Pre-rewrite ROADMAP text preserved verbatim at
+    [`docs/archive/2026-05-12-roadmap-d17-done-d7-spec-d18-added.md`](archive/2026-05-12-roadmap-d17-done-d7-spec-d18-added.md).
 
 Authoritative sources for things this file used to restate but
 now cross-references:
@@ -235,11 +266,12 @@ The single `(Gate 1)` item is **not** a Codex dispatch — Claude
 drafts the proposal, Yuka reviews per the two-gate crypto-review
 protocol (§2).
 
-Total: **17 Codex dispatches plus 1 Gate-1 proposal.**
-**D1, D2, D3, D4, D5, D6, D10, D11, D12, D13, D14, D15, D16
-are done** (13 of 17). Gate 1 and Gate 2 both approved.
-Remaining: D7, D8, D9 (Tier 2/3 connectors), D17
-(execution-substrate response-detached background-poll).
+Total: **18 Codex dispatches plus 1 Gate-1 proposal.**
+**D1, D2, D3, D4, D5, D6, D10, D11, D12, D13, D14, D15, D16,
+D17 are done** (14 of 18). Gate 1 and Gate 2 both approved.
+Remaining: D7, D8, D9 (Tier 2/3 connectors), D18
+(`mechanics-core` module-surface refactor: feature gating +
+new `mime`/`url`/`console`/`html` modules).
 
 ### A. Embedding datasets (6 dispatches + 1 Gate-1) — DONE
 
@@ -265,6 +297,20 @@ tokens and decrypts payloads — implementations only need to
 implement the `Implementation` trait.
 
 - **D7** `philharmonic-connector-impl-email-smtp` (Tier 2).
+  Implement per
+  [`docs/design/08-connector-architecture.md` §SMTP](design/08-connector-architecture.md#smtp).
+  Hard requirements (locked 2026-05-12 via HUMANS.md): reject
+  port 25 unconditionally; require username + password;
+  port-driven TLS mode (587 → STARTTLS, 465 → SMTPS, else
+  STARTTLS); auto-discover 587-then-465 when port omitted;
+  four-valued `tls_strictness` enum (`strict` default, plus
+  `sloppy`, `opportunistic`, `opportunistic_sloppy`). Request
+  shape `{mail_from, recipients[], body}` with minimal MIME
+  envelope fixing (insert `MIME-Version` / `Date` / `Message-Id`
+  / default `Content-Type` only when the submission server
+  would reject otherwise; CRLF-normalise line endings; never
+  inject security-relevant headers). Transport: `lettre` over
+  `rustls`.
 - **D8** `philharmonic-connector-impl-llm-anthropic` (Tier 3).
 - **D9** `philharmonic-connector-impl-llm-gemini` (Tier 3) —
   must support **both** Google API surfaces for Gemini:
@@ -366,60 +412,96 @@ are at
 [`docs/archive/2026-05-11-roadmap-completed-arc-trim.md`](archive/2026-05-11-roadmap-completed-arc-trim.md)
 under "Evening trim — 2026-05-11".
 
-### E. Execution-substrate runtime semantics (1 dispatch)
+### E. Execution-substrate runtime semantics (1 dispatch) — DONE
 
 - **D17** `mechanics-core` response-detached background-poll
-  runtime. Today
-  [`mechanics-core/src/internal/runtime.rs:268-275`](../mechanics-core/src/internal/runtime.rs#L268-L275)
-  unconditionally drives `ctx.run_jobs()` after invoking the
-  module's default export, and the executor loop at
-  [`mechanics-core/src/internal/executor.rs:209-302`](../mechanics-core/src/internal/executor.rs#L209-L302)
-  drains async-job / promise / timeout / generic queues to
-  full quiescence before returning. Net effect: an unawaited
-  `mechanics:endpoint(...)`, a live `setTimeout`, or any
-  fire-and-forget `Promise.then(...)` chain pins the worker
-  response open until the per-job `max_execution_time`
-  deadline trips. The script's `return` is therefore not the
-  step-completion fence — quiescence is.
+  runtime — **DONE 2026-05-12** (`mechanics-core` 0.4.0 →
+  0.4.1; submodule `0e6c3e7` + parent `743e091`). The worker's
+  run-job response now returns when the script's top-level
+  settles; unawaited promises, endpoint calls, and
+  `setTimeout` callbacks continue polling on the same worker
+  tokio task until quiescence or `max_execution_time`. The
+  script's `return` is the response fence; quiescence is not.
 
-  Target shape: as soon as the top-level resolves (sync
-  return or awaited promise fulfilled), the worker
-  serialises the result and returns the run-job response.
-  Pending promises continue to be polled in the background
-  until they settle or the per-job deadline expires — their
-  side effects (real HTTP calls to connectors, real timer
-  callbacks) still complete, but no longer hold the
-  response open.
+  Codex chose sub-shape B: `RunJobsExit { Complete,
+  DeadlineExceeded(QueueSnapshot) }` enum + `run_jobs_until
+  (predicate)` helper in `executor.rs`. `tracing = "0.1"`
+  dep added; deadline-mid-tail-poll emits one structured
+  `tracing::warn!` line with job ID + in-flight + queued
+  counts. `setTimeout(callback, delayMs)` added as a global
+  builtin inside the script realm (the realm had no timer
+  surface pre-D17). Authoritative behavior spec landed at
+  [`docs/design/06-execution-substrate.md` §Tail-promise
+  polling](design/06-execution-substrate.md#tail-promise-polling).
+  Codex prompt archive + post-mortem at
+  [`docs/codex-prompts/2026-05-12-0001-d17-mechanics-core-tail-promise-polling-01.md`](codex-prompts/2026-05-12-0001-d17-mechanics-core-tail-promise-polling-01.md);
+  pre-rewrite §3.E text preserved verbatim at
+  [`docs/archive/2026-05-12-roadmap-d17-done-d7-spec-d18-added.md`](archive/2026-05-12-roadmap-d17-done-d7-spec-d18-added.md).
 
-  Design choices (settled 2026-05-12; authoritative subsection
-  at [`docs/design/06-execution-substrate.md` §Tail-promise
-  polling](design/06-execution-substrate.md#tail-promise-polling)):
+### F. Mechanics module surface (1 dispatch)
 
-  - **Background-poll lifetime**: tail-poll shares the per-job
-    `max_execution_time` budget with main; runs on the same
-    worker tokio task that started the job; no separate pool.
-  - **Audit-trail handling**: fire-and-forget. Tail-promise
-    outcomes are not recorded in the workflow step record and do
-    not surface in the audit log.
-  - **Unhandled-rejection handling**: increment whatever
-    external rejection telemetry exists; today nothing external
-    is wired, so the internal `pending_unhandled_rejections`
-    counter (see `RuntimeHostHooks`) is the only sink. No
-    response failure on tail rejection — mirrors the 0.4.0
-    "trust the script's try/catch" stance.
-  - **Deadline mid-tail-poll**: drop realm + in-flight futures,
-    emit one `tracing::warn!` naming the job ID and the
-    in-flight + queued counts at abort time.
-  - **Realm + context lifetime**: realm stays alive on the
-    per-job tokio task until tail-poll exits (quiescence or
-    deadline); dropped at exit.
-  - **Backpressure / quota**: no new cap. The existing
-    worker-pool slot limits self-regulate, since tail-poll
-    occupies the worker's tokio slot it ran on.
-  - **Opt-in vs. default**: hardcoded default. No per-job knob.
+Surfaced via HUMANS.md §"MIME module at `mechanics-core`" and
+the surrounding directive on feature-gating non-endpoint
+modules.
 
-  Claude drafts the Codex prompt; Codex implements + tests. No
-  crypto-review gate — runtime control flow only.
+- **D18** `mechanics-core` module-surface refactor. Make every
+  non-endpoint built-in module feature-gated and ship four
+  new modules (one non-default, three default):
+
+  - **Refactor**: every existing non-endpoint module
+    (`mechanics:rand`, `mechanics:uuid`, `mechanics:encoding`)
+    moves behind a Cargo feature flag. Pre-existing modules
+    keep their previous availability by being members of
+    default features.
+  - **Feature `rand`** (default) — `mechanics:rand` +
+    `mechanics:uuid`. Without it, `Math.random()` is seeded
+    with zero (per HUMANS.md).
+  - **Feature `encoding`** (default) — form-urlencoded,
+    base64, base32, hex. Existing surface; gets gated.
+  - **Feature `html`** (default, **new**) — wraps the
+    `htmlize` crate: `htmlize::escape_text` → `escapeText`,
+    `htmlize::escape_all_quotes` → `escapeAttribute`,
+    `htmlize::unescape` → `unescapeText`,
+    `htmlize::unescape_attribute` → `unescapeAttribute`.
+  - **Feature `url`** (default, **new**) — WHATWG-compliant
+    `mechanics:url`. Default export `URL`; named export
+    `URLSearchParams`. Backed by the `url` crate.
+  - **Feature `console`** (default, **new**) — minimal
+    WHATWG-compliant `mechanics:console`. Levels: `log`,
+    `info`, `warn`, `error`, `debug`. Stdout/stderr
+    routing per worker config (out of scope for first
+    pass — default to host-side `tracing` emission).
+  - **Feature `mime`** (non-default, **new**) —
+    structured MIME composer + parser at `mechanics:mime`.
+    `import { compose, parse } from 'mechanics:mime'`.
+    Handles Base64 and multipart cleanly; emits
+    standards-compliant MIME messages. Format-only;
+    does **not** know about HTML, headers semantics, or
+    SMTP. Useful both standalone and as a workflow-author
+    helper for the D7 `email_smtp` connector
+    (workflows can keep hand-writing the `body` string
+    when `mime` isn't enabled).
+
+  Hard constraints:
+
+  - `jsdom` won't work with Mechanics — the runtime has no
+    non-ES globals on purpose. Modules expose ES-style
+    `import`s only; no implicit globals.
+  - No new public-API breakage on the Rust side beyond the
+    feature gates themselves (existing consumers stay
+    green with default features on).
+  - All modules respect Mechanics's per-job stateless
+    contract — no cross-job state, no globalThis
+    mutations that persist.
+  - Workflow-authoring guide (en + jp) re-synced as part of
+    the dispatch per HUMANS.md §"Keep the workflow authoring
+    guide up-to-date" — the new modules need recipe-shaped
+    documentation alongside the existing connector
+    walkthroughs.
+
+  Claude drafts the Codex prompt; Codex implements + tests.
+  No crypto-review gate — runtime module surface only.
+  Independent of D7-D9.
 
 ### Suggested sequencing
 
@@ -437,15 +519,26 @@ guide expansion, audit-log producer gap closed)
 summarised in the Current state preamble at the top of
 this file with the same archive pointer.
 
-**Next dispatchable**: D7 / D8 / D9 (Tier 2/3 connector
-implementations — SMTP, Anthropic, Gemini). D9 carries
-the dual-mode AI Studio + Vertex AI requirement. All
-three are independent and parallel-safe. **D17** (execution-
-substrate response-detached background-poll) design has
-landed in [`docs/design/06-execution-substrate.md` §Tail-promise
-polling](design/06-execution-substrate.md#tail-promise-polling)
-(2026-05-12); Codex prompt drafting is the only step left
-before dispatch. Sequence independent of D7–D9.
+**Next dispatchable**: D7 / D8 / D9 / D18, all four
+independent and parallel-safe.
+
+- **D7** is unblocked — the `email_send` wire shape locked
+  in [`docs/design/08-connector-architecture.md` §SMTP](design/08-connector-architecture.md#smtp)
+  on 2026-05-12 via HUMANS.md. Claude can draft the
+  Codex prompt directly from §SMTP.
+- **D8** is fully spec'd from
+  [`docs/design/08-connector-architecture.md` §llm_anthropic](design/08-connector-architecture.md#llm_anthropic--config);
+  ready for prompt draft.
+- **D9** carries the dual-mode AI Studio + Vertex AI
+  requirement; Claude proposes the discriminator field,
+  Vertex-mode field names, and OAuth2 access-token caching
+  strategy in the prompt; Yuka overrides at prompt-review
+  time if she has a preference.
+- **D18** (`mechanics-core` module-surface refactor) is
+  fully spec'd from §3.F above; ready for prompt draft.
+
+**D17** (execution-substrate tail-promise polling) landed
+2026-05-12; no further work in this arc.
 
 ### Dispatch discipline reminder
 
