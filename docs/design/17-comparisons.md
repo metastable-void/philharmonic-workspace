@@ -15,6 +15,20 @@ external I/O mediated by tenant-scoped connectors.
 | AWS Step Functions | cloud-native state machines | framework-level portability and code-first JS workflows |
 | Serverless functions | arbitrary backend code | constrained execution, persistent context, content-addressed records, no direct secrets |
 
+## By axis
+
+| Axis | Philharmonic angle |
+|---|---|
+| Primary abstraction | sandboxed workflow step + connector-mediated capabilities |
+| Secret handling | executor does not receive plaintext credentials |
+| Connector model | generic HTTP + specialized implementations |
+| Storage model | append-only, content-addressed workflow state |
+| AI stance | LLMs are ordinary connectors, not privileged architecture |
+| Authoring | JS today; visual/AI-assisted authoring planned |
+| Deployment | framework/crates, not SaaS-first |
+| Best fit | secure internal tools, AI workflows, tenant-scoped automation, auditable app backends |
+| Not best fit | huge off-the-shelf SaaS connector marketplace, pure no-code business automation, Temporal-style durable sagas |
+
 ## Why generic HTTP integrations matter
 
 Many third-party integrations are HTTP APIs. In Philharmonic
