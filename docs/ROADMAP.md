@@ -235,10 +235,11 @@ The single `(Gate 1)` item is **not** a Codex dispatch — Claude
 drafts the proposal, Yuka reviews per the two-gate crypto-review
 protocol (§2).
 
-Total: **16 Codex dispatches plus 1 Gate-1 proposal.**
+Total: **17 Codex dispatches plus 1 Gate-1 proposal.**
 **D1, D2, D3, D4, D5, D6, D10, D11, D12, D13, D14, D15, D16
-are done** (13 of 16). Gate 1 and Gate 2 both approved.
-Remaining: D7, D8, D9 (Tier 2/3 connectors).
+are done** (13 of 17). Gate 1 and Gate 2 both approved.
+Remaining: D7, D8, D9 (Tier 2/3 connectors), D17
+(execution-substrate response-detached background-poll).
 
 ### A. Embedding datasets (6 dispatches + 1 Gate-1) — DONE
 
@@ -365,6 +366,61 @@ are at
 [`docs/archive/2026-05-11-roadmap-completed-arc-trim.md`](archive/2026-05-11-roadmap-completed-arc-trim.md)
 under "Evening trim — 2026-05-11".
 
+### E. Execution-substrate runtime semantics (1 dispatch)
+
+- **D17** `mechanics-core` response-detached background-poll
+  runtime. Today
+  [`mechanics-core/src/internal/runtime.rs:268-275`](../mechanics-core/src/internal/runtime.rs#L268-L275)
+  unconditionally drives `ctx.run_jobs()` after invoking the
+  module's default export, and the executor loop at
+  [`mechanics-core/src/internal/executor.rs:209-302`](../mechanics-core/src/internal/executor.rs#L209-L302)
+  drains async-job / promise / timeout / generic queues to
+  full quiescence before returning. Net effect: an unawaited
+  `mechanics:endpoint(...)`, a live `setTimeout`, or any
+  fire-and-forget `Promise.then(...)` chain pins the worker
+  response open until the per-job `max_execution_time`
+  deadline trips. The script's `return` is therefore not the
+  step-completion fence — quiescence is.
+
+  Target shape: as soon as the top-level resolves (sync
+  return or awaited promise fulfilled), the worker
+  serialises the result and returns the run-job response.
+  Pending promises continue to be polled in the background
+  until they settle or the per-job deadline expires — their
+  side effects (real HTTP calls to connectors, real timer
+  callbacks) still complete, but no longer hold the
+  response open.
+
+  Design questions to settle in a [`docs/design/06-execution-substrate.md`](design/06-execution-substrate.md)
+  update **before** drafting the Codex prompt:
+
+  - Background-poll lifetime: per-job tokio task scoped to
+    `max_execution_time`? Per-worker shared budget? Cap on
+    concurrent in-flight tail-polls per worker?
+  - Audit-trail handling: do background-promise outcomes
+    surface in the step record (post-hoc trailer / separate
+    "tail" record), or are they fire-and-forget once the
+    response left the wire?
+  - Unhandled-rejection handling after response detachment:
+    log-only, warn-only, structured worker telemetry?
+    Mirror the post-2026-05-11 `mechanics-core 0.4.0`
+    stance (don't fail the step on a tail rejection) or
+    introduce a separate "tail rejection" channel?
+  - Realm + context lifetime: the realm is currently
+    dropped after `run_jobs()` returns. New shape needs the
+    realm alive for the background poll without leaking
+    across jobs or across worker restarts.
+  - Backpressure / quota: does a worker mid-tail-poll for
+    N older jobs still accept new jobs? Fair-share vs.
+    LIFO eviction policy?
+  - Opt-in vs. default: is background-poll a per-job knob
+    (workflow-author / template-author opts in), a per-
+    worker-config knob, or the new universal default?
+
+  Claude drafts the design update + Codex prompt; Codex
+  implements + tests. No crypto-review gate — runtime
+  control flow only.
+
 ### Suggested sequencing
 
 **Completed work (2026-05-02 through 2026-05-11):** D1 +
@@ -384,7 +440,12 @@ this file with the same archive pointer.
 **Next dispatchable**: D7 / D8 / D9 (Tier 2/3 connector
 implementations — SMTP, Anthropic, Gemini). D9 carries
 the dual-mode AI Studio + Vertex AI requirement. All
-three are independent and parallel-safe.
+three are independent and parallel-safe. **D17** (execution-
+substrate response-detached background-poll) is design-
+first: Claude updates `docs/design/06-execution-substrate.md`
+to settle the open questions listed in section E before the
+Codex prompt is drafted; sequence after the design lands,
+independent of D7–D9.
 
 ### Dispatch discipline reminder
 
