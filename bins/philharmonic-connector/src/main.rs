@@ -511,6 +511,9 @@ async fn start_tls_server(
     let listener = TcpListener::bind(bind)
         .await
         .map_err(|error| format!("failed to bind connector HTTPS listener: {error}"))?;
+    // HSTS scoped to the HTTPS server only (RFC 6797 §7.2 forbids it on
+    // HTTP). start_http_server uses `app` unmodified.
+    let app = app.layer(axum::middleware::from_fn(add_hsts_header));
 
     tokio::spawn(async move {
         loop {
@@ -575,12 +578,48 @@ fn read_tls_server_config(
     let private_key = PrivateKeyDer::from_pem_slice(&key_bytes)
         .map_err(|error| format!("failed to parse TLS private key: {error}"))?;
 
-    let mut config = tokio_rustls::rustls::ServerConfig::builder()
+    let provider = Arc::new(aes256_chacha20_only_provider());
+    let mut config = tokio_rustls::rustls::ServerConfig::builder_with_provider(provider)
+        .with_safe_default_protocol_versions()
+        .map_err(|error| format!("failed to build TLS provider config: {error}"))?
         .with_no_client_auth()
         .with_single_cert(cert_chain, private_key)
         .map_err(|error| format!("failed to build TLS server config: {error}"))?;
     config.alpn_protocols = vec![b"h2".to_vec(), b"http/1.1".to_vec()];
     Ok(config)
+}
+
+/// Build a rustls CryptoProvider that's the aws-lc-rs default minus
+/// every AES128-class cipher suite. Leaves AES256 and CHACHA20 suites
+/// (TLS 1.3 and TLS 1.2) untouched. Other provider defaults (KX groups,
+/// signature schemes, etc.) are unchanged.
+#[cfg(feature = "https")]
+fn aes256_chacha20_only_provider() -> tokio_rustls::rustls::crypto::CryptoProvider {
+    let mut provider = tokio_rustls::rustls::crypto::aws_lc_rs::default_provider();
+    provider
+        .cipher_suites
+        .retain(|suite| !format!("{:?}", suite.suite()).contains("AES_128"));
+    provider
+}
+
+/// Tower middleware that stamps every HTTPS response with HSTS.
+///
+/// `max-age=63072000` (2 years) matches the hstspreload.org minimum;
+/// `includeSubDomains` is intentionally omitted so deployments that
+/// host non-HTTPS services on adjacent subdomains aren't accidentally
+/// broken. Operators that want subdomain coverage can override at the
+/// upstream proxy.
+#[cfg(feature = "https")]
+async fn add_hsts_header(
+    request: axum::extract::Request,
+    next: axum::middleware::Next,
+) -> axum::response::Response {
+    let mut response = next.run(request).await;
+    response.headers_mut().insert(
+        axum::http::header::STRICT_TRANSPORT_SECURITY,
+        axum::http::HeaderValue::from_static("max-age=63072000"),
+    );
+    response
 }
 
 fn read_fixed_key_file<const N: usize>(path: &Path, label: &str) -> Result<[u8; N], String> {
