@@ -230,6 +230,45 @@ active work now lives in the post-v1 dispatch plan (§3 below).
     `ClientBuilder::use_preconfigured_tls()` with a
     `RootCertStore` populated from
     `webpki_roots::TLS_SERVER_ROOTS`. See §3.G.
+    Codex prompt archived at
+    [`docs/codex-prompts/2026-05-12-0002-d20-webpki-roots-only-tls-01.md`](codex-prompts/2026-05-12-0002-d20-webpki-roots-only-tls-01.md);
+    dispatch deferred to Yuka's CLI Claude Code session.
+  - **HTTPS hardening** (parent `876b6fe`,
+    `mechanics` 0.4.1 → 0.4.2): every HTTPS response now
+    stamped with
+    `Strict-Transport-Security: max-age=63072000`
+    (2 years, RFC 6797-scoped to HTTPS-only paths via
+    middleware on the three release bins;
+    `includeSubDomains` intentionally omitted so adjacent
+    non-HTTPS subdomains aren't broken — operators add
+    that at the reverse proxy). rustls `ServerConfig`
+    cipher-suite list pruned of AES128 across all three
+    bins, leaving AES256-GCM + CHACHA20-POLY1305 across
+    TLS 1.3 and TLS 1.2. Other rustls defaults (KX
+    groups, signature schemes, ALPN preferences,
+    protocol versions) unchanged.
+  - **D21 added** — `scripts/pre-landing.sh` dep-aware
+    test filtering. Today the script runs
+    `cargo test --workspace` for the default phase
+    regardless of which crates were modified; after the
+    workspace grew to ~25 crates with substantial Boa +
+    crypto build costs, that's several minutes of work
+    per run that mostly re-tests unaffected crates.
+    D21 narrows the default phase to the union of dirty
+    crates and their transitive reverse-dependency
+    closure (workspace-wide for `scripts/`-, `Cargo.toml`-,
+    or `Cargo.lock`-dirty runs; `--full` flag forces the
+    pre-D21 behavior). See §3.H.
+  - **Staging deployment** (end of day 2026-05-12):
+    Yuka deploying the release build (musl-static,
+    `--features https` default-on via the new
+    `release-build.sh` flag) to the staging server.
+    First deployment that carries the post-PoC arc end-
+    to-end: D17 tail-promise polling +
+    sql-postgres NUMERIC fix + sqlx aws-lc-rs ring
+    removal + HSTS/cipher hardening + CodeMirror TAB
+    capture + chat tab read-only-probe + step-elapsed
+    indicator + DNS connector placeholder.
   - Pre-rewrite ROADMAP text preserved verbatim at
     [`docs/archive/2026-05-12-roadmap-d17-done-d7-spec-d18-added.md`](archive/2026-05-12-roadmap-d17-done-d7-spec-d18-added.md).
 

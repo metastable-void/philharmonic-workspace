@@ -170,16 +170,31 @@ enforced by absence-assertion tests); connector-path
 body cap raised 2 MiB → 32 MiB
 (`philharmonic-connector-router` 0.1.2).
 
-Remaining post-v1 scope: Phase 7 Tier 2/3 connector
-implementations (SMTP, Anthropic, Gemini — D7/D8/D9), a new
-DNS connector (D19, fresh crate
-`philharmonic-connector-impl-dns` — Tier 2), and a
-`mechanics-core` module-surface refactor (feature gating
-+ new `mime`/`url`/`console`/`html` modules — D18). The
-2026-05-12 work — `mechanics-core` 0.4.0 → 0.4.1 with
-tail-promise polling (D17 landed) — moved the worker
-run-job response fence from quiescence to the script's
-`return`. The authoritative task list lives in
+Remaining post-v1 scope (seven dispatches; all independent and
+parallel-safe):
+
+- **Tier 2/3 connector implementations** — D7 SMTP, D8
+  Anthropic, D9 Gemini, D19 DNS (new crate; submodule wired
+  + crates.io 0.0.0 placeholder published 2026-05-12).
+- **D18** — `mechanics-core` module-surface refactor: feature
+  gating + new `mime`/`url`/`console`/`html` modules.
+- **D20** — workspace-wide webpki-roots-only TLS trust posture
+  (sqlx is already aws-lc-rs+webpki-roots after the
+  2026-05-12 ring removal; D20 finishes the consistency
+  story on the reqwest side).
+- **D21** — `scripts/pre-landing.sh` dep-aware test filtering
+  (skip tests for member crates not in the dirty-set's
+  transitive reverse-dep closure).
+
+2026-05-12 wins landed end-to-end: `mechanics-core` 0.4.0 →
+0.4.1 with tail-promise polling (D17) moved the worker run-job
+response fence from quiescence to the script's `return`;
+`mechanics` 0.4.1 → 0.4.2 added HSTS on HTTPS-only paths and
+pruned AES128 from the rustls cipher-suite list; sqlx switched
+to aws-lc-rs+webpki-roots so `ring` is gone from the runtime
+tree of all three release bins; sql-postgres NUMERIC overflow
+now correctly surfaces as `UpstreamError`. The authoritative
+task list lives in
 [`docs/ROADMAP.md` §3](docs/ROADMAP.md#3-post-v1-dispatch-plan)
 with verbatim pre-trim ROADMAP content at
 [`docs/archive/2026-05-11-roadmap-completed-arc-trim.md`](docs/archive/2026-05-11-roadmap-completed-arc-trim.md)
@@ -190,7 +205,8 @@ connector-triangle, and Phase 6/7 Tier 1 implementation crates
 have published substantive releases at `0.1.0` or higher. The
 remaining connector names (`philharmonic-connector-impl-email-smtp`,
 `philharmonic-connector-impl-llm-anthropic`,
-`philharmonic-connector-impl-llm-gemini`) are published placeholders
+`philharmonic-connector-impl-llm-gemini`,
+`philharmonic-connector-impl-dns`) are published placeholders
 at `0.0.x` until their implementations land.
 
 ## Working in the repo
