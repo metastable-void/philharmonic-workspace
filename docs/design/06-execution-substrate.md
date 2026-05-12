@@ -139,6 +139,54 @@ connector service using the endpoint configuration from the
 The host-function API is `mechanics-core`'s responsibility;
 precise details are in the crate's own documentation.
 
+### Tail-promise polling
+
+When the script's top-level resolves (sync return, or an awaited
+promise fulfilled), `mechanics-core` serialises the result and
+returns the run-job response immediately. Any pending promises
+left inside the realm — unawaited `mechanics:endpoint(...)`, live
+`setTimeout` callbacks, fire-and-forget `Promise.then(...)` chains
+— continue to be polled in the background until they settle.
+
+This is the **hardcoded default**. There is no per-job knob and
+no per-worker knob; every script execution gets the same
+behavior.
+
+Lifetime is bounded by the per-job `max_execution_time`:
+
+- The deadline is **shared** between main execution and
+  tail-poll. If main takes 3 s of a 10 s budget, tail-poll has
+  7 s remaining.
+- When the deadline trips during tail-poll, the realm and all
+  in-flight futures are dropped, and one `tracing::warn!` line
+  is emitted naming the job ID and the count of in-flight +
+  queued tail jobs at abort time.
+- The realm stays alive on the worker tokio task that started
+  the job until tail-poll exits (quiescence or deadline). The
+  worker tokio slot is occupied for that duration; existing
+  worker-pool slot limits self-regulate backpressure — no new
+  cap is introduced.
+
+Side effects in tail-poll still complete: real HTTP requests to
+connector services still go out, real timers still fire. What
+changes is that the run-job response is no longer held open by
+them. The script's `return` is the response fence; quiescence is
+not.
+
+Tail-promise outcomes are **not** recorded in the workflow step
+record — fire-and-forget. Unhandled rejections during tail-poll
+increment the internal `pending_unhandled_rejections` counter
+(see `RuntimeHostHooks`); if and when external metrics emission
+is added to `mechanics-core`, that counter is the natural place
+to bridge tail rejections into telemetry. Until then, only the
+deadline-abort `tracing::warn!` is visible.
+
+This is a 2026-05-12 design choice; the implementation lands as
+ROADMAP item **D17**. Pre-D17 behavior was that `run_jobs()` was
+called unconditionally between `main.call(...)` and reading the
+promise state, so the response was held open until every queue
+drained to quiescence.
+
 ### Dependencies
 
 Depends on `mechanics-config` (for the schema types),

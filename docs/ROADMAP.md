@@ -391,35 +391,35 @@ under "Evening trim — 2026-05-11".
   callbacks) still complete, but no longer hold the
   response open.
 
-  Design questions to settle in a [`docs/design/06-execution-substrate.md`](design/06-execution-substrate.md)
-  update **before** drafting the Codex prompt:
+  Design choices (settled 2026-05-12; authoritative subsection
+  at [`docs/design/06-execution-substrate.md` §Tail-promise
+  polling](design/06-execution-substrate.md#tail-promise-polling)):
 
-  - Background-poll lifetime: per-job tokio task scoped to
-    `max_execution_time`? Per-worker shared budget? Cap on
-    concurrent in-flight tail-polls per worker?
-  - Audit-trail handling: do background-promise outcomes
-    surface in the step record (post-hoc trailer / separate
-    "tail" record), or are they fire-and-forget once the
-    response left the wire?
-  - Unhandled-rejection handling after response detachment:
-    log-only, warn-only, structured worker telemetry?
-    Mirror the post-2026-05-11 `mechanics-core 0.4.0`
-    stance (don't fail the step on a tail rejection) or
-    introduce a separate "tail rejection" channel?
-  - Realm + context lifetime: the realm is currently
-    dropped after `run_jobs()` returns. New shape needs the
-    realm alive for the background poll without leaking
-    across jobs or across worker restarts.
-  - Backpressure / quota: does a worker mid-tail-poll for
-    N older jobs still accept new jobs? Fair-share vs.
-    LIFO eviction policy?
-  - Opt-in vs. default: is background-poll a per-job knob
-    (workflow-author / template-author opts in), a per-
-    worker-config knob, or the new universal default?
+  - **Background-poll lifetime**: tail-poll shares the per-job
+    `max_execution_time` budget with main; runs on the same
+    worker tokio task that started the job; no separate pool.
+  - **Audit-trail handling**: fire-and-forget. Tail-promise
+    outcomes are not recorded in the workflow step record and do
+    not surface in the audit log.
+  - **Unhandled-rejection handling**: increment whatever
+    external rejection telemetry exists; today nothing external
+    is wired, so the internal `pending_unhandled_rejections`
+    counter (see `RuntimeHostHooks`) is the only sink. No
+    response failure on tail rejection — mirrors the 0.4.0
+    "trust the script's try/catch" stance.
+  - **Deadline mid-tail-poll**: drop realm + in-flight futures,
+    emit one `tracing::warn!` naming the job ID and the
+    in-flight + queued counts at abort time.
+  - **Realm + context lifetime**: realm stays alive on the
+    per-job tokio task until tail-poll exits (quiescence or
+    deadline); dropped at exit.
+  - **Backpressure / quota**: no new cap. The existing
+    worker-pool slot limits self-regulate, since tail-poll
+    occupies the worker's tokio slot it ran on.
+  - **Opt-in vs. default**: hardcoded default. No per-job knob.
 
-  Claude drafts the design update + Codex prompt; Codex
-  implements + tests. No crypto-review gate — runtime
-  control flow only.
+  Claude drafts the Codex prompt; Codex implements + tests. No
+  crypto-review gate — runtime control flow only.
 
 ### Suggested sequencing
 
@@ -441,11 +441,11 @@ this file with the same archive pointer.
 implementations — SMTP, Anthropic, Gemini). D9 carries
 the dual-mode AI Studio + Vertex AI requirement. All
 three are independent and parallel-safe. **D17** (execution-
-substrate response-detached background-poll) is design-
-first: Claude updates `docs/design/06-execution-substrate.md`
-to settle the open questions listed in section E before the
-Codex prompt is drafted; sequence after the design lands,
-independent of D7–D9.
+substrate response-detached background-poll) design has
+landed in [`docs/design/06-execution-substrate.md` §Tail-promise
+polling](design/06-execution-substrate.md#tail-promise-polling)
+(2026-05-12); Codex prompt drafting is the only step left
+before dispatch. Sequence independent of D7–D9.
 
 ### Dispatch discipline reminder
 
