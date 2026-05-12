@@ -21,6 +21,7 @@ members = [
     "philharmonic-connector-impl-llm-gemini",
     "philharmonic-connector-impl-sql-postgres",
     "philharmonic-connector-impl-sql-mysql",
+    "philharmonic-connector-impl-dns",
     "philharmonic-connector-impl-email-smtp",
     "philharmonic-connector-impl-embed",
     "philharmonic-connector-impl-vector-search",
@@ -62,6 +63,7 @@ philharmonic-connector-impl-vector-search = { path = "philharmonic-connector-imp
 philharmonic-api = { path = "philharmonic-api" }
 philharmonic-connector-impl-api = { path = "philharmonic-connector-impl-api" }
 inline-blob = { path = "inline-blob" }
+philharmonic-connector-impl-dns = { path = "philharmonic-connector-impl-dns" }
 
 [profile.release]
 opt-level = 3

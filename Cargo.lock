@@ -3976,6 +3976,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "philharmonic-connector-impl-dns"
+version = "0.0.0"
+
+[[package]]
 name = "philharmonic-connector-impl-email-smtp"
 version = "0.0.1"
 

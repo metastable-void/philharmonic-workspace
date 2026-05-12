@@ -100,3 +100,6 @@
 	path = docs-jp
 	url = https://github.com/metastable-void/philharmonic-docs-jp.git
 	branch = main
+[submodule "philharmonic-connector-impl-dns"]
+	path = philharmonic-connector-impl-dns
+	url = https://github.com/metastable-void/philharmonic-connector-impl-dns.git
