@@ -74,7 +74,120 @@ behavior.
 
 ## Outcome
 
-Pending — will be updated after Codex run.
+**Completed 2026-05-12 with Claude post-processing.** Codex
+dispatched 04:33 UTC, wrote all six expected files (752
+insertions / 88 deletions across `runtime.rs`, `executor.rs`,
+`pool/shared.rs`, `pool/tests/runtime_behavior.rs`,
+`Cargo.toml`, `CHANGELOG.md`), then died at 04:43:17 UTC while
+waiting on `pre-landing.sh` stdin yield. No `task_complete`,
+no structured-output report. Total session tokens 6.97 M
+(input cumulative across turns, well under the 258 K
+context window); the death cause was the helper subagent
+detaching, not an in-context limit.
+
+**Codex's choices** (inferred from code; no report was
+emitted):
+
+- **Sub-shape B**: introduced `RunJobsExit { Complete,
+  DeadlineExceeded(QueueSnapshot) }` enum and
+  `run_jobs_until(predicate)` + `run_jobs_to_quiescence`
+  helpers in `executor.rs`. `run_jobs_async` (the
+  quiescence-only entry) now delegates to
+  `run_jobs_async_until` with a `|| false` predicate, and
+  converts `DeadlineExceeded` → `timeout_error` to keep the
+  pre-D17 public-API behavior.
+- Logging dep: **`tracing = "0.1"`** added; no
+  `tracing-subscriber`. Warn line emitted at
+  `runtime.rs:269-282` via `log_tail_poll_aborted(job_id,
+  snapshot)`, with a `test_support::record_tail_poll_abort`
+  shim under `#[cfg(test)]` for the deadline-mid-tail-poll
+  test's observability.
+- **Job-ID source**: derived per-worker from a monotonic
+  `worker_job_sequence: u64`, formatted
+  `"worker-{worker_id}-job-{seq}"`. Not intrinsic to
+  `MechanicsJob`; the prompt allowed either path.
+- **Early-reply plumbing**: `RuntimeInternal::run_source_with_early_reply(job,
+  job_id, early_reply)` returns `Result<(), MechanicsError>`;
+  worker loop's `Arc<AtomicBool>` `replied` guard prevents
+  double-reply on the panic/error fallback paths.
+- **`setTimeout` global builtin** added (implicit addition —
+  the prompt's test 4 required `setTimeout` without
+  specifying that mechanics-core had to expose it; before
+  D17 the realm had no timer surface). `setTimeout(callback,
+  delayMs)` enqueues a `TimeoutJob` on the executor's
+  timeout queue.
+- Version bump: 0.4.0 → 0.4.1 (patch, per the prompt).
+
+**All seven required D17 tests landed**, named `d17_*`:
+sync return, awaited async return, fire-and-forget endpoint,
+setTimeout without await, deadline mid-tail-poll with one
+warn-line emitted, unhandled rejection during tail-poll
+(counter increments, response succeeds), main-never-settles
+(preserves "Default export promise did not settle").
+
+**Claude post-processing** (housekeeping after Codex death):
+
+1. **Test-assertion fix in
+   `src/internal/pool/tests/endpoint_network.rs`**:
+   pre-existing test
+   `execution_timeout_stops_slow_async_job` asserted the
+   error message contained "Maximum execution time
+   exceeded". With D17, when main is still awaiting at the
+   deadline, the partial-drain's `Ok(DeadlineExceeded(_))`
+   is discarded by `let _ = ...?` and the `match
+   res.state() => Pending` branch returns "Default export
+   promise did not settle" instead. Per the prompt's "What
+   stays the same" — this is intentional. Updated the
+   assertion to accept either string (matches the sibling
+   test's permissive style).
+2. **Mechanics-Philharmonic-independence fix in
+   `CHANGELOG.md`**: Codex's entry referenced `[ROADMAP.md
+   D17](../docs/ROADMAP.md#...)` — both the relative path
+   and the "D17" label leak Philharmonic-workspace-internal
+   identifiers that break when `mechanics-core` is
+   consumed standalone (crates.io / standalone clone).
+   Rewrote the entry self-contained, mirroring the 0.4.0
+   entry's prose style; also expanded to mention the
+   `setTimeout` addition and the `tracing::warn!` abort
+   path so consumers reading the changelog standalone get
+   the full picture.
+3. Verified no other Philharmonic leak in D17-introduced
+   lines (grep on `philharmonic|workflow|tenant|connector`
+   against `git diff HEAD` for all touched .rs files and
+   the CHANGELOG — clean).
+
+**Verification (post-fix)**:
+
+- `./scripts/pre-landing.sh` — green, including the 20
+  ignored network tests under `--ignored`.
+- `./scripts/check-api-breakage.sh mechanics-core 0.3.1`
+  — green, "no semver update required" (0 checks, 252
+  skip — `cargo-semver-checks` against the latest
+  published baseline 0.3.1; the local 0.4.0 isn't on
+  crates.io yet).
+
+**Open / residual**:
+
+- Test names are prefixed `d17_*` — minor Philharmonic-
+  workspace-internal label leak in test code only.
+  Standalone consumers see opaque tags. Not fixed in this
+  dispatch; trivial cleanup if Yuka wants.
+- semver-checks baseline used `0.3.1` (latest published)
+  rather than `0.4.0` (local unpublished). The crate has
+  drifted across two minor versions since the last
+  publish (0.3.1 → 0.4.0 → 0.4.1). No public-API change
+  flagged.
+- Structured-output report never emitted by Codex — the
+  six-section contract streak broke at this dispatch.
+  Cause was helper-subagent detachment mid-pre-landing,
+  not a contract violation by Codex per se. Future
+  dispatches need to watch for this failure mode.
+- No publish — Claude reviews and decides post-merge.
+
+**Status**: 14 of 17 post-v1 dispatches done (D1, D2, D3,
+D4, D5, D6, D10, D11, D12, D13, D14, D15, D16, D17) plus
+both crypto gates approved. Remaining: D7, D8, D9 (Tier
+2/3 connectors).
 
 ---
 
