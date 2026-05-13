@@ -622,32 +622,30 @@ Codex session: `019e2105-...` (job `bjctv0bn6`).
 - `cargo tree --workspace --invert rustls-native-certs -e all --target all`
   → **empty**.
 
-### Known follow-up
+### Follow-up landed same day
 
-**Container leak on test-binary exit.** The warm-
-container pattern stores the `Container` inside a static
-`OnceCell`, and Rust doesn't run `Drop` on statics at
-process exit. The container stays running after the test
-binary terminates; Docker reaps the underlying mysqld
-process only when the container is explicitly stopped or
-removed. Pragmatic effect: `docker ps` lists
-`dockerlet-` containers from prior test runs until the
-user manually `docker rm -f`s them.
-
-Fix queued as a separate dispatch / commit: dockerlet
-registers a process-level `libc::atexit` hook that stops
-each spawned container; combined with Docker's
-`auto_remove: true`, the daemon then removes them
-cleanly. Not blocking for D23's "remove the
-`rustls-native-certs` wrapper" objective, but a real
-dockerlet quality issue to land next.
+**Container leak on test-binary exit — fixed.** The
+warm-container pattern stores the `Container` inside a
+static `OnceCell`, and Rust doesn't run `Drop` on statics
+at process exit. dockerlet now registers a process-level
+`libc::atexit(3)` hook on first container start that
+sends a best-effort stop (2-second SIGTERM grace) to
+every spawned container at process termination, paired
+with Docker's `auto_remove: true` flag (set by default
+on every dockerlet-spawned container) so the daemon
+removes them automatically post-stop. `Container::drop`
+unregisters from the atexit registry first to avoid
+double-processing. Landed in the same `dockerlet 0.1.0`
+release (edited in place before first publish to
+crates.io rather than bumping to 0.1.1) so the leak
+never reached any published version.
 
 ### Sequencing follow-up to D23
 
 §3.J ordering becomes **D24 next** (workspace-wide
-`default-features = false` audit). D23's atexit
-cleanup ships as a `dockerlet 0.1.1` patch release
-ahead of D24.
+`default-features = false` audit). With D25 + D23 done,
+§3.J is two thirds complete; D24 closes the production-
+security cleanup arc.
 
 ## Prompt (verbatim)
 

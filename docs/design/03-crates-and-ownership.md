@@ -143,6 +143,31 @@ pending):
   `include_bytes!`-d into ELF binaries without triggering
   rust-lld's small-code-model 32-bit relocation overflow.
   Consumed by `philharmonic-connector-impl-embed`.
+- **`mechanics-http-client`** — workspace's single outbound
+  HTTP client. `hyper-rustls` + `webpki-roots` +
+  `aws-lc-rs`; optional `http3` feature for opportunistic
+  HTTP/3 (HTTPS RR discovery + Alt-Svc caching + fallback).
+  Added 2026-05-13 (D20 / D22 client). All runtime
+  outbound-HTTP call sites in the three release bins go
+  through this crate; `reqwest` is no longer in the
+  workspace dep tree.
+- **`mechanics-http-server`** — opt-in HTTP/3 (QUIC)
+  listener + Alt-Svc tower middleware that runs alongside
+  the existing hyper-driven HTTP/1.1+HTTP/2 listener.
+  Caller-supplied cert chain + private key; `aws-lc-rs`
+  rustls provider only; activation gated by
+  `bind_h3: Option<SocketAddr>`. Added 2026-05-13 (D22
+  server-lib).
+- **`dockerlet`** — dev-tooling: minimal Docker
+  test-container helper, thin wrapper over `bollard` with
+  deliberately narrow features (Unix socket only, no
+  `home`, no `ssl_providerless`, no `rustls-native-certs`).
+  Used by SQL connector + e2e integration tests as a
+  lightweight alternative to `testcontainers` (which was
+  evicted from the workspace dep tree during the §3.J
+  cleanup pass). Added 2026-05-13 (D23). `libc::atexit`
+  cleanup hook + Docker `auto_remove: true` so containers
+  don't leak across test runs.
 
 ### API and meta
 

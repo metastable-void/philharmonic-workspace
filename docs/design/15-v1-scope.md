@@ -504,7 +504,9 @@ landed.
 9. **Implement `philharmonic-api`**. Done.
 
 10. **End-to-end integration testing**. Done via
-    testcontainers and full-pipeline e2e tests.
+    `dockerlet` (the in-tree Docker test-container helper
+    added 2026-05-13 as the `testcontainers` replacement)
+    and full-pipeline e2e tests.
 
 11. **Deploy reference deployment.** Done — reference
     deployment operational with the OpenAI-compatible LLM

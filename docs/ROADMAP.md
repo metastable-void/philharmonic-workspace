@@ -275,6 +275,56 @@ active work now lives in the post-v1 dispatch plan (§3 below).
     indicator + DNS connector placeholder.
   - Pre-rewrite ROADMAP text preserved verbatim at
     [`docs/archive/2026-05-12-roadmap-d17-done-d7-spec-d18-added.md`](archive/2026-05-12-roadmap-d17-done-d7-spec-d18-added.md).
+- **2026-05-13 work** (production-security cleanup arc;
+  the §3.J first two thirds):
+  - **D20 landed** (early) — pivot from the original
+    runtime-bypass design to a new
+    `mechanics-http-client 0.1.0` then `0.2.0` crate.
+    See §3.G; full done-state at
+    [`docs/archive/2026-05-13-roadmap-d20-done.md`](archive/2026-05-13-roadmap-d20-done.md).
+  - **D21 landed** (Claude-direct) — `pre-landing.sh`
+    dep-aware test filtering; §3.H; archive at
+    [`docs/archive/2026-05-13-roadmap-d21-done.md`](archive/2026-05-13-roadmap-d21-done.md).
+  - **D22 split into three rounds**: D22 client
+    (mhc 0.2.0; landed in `c7efa37`); D22 server-lib
+    (`mechanics-http-server 0.1.0`; landed in
+    `5397d8b`); D22 server-integration still pending.
+  - **Workspace ring / native-tls / platform-verifier
+    bans tightening** — landed alongside the D22
+    server-lib commit; `deny.toml` gained four new
+    bans (`ring`, `native-tls`,
+    `rustls-platform-verifier`, `rustls-native-certs`).
+    Net: `reqwest`, `testcontainers`,
+    `testcontainers-modules`, `rustls-platform-verifier`,
+    `rustls-native-certs` all evicted from the
+    workspace dep tree entirely; `ring` reduced from 5+
+    pulling paths to 1 (upstream `h3-quinn 0.0.10`
+    feature-unification bug, `quinn-proto`-wrapper).
+  - **D25 landed** — `mechanics-http-client 0.2.1`
+    patch release clearing `RUSTSEC-2026-0118` +
+    `RUSTSEC-2026-0119` (hickory-resolver 0.25.2 →
+    0.26.1). See §3.J + archive.
+  - **D23 landed** — `dockerlet 0.1.0` (new in-tree
+    minimal testcontainers replacement) + six consumer
+    test fixtures migrated + warm-container pivot
+    (`OnceCell<SharedMysql/Postgres>` per binary,
+    per-test isolation by unique database name) +
+    dockerlet `libc::atexit` cleanup hook +
+    `auto_remove: true`. See §3.J + archive.
+  - **`mechanics-http-server 0.1.0`** scaffolded +
+    adopted as submodule + published 0.0.0 placeholder
+    + Codex round 01 substantive 0.1.0 implementation.
+  - **scripts/clean-target-debug.sh** added — frees
+    `target-main/debug` (POSIX-clean rm-rf wrapper for
+    the new `target-main -> /tmp tmpfs symlink`
+    introduced in `f4c66e8`). See
+    [`CONTRIBUTING.md §5.5`](../CONTRIBUTING.md#55-reclaiming-tmpfs-when-tmp-fills-up).
+  - **CONTRIBUTING.md §3.1** gained a
+    "Per-setting rationale for `[profile.release]`"
+    subsection documenting the workspace's canonical
+    `[profile.release]` block (`codegen-units = 1`,
+    `panic = "abort"`, etc.) so future maintainers
+    don't silently revert.
 
 Authoritative sources for things this file used to restate but
 now cross-references:
@@ -351,37 +401,35 @@ protocol (§2).
 
 Total: **25 Codex dispatches plus 1 Gate-1 proposal.**
 **D1, D2, D3, D4, D5, D6, D10, D11, D12, D13, D14, D15, D16,
-D17, D20, D21 are done** (16 of 25; D20 + D21 both landed via
-Claude-direct implementation on 2026-05-13, with user override
-on the default Codex-dispatch path). Gate 1 and Gate 2 both
-approved.
+D17, D20, D21, D23, D25 are done** (18 of 25; D20 + D21
+both landed via Claude-direct implementation on 2026-05-13,
+with user override on the default Codex-dispatch path; D23
+and D25 also landed 2026-05-13 as the §3.J production-
+security cleanup arc — D25 via Codex round 01 + Claude
+post-Codex polish, D23 via Codex round 01 + Claude
+post-Codex warm-container pivot + atexit cleanup). Gate 1
+and Gate 2 both approved.
 
 **Sequencing directive (Yuka, 2026-05-13):** production-
-security cleanups (§3.J — D25 hickory CVE bump,
-D23 testcontainers replacement, D24 default-features
-audit) take **priority over** every other pending
-dispatch, including the Tier 2/3 connector work (D7 / D8 /
-D9 / D19) and D18 (mechanics-core module refactor).
-Framing: "serious production-ready security" — clean
-release-binary runtime trees and minimised per-dep
+security cleanups (§3.J) take **priority over** every other
+pending dispatch, including the Tier 2/3 connector work
+(D7 / D8 / D9 / D19) and D18 (mechanics-core module
+refactor). Framing: "serious production-ready security" —
+clean release-binary runtime trees and minimised per-dep
 feature surface are baseline requirements, not optional
 polish. D22 server-integration is the one exception that
 co-sequences with §J (it's part of the in-flight D22 arc).
+**D25 and D23 are now done**; only D24 remains in §J.
 
 Remaining, in landing order:
-- **D25** (mhc 0.2.1 patch release; hickory-resolver
-  0.25.2 → 0.26.1 to clear two Dependabot advisories
-  that surfaced after the D22 client push — see §3.J).
+- **D24** (workspace-wide `default-features = false`
+  audit; per-dep feature trim across every workspace
+  Cargo.toml — see §3.J). Next dispatch.
 - **D22 server-integration** (in-flight; wire
   `mechanics-http-server` into `mechanics` +
   `philharmonic-api` + `philharmonic-connector-service`
   + the three bins' `bind_h3: Option<SocketAddr>` config
   fields).
-- **D23** (in-tree minimal testcontainers replacement;
-  drops bollard's `rustls-native-certs` pull — see §3.J).
-- **D24** (workspace-wide `default-features = false`
-  audit; per-dep feature trim across every workspace
-  Cargo.toml — see §3.J).
 - D18 (`mechanics-core` module-surface refactor: feature
   gating + new `mime`/`url`/`console`/`html` modules + the
   2026-05-13 setTimeout-global removal per HUMANS.md's
@@ -992,10 +1040,10 @@ deferred to a later session.
   transport-layer change only, no AAD / AEAD / SCK / COSE
   touches.
 
-### J. Production-security dep cleanup (3 dispatches) — TOP PRIORITY
+### J. Production-security dep cleanup (D24 remaining; D23 + D25 done) — TOP PRIORITY
 
-**Sequencing directive (Yuka, 2026-05-13):** these
-production-security cleanups land **before any remaining
+**Sequencing directive (Yuka, 2026-05-13):** production-
+security cleanups in §3.J land **before any remaining
 Tier 2/3 connector work (D7 SMTP, D8 Anthropic, D9 Gemini,
 D19 DNS) and before D18 (mechanics-core module refactor)**.
 The framing is "serious production-ready security" — the
@@ -1004,11 +1052,17 @@ non-aws-lc-rs / non-webpki-roots TLS and the per-dep
 feature surface being minimised are baseline requirements,
 not optional polish.
 
-In-section ordering: **D25 → D23 → D24** (active CVE bump
-first, then testcontainers replacement to drop the bollard
-`rustls-native-certs` wrapper, then the broad
-default-features audit that benefits from D23 + D25 already
-being landed).
+**D25 and D23 landed 2026-05-13.** Done-state preserved
+verbatim at
+[`docs/archive/2026-05-13-roadmap-d23-d25-done.md`](archive/2026-05-13-roadmap-d23-d25-done.md);
+release artefacts are `mechanics-http-client 0.2.1` and
+`dockerlet 0.1.0` on crates.io, plus six consumer patch
+bumps awaiting publish. `deny.toml` after the pass:
+`rustls-native-certs`, `rustls-platform-verifier`, and
+`native-tls` all no-wrapper full bans; only `ring` retains
+a wrapper for the upstream `h3-quinn 0.0.10`
+default-features feature-unification bug
+(`wrappers = ["quinn-proto"]`).
 
 **Retro / sequencing lesson** (Yuka, 2026-05-13): when
 several §J-class cleanups queue together, weight
@@ -1027,162 +1081,37 @@ recurs, surface the speed-vs-urgency tradeoff to the
 human-developer explicitly at dispatch-archival time
 instead of defaulting to CVE-first.
 
-#### D25 — `mechanics-http-client` hickory-resolver CVE bump
+#### D25 — `mechanics-http-client` hickory-resolver CVE bump — DONE
 
-Captured 2026-05-13 as an immediate follow-up to the D22
-client push. GitHub Dependabot surfaced two `hickory-proto`
-advisories on the parent repo within hours of the D22
-client landing:
+DONE 2026-05-13 via Codex round 01 + Claude post-Codex
+polish. `mechanics-http-client 0.2.1` shipped to crates.io.
+Cleared `RUSTSEC-2026-0118` (HIGH; not applicable to mhc's
+config) and `RUSTSEC-2026-0119` (MEDIUM; triggerable in
+mhc's HTTPS RR path) by bumping `hickory-resolver` 0.25.2
+→ 0.26.1 + handling the upstream `hickory-proto` →
+`hickory-net` rename. Codex prompt archive:
+[`2026-05-13-0003-d25-mhc-hickory-resolver-cve-fix-01.md`](codex-prompts/2026-05-13-0003-d25-mhc-hickory-resolver-cve-fix-01.md).
+Full pre-trim spec preserved at
+[`archive/2026-05-13-roadmap-d23-d25-done.md`](archive/2026-05-13-roadmap-d23-d25-done.md).
 
-- **HIGH** — `RUSTSEC-2026-0118` /
-  `GHSA-3v94-mw7p-v465` — NSEC3 closest-encloser
-  proof unbounded loop. Only triggerable with
-  `dnssec-ring` / `dnssec-aws-lc-rs` features on;
-  **not applicable to mhc's config** (mhc uses
-  `default-features = false, features = ["system-config",
-  "tokio"]`, no dnssec).
-- **MEDIUM** — `RUSTSEC-2026-0119` /
-  `GHSA-q2qq-hmj6-3wpp` — O(n²) name compression in
-  `BinEncoder` during DNS message encoding. **Triggerable
-  in mhc's config** — any attacker-influenced
-  authoritative server response during HTTPS RR
-  resolution can amplify CPU exhaustion.
+#### D23 — in-tree minimal testcontainers replacement — DONE
 
-Bump `hickory-resolver` 0.25.2 → 0.26.1 in mhc; pick up
-the upstream rename of `hickory-proto` → `hickory-net`
-(0.26.0 release) and any API drift it forced. mhc ships
-as `0.2.1` patch release (public API unchanged; the
-hickory types are internal to `src/https_rr.rs` and
-`src/tests.rs`).
-
-Claude drafts the Codex prompt at
-[`docs/codex-prompts/2026-05-13-0003-d25-mhc-hickory-resolver-cve-fix-01.md`](codex-prompts/2026-05-13-0003-d25-mhc-hickory-resolver-cve-fix-01.md);
-Codex implements + tests. **No crypto-review gate** —
-transport-layer dep bump only. Patch-bump mhc to 0.2.1
-(0.3.0 only if upstream API drift forced a public-
-surface change, which is not expected).
-
-Lands **before D23 and D24** per the §J in-section
-ordering; lands **before any other workspace work** per
-the §J top-priority directive.
-
-#### D23 — in-tree minimal testcontainers replacement
-
-Captured 2026-05-13 as the cleanup-residual of the
-`ring` / `rustls-platform-verifier` / `rustls-native-certs`
-bans-tightening pass. After that pass (philharmonic-api
-reqwest → mhc dev-dep migration, rcgen aws_lc_rs feature,
-ureq `rustls-no-provider` + manual aws-lc-rs provider
-install, testcontainers/bollard switched to `aws-lc-rs`
-feature), exactly one wrapper remains in `deny.toml`:
-`rustls-native-certs` allowed when its direct parent is
-`bollard`. The path is `bollard`'s `ssl_providerless`
-feature (which both `aws-lc-rs` and `ssl` build on)
-unconditionally pulling `rustls-native-certs` — bollard
-uses it to validate the Docker daemon's registry-side TLS
-when pulling images.
-
-Replace `testcontainers` / `testcontainers-modules`
-  with a minimal in-tree dev-tooling crate
-  (working name `xtask-testcontainers` or
-  `mechanics-testcontainers`; bikeshed at prompt-drafting
-  time) that uses `bollard` with **only the features the
-  workspace's integration tests actually need**, dropping
-  `ssl_previderless` / `home` / `rustls-native-certs`
-  entirely.
-
-  **What workspace tests use today** (audit before drafting
-  the prompt; this is the baseline):
-  - Start a MySQL container (`mysql:8` or similar public
-    image) with a healthcheck-style wait.
-  - Start a Postgres container with the same pattern.
-  - Inspect host + assigned port for the connection string.
-  - Tear down on `Drop`.
-  - All over a local Docker daemon Unix socket (the
-    workspace doesn't currently use remote-daemon test
-    setups).
-
-  **What bollard needs for that subset:**
-  - `unix-socket` feature (talk to local Docker daemon).
-  - Image-pull / container-start / container-inspect /
-    container-stop API calls.
-  - **No TLS**: registry-side TLS is the daemon's concern,
-    not bollard's, when the workspace talks to the daemon
-    over a Unix socket.
-  - **No `home`**: workspace tests use public images that
-    don't need Docker Hub auth from `~/.docker/config.json`.
-
-  **Hard requirements:**
-  - Public surface mirrors what the workspace's test code
-    actually uses today (a `Container<Image>` handle with
-    `.start().await`, `.get_host_port_ipv4(...)`,
-    `.get_host()`, `.with_startup_timeout(...)`, Drop-based
-    teardown). Migration sites are mostly mechanical.
-  - The MySQL and Postgres "image" types from
-    `testcontainers-modules` get re-implemented as
-    minimal wrappers (image name + env vars + ready
-    probe).
-  - Dev-tooling crate, never published. `publish = false`.
-  - In-tree (non-submodule) member, mirroring the existing
-    `xtask/` placement convention.
-  - No `unsafe`, no panics on reachable paths in lib code
-    (test fixtures themselves may `.expect()` per the
-    workspace's test conventions).
-
-  **Migration scope** (~6 consumer crates):
-  - `philharmonic-api/tests/{e2e_mysql.rs, e2e_full_pipeline.rs}`
-  - `philharmonic-policy/tests/...`
-  - `philharmonic-workflow/tests/...`
-  - `philharmonic-store-sqlx-mysql/tests/...`
-  - `philharmonic-connector-impl-sql-mysql/tests/...`
-  - `philharmonic-connector-impl-sql-postgres/tests/...`
-
-  Each migrates from `testcontainers` / `testcontainers-modules`
-  imports to the in-tree replacement. Existing test logic
-  unchanged.
-
-  **Concurrency-limit knob** (Yuka, 2026-05-13): today the
-  workspace's testcontainer tests are file-lock-serialized
-  via `serial_test` (see comments in
-  `philharmonic-connector-impl-sql-{mysql,postgres}/Cargo.toml`)
-  because spinning up many containers concurrently used to
-  OOM the dev box. The current host is more capable —
-  the new default is **`min(4, available_parallelism / 4)`**
-  concurrent testcontainer tests (computed via
-  `std::thread::available_parallelism()`). On a 16-core
-  box that's 4; on an 8-core box, 2; on a 4-core box, 1;
-  on resource-tight CI runners, the floor of 1 falls back
-  to the current serial behaviour automatically. Implement
-  via either a semaphore-style file-based limiter (so the
-  limit applies across cargo's per-test-binary process
-  fan-out) or a concurrency knob on the replacement
-  crate's fixture initialiser. Wire the formula in one
-  place in the replacement crate (a `pub const` or a
-  `LazyLock<usize>`) so future tuning is one-edit. Verify
-  by running the SQL connector test suites under a load
-  monitor (`./scripts/build-status.sh` or the
-  resource-pressure xtask) at the computed concurrency
-  and confirming the dev box stays healthy; the formula
-  errs on the conservative side.
-
-  **Acceptance:** after D23, the `rustls-native-certs`
-  entry in `deny.toml` becomes a no-wrapper full ban
-  (matching `native-tls`, `rustls-platform-verifier`).
-  `cargo tree --workspace --invert rustls-native-certs`
-  prints nothing.
-
-  Claude drafts the Codex prompt; Codex implements + tests
-  + migrates consumers. No crypto-review gate — dev-tooling
-  only, no AAD / AEAD / SCK / COSE touches.
-
-  **Why not fork bollard's features instead?** Bollard's
-  Cargo.toml entangles `home` / `ssl_providerless` /
-  `rustls-native-certs` such that disabling them from a
-  consumer's feature flags isn't possible without a fork.
-  The in-tree wrapper approach is structurally cleaner —
-  one small crate that depends on bollard with the precise
-  minimum features the workspace needs, instead of a
-  bollard fork that has to be kept in sync.
+DONE 2026-05-13 via Codex round 01 + Claude post-Codex
+warm-container pivot + dockerlet atexit cleanup.
+`dockerlet 0.1.0` shipped to crates.io. Six consumer
+crates migrated from `testcontainers` /
+`testcontainers-modules` to `dockerlet` + patch-bumped:
+`philharmonic-api` 0.1.9, `philharmonic-policy` 0.2.4,
+`philharmonic-workflow` 0.1.5,
+`philharmonic-store-sqlx-mysql` 0.1.4,
+`philharmonic-connector-impl-sql-mysql` 0.1.1,
+`philharmonic-connector-impl-sql-postgres` 0.1.1
+(awaiting publish to crates.io). `deny.toml`
+`rustls-native-certs` switched from wrapper-allowed to
+no-wrapper full ban. Codex prompt archive:
+[`2026-05-13-0004-d23-dockerlet-testcontainers-replacement-01.md`](codex-prompts/2026-05-13-0004-d23-dockerlet-testcontainers-replacement-01.md).
+Full pre-trim spec preserved at
+[`archive/2026-05-13-roadmap-d23-d25-done.md`](archive/2026-05-13-roadmap-d23-d25-done.md).
 
 #### D24 — workspace-wide `default-features = false` audit
 

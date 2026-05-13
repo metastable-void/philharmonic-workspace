@@ -133,9 +133,16 @@ this.
 
 ## Test infrastructure
 
-28 integration tests via testcontainers MySQL 8, all passing.
-Cleanly isolated per-test containers with a global async mutex
-preventing parallel container startup contention.
+28 integration tests via `dockerlet` against MySQL 8, all
+passing. Per-binary warm-container pattern (single
+`OnceCell<SharedMysql>` per test binary, started on first
+test, reused by every test, atexit-cleaned at process exit
+via `dockerlet`'s `libc::atexit` hook + Docker
+`auto_remove: true`); per-test isolation by unique
+`CREATE DATABASE` + `DROP DATABASE`-on-Drop. Replaced the
+prior single-container-per-test `testcontainers` setup on
+2026-05-13 (D23); wall-clock for the full 28-test pass
+dropped from minutes to ~17s.
 
 ## Status
 

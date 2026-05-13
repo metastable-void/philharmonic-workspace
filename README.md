@@ -48,8 +48,10 @@ philharmonic-workspace/
 ├── philharmonic-store-sqlx-mysql/             # submodule
 ├── mechanics-config/                          # submodule
 ├── mechanics-http-client/                     # submodule
+├── mechanics-http-server/                     # submodule
 ├── mechanics-core/                            # submodule
 ├── mechanics/                                 # submodule
+├── dockerlet/                                 # submodule (dev-tooling)
 ├── philharmonic-policy/                       # submodule
 ├── philharmonic-workflow/                     # submodule
 ├── philharmonic-connector-common/             # submodule
@@ -83,7 +85,11 @@ English-only rule per [`CONTRIBUTING.md §14.6`](CONTRIBUTING.md#146-english-as-
 
 **Execution substrate:** `mechanics-config`, `mechanics-core`,
 `mechanics`, `mechanics-http-client` (workspace's outbound
-HTTP client; hyper-rustls + webpki-roots + aws-lc-rs).
+HTTP client; hyper-rustls + webpki-roots + aws-lc-rs;
+opportunistic HTTP/3 via the optional `http3` feature),
+`mechanics-http-server` (opportunistic HTTP/3 listener +
+Alt-Svc tower middleware that sits alongside the existing
+TCP+TLS HTTP/1.1+HTTP/2 path; added 2026-05-13 for D22).
 
 **Policy and workflow:** `philharmonic-policy`,
 `philharmonic-workflow`.
@@ -102,6 +108,16 @@ HTTP client; hyper-rustls + webpki-roots + aws-lc-rs).
 **Build tooling (published, submodule):** `inline-blob` —
 proc-macro for embedding large binaries in `.lrodata.*` ELF
 sections; used by the embed impl for ONNX model bundling.
+
+**Dev-tooling (published, submodule):** `dockerlet` —
+minimal Docker test-container helper. Thin wrapper over
+`bollard` with a deliberately narrow feature set (Unix
+socket only, no `rustls-native-certs`, no `home`); used
+by the SQL connector + e2e integration tests as a
+lightweight alternative to the broader `testcontainers`
+crate (which was evicted from the workspace dep tree
+during the §3.J production-security cleanup pass on
+2026-05-13).
 
 **Meta-crate:** `philharmonic`.
 
@@ -172,17 +188,24 @@ enforced by absence-assertion tests); connector-path
 body cap raised 2 MiB → 32 MiB
 (`philharmonic-connector-router` 0.1.2).
 
-Remaining post-v1 scope (six dispatches; all independent and
-parallel-safe):
+Remaining post-v1 scope (seven dispatches; mostly independent
+and parallel-safe):
 
+- **D24** — workspace-wide `default-features = false` audit
+  (top priority; closes §3.J production-security cleanup
+  arc).
+- **D22 server-integration** — wire `mechanics-http-server`
+  into `mechanics` + `philharmonic-api` +
+  `philharmonic-connector-service` + the three release
+  bins' `bind_h3: Option<SocketAddr>` config (D22 client
+  + D22 server-lib both landed 2026-05-13).
 - **Tier 2/3 connector implementations** — D7 SMTP, D8
   Anthropic, D9 Gemini, D19 DNS (new crate; submodule wired
   + crates.io 0.0.0 placeholder published 2026-05-12).
 - **D18** — `mechanics-core` module-surface refactor: feature
-  gating + new `mime`/`url`/`console`/`html` modules.
-- **D22** — HTTP/3 client + server support on top of the
-  mechanics-http-client transport (added 2026-05-13 for a
-  later session).
+  gating + new `mime`/`url`/`console`/`html` modules + the
+  D17 `setTimeout`-global removal (per HUMANS.md's
+  "no non-ES globals" hard rule).
 
 2026-05-12 wins landed end-to-end: `mechanics-core` 0.4.0 →
 0.4.1 with tail-promise polling (D17) moved the worker run-job
@@ -191,28 +214,62 @@ response fence from quiescence to the script's `return`;
 pruned AES128 from the rustls cipher-suite list; sqlx switched
 to aws-lc-rs+webpki-roots so `ring` is gone from the runtime
 tree of all three release bins; sql-postgres NUMERIC overflow
-now correctly surfaces as `UpstreamError`. 2026-05-13 wins
-landed end-to-end: D20 introduced the new
-`mechanics-http-client` crate (hyper-rustls + webpki-roots +
-aws-lc-rs) and migrated all four outbound-HTTP call sites to
-it, dropping `reqwest`, `rustls-platform-verifier`,
-`rustls-native-certs` from the runtime tree of all three
-release bins (cascade bumps: `mechanics-core` 0.4.1 → 0.5.0,
-`mechanics` 0.4.2 → 0.5.0, `philharmonic` 0.2.0 → 0.3.0,
-`philharmonic-connector-impl-http-forward` 0.1.0 → 0.2.0,
-`philharmonic-connector-impl-llm-openai-compat` 0.1.2 → 0.2.0;
-mechanics-http-client itself published to crates.io as 0.1.0,
-and each cascade-bumped crate's dep on it is `"0.1"`);
-D21 added dep-aware test filtering to
-`scripts/pre-landing.sh`. The authoritative task list lives in
+now correctly surfaces as `UpstreamError`.
+
+2026-05-13 wins landed end-to-end (the
+production-security cleanup arc, §3.J's first two thirds
+plus D20–D22):
+
+- **D20** introduced the new `mechanics-http-client` crate
+  (hyper-rustls + webpki-roots + aws-lc-rs) and migrated
+  all four outbound-HTTP call sites to it, dropping
+  `reqwest`, `rustls-platform-verifier`,
+  `rustls-native-certs` from the runtime tree of all
+  three release bins.
+- **D21** added dep-aware test filtering to
+  `scripts/pre-landing.sh`.
+- **D22 client + server-lib** landed: `mechanics-http-client`
+  gained opportunistic HTTP/3 via the optional `http3`
+  feature (HTTPS RR discovery, Alt-Svc caching, fallback
+  to hyper); `mechanics-http-server 0.1.0` shipped as a
+  new submodule, providing an opt-in HTTP/3 listener +
+  Alt-Svc tower middleware that sits alongside the
+  existing TCP+TLS HTTP/1.1+HTTP/2 path.
+- **Workspace ring / native-tls / platform-verifier bans
+  tightening** — `deny.toml` gained `ring`, `native-tls`,
+  `rustls-platform-verifier`, `rustls-native-certs`.
+  Whole crates evicted from the dep tree: `reqwest`,
+  `testcontainers`, `testcontainers-modules`,
+  `rustls-platform-verifier`, `rustls-native-certs`.
+  `ring` reduced from 5+ pulling paths to one (upstream
+  `h3-quinn 0.0.10` feature-unification bug; wrappered).
+- **D25** — `mechanics-http-client 0.2.1` cleared
+  `RUSTSEC-2026-0118` + `RUSTSEC-2026-0119` (hickory-
+  resolver 0.25.2 → 0.26.1 + upstream `hickory-proto` →
+  `hickory-net` rename).
+- **D23** — `dockerlet 0.1.0` (new in-tree dev-tooling
+  crate) replaced `testcontainers` in six consumer test
+  fixtures. The pattern pivoted from per-test container
+  starts to per-binary warm-container + per-test unique
+  database, with a `libc::atexit` cleanup hook and
+  `auto_remove: true` so containers don't leak across
+  test runs. Pre-landing's `--ignored` testcontainer
+  phase wall clock for the 28-test
+  `philharmonic-store-sqlx-mysql/tests/integration.rs`
+  dropped from minutes to ~17s.
+
+The authoritative task list lives in
 [`docs/ROADMAP.md` §3](docs/ROADMAP.md#3-post-v1-dispatch-plan)
 with verbatim pre-trim ROADMAP content at
 [`docs/archive/2026-05-11-roadmap-completed-arc-trim.md`](docs/archive/2026-05-11-roadmap-completed-arc-trim.md),
 [`docs/archive/2026-05-12-roadmap-d17-done-d7-spec-d18-added.md`](docs/archive/2026-05-12-roadmap-d17-done-d7-spec-d18-added.md),
-and [`docs/archive/2026-05-13-roadmap-d20-done.md`](docs/archive/2026-05-13-roadmap-d20-done.md).
+[`docs/archive/2026-05-13-roadmap-d20-done.md`](docs/archive/2026-05-13-roadmap-d20-done.md),
+and
+[`docs/archive/2026-05-13-roadmap-d23-d25-done.md`](docs/archive/2026-05-13-roadmap-d23-d25-done.md).
 
-All 26 published-crate names are reserved on crates.io
-(D20 added `mechanics-http-client`, published 2026-05-13).
+All 28 published-crate names are reserved on crates.io
+(2026-05-13 added `mechanics-http-server`, published 0.1.0;
+and `dockerlet`, published 0.1.0).
 Foundational, API,
 connector-triangle, and Phase 6/7 Tier 1 implementation crates
 have published substantive releases at `0.1.0` or higher. The

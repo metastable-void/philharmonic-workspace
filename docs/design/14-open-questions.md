@@ -94,9 +94,11 @@ once a first deployment sets one up.
 
 Integration tests across the full stack (substrate + executor
 + connector + policy + API) require real infrastructure.
-testcontainers for MySQL works. Mechanics workers and
-connector services need similar — testcontainers running
-their binaries, or in-process test implementations.
+`dockerlet` (the in-tree minimal Docker test-container
+helper added 2026-05-13 to replace `testcontainers`) covers
+the MySQL + Postgres path. Mechanics workers and connector
+services need similar — `dockerlet` running their binaries,
+or in-process test implementations.
 
 ## Exploratory
 

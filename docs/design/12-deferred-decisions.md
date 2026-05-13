@@ -111,9 +111,10 @@ vocabulary. See `09-policy-and-tenancy.md`.
 **What it would be**: `philharmonic-store-mem` for testing
 without MySQL.
 
-**Why deferred**: SQL backend works; testcontainers-based
-testing is functional if slow. Mem backend is quality-of-life,
-not blocker.
+**Why deferred**: SQL backend works; `dockerlet`-based
+testing (2026-05-13 replacement for `testcontainers`,
+warm-container pattern) is fast and functional. Mem
+backend is quality-of-life, not blocker.
 
 **Door stays open**: substrate trait surface is backend-agnostic;
 mem backend is a sibling crate. Name is reserved.
