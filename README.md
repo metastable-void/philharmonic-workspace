@@ -47,6 +47,7 @@ philharmonic-workspace/
 ├── philharmonic-store/                        # submodule
 ├── philharmonic-store-sqlx-mysql/             # submodule
 ├── mechanics-config/                          # submodule
+├── mechanics-http-client/                     # submodule
 ├── mechanics-core/                            # submodule
 ├── mechanics/                                 # submodule
 ├── philharmonic-policy/                       # submodule
@@ -81,7 +82,8 @@ English-only rule per [`CONTRIBUTING.md §14.6`](CONTRIBUTING.md#146-english-as-
 `philharmonic-store-sqlx-mysql`.
 
 **Execution substrate:** `mechanics-config`, `mechanics-core`,
-`mechanics`.
+`mechanics`, `mechanics-http-client` (workspace's outbound
+HTTP client; hyper-rustls + webpki-roots + aws-lc-rs).
 
 **Policy and workflow:** `philharmonic-policy`,
 `philharmonic-workflow`.
@@ -199,19 +201,19 @@ release bins (cascade bumps: `mechanics-core` 0.4.1 → 0.5.0,
 `mechanics` 0.4.2 → 0.5.0, `philharmonic` 0.2.0 → 0.3.0,
 `philharmonic-connector-impl-http-forward` 0.1.0 → 0.2.0,
 `philharmonic-connector-impl-llm-openai-compat` 0.1.2 → 0.2.0;
-crates.io publish coordination deferred to a follow-up
-session); D21 added dep-aware test filtering to
+mechanics-http-client itself published to crates.io as 0.1.0,
+and each cascade-bumped crate's dep on it is `"0.1"`);
+D21 added dep-aware test filtering to
 `scripts/pre-landing.sh`. The authoritative task list lives in
 [`docs/ROADMAP.md` §3](docs/ROADMAP.md#3-post-v1-dispatch-plan)
 with verbatim pre-trim ROADMAP content at
-[`docs/archive/2026-05-11-roadmap-completed-arc-trim.md`](docs/archive/2026-05-11-roadmap-completed-arc-trim.md)
-and [`docs/archive/2026-05-12-roadmap-d17-done-d7-spec-d18-added.md`](docs/archive/2026-05-12-roadmap-d17-done-d7-spec-d18-added.md).
+[`docs/archive/2026-05-11-roadmap-completed-arc-trim.md`](docs/archive/2026-05-11-roadmap-completed-arc-trim.md),
+[`docs/archive/2026-05-12-roadmap-d17-done-d7-spec-d18-added.md`](docs/archive/2026-05-12-roadmap-d17-done-d7-spec-d18-added.md),
+and [`docs/archive/2026-05-13-roadmap-d20-done.md`](docs/archive/2026-05-13-roadmap-d20-done.md).
 
-All 25 published-crate names are reserved on crates.io.
-`mechanics-http-client` (added 2026-05-13 via D20) lives in
-the workspace as a `publish = false` path-dep for now; its
-crates.io bootstrap publish is deferred to a follow-up
-session. Foundational, API,
+All 26 published-crate names are reserved on crates.io
+(D20 added `mechanics-http-client`, published 2026-05-13).
+Foundational, API,
 connector-triangle, and Phase 6/7 Tier 1 implementation crates
 have published substantive releases at `0.1.0` or higher. The
 remaining connector names (`philharmonic-connector-impl-email-smtp`,
