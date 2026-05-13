@@ -349,25 +349,29 @@ The single `(Gate 1)` item is **not** a Codex dispatch — Claude
 drafts the proposal, Yuka reviews per the two-gate crypto-review
 protocol (§2).
 
-Total: **24 Codex dispatches plus 1 Gate-1 proposal.**
+Total: **25 Codex dispatches plus 1 Gate-1 proposal.**
 **D1, D2, D3, D4, D5, D6, D10, D11, D12, D13, D14, D15, D16,
-D17, D20, D21 are done** (16 of 24; D20 + D21 both landed via
+D17, D20, D21 are done** (16 of 25; D20 + D21 both landed via
 Claude-direct implementation on 2026-05-13, with user override
 on the default Codex-dispatch path). Gate 1 and Gate 2 both
 approved.
 
 **Sequencing directive (Yuka, 2026-05-13):** production-
-security cleanups (§3.J — D23 testcontainers replacement +
-D24 default-features audit) take **priority over** every
-other pending dispatch, including the Tier 2/3 connector
-work (D7 / D8 / D9 / D19) and D18 (mechanics-core module
-refactor). Framing: "serious production-ready security" —
-clean release-binary runtime trees and minimised per-dep
+security cleanups (§3.J — D25 hickory CVE bump,
+D23 testcontainers replacement, D24 default-features
+audit) take **priority over** every other pending
+dispatch, including the Tier 2/3 connector work (D7 / D8 /
+D9 / D19) and D18 (mechanics-core module refactor).
+Framing: "serious production-ready security" — clean
+release-binary runtime trees and minimised per-dep
 feature surface are baseline requirements, not optional
 polish. D22 server-integration is the one exception that
 co-sequences with §J (it's part of the in-flight D22 arc).
 
 Remaining, in landing order:
+- **D25** (mhc 0.2.1 patch release; hickory-resolver
+  0.25.2 → 0.26.1 to clear two Dependabot advisories
+  that surfaced after the D22 client push — see §3.J).
 - **D22 server-integration** (in-flight; wire
   `mechanics-http-server` into `mechanics` +
   `philharmonic-api` + `philharmonic-connector-service`
@@ -988,7 +992,7 @@ deferred to a later session.
   transport-layer change only, no AAD / AEAD / SCK / COSE
   touches.
 
-### J. Production-security dep cleanup (2 dispatches) — TOP PRIORITY
+### J. Production-security dep cleanup (3 dispatches) — TOP PRIORITY
 
 **Sequencing directive (Yuka, 2026-05-13):** these
 production-security cleanups land **before any remaining
@@ -999,6 +1003,51 @@ workspace's release-binary runtime trees being clean of
 non-aws-lc-rs / non-webpki-roots TLS and the per-dep
 feature surface being minimised are baseline requirements,
 not optional polish.
+
+In-section ordering: **D25 → D23 → D24** (active CVE bump
+first, then testcontainers replacement to drop the bollard
+`rustls-native-certs` wrapper, then the broad
+default-features audit that benefits from D23 + D25 already
+being landed).
+
+#### D25 — `mechanics-http-client` hickory-resolver CVE bump
+
+Captured 2026-05-13 as an immediate follow-up to the D22
+client push. GitHub Dependabot surfaced two `hickory-proto`
+advisories on the parent repo within hours of the D22
+client landing:
+
+- **HIGH** — `RUSTSEC-2026-0118` /
+  `GHSA-3v94-mw7p-v465` — NSEC3 closest-encloser
+  proof unbounded loop. Only triggerable with
+  `dnssec-ring` / `dnssec-aws-lc-rs` features on;
+  **not applicable to mhc's config** (mhc uses
+  `default-features = false, features = ["system-config",
+  "tokio"]`, no dnssec).
+- **MEDIUM** — `RUSTSEC-2026-0119` /
+  `GHSA-q2qq-hmj6-3wpp` — O(n²) name compression in
+  `BinEncoder` during DNS message encoding. **Triggerable
+  in mhc's config** — any attacker-influenced
+  authoritative server response during HTTPS RR
+  resolution can amplify CPU exhaustion.
+
+Bump `hickory-resolver` 0.25.2 → 0.26.1 in mhc; pick up
+the upstream rename of `hickory-proto` → `hickory-net`
+(0.26.0 release) and any API drift it forced. mhc ships
+as `0.2.1` patch release (public API unchanged; the
+hickory types are internal to `src/https_rr.rs` and
+`src/tests.rs`).
+
+Claude drafts the Codex prompt at
+[`docs/codex-prompts/2026-05-13-0003-d25-mhc-hickory-resolver-cve-fix-01.md`](codex-prompts/2026-05-13-0003-d25-mhc-hickory-resolver-cve-fix-01.md);
+Codex implements + tests. **No crypto-review gate** —
+transport-layer dep bump only. Patch-bump mhc to 0.2.1
+(0.3.0 only if upstream API drift forced a public-
+surface change, which is not expected).
+
+Lands **before D23 and D24** per the §J in-section
+ordering; lands **before any other workspace work** per
+the §J top-priority directive.
 
 #### D23 — in-tree minimal testcontainers replacement
 
