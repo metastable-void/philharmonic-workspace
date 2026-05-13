@@ -15,6 +15,22 @@ this file, but never edit this file.
   workspace repo into a reusable template/Rust crate/etc.
   this can happen after the MVP work is done.
 
+## HTTP/3 support notes
+
+- HTTP/3 is enabled for a server whenever it is configured
+  with the HTTP/3 UDP bind port (the convention would be the top-level `bind_h3: Option<SockAddr>`).
+- HTTP/3 is auto-discovered for any remote services (with HTTPS RRs, and
+  alt-svc headers) by the client. Forgetting HTTP/3 support statuses across
+  statelessness boundaries is fine, but static LazyLock/Mutex states can be kept
+  by the lib crate.
+
+```
+pub static MUTEX: Mutex<MyType> = Mutex::new(MyType::new());
+// or
+pub static MUTEX: LazyLock<Arc<Mutex<MyType>>> =
+  LazyLock::new(|| Arc::new(Mutex::new(MyType::new())));
+```
+
 ## SMTP connector
 
 ### Requirements
@@ -89,9 +105,6 @@ import console from `mechanics:console`;
 
 Note: Keep WebUI up-to-date with any API features added
 in the future.
-
-- **Code editor**. Code editor currently doesn't capture
-  TAB presses (moves to the next element); should be fixed.
 
 ## New connector: DNS (Tier 2)
 

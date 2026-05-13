@@ -7,6 +7,7 @@ members = [
     "mechanics-config",
     "mechanics-core",
     "mechanics",
+    "mechanics-http-client",
     "philharmonic",
     "philharmonic-policy",
     "philharmonic-workflow",
@@ -64,6 +65,7 @@ philharmonic-api = { path = "philharmonic-api" }
 philharmonic-connector-impl-api = { path = "philharmonic-connector-impl-api" }
 inline-blob = { path = "inline-blob" }
 philharmonic-connector-impl-dns = { path = "philharmonic-connector-impl-dns" }
+mechanics-http-client = { path = "mechanics-http-client" }
 
 [profile.release]
 opt-level = 3

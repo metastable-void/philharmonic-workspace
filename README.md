@@ -170,7 +170,7 @@ enforced by absence-assertion tests); connector-path
 body cap raised 2 MiB → 32 MiB
 (`philharmonic-connector-router` 0.1.2).
 
-Remaining post-v1 scope (seven dispatches; all independent and
+Remaining post-v1 scope (six dispatches; all independent and
 parallel-safe):
 
 - **Tier 2/3 connector implementations** — D7 SMTP, D8
@@ -178,13 +178,9 @@ parallel-safe):
   + crates.io 0.0.0 placeholder published 2026-05-12).
 - **D18** — `mechanics-core` module-surface refactor: feature
   gating + new `mime`/`url`/`console`/`html` modules.
-- **D20** — workspace-wide webpki-roots-only TLS trust posture
-  (sqlx is already aws-lc-rs+webpki-roots after the
-  2026-05-12 ring removal; D20 finishes the consistency
-  story on the reqwest side).
-- **D21** — `scripts/pre-landing.sh` dep-aware test filtering
-  (skip tests for member crates not in the dirty-set's
-  transitive reverse-dep closure).
+- **D22** — HTTP/3 client + server support on top of the
+  mechanics-http-client transport (added 2026-05-13 for a
+  later session).
 
 2026-05-12 wins landed end-to-end: `mechanics-core` 0.4.0 →
 0.4.1 with tail-promise polling (D17) moved the worker run-job
@@ -193,14 +189,29 @@ response fence from quiescence to the script's `return`;
 pruned AES128 from the rustls cipher-suite list; sqlx switched
 to aws-lc-rs+webpki-roots so `ring` is gone from the runtime
 tree of all three release bins; sql-postgres NUMERIC overflow
-now correctly surfaces as `UpstreamError`. The authoritative
-task list lives in
+now correctly surfaces as `UpstreamError`. 2026-05-13 wins
+landed end-to-end: D20 introduced the new
+`mechanics-http-client` crate (hyper-rustls + webpki-roots +
+aws-lc-rs) and migrated all four outbound-HTTP call sites to
+it, dropping `reqwest`, `rustls-platform-verifier`,
+`rustls-native-certs` from the runtime tree of all three
+release bins (cascade bumps: `mechanics-core` 0.4.1 → 0.5.0,
+`mechanics` 0.4.2 → 0.5.0, `philharmonic` 0.2.0 → 0.3.0,
+`philharmonic-connector-impl-http-forward` 0.1.0 → 0.2.0,
+`philharmonic-connector-impl-llm-openai-compat` 0.1.2 → 0.2.0;
+crates.io publish coordination deferred to a follow-up
+session); D21 added dep-aware test filtering to
+`scripts/pre-landing.sh`. The authoritative task list lives in
 [`docs/ROADMAP.md` §3](docs/ROADMAP.md#3-post-v1-dispatch-plan)
 with verbatim pre-trim ROADMAP content at
 [`docs/archive/2026-05-11-roadmap-completed-arc-trim.md`](docs/archive/2026-05-11-roadmap-completed-arc-trim.md)
 and [`docs/archive/2026-05-12-roadmap-d17-done-d7-spec-d18-added.md`](docs/archive/2026-05-12-roadmap-d17-done-d7-spec-d18-added.md).
 
-All 25 crate names are reserved on crates.io. Foundational, API,
+All 25 published-crate names are reserved on crates.io.
+`mechanics-http-client` (added 2026-05-13 via D20) lives in
+the workspace as a `publish = false` path-dep for now; its
+crates.io bootstrap publish is deferred to a follow-up
+session. Foundational, API,
 connector-triangle, and Phase 6/7 Tier 1 implementation crates
 have published substantive releases at `0.1.0` or higher. The
 remaining connector names (`philharmonic-connector-impl-email-smtp`,

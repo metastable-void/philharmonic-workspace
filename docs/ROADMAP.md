@@ -347,17 +347,14 @@ protocol (§2).
 
 Total: **22 Codex dispatches plus 1 Gate-1 proposal.**
 **D1, D2, D3, D4, D5, D6, D10, D11, D12, D13, D14, D15, D16,
-D17, D21 are done** (15 of 22; D21 landed via Claude-direct
-implementation on 2026-05-13). Gate 1 and Gate 2 both
+D17, D20, D21 are done** (16 of 22; D20 + D21 both landed via
+Claude-direct implementation on 2026-05-13, with user override
+on the default Codex-dispatch path). Gate 1 and Gate 2 both
 approved.
 Remaining: D7, D8, D9, D19 (Tier 2/3 connectors — D19 is
 the new DNS connector surfaced 2026-05-12 via HUMANS.md), D18
 (`mechanics-core` module-surface refactor: feature gating +
-new `mime`/`url`/`console`/`html` modules), D20 (revised
-2026-05-13: build a new `mechanics-http-client` crate wrapping
-hyper-rustls + webpki-roots, drop reqwest from all four
-HTTP-outbound call sites; the runtime-bypass approach
-documented in the codex-prompt archive is superseded), D22
+new `mime`/`url`/`console`/`html` modules), D22
 (HTTP/3 client + server support added 2026-05-13 for a later
 session — alt-svc-driven HTTP/3 negotiation on top of the
 mechanics-http-client transport, plus HTTP/3 listeners on the
@@ -651,7 +648,7 @@ modules.
   No crypto-review gate — runtime module surface only.
   Independent of D7-D9.
 
-### G. HTTP-client transport + TLS trust posture (1 dispatch)
+### G. HTTP-client transport + TLS trust posture (1 dispatch) — DONE
 
 Surfaced 2026-05-12 after the ring-removal work (commit
 `18f1bb2`); design pivoted 2026-05-13 from "runtime-bypass
@@ -692,8 +689,29 @@ migrates to it; reqwest is dropped from the four affected
 crates;`rustls-platform-verifier` and `rustls-native-certs`
 exit the runtime dep tree as a natural consequence.
 
-- **D20** Build `mechanics-http-client` and migrate every
-  reqwest call site to it.
+- **D20 — DONE 2026-05-13** Built `mechanics-http-client`
+  and migrated every reqwest call site to it.
+
+  **Outcome.** All three release binaries
+  (`philharmonic-api-server`, `mechanics-worker`,
+  `philharmonic-connector-bin`) now have a runtime tree free
+  of `reqwest`, `rustls-platform-verifier`,
+  `rustls-native-certs`, and `ring`. TLS provider is
+  `aws-lc-rs` 1.16.3; trust store is `webpki-roots` 1.0.7.
+  Cascaded version bumps shipped in this dispatch:
+  `mechanics-core` 0.4.1 → 0.5.0 (rename
+  `ReqwestEndpointHttpClient` → `DefaultEndpointHttpClient`),
+  `mechanics` 0.4.2 → 0.5.0 (mechanics-core dep bump),
+  `philharmonic` 0.2.0 → 0.3.0 (mechanics + connector dep
+  bumps), `philharmonic-connector-impl-http-forward`
+  0.1.0 → 0.2.0, `philharmonic-connector-impl-llm-openai-compat`
+  0.1.2 → 0.2.0. `mechanics-http-client` itself is published
+  here at `0.0.1` (workspace path-dep; crates.io bootstrap
+  publish deferred to a follow-up session, at which point the
+  five bumped crates can each pick up a path-and-version dep
+  and become independently publishable).
+
+  **Original scope notes:**
 
   **Crate placement.** `mechanics-http-client` lives in the
   Mechanics family (same independence rule as the rest of

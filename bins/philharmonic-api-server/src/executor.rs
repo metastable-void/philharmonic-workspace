@@ -1,13 +1,14 @@
 use async_trait::async_trait;
+use std::str::FromStr;
 use std::time::Duration;
 
+use mechanics_http_client::Uri;
 use philharmonic::types::JsonValue;
 use philharmonic::workflow::{StepExecutionError, StepExecutor};
-use reqwest::header::{AUTHORIZATION, CONTENT_TYPE};
 use serde_json::json;
 
 pub(crate) struct MechanicsWorkerExecutor {
-    client: reqwest::Client,
+    client: mechanics_http_client::Client,
     worker_url: String,
     bearer_token: Option<String>,
 }
@@ -18,10 +19,12 @@ impl MechanicsWorkerExecutor {
         if worker_url.is_empty() {
             return Err("mechanics worker URL must not be empty".to_string());
         }
-        reqwest::Url::parse(&worker_url)
+        Uri::from_str(&worker_url)
             .map_err(|error| format!("mechanics worker URL is invalid: {error}"))?;
+        let client = mechanics_http_client::Client::new()
+            .map_err(|error| format!("failed to build HTTP client: {error}"))?;
         Ok(Self {
-            client: reqwest::Client::new(),
+            client,
             worker_url,
             bearer_token: token,
         })
@@ -63,9 +66,9 @@ impl MechanicsWorkerExecutor {
         let mut request = self
             .client
             .post(&url)
-            .header(CONTENT_TYPE, "application/json");
+            .header("content-type", "application/json");
         if let Some(token) = &self.bearer_token {
-            request = request.header(AUTHORIZATION, format!("Bearer {token}"));
+            request = request.bearer_auth(token);
         }
         let response = request.json(&job).send().await.map_err(|error| {
             StepExecutionError::Transport(format!("mechanics worker request failed: {error}"))
@@ -106,29 +109,27 @@ impl MechanicsWorkerExecutor {
     }
 }
 
-/// Streaming-read a reqwest response body up to `max_bytes`. Errors with
-/// a `Transport` variant if the cumulative read exceeds the cap. Used by
-/// the embed-job path (per Gate-2 pre-review Finding 1.5) to bound
-/// transient JSON-in-memory pressure before parsing.
+/// Read the response body up to `max_bytes` of *wire* bytes, then
+/// decompress per `Content-Encoding`. Errors with `Transport` if the
+/// cap is exceeded. Used by the embed-job path (per Gate-2 pre-review
+/// Finding 1.5) to bound transient JSON-in-memory pressure before
+/// parsing.
 async fn read_capped_body(
-    mut response: reqwest::Response,
+    response: mechanics_http_client::Response,
     max_bytes: usize,
 ) -> Result<Vec<u8>, StepExecutionError> {
-    let mut buf: Vec<u8> = Vec::new();
-    while let Some(chunk) = response.chunk().await.map_err(|error| {
-        StepExecutionError::Transport(format!("mechanics worker chunk read failed: {error}"))
-    })? {
-        if buf.len().saturating_add(chunk.len()) > max_bytes {
-            return Err(StepExecutionError::Transport(format!(
-                "mechanics worker response exceeds cap of {max_bytes} bytes \
-                 (read {} bytes before next chunk of {} bytes pushed past)",
-                buf.len(),
-                chunk.len()
-            )));
+    match response.bytes_with_cap(max_bytes).await {
+        Ok(bytes) => Ok(bytes.to_vec()),
+        Err(mechanics_http_client::Error::BodyTooLarge { limit, seen }) => {
+            Err(StepExecutionError::Transport(format!(
+                "mechanics worker response exceeds cap of {limit} bytes \
+                 (read {seen} bytes before next chunk pushed past)"
+            )))
         }
-        buf.extend_from_slice(&chunk);
+        Err(other) => Err(StepExecutionError::Transport(format!(
+            "mechanics worker response body read failed: {other}"
+        ))),
     }
-    Ok(buf)
 }
 
 #[async_trait]

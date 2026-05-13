@@ -103,3 +103,6 @@
 [submodule "philharmonic-connector-impl-dns"]
 	path = philharmonic-connector-impl-dns
 	url = https://github.com/metastable-void/philharmonic-connector-impl-dns.git
+[submodule "mechanics-http-client"]
+	path = mechanics-http-client
+	url = https://github.com/metastable-void/mechanics-http-client.git
