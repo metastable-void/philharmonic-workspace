@@ -29,6 +29,7 @@ members = [
     "philharmonic-api",
     "inline-blob",
     "mechanics-http-server",
+    "dockerlet",
     # In-tree (non-submodule) member crates live below. They're
     # workspace dev tooling — never published, never consumed by
     # runtime crates. See `xtask/Cargo.toml` for the current home
@@ -68,6 +69,7 @@ inline-blob = { path = "inline-blob" }
 philharmonic-connector-impl-dns = { path = "philharmonic-connector-impl-dns" }
 mechanics-http-client = { path = "mechanics-http-client" }
 mechanics-http-server = { path = "mechanics-http-server" }
+dockerlet = { path = "dockerlet" }
 
 [profile.release]
 opt-level = 3

@@ -109,3 +109,6 @@
 [submodule "mechanics-http-server"]
 	path = mechanics-http-server
 	url = https://github.com/metastable-void/mechanics-http-server.git
+[submodule "dockerlet"]
+	path = dockerlet
+	url = https://github.com/metastable-void/dockerlet.git
