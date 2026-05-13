@@ -345,9 +345,9 @@ The single `(Gate 1)` item is **not** a Codex dispatch — Claude
 drafts the proposal, Yuka reviews per the two-gate crypto-review
 protocol (§2).
 
-Total: **21 Codex dispatches plus 1 Gate-1 proposal.**
+Total: **22 Codex dispatches plus 1 Gate-1 proposal.**
 **D1, D2, D3, D4, D5, D6, D10, D11, D12, D13, D14, D15, D16,
-D17, D21 are done** (15 of 21; D21 landed via Claude-direct
+D17, D21 are done** (15 of 22; D21 landed via Claude-direct
 implementation on 2026-05-13). Gate 1 and Gate 2 both
 approved.
 Remaining: D7, D8, D9, D19 (Tier 2/3 connectors — D19 is
@@ -357,7 +357,11 @@ new `mime`/`url`/`console`/`html` modules), D20 (revised
 2026-05-13: build a new `mechanics-http-client` crate wrapping
 hyper-rustls + webpki-roots, drop reqwest from all four
 HTTP-outbound call sites; the runtime-bypass approach
-documented in the codex-prompt archive is superseded).
+documented in the codex-prompt archive is superseded), D22
+(HTTP/3 client + server support added 2026-05-13 for a later
+session — alt-svc-driven HTTP/3 negotiation on top of the
+mechanics-http-client transport, plus HTTP/3 listeners on the
+three release bins).
 
 ### A. Embedding datasets (6 dispatches + 1 Gate-1) — DONE
 
@@ -836,6 +840,83 @@ exit the runtime dep tree as a natural consequence.
   Claude drafts the Codex prompt; Codex implements + tests.
   No crypto-review gate.
 
+### I. HTTP/3 client + server (1 dispatch, future session)
+
+Captured 2026-05-13 alongside the D20 revision; explicitly
+deferred to a later session.
+
+- **D22** HTTP/3 (QUIC) support on both the outbound HTTP
+  client side and the inbound HTTPS server side. Sequenced
+  after D20's `mechanics-http-client` lands — the new crate
+  is the natural home for the HTTP/3 client transport, and
+  the alt-svc negotiation hook fits its `Client::send()`
+  path. Sequenced after deployment-time feedback on the
+  HTTP/2 release builds — HTTP/3 in production needs
+  operational validation (firewalls, load balancers,
+  observability) that doesn't exist yet for this workspace.
+
+  **Client side** (in `mechanics-http-client`):
+
+  - Pull in `quinn` (rustls-based QUIC) + `h3` (HTTP/3 over
+    QUIC) under a non-default `http3` feature. Reuse the
+    same aws-lc-rs + webpki-roots TLS configuration; UDP
+    socket lifecycle is QUIC's concern.
+  - Negotiate via `Alt-Svc` response header: first request
+    over HTTP/2, server advertises `h3=":443"`, subsequent
+    requests upgrade to HTTP/3 for that origin within the
+    advertised lifetime. Origin cache in the `Client`.
+  - Fall back to HTTP/2 when the server doesn't advertise
+    HTTP/3 or the QUIC handshake fails.
+
+  **Server side** (`mechanics`, `bins/philharmonic-api-server`,
+  `bins/philharmonic-connector`):
+
+  - Add a UDP/443 listener (alongside the existing TCP/443
+    HTTPS listener) under each bin's `https` feature.
+    `quinn` provides the QUIC endpoint; `h3` plus an axum-
+    or tower-style adapter routes HTTP/3 requests into the
+    same handler chain as HTTP/2.
+  - Each bin advertises `Alt-Svc: h3=":443"; ma=86400`
+    (or similar) on every HTTPS response so clients learn
+    of HTTP/3 capability after the first HTTP/2 exchange.
+  - 0-RTT replay safety: only allow 0-RTT on idempotent
+    methods (GET / HEAD) at first; explicit per-route opt-in
+    for others.
+
+  **TLS posture stays D20's**: aws-lc-rs + webpki-roots,
+  Mozilla bundle only, no native-roots. ALPN must include
+  `h3` alongside `h2` / `http/1.1`. HSTS continues to apply
+  to HTTP/3 responses identically (RFC 6797 is
+  transport-agnostic; the header lives in HTTP semantics
+  layer above QUIC).
+
+  **Hard constraints:**
+
+  - Mechanics-Philharmonic independence stays.
+    `mechanics-http-client` owns the HTTP/3 client surface.
+    Philharmonic crates consume it. No Philharmonic dep on
+    mhc.
+  - Optional / feature-gated. HTTP/3 ships under a non-
+    default `http3` Cargo feature on every affected crate.
+    Operators opt in when they're ready.
+  - Existing HTTP/1.1 + HTTP/2 paths unchanged. HTTP/3 is
+    additive.
+  - No `unsafe` blocks introduced by D22 work beyond what
+    quinn / h3 require internally.
+
+  Sequencing note: D22 unblocks itself the moment D20 is
+  in — the new crate has to exist before HTTP/3 client
+  support attaches to it. The server side can technically
+  land in parallel with D20 since it doesn't depend on
+  `mechanics-http-client`, but operationally it's cleaner
+  to ship both halves together so a deployment that turns
+  on HTTP/3 gets a coherent picture.
+
+  Implementation owner: Claude direct or Codex dispatch
+  TBD when D22 is scheduled. No crypto-review gate —
+  transport-layer change only, no AAD / AEAD / SCK / COSE
+  touches.
+
 ### Suggested sequencing
 
 **Completed work (2026-05-02 through 2026-05-11):** D1 +
@@ -854,6 +935,9 @@ this file with the same archive pointer.
 
 **Next dispatchable**: D7 / D8 / D9 / D18 / D19 / D20, all
 six independent and parallel-safe. D21 landed 2026-05-13.
+D22 (HTTP/3) sequenced after D20 lands (`mechanics-http-client`
+is the natural client-side home) and after deployment-time
+HTTP/2 validation feedback — explicit later-session work.
 
 - **D7** is unblocked — the `email_send` wire shape locked
   in [`docs/design/08-connector-architecture.md` §SMTP](design/08-connector-architecture.md#smtp)
