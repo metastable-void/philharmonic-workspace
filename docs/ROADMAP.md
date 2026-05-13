@@ -353,10 +353,11 @@ approved.
 Remaining: D7, D8, D9, D19 (Tier 2/3 connectors — D19 is
 the new DNS connector surfaced 2026-05-12 via HUMANS.md), D18
 (`mechanics-core` module-surface refactor: feature gating +
-new `mime`/`url`/`console`/`html` modules), D20 (workspace-wide
-webpki-roots-only TLS trust posture surfaced 2026-05-12 — sqlx
-already aws-lc-rs+webpki-roots after the ring removal, reqwest
-still picks up platform-native via rustls-platform-verifier).
+new `mime`/`url`/`console`/`html` modules), D20 (revised
+2026-05-13: build a new `mechanics-http-client` crate wrapping
+hyper-rustls + webpki-roots, drop reqwest from all four
+HTTP-outbound call sites; the runtime-bypass approach
+documented in the codex-prompt archive is superseded).
 
 ### A. Embedding datasets (6 dispatches + 1 Gate-1) — DONE
 
@@ -646,16 +647,19 @@ modules.
   No crypto-review gate — runtime module surface only.
   Independent of D7-D9.
 
-### G. TLS trust posture (1 dispatch)
+### G. HTTP-client transport + TLS trust posture (1 dispatch)
 
 Surfaced 2026-05-12 after the ring-removal work (commit
-`18f1bb2`): the workspace's TLS trust-store posture is
-inconsistent. sqlx (Postgres/MySQL connectors,
+`18f1bb2`); design pivoted 2026-05-13 from "runtime-bypass
+reqwest's `rustls-platform-verifier`" to a structural fix.
+
+**The problem.** The workspace's TLS trust-store posture is
+inconsistent: sqlx (Postgres/MySQL connectors,
 philharmonic-api's MySQL substrate store) verifies against
 the bundled Mozilla CA bundle via `webpki-roots`; reqwest
 (every outbound HTTP path — mechanics-core's endpoint client,
 http_forward, llm_openai_compat, and the upcoming Tier 3 LLM
-connectors) verifies against the OS-native trust store via
+connectors) verifies against the host OS trust store via
 `rustls-platform-verifier` + `rustls-native-certs`. Operator
 consequences: a tenant-installed corporate CA gets picked up
 for HTTP outbound but not for SQL outbound; air-gapped
@@ -663,71 +667,123 @@ environments need different mitigations for each path; the
 HTTP trust set drifts on OS package updates while SQL trust
 is frozen at compile time.
 
-- **D20** Force `webpki-roots` everywhere; remove the
-  reqwest → `rustls-platform-verifier` / `rustls-native-certs`
-  path. Locked design choice (2026-05-12, Yuka): the bundled
-  Mozilla bundle is the workspace's single source of CA truth.
-  No native-roots fallback.
+**The earlier plan** (archived) was to keep reqwest and call
+`ClientBuilder::use_preconfigured_tls(webpki_roots_config)` at
+every construction site. reqwest 0.13.3's public `rustls`
+feature unconditionally pulls `dep:rustls-platform-verifier`,
+so the dead crate stays compiled into the binary even though
+the runtime path never invokes it. Acceptable trade-off in
+isolation, but reqwest is a convenience layer the framework
+has outgrown — the connector impls each carry near-duplicate
+client-builder + error-classification + body-reading code,
+and the workspace's serious-frameworking direction is to own
+this surface rather than depend on a thick general-purpose
+HTTP client.
 
-  reqwest 0.13.3 does not have a `webpki-roots`-only feature
-  variant — its `rustls` feature unconditionally enables
-  `rustls-platform-verifier` as a dep. The cleanest in-workspace
-  fix is `reqwest::ClientBuilder::use_preconfigured_tls()` with
-  a `rustls::ClientConfig` whose `RootCertStore` is populated
-  from `webpki_roots::TLS_SERVER_ROOTS`. The
-  `rustls-platform-verifier` crate stays in the dep tree
-  (binary weight cost) but is never invoked at runtime if every
-  reqwest client construction routes through the helper.
+**The locked direction** (2026-05-13, Yuka): build a small
+in-house HTTP-client crate `mechanics-http-client` that wraps
+`hyper-rustls` + `webpki-roots` with a reqwest-shaped
+convenience API. Every outbound HTTP path in the workspace
+migrates to it; reqwest is dropped from the four affected
+crates;`rustls-platform-verifier` and `rustls-native-certs`
+exit the runtime dep tree as a natural consequence.
 
-  Touched call sites (4 production + 4 test, grep
-  `reqwest::Client(::|<)|reqwest::Client::new|Client::builder\(\)`):
+- **D20** Build `mechanics-http-client` and migrate every
+  reqwest call site to it.
 
-  - `mechanics-core/src/internal/pool/api.rs:119` (production)
-  - `bins/philharmonic-api-server/src/executor.rs:24` (production)
-  - `philharmonic-connector-impl-http-forward/src/client.rs:18`
-    (production)
-  - `philharmonic-connector-impl-llm-openai-compat/src/client.rs:15`
-    (production)
+  **Crate placement.** `mechanics-http-client` lives in the
+  Mechanics family (same independence rule as the rest of
+  mechanics — MUST NOT depend on any `philharmonic-*` crate;
+  Philharmonic crates depend on it, never the reverse). Lives
+  as a workspace submodule mirroring the existing Mechanics
+  submodule layout. crates.io reservation as a `0.0.0`
+  placeholder before substantive content lands, then patch /
+  minor bumps as the API stabilises. The "mechanics-" prefix
+  signals ownership; the crate itself is general-purpose and
+  could be consumed by anyone, but the Mechanics family
+  conventions (no Philharmonic-internal references in docs /
+  CHANGELOG / module names) apply.
+
+  **API shape.** Reqwest-like convenience subset that covers
+  exactly what the workspace's call sites need today:
+
+  - `Client` / `ClientBuilder` with timeout / pool sizing /
+    user agent / default headers.
+  - `RequestBuilder` chainable: `.timeout()`, `.header()`,
+    `.body()`, `.json()`, `.bearer_auth()`, `.send().await`.
+  - `Response` with `.status()`, `.headers()`, `.bytes()`,
+    `.text()`, `.json::<T>()`, `.chunk()` (streaming).
+  - Body decompression: gzip, deflate, brotli (transparent on
+    response).
+  - Error model: thiserror-derived `Error` enum with
+    `Timeout`, `Unreachable`, `Tls`, `Decode`, `Status`,
+    `Cancelled` variants. Each call site re-maps these into
+    its own crate's error.
+  - TLS: hyper-rustls + webpki-roots only, baked at compile
+    time; aws-lc-rs as the rustls crypto provider.
+  - HTTP/1.1 and HTTP/2 via ALPN (matching the existing
+    reqwest-based behavior).
+  - No multipart, no cookies, no proxy, no redirect-following
+    knobs in v1. Add later if a call site needs them.
+
+  **Migration sites** (4 production + the test fleet):
+
+  - `mechanics-core/src/internal/pool/api.rs:119` and the
+    underlying `ReqwestEndpointHttpClient` transport in
+    `mechanics-core/src/internal/http/transport.rs` — the
+    bulk of the porting work, since this is the script-level
+    `endpoint(...)` HTTP path.
+  - `bins/philharmonic-api-server/src/executor.rs:24` — the
+    mechanics-worker dispatch path.
+  - `philharmonic-connector-impl-http-forward/src/client.rs` —
+    the generic-HTTP connector.
+  - `philharmonic-connector-impl-llm-openai-compat/src/client.rs`
+    — the OpenAI-compatible LLM connector.
   - `mechanics-core/src/internal/pool/tests/{mod,queue,lifecycle}.rs`
-    (4 sites; test-only, but update for consistency)
+    — 4 test-side `reqwest::Client::new()` sites in tests.
 
-  Per-crate Cargo.toml additions: `rustls = "0.23"` (already in
-  the tree transitively at 0.23.40) and `webpki-roots = "1"`
-  (already at 1.0.7). No feature unification surprises — the
-  existing `aws-lc-rs` provider feature stays enabled.
+  After migration: drop `reqwest` from each of the four
+  production crates' `[dependencies]`.
+  `rustls-platform-verifier` and `rustls-native-certs` should
+  no longer appear in `cargo tree -p <bin> --features https
+  -e normal` for the three release bins.
 
-  Codex picks: helper-function-per-crate (inline 5-6 line
-  factory) vs. shared crate. The `philharmonic-connector-common`
-  crate is one natural home for the connector-impl sites but
-  has no current HTTP-client responsibilities; mechanics-core
-  is on the wrong side of the Mechanics-Philharmonic
-  independence boundary to be a workspace-wide helper home.
-  Per-crate inline is the safest default; the dispatch may
-  choose otherwise.
+  **Version bumps** (published crates touched):
 
-  Version bumps: patch bumps on every published crate the
-  dispatch touches (`mechanics-core` 0.4.1 → 0.4.2,
-  `philharmonic-connector-impl-http-forward` 0.1.0 → 0.1.1,
-  `philharmonic-connector-impl-llm-openai-compat` 0.1.2 →
-  0.1.3). `bins/philharmonic-api-server` is unpublished so
-  no bump. Pre-1.0 SemVer permits patch bump for an internal
-  behavior change of this scope.
+  - `mechanics-core` 0.4.1 → 0.5.0 (minor; not a SemVer-
+    visible API change strictly — the public surface stays —
+    but switching the HTTP transport is operator-visible
+    behavior worth flagging).
+  - `philharmonic-connector-impl-http-forward` 0.1.0 → 0.2.0
+    (same reasoning).
+  - `philharmonic-connector-impl-llm-openai-compat` 0.1.2 →
+    0.2.0 (same).
+  - `mechanics-http-client` (new): published as `0.0.1`
+    initial substantive version, after a `0.0.0` name
+    reservation.
 
-  Hard constraints:
+  **Hard constraints:**
 
-  - No native-roots fallback. Even `rustls-native-certs` /
-    `openssl-probe` should drop out of the runtime tree where
-    possible (they may remain as transitive deps of
-    `rustls-platform-verifier` which itself stays compiled —
-    that's acceptable as long as the runtime control flow
-    never touches them).
-  - aws-lc-rs stays as the sole crypto provider (no
-    re-introduction of `ring`).
-  - No HTTP wire format change. No public API surface change.
+  - No `philharmonic-*` dep on `mechanics-http-client`.
+    Mechanics family stays independent.
+  - aws-lc-rs is the sole crypto provider. No `ring`.
+  - Trust store is webpki-roots only. No native-certs, no
+    platform-verifier — those should literally not appear in
+    the runtime dep tree after the migration.
+  - Existing wire behavior preserved: HTTP/1.1 + HTTP/2 ALPN,
+    same body decompression set, same error-classification
+    semantics that the connector impls' tests assert against.
+  - No public API change on the four migrated crates beyond
+    error-variant additions, which take a patch/minor bump as
+    appropriate.
 
-  Claude drafts the Codex prompt; Codex implements + tests.
-  No crypto-review gate — trust-store config only, no
-  changes to AAD/AEAD/SCK/COSE paths.
+  **Implementation approach:** Claude direct, this session
+  (user override of the default Codex-dispatch path). The
+  pre-existing D20 Codex prompt archive at
+  [`docs/codex-prompts/2026-05-12-0002-d20-webpki-roots-only-tls-01.md`](codex-prompts/2026-05-12-0002-d20-webpki-roots-only-tls-01.md)
+  is **superseded** — it described the runtime-bypass shape
+  that this revision replaces. Pre-revision §3.G text
+  archived alongside.
 
 ### H. Workspace tooling (1 dispatch) — DONE
 

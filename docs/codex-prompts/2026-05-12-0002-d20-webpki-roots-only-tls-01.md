@@ -91,7 +91,28 @@ Per-crate `Cargo.toml`s that gain direct `rustls` +
 
 ## Outcome
 
-Pending — will be updated after Codex run.
+**Superseded 2026-05-13 — not dispatched.** The runtime-bypass
+approach described below was the original D20 plan: keep
+reqwest and call `ClientBuilder::use_preconfigured_tls()` at
+every construction site, leaving `rustls-platform-verifier` as
+unused dead weight in the dep tree.
+
+Yuka's 2026-05-13 redirection pivoted D20 to a structural
+solution: build a new `mechanics-http-client` crate wrapping
+`hyper-rustls` + `webpki-roots`, migrate the four reqwest call
+sites to it, and drop reqwest entirely. The dead crates
+(`rustls-platform-verifier`, `rustls-native-certs`,
+`openssl-probe`) exit the runtime dep tree as a natural
+consequence rather than persisting as unused compiled weight.
+
+This file is preserved as the historical record of the
+runtime-bypass approach (a reasonable middle path that future
+maintainers may want to reach for if the new-crate path runs
+into upstream-API instability). The authoritative current spec
+lives in
+[`docs/ROADMAP.md` §3.G](../ROADMAP.md#g-http-client-transport--tls-trust-posture-1-dispatch).
+No Codex dispatch was created for either shape; D20 lands via
+Claude-direct implementation per same-session user override.
 
 ---
 
