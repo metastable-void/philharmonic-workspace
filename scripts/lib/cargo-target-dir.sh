@@ -21,5 +21,12 @@
 #
 # POSIX sh only — see CONTRIBUTING.md §6.
 
+if [ ! -h target-main ] ; then
+  rm -rf target-main
+  dir="/tmp/philharmonic-$( id -u )-target-main"
+  mkdir "$dir"
+  ln -s "$dir" target-main
+fi
+
 CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-target-main}"
 export CARGO_TARGET_DIR

@@ -8,7 +8,7 @@ target/
 # duration of the competing build.
 target-xtask/
 target-publish/
-target-main/
+target-main
 target-release/
 
 **/*.rs.bk
