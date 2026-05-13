@@ -47,3 +47,4 @@
 - [2026-05-10](project-status-reports/2026-05-10-21-47-26.md)
 - [2026-05-11 (end-to-end PoC milestone)](project-status-reports/2026-05-11-19-50-15.md)
 - [2026-05-12 (post-PoC arc: D17 landed, D20/D21 added, HTTPS hardening, staging deploy)](project-status-reports/2026-05-12-18-58-06.md)
+- [2026-05-13 (production-security cleanup arc: D20/D21/D22-client/D22-server-lib/D25/D23 landed; ring + native-tls + platform-verifier + native-certs bans; dockerlet 0.1.0 + mhc 0.2.1 published)](project-status-reports/2026-05-13-23-17-00.md)
