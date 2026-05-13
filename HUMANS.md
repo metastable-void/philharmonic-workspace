@@ -101,6 +101,9 @@ import URL, { URLSearchParams } from `mechanics:url`;
 import console from `mechanics:console`;
 ```
 
+Please note that philharmonic ecosystem enables
+mechanics-rs's `mime` feature unconditionally.
+
 ## WebUI
 
 Note: Keep WebUI up-to-date with any API features added
