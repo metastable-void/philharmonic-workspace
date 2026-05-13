@@ -165,14 +165,15 @@ active work now lives in the post-v1 dispatch plan (§3 below).
   - **D17 landed** — `mechanics-core` 0.4.0 → 0.4.1
     (`0e6c3e7` submodule + `743e091` parent). Worker
     run-job response now returns when the script's
-    top-level settles; unawaited promises, endpoint
-    calls, and `setTimeout` callbacks continue polling on
-    the worker tokio task until quiescence or
-    `max_execution_time`. Authoritative behavior spec
-    at [`design/06` §Tail-promise polling](design/06-execution-substrate.md#tail-promise-polling).
+    top-level settles; unawaited promises and endpoint
+    calls continue polling on the worker tokio task
+    until quiescence or `max_execution_time`. Authoritative
+    behavior spec at [`design/06` §Tail-promise polling](design/06-execution-substrate.md#tail-promise-polling).
     Codex chose sub-shape B (`RunJobsExit` enum +
     `run_jobs_until(predicate)` helper); `tracing = "0.1"`
-    dep + `setTimeout` global builtin added.
+    dep + `setTimeout` global builtin added (the
+    `setTimeout` global is being reverted under D18 per
+    HUMANS.md's "no non-ES globals" hard rule; see §3.F).
   - **D7 wire shape locked** — HUMANS.md surfaced a
     complete SMTP submission spec (port-25 ban, port-driven
     TLS, four-valued strictness enum, request shape,
@@ -348,20 +349,41 @@ The single `(Gate 1)` item is **not** a Codex dispatch — Claude
 drafts the proposal, Yuka reviews per the two-gate crypto-review
 protocol (§2).
 
-Total: **22 Codex dispatches plus 1 Gate-1 proposal.**
+Total: **24 Codex dispatches plus 1 Gate-1 proposal.**
 **D1, D2, D3, D4, D5, D6, D10, D11, D12, D13, D14, D15, D16,
-D17, D20, D21 are done** (16 of 22; D20 + D21 both landed via
+D17, D20, D21 are done** (16 of 24; D20 + D21 both landed via
 Claude-direct implementation on 2026-05-13, with user override
 on the default Codex-dispatch path). Gate 1 and Gate 2 both
 approved.
-Remaining: D7, D8, D9, D19 (Tier 2/3 connectors — D19 is
-the new DNS connector surfaced 2026-05-12 via HUMANS.md), D18
-(`mechanics-core` module-surface refactor: feature gating +
-new `mime`/`url`/`console`/`html` modules), D22
-(HTTP/3 client + server support added 2026-05-13 for a later
-session — HTTPS DNS RR-driven discovery as the primary path
-with Alt-Svc as fallback, on top of the mechanics-http-client
-transport, plus HTTP/3 listeners on the three release bins).
+
+**Sequencing directive (Yuka, 2026-05-13):** production-
+security cleanups (§3.J — D23 testcontainers replacement +
+D24 default-features audit) take **priority over** every
+other pending dispatch, including the Tier 2/3 connector
+work (D7 / D8 / D9 / D19) and D18 (mechanics-core module
+refactor). Framing: "serious production-ready security" —
+clean release-binary runtime trees and minimised per-dep
+feature surface are baseline requirements, not optional
+polish. D22 server-integration is the one exception that
+co-sequences with §J (it's part of the in-flight D22 arc).
+
+Remaining, in landing order:
+- **D22 server-integration** (in-flight; wire
+  `mechanics-http-server` into `mechanics` +
+  `philharmonic-api` + `philharmonic-connector-service`
+  + the three bins' `bind_h3: Option<SocketAddr>` config
+  fields).
+- **D23** (in-tree minimal testcontainers replacement;
+  drops bollard's `rustls-native-certs` pull — see §3.J).
+- **D24** (workspace-wide `default-features = false`
+  audit; per-dep feature trim across every workspace
+  Cargo.toml — see §3.J).
+- D18 (`mechanics-core` module-surface refactor: feature
+  gating + new `mime`/`url`/`console`/`html` modules + the
+  2026-05-13 setTimeout-global removal per HUMANS.md's
+  "no non-ES globals" hard rule — see §3.F).
+- D7 / D8 / D9 / D19 (Tier 2/3 connectors: SMTP /
+  Anthropic / Gemini / DNS).
 
 ### A. Embedding datasets (6 dispatches + 1 Gate-1) — DONE
 
@@ -576,9 +598,15 @@ under "Evening trim — 2026-05-11".
   (predicate)` helper in `executor.rs`. `tracing = "0.1"`
   dep added; deadline-mid-tail-poll emits one structured
   `tracing::warn!` line with job ID + in-flight + queued
-  counts. `setTimeout(callback, delayMs)` added as a global
-  builtin inside the script realm (the realm had no timer
-  surface pre-D17). Authoritative behavior spec landed at
+  counts. `setTimeout(callback, delayMs)` was added as a
+  global builtin inside the script realm during D17 (the
+  realm had no timer surface pre-D17); **this global will
+  be reverted under D18** (2026-05-13 clarification per
+  HUMANS.md's "no non-ES globals" hard rule — `setTimeout`
+  is WHATWG, not ECMAScript spec; the D17 tail-promise
+  polling *behavior* stays, only the user-facing
+  `setTimeout` *surface* leaves). See §3.F.
+  Authoritative behavior spec landed at
   [`docs/design/06-execution-substrate.md` §Tail-promise
   polling](design/06-execution-substrate.md#tail-promise-polling).
   Codex prompt archive + post-mortem at
@@ -630,14 +658,59 @@ modules.
     (workflows can keep hand-writing the `body` string
     when `mime` isn't enabled).
 
+  Additional scope folded in 2026-05-13: **remove the
+  non-ES `setTimeout` global** that D17 inadvertently added
+  to the Mechanics realm. Per HUMANS.md the rule is "no
+  non-ES globals" (hard rule, just reiterated 2026-05-13);
+  `setTimeout` and `setInterval` are WHATWG/Web Platform
+  globals, not ECMAScript spec, so neither belongs in the
+  realm's global object or in any `mechanics:*` module
+  export. Engine-level timer plumbing (Boa's `TimeoutJob`
+  queue + the D17 tail-promise polling loop) stays — it's
+  needed for spec-conformant Promise microtask handling
+  and shouldn't be torn out. The fix is narrowly:
+  - Drop `set_timeout` + `install_timer_builtins` from
+    `mechanics-core/src/internal/runtime.rs` (D17's
+    additions; ~25 lines).
+  - Rewrite the two `setTimeout`-using fixtures in
+    `mechanics-core/src/internal/pool/tests/runtime_behavior.rs`
+    (the D17 tail-poll behavior tests) to exercise the same
+    invariants via Promise-based async patterns (e.g.
+    `new Promise(resolve => endpoint(...).then(resolve))`)
+    so D17's tail-poll behavior remains tested without the
+    `setTimeout` surface.
+  - Update `docs/design/06-execution-substrate.md`
+    §Tail-promise polling to drop the `setTimeout`
+    callback bullet (Promise chains + endpoint calls remain
+    as the only legitimate sources of tail work).
+  - Update `docs/ROADMAP.md` §2 daily-log (2026-05-12 D17
+    entry) and §3.E to note the `setTimeout` addition was
+    reversed under D18.
+  - `mechanics-core/CHANGELOG.md`: new `[0.6.0]` entry
+    naming the global-removal as a breaking change
+    (alongside the rest of D18's surface).
+  - Add an `Outcome` addendum to the D17 prompt archive +
+    the 2026-05-12 ROADMAP trim archive linking forward
+    here, so future readers tracing the D17 reversal don't
+    chase a phantom feature.
+
   Hard constraints:
 
   - `jsdom` won't work with Mechanics — the runtime has no
     non-ES globals on purpose. Modules expose ES-style
-    `import`s only; no implicit globals.
+    `import`s only; no implicit globals. This is a **hard
+    rule** (reiterated by Yuka 2026-05-13). `setTimeout`,
+    `setInterval`, `requestAnimationFrame`, `queueMicrotask`,
+    and anything else from the Web Platform / WHATWG global
+    surface MUST NOT appear as Mechanics realm globals or
+    as `mechanics:*` module exports. Engine-internal job
+    queue plumbing is fine — the constraint is the user-
+    facing surface, not the runtime's internals.
   - No new public-API breakage on the Rust side beyond the
-    feature gates themselves (existing consumers stay
-    green with default features on).
+    feature gates themselves and the `setTimeout`-global
+    removal (existing Rust consumers stay green with default
+    features on; JS workflows that called `setTimeout()`
+    explicitly will fail — that's the intended behavior).
   - All modules respect Mechanics's per-job stateless
     contract — no cross-job state, no globalThis
     mutations that persist.
@@ -914,6 +987,211 @@ deferred to a later session.
   TBD when D22 is scheduled. No crypto-review gate —
   transport-layer change only, no AAD / AEAD / SCK / COSE
   touches.
+
+### J. Production-security dep cleanup (2 dispatches) — TOP PRIORITY
+
+**Sequencing directive (Yuka, 2026-05-13):** these
+production-security cleanups land **before any remaining
+Tier 2/3 connector work (D7 SMTP, D8 Anthropic, D9 Gemini,
+D19 DNS) and before D18 (mechanics-core module refactor)**.
+The framing is "serious production-ready security" — the
+workspace's release-binary runtime trees being clean of
+non-aws-lc-rs / non-webpki-roots TLS and the per-dep
+feature surface being minimised are baseline requirements,
+not optional polish.
+
+#### D23 — in-tree minimal testcontainers replacement
+
+Captured 2026-05-13 as the cleanup-residual of the
+`ring` / `rustls-platform-verifier` / `rustls-native-certs`
+bans-tightening pass. After that pass (philharmonic-api
+reqwest → mhc dev-dep migration, rcgen aws_lc_rs feature,
+ureq `rustls-no-provider` + manual aws-lc-rs provider
+install, testcontainers/bollard switched to `aws-lc-rs`
+feature), exactly one wrapper remains in `deny.toml`:
+`rustls-native-certs` allowed when its direct parent is
+`bollard`. The path is `bollard`'s `ssl_providerless`
+feature (which both `aws-lc-rs` and `ssl` build on)
+unconditionally pulling `rustls-native-certs` — bollard
+uses it to validate the Docker daemon's registry-side TLS
+when pulling images.
+
+Replace `testcontainers` / `testcontainers-modules`
+  with a minimal in-tree dev-tooling crate
+  (working name `xtask-testcontainers` or
+  `mechanics-testcontainers`; bikeshed at prompt-drafting
+  time) that uses `bollard` with **only the features the
+  workspace's integration tests actually need**, dropping
+  `ssl_previderless` / `home` / `rustls-native-certs`
+  entirely.
+
+  **What workspace tests use today** (audit before drafting
+  the prompt; this is the baseline):
+  - Start a MySQL container (`mysql:8` or similar public
+    image) with a healthcheck-style wait.
+  - Start a Postgres container with the same pattern.
+  - Inspect host + assigned port for the connection string.
+  - Tear down on `Drop`.
+  - All over a local Docker daemon Unix socket (the
+    workspace doesn't currently use remote-daemon test
+    setups).
+
+  **What bollard needs for that subset:**
+  - `unix-socket` feature (talk to local Docker daemon).
+  - Image-pull / container-start / container-inspect /
+    container-stop API calls.
+  - **No TLS**: registry-side TLS is the daemon's concern,
+    not bollard's, when the workspace talks to the daemon
+    over a Unix socket.
+  - **No `home`**: workspace tests use public images that
+    don't need Docker Hub auth from `~/.docker/config.json`.
+
+  **Hard requirements:**
+  - Public surface mirrors what the workspace's test code
+    actually uses today (a `Container<Image>` handle with
+    `.start().await`, `.get_host_port_ipv4(...)`,
+    `.get_host()`, `.with_startup_timeout(...)`, Drop-based
+    teardown). Migration sites are mostly mechanical.
+  - The MySQL and Postgres "image" types from
+    `testcontainers-modules` get re-implemented as
+    minimal wrappers (image name + env vars + ready
+    probe).
+  - Dev-tooling crate, never published. `publish = false`.
+  - In-tree (non-submodule) member, mirroring the existing
+    `xtask/` placement convention.
+  - No `unsafe`, no panics on reachable paths in lib code
+    (test fixtures themselves may `.expect()` per the
+    workspace's test conventions).
+
+  **Migration scope** (~6 consumer crates):
+  - `philharmonic-api/tests/{e2e_mysql.rs, e2e_full_pipeline.rs}`
+  - `philharmonic-policy/tests/...`
+  - `philharmonic-workflow/tests/...`
+  - `philharmonic-store-sqlx-mysql/tests/...`
+  - `philharmonic-connector-impl-sql-mysql/tests/...`
+  - `philharmonic-connector-impl-sql-postgres/tests/...`
+
+  Each migrates from `testcontainers` / `testcontainers-modules`
+  imports to the in-tree replacement. Existing test logic
+  unchanged.
+
+  **Concurrency-limit knob** (Yuka, 2026-05-13): today the
+  workspace's testcontainer tests are file-lock-serialized
+  via `serial_test` (see comments in
+  `philharmonic-connector-impl-sql-{mysql,postgres}/Cargo.toml`)
+  because spinning up many containers concurrently used to
+  OOM the dev box. The current host is more capable —
+  the new default is **`min(4, available_parallelism / 4)`**
+  concurrent testcontainer tests (computed via
+  `std::thread::available_parallelism()`). On a 16-core
+  box that's 4; on an 8-core box, 2; on a 4-core box, 1;
+  on resource-tight CI runners, the floor of 1 falls back
+  to the current serial behaviour automatically. Implement
+  via either a semaphore-style file-based limiter (so the
+  limit applies across cargo's per-test-binary process
+  fan-out) or a concurrency knob on the replacement
+  crate's fixture initialiser. Wire the formula in one
+  place in the replacement crate (a `pub const` or a
+  `LazyLock<usize>`) so future tuning is one-edit. Verify
+  by running the SQL connector test suites under a load
+  monitor (`./scripts/build-status.sh` or the
+  resource-pressure xtask) at the computed concurrency
+  and confirming the dev box stays healthy; the formula
+  errs on the conservative side.
+
+  **Acceptance:** after D23, the `rustls-native-certs`
+  entry in `deny.toml` becomes a no-wrapper full ban
+  (matching `native-tls`, `rustls-platform-verifier`).
+  `cargo tree --workspace --invert rustls-native-certs`
+  prints nothing.
+
+  Claude drafts the Codex prompt; Codex implements + tests
+  + migrates consumers. No crypto-review gate — dev-tooling
+  only, no AAD / AEAD / SCK / COSE touches.
+
+  **Why not fork bollard's features instead?** Bollard's
+  Cargo.toml entangles `home` / `ssl_providerless` /
+  `rustls-native-certs` such that disabling them from a
+  consumer's feature flags isn't possible without a fork.
+  The in-tree wrapper approach is structurally cleaner —
+  one small crate that depends on bollard with the precise
+  minimum features the workspace needs, instead of a
+  bollard fork that has to be kept in sync.
+
+#### D24 — workspace-wide `default-features = false` audit
+
+Captured 2026-05-13. Production-security driver: each
+direct dep's default-feature set is whatever the upstream
+maintainer ships, often broader than what the workspace
+actually uses. Untouched default features (a) inflate
+compile time and binary size, (b) expand the supply-chain
+attack surface unnecessarily (each pulled crate is one
+more compromise vector), (c) sometimes pull crypto
+backends or HTTP clients we don't want — the `ring` /
+`native-tls` / `rustls-platform-verifier` chains found
+during the D23 bans pass were specifically default-feature
+leaks that the workspace's runtime intent didn't authorise.
+
+The audit walks every workspace crate's `Cargo.toml`,
+direct dep by direct dep, and:
+
+- Sets `default-features = false` on every dep where the
+  workspace's usage doesn't need the upstream's defaults.
+- Enumerates the explicit feature list the crate actually
+  uses, picked from reading the crate's own `src/` calls.
+- Applies the same discipline to internal workspace-deps
+  (philharmonic-* / mechanics-* using each other) — when
+  crate A depends on crate B, it pins `default-features =
+  false` and only enables the B features it actually
+  needs. This is the cross-crate piece Yuka called out
+  explicitly: "we'll trim … with default-features = false
+  for our own crates too."
+
+Scope estimate: 25+ workspace Cargo.tomls, ~150-200 dep
+entries to audit (per-Cargo.toml ranges from ~5 to ~25
+direct deps). Mechanical-but-thorough; the per-dep
+question is always "which features does this crate's src/
+actually touch", which is grep-able. Codex's bread and
+butter.
+
+**Hard requirements:**
+
+- Workspace `cargo build --workspace` stays green
+  end-to-end after each crate's audit (no missing features
+  cascade).
+- `./scripts/pre-landing.sh` clean after the whole pass.
+- Test paths preserved: `#[cfg(test)]` features added
+  where dev-deps need them.
+- Per-crate version-bump policy: this is a behaviour-
+  preserving refactor for the workspace's published
+  crates. Patch-version-bump on any crate that lands
+  Cargo.toml changes (e.g. mhc 0.2.0 → 0.2.1 if its deps
+  shifted; ditto every other touched published crate).
+- For any dep where trimming exposed a real previously-
+  hidden behaviour change (rare; called out in residual
+  risks), the Codex prompt may opt to leave defaults on
+  and document. The bias is toward trimming.
+
+**Acceptance:**
+
+- Every workspace crate's direct deps either have
+  `default-features = false` with an explicit feature list
+  *or* an inline comment explaining why defaults are kept
+  (e.g. "axum's default feature set is the cheapest path
+  for our usage; trimming explored and not worth").
+- `cargo tree --workspace -e all --duplicates` shows no
+  new duplicates introduced by the audit (feature
+  unification can sometimes worsen with trimming; document
+  any case where it does and accept).
+- Compile-time wins documented per published crate as a
+  CHANGELOG patch entry.
+
+Claude drafts the Codex prompt; Codex implements; Claude
+reviews + commits. No crypto-review gate — Cargo.toml
+edits + CHANGELOG entries only. Lands **after D23** (so
+the bans wrapper churn isn't doubled up) and **before
+D7 / D8 / D9 / D18 / D19** per the §J sequencing
+directive.
 
 ### Suggested sequencing
 

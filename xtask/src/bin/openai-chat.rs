@@ -386,6 +386,7 @@ fn main() -> ExitCode {
 
     let auth = format!("Bearer {api_key}");
 
+    xtask::http::install_rustls_provider();
     // Configure ureq to NOT turn 4xx/5xx into an Err — we want the
     // response body regardless of status so callers can see what
     // OpenAI actually said (e.g., "schema feature X not supported

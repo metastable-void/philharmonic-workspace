@@ -93,7 +93,145 @@ pattern.
 
 ## Outcome
 
-**Pending — will be updated after the Codex run.**
+**Completed 2026-05-13 with Claude post-Codex polish.**
+**RUN STATUS: PARTIAL** — Codex reached the
+pre-landing.sh step cleanly (the mhs library compiled,
+8 tests passed + 1 ignored, fmt + clippy + rustdoc all
+clean, the cargo-tree grep was empty including for
+`webpki-roots`), but the run died mid-pre-landing during
+the philharmonic-submodule `--ignored` phase when the host
+hit a transient storage pressure event (resolved by Yuka
+post-task). The mhs side of the work was complete; only
+the final structured-output emission step was missed.
+
+Codex session: `019e2053-d7f5-7e82-9fc6-7c94a86999ca`
+(resumable via `codex resume`).
+Codex job ID: `task-mp3rjhjj-yrnu7c`.
+
+### What Codex shipped inside `mechanics-http-server/`
+
+- `Cargo.toml`: version `0.0.0 → 0.1.0`. Deps `bytes`,
+  `h3 = "0.0.8"`, `h3-quinn = "0.0.10"`, `http`,
+  `quinn = "0.11.9"` (`default-features = false`, features
+  `["runtime-tokio", "rustls-aws-lc-rs"]`),
+  `rustls = "0.23"` (`default-features = false`, features
+  `["std", "tls12", "aws_lc_rs"]`), `thiserror`,
+  `tokio = "1"` (features `["rt", "time", "net", "sync",
+  "macros"]`), `tower = "0.5"` features `["util"]`,
+  `tracing`. Dev-deps: `rcgen = "0.13"` (initially default,
+  Claude post-Codex switched to `default-features = false,
+  features = ["aws_lc_rs", "pem"]` to drop the dev-tree
+  `ring` pull). NO `webpki-roots`.
+- New modules under `src/`:
+  - `server.rs` — `Http3Server`, `Http3ServerConfig`,
+    `Http3Handle`. The `Http3Server::start` method validates
+    config + TLS material; when `bind_h3 = None` returns an
+    inert handle that completes immediately on poll; when
+    `Some(addr)` builds a `rustls::ServerConfig` with
+    `aws_lc_rs::default_provider()`, wraps cert+key, sets
+    QUIC-side ALPN to `[b"h3"]`, max_early_data_size = 0
+    (server-side 0-RTT off by default, defense in depth on
+    top of the method-allow-list predicate), binds a
+    `quinn::Endpoint::server(...)` on the supplied addr,
+    spawns a tokio accept-loop with `tokio::select!` over
+    shutdown signal + endpoint.accept + per-connection
+    JoinSet. Per-connection task runs
+    `h3::server::Connection::new(h3_quinn::Connection)`,
+    accepts h3 requests, routes through the supplied
+    tower::Service. `Http3Handle::drop` triggers graceful
+    shutdown (cancel-on-drop via `quinn::Endpoint::close`).
+  - `alt_svc.rs` — `AltSvcLayer` + `AltSvcService` +
+    `alt_svc_layer(h3_port, max_age_secs)` factory.
+    Implements `tower::Layer`; the produced service inserts
+    a single `Alt-Svc: h3=":<port>"; ma=<max-age>"` header
+    on every response. Insert-only semantics (re-layering
+    doesn't duplicate; idempotency test covers it).
+  - `zero_rtt.rs` — `default_zero_rtt_methods()` (`[GET,
+    HEAD]`) + `is_zero_rtt_safe(method, allowed) -> bool`
+    predicate. Server-side enforcement is defense-in-depth:
+    the rustls `max_early_data_size = 0` setting refuses
+    0-RTT at the TLS layer; the predicate is a future-
+    proofing hook for when v2 allows 0-RTT.
+  - `error.rs` — `Error` enum with `InvalidTls(String)`,
+    `BindFailed(String)`, `Internal(String)` variants;
+    `#[non_exhaustive]`; `thiserror::Error` impl.
+- `src/lib.rs`: real crate-level rustdoc explaining role,
+  activation model, TLS posture, HTTP/1.1+HTTP/2 are NOT
+  this crate's concern. Module declarations + public
+  re-exports.
+- `src/tests.rs`: 8 active tests + 1 ignored:
+  - `start_with_no_bind_is_inert` ✓
+  - `start_with_bind_opens_listener` ✓
+  - `end_to_end_h3_request_via_mhc` (`#[ignore]` — Codex
+    chose the in-process state-machine substitute below;
+    full mhc-driven fixture is D22 server-integration's
+    round if it surfaces a need).
+  - `request_routes_into_tower_service_substitute` ✓
+    (the state-machine substitute for test 3 — verifies
+    Router routing without QUIC).
+  - `alt_svc_layer_adds_header` ✓
+  - `alt_svc_layer_respects_custom_port_and_max_age` ✓
+  - `alt_svc_layer_is_idempotent_under_repeated_layer_stacking` ✓
+  - `zero_rtt_policy_default_rejects_non_idempotent_methods` ✓
+  - `zero_rtt_policy_honours_config_override` ✓
+- `CHANGELOG.md`: new `[0.1.0] - 2026-05-13` entry naming
+  the dispatch.
+
+### What Claude did post-Codex (this turn)
+
+Three follow-through arcs landed alongside the mhs work:
+
+1. **rcgen → aws_lc_rs**: switched the mhs dev-dep to
+   `rcgen = { default-features = false, features = ["aws_lc_rs", "pem"] }`
+   to drop the ring path from the mhs test build.
+2. **Cleanup sweep (ring / native-tls / platform-verifier /
+   native-certs)**: per Yuka's directive
+   "add ring+native-tls+platform-verifier+roots to bans"
+   (2026-05-13). Migrated `philharmonic-api`'s reqwest
+   dev-dep to `mechanics-http-client` (rewrote
+   `tests/e2e_mysql.rs` + `tests/e2e_full_pipeline.rs`),
+   switched the 6 testcontainers consumers to
+   `default-features = false, features = ["aws-lc-rs"]`,
+   switched `ureq` (xtask + embed build-dep) to
+   `rustls-no-provider` + a workspace-direct
+   `rustls = "0.23"` with `aws_lc_rs` and explicit
+   `install_default()` calls in `xtask::http` +
+   `philharmonic-connector-impl-embed/build.rs`. Net
+   result: `rustls-platform-verifier` gone entirely; all
+   directly-fixable `ring` sources gone; two remaining
+   wrappers (`bollard` for `rustls-native-certs`,
+   `quinn-proto` for `ring` via h3-quinn upstream feature-
+   unification). Both wrappers documented in `deny.toml`
+   with the upstream-blocker reasoning.
+3. **Documentation**: `docs/design/06-execution-substrate.md`
+   gained a new §"Realm surface (no non-ES globals)" hard
+   rule (per HUMANS.md / Yuka's 2026-05-13 reiteration);
+   §"Tail-promise polling" dropped `setTimeout` from its
+   list of legitimate tail-work sources. `docs/ROADMAP.md`
+   §2 + §3.E forward-point to D18's setTimeout-reversal
+   scope. §3.F (D18) gained the setTimeout-global removal
+   as folded scope. §3.J added with D23 (in-tree
+   testcontainers replacement) and D24 (workspace-wide
+   `default-features = false` audit) — both flagged as
+   top-priority production-security cleanups landing
+   before D7/D8/D9/D18/D19. Also: a WebUI chat-greeting
+   regression fix landed in `philharmonic/webui/src/pages/
+   InstanceDetail.tsx` per Yuka's HUMANS.md §WebUI bullet.
+
+### Codex's open questions, resolved here
+
+1. *Alt-Svc semantics (insert / append / replace)?* —
+   Codex picked **insert-only** and added an idempotency
+   test. Left as-is.
+2. *`Http3Handle` `Future` vs. `IntoFuture`?* — Codex
+   picked direct `Future` impl; simpler, no second
+   pattern to learn. Left as-is.
+3. *0-RTT method list `Vec<Method>` vs.
+   `BTreeSet<Method>`?* — Codex picked `Vec`. Left
+   as-is; perf-immaterial for the expected set size.
+4. *Anything punted as out-of-scope?* — Real h3 server
+   fixture test (test 3, `#[ignore]`'d) deferred to D22
+   server-integration's round if it surfaces a need.
 
 ---
 

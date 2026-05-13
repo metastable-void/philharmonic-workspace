@@ -139,14 +139,67 @@ connector service using the endpoint configuration from the
 The host-function API is `mechanics-core`'s responsibility;
 precise details are in the crate's own documentation.
 
+### Realm surface (no non-ES globals)
+
+**Hard rule:** the Mechanics realm exposes only ECMAScript-spec
+globals plus the `mechanics:*` synthetic modules. Web Platform /
+WHATWG surface is **not** part of the contract — neither as
+realm globals nor as `mechanics:*` module exports. That
+explicitly excludes (non-exhaustive):
+
+- `setTimeout`, `setInterval`, `clearTimeout`, `clearInterval`
+- `requestAnimationFrame`, `cancelAnimationFrame`,
+  `requestIdleCallback`
+- `queueMicrotask` (microtasks are implicit via Promise
+  chaining; no explicit user-facing scheduling primitive)
+- `fetch`, `XMLHttpRequest`, `WebSocket` (outbound HTTP goes
+  through `mechanics:endpoint` only)
+- `window`, `document`, `navigator`, `location`, `history`,
+  `localStorage`, `sessionStorage`, `IndexedDB`, `crypto`
+  (the WHATWG one — JS-engine `Math.random` is fine; Web
+  Crypto isn't), `performance`, and anything else with a
+  `[Exposed]`-to-the-Web IDL annotation
+- Any node-built-in (`process`, `require`, `Buffer`, …)
+
+Operational reason: workflows that reach for these surfaces
+typically violate Mechanics's stateless-per-job contract or
+the connector framework's centralised side-effect routing.
+Forbidding them at the realm boundary prevents whole classes
+of bad script authoring (fire-and-forget timer callbacks that
+escape the workflow's response fence, direct outbound HTTP
+that bypasses connector tokens + payload encryption, DOM-
+emulation libraries like `jsdom` accidentally working and
+then carrying state that doesn't survive worker fungibility).
+
+Engine-internal job-queue / microtask plumbing is fine — Boa
+uses `TimeoutJob` internally to drive Promise resolution and
+microtask draining. The constraint is on the **script-visible
+surface**, not the host's implementation details.
+
+Future `mechanics:*` modules (the D18 batch ships
+`mechanics:mime` / `mechanics:url` / `mechanics:console` /
+`mechanics:html`) must be designed against this constraint:
+they expose ECMAScript-shaped APIs (named exports, no
+implicit globals) and never re-export WHATWG-shaped surfaces
+even if the underlying Rust crate happens to mirror one.
+
 ### Tail-promise polling
 
 When the script's top-level resolves (sync return, or an awaited
 promise fulfilled), `mechanics-core` serialises the result and
 returns the run-job response immediately. Any pending promises
-left inside the realm — unawaited `mechanics:endpoint(...)`, live
-`setTimeout` callbacks, fire-and-forget `Promise.then(...)` chains
-— continue to be polled in the background until they settle.
+left inside the realm — unawaited `mechanics:endpoint(...)` calls
+and fire-and-forget `Promise.then(...)` chains — continue to be
+polled in the background until they settle.
+
+**The Mechanics realm provides no timer surface.** Scripts have no
+`setTimeout` / `setInterval` / `requestAnimationFrame` /
+`queueMicrotask` globals and no `mechanics:*` module exporting any
+such function — see the "Realm surface (no non-ES globals)" hard
+rule above. The host's underlying job queue (Boa's `TimeoutJob` +
+microtask plumbing) is an implementation detail used internally
+to drive Promise resolution; it is **not** exposed to script
+authors and not a legitimate source of tail work.
 
 This is the **hardcoded default**. There is no per-job knob and
 no per-worker knob; every script execution gets the same
@@ -168,10 +221,10 @@ Lifetime is bounded by the per-job `max_execution_time`:
   cap is introduced.
 
 Side effects in tail-poll still complete: real HTTP requests to
-connector services still go out, real timers still fire. What
-changes is that the run-job response is no longer held open by
-them. The script's `return` is the response fence; quiescence is
-not.
+connector services still go out, real Promise chains still
+settle. What changes is that the run-job response is no longer
+held open by them. The script's `return` is the response fence;
+quiescence is not.
 
 Tail-promise outcomes are **not** recorded in the workflow step
 record — fire-and-forget. Unhandled rejections during tail-poll

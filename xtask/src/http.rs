@@ -14,8 +14,29 @@
 //! inline until then.
 
 use std::io::Read;
+use std::sync::Once;
 
 const DEFAULT_UA: &str = "philharmonic-dev-agent/1.0";
+
+/// Install the `aws-lc-rs` rustls `CryptoProvider` as the
+/// process-wide default, exactly once. ureq's `rustls-no-provider`
+/// mode requires the consumer to register a provider before the
+/// first TLS handshake; the workspace's no-`ring` policy
+/// (CONTRIBUTING.md §10.9, post-D20 / D22) forbids the
+/// `_ring`-enabled default ureq would otherwise pull. Calling
+/// this at the top of every xtask `fetch_*` and bin entry point
+/// is cheap (the `Once` keeps it idempotent and lock-free after
+/// the first call).
+pub fn install_rustls_provider() {
+    static ONCE: Once = Once::new();
+    ONCE.call_once(|| {
+        // `install_default` returns `Err` if another provider has
+        // already been installed (e.g. via `mechanics-http-client`
+        // when a hybrid xtask later links both). Either provider
+        // is fine for our use; tolerate the conflict silently.
+        let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
+    });
+}
 
 /// Errors that can occur during an HTTP request via `fetch_text` or `fetch_bytes`.
 #[derive(Debug)]
@@ -49,6 +70,7 @@ impl std::error::Error for HttpError {}
 /// default). All outbound HTTP from xtask bins that want the
 /// web-fetch discipline should go through this.
 pub fn fetch_text(url: &str) -> Result<String, HttpError> {
+    install_rustls_provider();
     let ua = std::env::var("WEB_FETCH_UA").unwrap_or_else(|_| DEFAULT_UA.to_owned());
 
     let response = match ureq::get(url).header("User-Agent", &ua).call() {
@@ -75,6 +97,7 @@ pub fn fetch_text(url: &str) -> Result<String, HttpError> {
 /// size cap or streaming variant — this buffers the whole body
 /// into memory. No built-in cap; each bin chooses.
 pub fn fetch_bytes(url: &str) -> Result<Vec<u8>, HttpError> {
+    install_rustls_provider();
     let ua = std::env::var("WEB_FETCH_UA").unwrap_or_else(|_| DEFAULT_UA.to_owned());
 
     let response = match ureq::get(url).header("User-Agent", &ua).call() {

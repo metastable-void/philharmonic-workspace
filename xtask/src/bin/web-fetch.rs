@@ -59,6 +59,7 @@ fn main() -> ExitCode {
         return ExitCode::from(1);
     }
 
+    xtask::http::install_rustls_provider();
     let ua = std::env::var("WEB_FETCH_UA").unwrap_or_else(|_| DEFAULT_UA.to_string());
 
     let response = match ureq::get(&args.url).header("User-Agent", &ua).call() {

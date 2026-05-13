@@ -268,6 +268,78 @@ not in place of it. The two coexist by design: the workspace
 block governs in-workspace builds, the per-crate block
 governs standalone builds.
 
+#### Per-setting rationale for `[profile.release]`
+
+The workspace's canonical `[profile.release]` block — used
+both at the workspace root and (verbatim, intentionally) in
+every published submodule's `Cargo.toml` — is:
+
+```toml
+[profile.release]
+opt-level = 3
+lto = true
+strip = true
+codegen-units = 1
+panic = "abort"
+overflow-checks = true
+```
+
+Each setting is a deliberate workspace choice. **Do not
+revert any of them silently** to "match cargo defaults" or
+"speed up CI" — each was set for a reason that survives the
+short-term win of relaxing it. If a future change genuinely
+requires a different value, surface the reasoning in the
+relevant PR + commit message and update this section.
+
+- **`opt-level = 3`** — release builds want the maximum
+  optimisation tier. Default. Just made explicit so the
+  intent is grep-able.
+- **`lto = true`** — full link-time optimisation across
+  every crate boundary in the release artifact. Slower
+  link, smaller and faster binary. Worth it for the
+  release bins and for downstream users embedding the
+  library crates with their own LTO discipline.
+- **`strip = true`** — strip symbols from the release
+  binary. Smaller artefact; loses debuginfo (which release
+  builds don't need; sourcemaps via `panic = "abort"` are
+  cheap to capture with `RUST_BACKTRACE=1` at run time).
+- **`codegen-units = 1`** — single codegen unit means the
+  optimiser sees the whole crate at once and can inline
+  / dead-code-eliminate across function boundaries that
+  the multi-unit default would block. Slower compile per
+  release build, **noticeably faster runtime + slimmer
+  binary**. This trade is intentional and has been
+  ratified by the workspace's release-performance work;
+  do not bump back to a higher count to shave compile
+  time. The compile cost is paid once per release; the
+  runtime + size win is paid every time the binary runs.
+- **`panic = "abort"`** — release builds abort on panic
+  rather than unwinding. Smaller binary (no unwind tables
+  on most call frames), faster (no per-frame landing-pad
+  cost), and removes a class of unwind-based attacks. The
+  workspace's no-panic-in-`src/` rule
+  ([§10.3](#103-panics-and-undefined-behavior)) means
+  panics are bugs we want to surface as crashes, not
+  recover from. `catch_unwind` is unavailable under abort
+  semantics; that's a feature, not a regression. The dev
+  profile uses default unwind so test failures are
+  diagnosable.
+- **`overflow-checks = true`** — keep integer-overflow
+  checks on in release. The workspace's no-panic rule
+  treats unchecked arithmetic as a bug (use
+  `checked_*` / `saturating_*` / `wrapping_*` to declare
+  intent explicitly); silent wrap in release would mask
+  rule violations. Combined with `panic = "abort"`,
+  unchecked overflow → abort, which is exactly what
+  the no-panic rule wants surfaced.
+
+When you add a new published crate to the workspace, copy
+this block verbatim into its `Cargo.toml`. Same when
+adopting an existing remote crate as a submodule
+(`./scripts/new-submodule.sh --adopt-existing`); the
+adopted Cargo.toml MUST end up with this block before the
+adoption commit lands.
+
 ---
 
 ## 4. Git workflow

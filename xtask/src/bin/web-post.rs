@@ -52,6 +52,7 @@ fn main() -> ExitCode {
         return ExitCode::from(1);
     }
 
+    xtask::http::install_rustls_provider();
     let ua = std::env::var("WEB_POST_UA").unwrap_or_else(|_| DEFAULT_UA.to_string());
 
     let mut request = ureq::post(&args.url)

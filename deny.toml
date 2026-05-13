@@ -185,14 +185,49 @@ external-default-features = "allow"
 allow-workspace = true
 # List of crates to deny
 deny = [
-    #"ansi_term@0.11.0",
-    #{ crate = "ansi_term@0.11.0", reason = "you can specify a reason it is banned" },
-    # Wrapper crates can optionally be specified to allow the crate when it
-    # is a direct dependency of the otherwise banned crate
-    #{ crate = "ansi_term@0.11.0", wrappers = ["this-crate-directly-depends-on-ansi_term"] },
+    # Python-build toolchain — workspace is Rust-only.
     "pyo3",
     "maturin",
+
+    # OpenSSL — workspace TLS is rustls-only.
     "openssl-sys",
+    "native-tls",
+
+    # TLS trust-store posture — workspace verifies against the
+    # bundled `webpki-roots` Mozilla CA bundle only (post-D20).
+    # No OS-native trust, no platform-supplied roots.
+    "rustls-platform-verifier",
+
+    # `rustls-native-certs` enters via one remaining upstream-
+    # blocked path: `bollard`'s `ssl_providerless` feature
+    # unconditionally pulls `rustls-native-certs` even when its
+    # `aws-lc-rs` provider variant is selected. `testcontainers`
+    # (workspace integration-test dev-dep) uses that bollard
+    # feature for Docker registry TLS validation. Removing this
+    # wrapper requires either forking bollard's feature config
+    # or replacing testcontainers.
+    { crate = "rustls-native-certs", wrappers = ["bollard"] },
+
+    # Crypto provider — workspace is `aws-lc-rs` only
+    # (post-D20 / D22-client / D22-server). All directly-fixable
+    # `ring` sources eliminated: `reqwest` dev-dep migrated to
+    # mhc; `rcgen` switched to `aws_lc_rs`; `ureq` + embed
+    # `build.rs` use `rustls-no-provider` + explicit aws-lc-rs
+    # provider install; `testcontainers` / `bollard` switched
+    # to the `aws-lc-rs` feature.
+    #
+    # The one remaining wrapper is `quinn-proto`: `h3-quinn
+    # 0.0.10` declares its `quinn` dep without
+    # `default-features = false`, so quinn defaults (which
+    # include `rustls-ring`) leak in via cargo feature
+    # unification, pulling `quinn-proto/rustls-ring → ring`.
+    # `mechanics-http-client` / `mechanics-http-server` both
+    # explicitly select `rustls-aws-lc-rs` but feature
+    # unification can't unset another consumer's enable.
+    # Removing this wrapper requires either an upstream h3-quinn
+    # fix (no newer version available as of 2026-05-13) or a
+    # vendored fork via `[patch.crates-io]`.
+    { crate = "ring", wrappers = ["quinn-proto"] },
 ]
 
 # List of features to allow/deny
