@@ -1010,6 +1010,23 @@ first, then testcontainers replacement to drop the bollard
 default-features audit that benefits from D23 + D25 already
 being landed).
 
+**Retro / sequencing lesson** (Yuka, 2026-05-13): when
+several §J-class cleanups queue together, weight
+**test-speed-impact** alongside CVE urgency when ordering.
+Dispatches that speed up `pre-landing.sh` (e.g. D23's
+testcontainer-concurrency knob trimming the per-run cost
+of the SQL-connector `--ignored` phase) compound across
+**every** subsequent dispatch's verification pass, while a
+CVE patch bump is a one-shot win. If a near-term cleanup
+will materially shorten the validation loop for the
+remaining queued cleanups, landing it first usually pays
+back the delay on the urgent-but-isolated item. D25
+landed first this round because the CVE was active and
+the queue was already drafted; if a similar situation
+recurs, surface the speed-vs-urgency tradeoff to the
+human-developer explicitly at dispatch-archival time
+instead of defaulting to CVE-first.
+
 #### D25 — `mechanics-http-client` hickory-resolver CVE bump
 
 Captured 2026-05-13 as an immediate follow-up to the D22
