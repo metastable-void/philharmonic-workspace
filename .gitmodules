@@ -106,3 +106,6 @@
 [submodule "mechanics-http-client"]
 	path = mechanics-http-client
 	url = https://github.com/metastable-void/mechanics-http-client.git
+[submodule "mechanics-http-server"]
+	path = mechanics-http-server
+	url = https://github.com/metastable-void/mechanics-http-server.git

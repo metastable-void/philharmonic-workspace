@@ -3267,6 +3267,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "mechanics-http-server"
+version = "0.0.0"
+
+[[package]]
 name = "mechanics-worker"
 version = "0.0.0"
 dependencies = [
