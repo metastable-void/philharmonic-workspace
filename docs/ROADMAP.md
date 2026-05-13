@@ -359,9 +359,9 @@ the new DNS connector surfaced 2026-05-12 via HUMANS.md), D18
 (`mechanics-core` module-surface refactor: feature gating +
 new `mime`/`url`/`console`/`html` modules), D22
 (HTTP/3 client + server support added 2026-05-13 for a later
-session — alt-svc-driven HTTP/3 negotiation on top of the
-mechanics-http-client transport, plus HTTP/3 listeners on the
-three release bins).
+session — HTTPS DNS RR-driven discovery as the primary path
+with Alt-Svc as fallback, on top of the mechanics-http-client
+transport, plus HTTP/3 listeners on the three release bins).
 
 ### A. Embedding datasets (6 dispatches + 1 Gate-1) — DONE
 
@@ -755,12 +755,51 @@ deferred to a later session.
     QUIC) under a non-default `http3` feature. Reuse the
     same aws-lc-rs + webpki-roots TLS configuration; UDP
     socket lifecycle is QUIC's concern.
-  - Negotiate via `Alt-Svc` response header: first request
-    over HTTP/2, server advertises `h3=":443"`, subsequent
-    requests upgrade to HTTP/3 for that origin within the
-    advertised lifetime. Origin cache in the `Client`.
-  - Fall back to HTTP/2 when the server doesn't advertise
-    HTTP/3 or the QUIC handshake fails.
+
+  - **Discovery priority** (matches Firefox 84+ /
+    Chrome 113+ / curl 8.10+ behavior):
+
+    1. **HTTPS DNS RR lookup (primary).** Before opening any
+       connection, query the `HTTPS` resource record (RFC 9460
+       SVCB/HTTPS, DNS TYPE 65) for the origin hostname. If
+       the `alpn` SvcParam advertises `h3`, attempt HTTP/3
+       immediately — no HTTP/2 bootstrap round-trip required.
+       Honour the `port`, `ipv4hint`, and `ipv6hint`
+       SvcParams when present (the address hints skip the
+       follow-up A/AAAA query). Cache per HTTPS RR TTL.
+       This is the **higher-priority** discovery path, on by
+       default for first-contact connections. Resolver:
+       `hickory-resolver` in system-config mode (consults
+       `/etc/resolv.conf`); same crate D19 introduces, so
+       sequencing D19 before D22 amortises the dep
+       introduction.
+    2. **`Alt-Svc` response header (fallback).** When the
+       HTTPS RR lookup returned NODATA, NXDOMAIN, or no `h3`
+       in `alpn`, the first request goes over HTTP/2. If the
+       server's response carries
+       `Alt-Svc: h3=":443"; ma=N`, subsequent requests to
+       that origin upgrade to HTTP/3 within the advertised
+       `max-age` lifetime. Per-origin Alt-Svc cache in the
+       `Client`.
+    3. **HTTP/2-only fallback.** When neither HTTPS RR nor
+       Alt-Svc advertises h3, or the QUIC handshake fails,
+       requests stay on HTTP/2 / HTTP/1.1 for the origin
+       (and the negative result is cached briefly to avoid
+       per-request DNS thrash).
+
+  - HTTPS RR caching obeys the resource record's TTL; on
+    expiry the next first-contact request re-queries.
+    Alt-Svc cache obeys the `ma` (max-age) directive; entries
+    purge on expiry. Both caches live in the `Client`
+    (cheap-to-clone `Arc` state already).
+  - **Privacy/correctness note.** HTTPS RR lookup happens
+    via the resolver configured in `/etc/resolv.conf`; if the
+    host uses an encrypted upstream (DoH / DoT / DoQ via the
+    stub) the privacy properties of the lookup are equal to
+    or better than the equivalent A/AAAA query. We do **not**
+    bundle our own DoH resolver in v1 — that's a separate
+    decision if the workspace's deployment model later wants
+    it.
 
   **Server side** (`mechanics`, `bins/philharmonic-api-server`,
   `bins/philharmonic-connector`):
@@ -773,6 +812,14 @@ deferred to a later session.
   - Each bin advertises `Alt-Svc: h3=":443"; ma=86400`
     (or similar) on every HTTPS response so clients learn
     of HTTP/3 capability after the first HTTP/2 exchange.
+    Alt-Svc remains the **secondary** discovery path; the
+    deployment guide should recommend operators publish an
+    HTTPS RR alongside their A/AAAA records (e.g.
+    `example.com. IN HTTPS 1 . alpn="h3,h2"`) so
+    HTTPS-RR-capable clients skip the HTTP/2 bootstrap
+    round-trip on first contact. Alt-Svc covers the case
+    where operators can't edit the DNS zone (managed-DNS
+    providers without HTTPS-type support, etc.).
   - 0-RTT replay safety: only allow 0-RTT on idempotent
     methods (GET / HEAD) at first; explicit per-route opt-in
     for others.
@@ -795,16 +842,73 @@ deferred to a later session.
     Operators opt in when they're ready.
   - Existing HTTP/1.1 + HTTP/2 paths unchanged. HTTP/3 is
     additive.
+  - **HTTP/1.1 must keep working in every form it works in
+    today, on both client and server.** HTTP/3 is QUIC-over-
+    TLS by design and cannot be served over plaintext UDP —
+    that's inherent, not a project choice — so the constraint
+    is that *enabling the `http3` feature must not regress
+    any existing HTTP/1.1 (or HTTP/2) path*. The three
+    HTTP/1.1 modes that all stay supported:
+    1. **Plain HTTP/1.1 over cleartext TCP** (`http://`).
+       No TLS, no ALPN, no discovery; the existing `hyper`
+       HTTP/1.x cleartext path stays untouched.
+    2. **HTTP/1.1 over TLS** (`https://`) when the server
+       only offers HTTP/1.1 — i.e. ALPN negotiation lands on
+       `http/1.1` because the server doesn't advertise `h2`.
+    3. **HTTP/1.1 selected via ALPN** when the server offers
+       multiple protocols but the client chooses (or is
+       forced down to) `http/1.1`. The client's ALPN list
+       MUST continue to include `http/1.1` after D22 lands;
+       adding `h3` to the advertised protocol set is
+       additive, not a replacement.
+
+    Concretely:
+    - **Client.** `http://` URLs flow through the existing
+      `hyper` HTTP/1.1/HTTP/2 cleartext path with **no**
+      HTTPS RR lookup, **no** QUIC attempt, **no** Alt-Svc
+      honouring. Discovery-priority logic only kicks in for
+      `https://` origins. For `https://` origins where the
+      HTTPS RR / Alt-Svc paths produce no HTTP/3 hit, or
+      where the QUIC handshake fails, ALPN over the TCP+TLS
+      fallback negotiates HTTP/2 or HTTP/1.1 exactly as it
+      does pre-D22. The crate's URL-scheme allowlist (`http`
+      and `https`, per
+      [`mechanics-http-client/src/request.rs`](../mechanics-http-client/src/request.rs))
+      stays open to both, and the TLS-side ALPN list stays
+      `h2, http/1.1` (with `h3` added under the `http3`
+      feature in the QUIC-side ALPN list — separate channel).
+    - **Server.** Each release bin keeps its current shape:
+      plain HTTP/1.1 over TCP is the default when the `https`
+      feature is off, full stop. With `https` on but `http3`
+      off: TLS-side ALPN advertises `h2, http/1.1` (current
+      behaviour). With both `https` and `http3` on: TLS-side
+      ALPN stays `h2, http/1.1` (clients that don't speak
+      h3 over QUIC must still get HTTP/2 or HTTP/1.1 over
+      TCP+TLS), and the QUIC-side ALPN is `h3`. The HTTP/3
+      UDP listener is gated behind the *existing* `https`
+      feature (no new umbrella feature, no implicit upgrade)
+      — turning on `http3` without `https` is either a Cargo-
+      feature-validation error at build time or a runtime
+      no-op, whichever Codex picks at prompt-drafting time.
+      A bin built without `https` MUST NOT open a UDP
+      listener, MUST NOT emit `Alt-Svc`, and MUST NOT
+      advertise an HTTPS RR-style capability anywhere in its
+      response shape.
   - No `unsafe` blocks introduced by D22 work beyond what
     quinn / h3 require internally.
 
-  Sequencing note: D22 unblocks itself the moment D20 is
-  in — the new crate has to exist before HTTP/3 client
-  support attaches to it. The server side can technically
-  land in parallel with D20 since it doesn't depend on
-  `mechanics-http-client`, but operationally it's cleaner
-  to ship both halves together so a deployment that turns
-  on HTTP/3 gets a coherent picture.
+  Sequencing note: D20 (✓ landed 2026-05-13) was the
+  code-side prerequisite — `mechanics-http-client` is the
+  natural home for the HTTP/3 client transport. D19 (DNS
+  connector, hickory-resolver) is a soft prerequisite worth
+  honouring: doing D19 first introduces `hickory-resolver`
+  to the workspace under one Cargo.toml, and D22 then reuses
+  the dep for HTTPS RR lookup rather than adding it twice in
+  the same workspace. The server side technically doesn't
+  depend on either D19 or D20, but operationally it's
+  cleaner to ship client + server together so a deployment
+  that turns on HTTP/3 gets a coherent picture (HTTPS RR
+  publishing + Alt-Svc emission + UDP listener all line up).
 
   Implementation owner: Claude direct or Codex dispatch
   TBD when D22 is scheduled. No crypto-review gate —
