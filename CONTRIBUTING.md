@@ -956,6 +956,21 @@ cargo processes share `target/`. **If you must run cargo
 outside a wrapper, prefix the command with
 `CARGO_TARGET_DIR=target-main`.**
 
+**Tmpfs redirect for `target-main`**:
+`cargo-target-dir.sh` also turns `target-main` into a
+symlink pointing at `/tmp/philharmonic-$(id -u)-target-main`
+on first run, so workspace builds land on the host's `/tmp`
+filesystem (typically a large tmpfs on the dev box) rather
+than the persistent project filesystem. The setup is
+idempotent and per-uid scoped; on hosts where `/tmp` isn't
+tmpfs the symlink still works correctly, just with no RAM
+benefit. The redirect is invisible at the cargo level —
+`CARGO_TARGET_DIR=target-main` resolves through the symlink
+exactly like the bare directory it replaces. The `xtask`
+and `publish` target dirs are not redirected; they're
+typically small enough that the tmpfs win isn't worth the
+extra symlink mechanism.
+
 **Exempt**: read-only cargo queries have no wrapper and don't
 need one — `cargo tree`, `cargo metadata`, `cargo --version`,
 `cargo search` are fine to run raw.
@@ -1117,6 +1132,46 @@ doesn't and shouldn't know which crates we authored). Treat
 the warning as **informational, not blocking** for our own
 crates; document the exception in the relevant prompt's
 Outcome section so the deviation is durable.
+
+### 5.5 Reclaiming tmpfs when `/tmp` fills up
+
+`scripts/lib/cargo-target-dir.sh` redirects `target-main`
+to a per-uid `/tmp/...` symlink (see the "Tmpfs redirect"
+paragraph at the top of §5). On a long-running session
+the debug build cache there can grow into the
+many-gigabyte range — fast for cargo, but eventually
+`/tmp` runs low and every cargo run starts erroring on
+the next file write.
+
+**Recovery: `./scripts/clean-target-debug.sh`.**
+The script `rm -rf`s exactly `target-main/debug` —
+the bulk of the cache. It deliberately spares:
+
+- `target-main/release` (release builds you may want
+  to keep around between sessions).
+- `target-main/doc` (rustdoc output, slow to rebuild).
+- Anything else cargo wrote under `target-main/` for
+  a non-debug profile.
+- `target-xtask/` (xtask's separate target dir; not
+  affected by the `target-main` tmpfs symlink).
+- The cargo registry / git cache under `$CARGO_HOME`.
+
+The next debug build is a cold rebuild after this —
+slow first compile, normal incrementals after. That's
+the trade vs. a `df -h /tmp` exhaustion that would
+break every subsequent cargo run.
+
+Run before kicking off heavy work if `df -Pk /tmp` shows
+the tmpfs capacity above ~80% — the script itself emits
+that same `df -Pk /tmp` line before and after the
+deletion so the win is visible. (`df -h` is more
+human-readable but is a GNU/BSD extension; `df -Pk`
+gives portable POSIX output. Run `df -h /tmp` yourself
+interactively if you prefer the human-readable form;
+the script sticks to `-Pk` to stay POSIX per §6.) The
+resource-pressure xtask covers CPU / load / RAM / swap
+but not filesystem fill, so `df` is the direct signal
+for the tmpfs target dir.
 
 ---
 
