@@ -352,8 +352,14 @@ runs match CI. Raw `cargo <subcommand>` drifts.
   background task that took more than ~30 s on its previous
   run. Lighter scripts (`webui-build.sh` ~12 s,
   `cargo-audit.sh`, per-crate `cargo check -p <one>`) are
-  fine to re-run when convenient. The workspace's particular
-  pain points are `aws-lc-rs` C builds and the Boa engine.
+  fine to re-run when convenient. The workspace's biggest
+  cost drivers, in rough order: a full
+  `cargo test --workspace` pass (many tests across many
+  crates) and any compile of
+  `philharmonic-connector-impl-embed` (BGE-M3 ONNX model
+  bundling via inline-blob + tract). `aws-lc-rs` C builds
+  and the Boa engine are heavy but routine; they cost
+  minutes, not the tens-of-minutes the two above can hit.
   **Never pipe a Rust-build-heavy script through `head` /
   `tail`** — those truncate before the capture file is
   written, so the lines you trimmed are gone and you'll be

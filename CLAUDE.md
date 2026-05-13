@@ -345,8 +345,13 @@ full in `CONTRIBUTING.md`. Read the full section before acting
   scripts (`webui-build.sh` at ~12 s, `cargo-audit.sh`,
   per-crate `cargo check -p <one>`) are fine to re-run when
   convenient — they're not in the "painful" bucket. The
-  workspace's particular pain points are `aws-lc-rs` C builds
-  and the Boa engine.
+  workspace's biggest cost drivers, in rough order: a full
+  `cargo test --workspace` pass (many tests across many
+  crates), and any compile of `philharmonic-connector-impl-embed`
+  (BGE-M3 ONNX model bundling via inline-blob + tract).
+  `aws-lc-rs` C builds and the Boa engine are heavy but
+  routine; they cost minutes, not the tens-of-minutes the two
+  above can hit.
 - **Never pipe a Rust-build-heavy script through `head` or
   `tail`.** Those truncate the output before the Bash tool's
   capture file is written, so the lines you trimmed are gone
