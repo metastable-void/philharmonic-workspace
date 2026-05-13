@@ -2,6 +2,7 @@
   "permissions": {
     "allow": [
       "Bash(node *)",
+      "Bash(codex *)",
       "Bash(./scripts/test-scripts.sh)",
       "Bash(./scripts/codex-status.sh)",
       "Skill(codex:rescue)",

@@ -106,6 +106,11 @@ import console from `mechanics:console`;
 Note: Keep WebUI up-to-date with any API features added
 in the future.
 
+- Fix one regression from Chat UI: it should call the step
+  execution with `{}` when it is first created with the chat
+  UI. Currently the greeting disappeared. No regression for
+  non-chat workflows.
+
 ## New connector: DNS (Tier 2)
 
 **`philharmonic-connector-impl-dns`**:

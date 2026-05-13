@@ -114,7 +114,124 @@ notes) stands unchanged.
 
 ## Outcome
 
-**Pending — will be updated after the Codex run.**
+**Completed 2026-05-13 with Claude post-processing.**
+**RUN STATUS: PARTIAL** as Codex reported, because the
+workspace-level verification was blocked by the consumer dep
+specs. Claude landed the housekeeping follow-up
+(`mechanics-http-client = "0.1"` → `"0.2"` in the four
+consumers: `mechanics-core`, `philharmonic-connector-impl-
+http-forward`, `philharmonic-connector-impl-llm-openai-compat`,
+`bins/philharmonic-api-server`) and re-ran pre-landing
+post-bump.
+
+Codex session: `019e2021-8c2b-7da1-b37b-896a72c9513c`
+(resumable via `codex resume`).
+Codex job ID: `task-mp3pktrc-17dnxs`.
+
+### What Codex shipped inside `mechanics-http-client/`
+
+- `Cargo.toml`: version `0.1.0 → 0.2.0`. New `http3` feature
+  (default-on per Yuka's direction during prompt-drafting:
+  `default = ["http3"]`). Optional deps under the feature:
+  `hickory-resolver 0.25.2` (with `default-features = false`,
+  features `["system-config", "tokio"]`), `quinn 0.11.9`
+  (`default-features = false`, features `["runtime-tokio",
+  "rustls-aws-lc-rs"]`), `h3 0.0.8`, `h3-quinn 0.0.10`.
+- New modules under `src/`:
+  - `https_rr.rs` — HTTPS RR (RFC 9460) parser + per-origin
+    cache. Honours `alpn`, `port`, `ipv4hint`, `ipv6hint`
+    SvcParams; ignores `mandatory`, `no-default-alpn`,
+    `ech`, unknown keys, alias-mode targets, and priority
+    ordering (residual).
+  - `alt_svc.rs` — `Alt-Svc` header parser + per-origin
+    cache. Recognises `h3=...` with `ma` directive; treats
+    draft variants like `h3-29=...` as "no h3"; honours
+    `clear`.
+  - `http3.rs` — `quinn` endpoint (one per `Client`, lazy-
+    created, dropped with the client) + `h3` request path.
+- `error.rs`: gated `Dns(String)` and `QuicHandshake(String)`
+  variants under `#[cfg(feature = "http3")]`. Reserved for
+  *terminal* failures only — opportunistic h3-path failures
+  silently fall through to hyper.
+- `response.rs`: `ResponseBody` enum with `Hyper(hyper::body::
+  Incoming)` (the existing path) + `Buffered(Bytes)` (h3
+  responses, where `h3` delivers a fully-collected body
+  buffer). `bytes_with_cap` handles both arms.
+- `client.rs`: new `ClientInner` fields under the feature
+  (`http3_enabled: bool` defaulting to `true`,
+  `http3_negative_cache_duration: Duration` defaulting to
+  5 minutes, the three `Arc<RwLock<...>>` caches, the
+  `http3::Http3State`). New `Origin { host, port }` cache
+  key type. `ClientBuilder::http3(bool)` toggle (default
+  `true` when feature compiled), `ClientBuilder::http3_negative_cache_duration(Duration)`.
+  Six `#[cfg(all(feature = "http3", test))] pub(crate)`
+  test accessors for cache injection +
+  observation.
+- `request.rs`: discovery dispatch in `send()` — for
+  `https://` URIs, check negative cache → check HTTPS RR
+  cache → query DNS HTTPS RR → check Alt-Svc cache →
+  attempt QUIC. On any failure, fall through to hyper.
+  For `http://` URIs the existing hyper path is byte-
+  identical to 0.1.0.
+- `tests.rs`: extended. 18 tests pass (the 5 0.1.0 ones +
+  the new gated ones), 2 `#[ignore]`'d (the local h3 server
+  fixture cases — Codex chose the state-machine + parser-
+  unit-test substitute documented in the prompt's "h3
+  server fixture" footnote).
+- `lib.rs`: `#[cfg(feature = "http3")]` module declarations
+  for the three new modules; small rustdoc tweak adding
+  "Server-side HTTP/3" to the out-of-scope list.
+- `CHANGELOG.md`: new `[0.2.0] - 2026-05-13` entry.
+
+Standalone (`/tmp` copy) verifications Codex ran in lieu of
+in-workspace pre-landing:
+
+- `cargo test` — 18 pass + 2 ignored + doctest pass.
+- `cargo test --no-default-features` — 5 pass + doctest
+  pass (the opt-out compile = 0.1.0 baseline).
+- `cargo clippy --all-targets -- -D warnings` — clean.
+- `cargo tree -e normal | grep -E "reqwest|rustls-platform-
+  verifier|rustls-native-certs|ring v"` — empty.
+- `cargo tree --no-default-features -e normal | grep -E "
+  quinn|h3|hickory"` — empty (proves opt-out is the 0.1.0
+  baseline).
+
+### What Claude did post-Codex (this turn)
+
+- Bumped `mechanics-http-client = "0.1"` → `"0.2"` in the
+  four mhc consumer Cargo.tomls (mechanics-core / http-
+  forward / llm-openai-compat / api-server). This unblocks
+  the workspace resolution that Codex couldn't fix per
+  its action-safety allowlist.
+- Re-ran `./scripts/pre-landing.sh` (post-bump). Outcome
+  recorded in the commit message.
+- Cargo-tree cascade verification across the four consumers
+  (default-feature trees, ring-free).
+- Did **not** publish mhc 0.2.0 yet — that's a follow-up
+  (matches the D20 publish-flow pattern: ship the code
+  first, publish-coordinate later). The 4 consumers' dep
+  spec `"0.2"` works locally via `[patch.crates-io]`; for
+  them to be independently publishable, mhc 0.2.0 needs to
+  land on crates.io first.
+
+### Codex's open questions, resolved here
+
+1. *"Should Claude update the four consumers from `mechanics-
+   http-client = "0.1"` to accept `0.2` in the same landing
+   commit?"* — **Yes, done** (this turn).
+2. *"Is 5 minutes the right negative-cache default?"* —
+   keeping 5 min for v1; operational data will inform
+   tuning later.
+3. *"Should the cache injection accessor stay `#[cfg(test)]`
+   only, or become `#[doc(hidden)] pub` for downstream
+   integration tests?"* — keeping `#[cfg(test)] pub(crate)`
+   for now. Promote later if a real downstream-testing need
+   surfaces.
+4. *"Should D22 round 02 add a real local h3 fixture and
+   fuller SVCB priority/alias handling?"* — flag for the
+   D22 server-side dispatch's sibling round, when standing
+   up an h3 server fixture is unavoidable anyway. Track in
+   ROADMAP §3.I as a residual.
 
 ---
 
