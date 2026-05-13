@@ -527,7 +527,127 @@ existing pattern.
 
 ## Outcome
 
-**Pending — will be updated after the Codex run.**
+**Completed 2026-05-13** as a Codex + Claude-co-implemented
+dispatch. Codex shipped the bulk of `dockerlet 0.1.0` plus
+the six consumer migrations and the `deny.toml` cleanup;
+Claude post-Codex addressed three real bugs Codex's pass
+left behind, pivoted the consumer test pattern from
+single-container-per-test to a warm-container-per-binary
+model on Yuka's directive, and added a fail-fast path in
+`dockerlet`'s readiness probe.
+
+### Codex's contribution (single run)
+
+Codex session: `019e2105-...` (job `bjctv0bn6`).
+
+- `dockerlet 0.1.0`: `GenericImage` builder + `Container`
+  handle + `WaitFor` readiness + `ContainerPort` +
+  `IntoContainerPort` + concurrency-limit semaphore via
+  `flock(2)`-on-`/tmp/dockerlet-locks-$uid/slot-N` with
+  N = `min(4, available_parallelism / 4)`.
+- Bollard feature audit landed `default-features = false,
+  features = ["pipe"]` — no `home`, no `ssl_providerless`,
+  no `rustls-native-certs`, no `ring` reintroduction.
+- Six consumer migrations from
+  `testcontainers` / `testcontainers-modules` to
+  `dockerlet 0.1`:
+  `philharmonic-api/tests/{e2e_mysql, e2e_full_pipeline}.rs`,
+  `philharmonic-policy/tests/permission_mysql.rs`,
+  `philharmonic-workflow/tests/engine_mysql.rs`,
+  `philharmonic-store-sqlx-mysql/tests/integration.rs`,
+  `philharmonic-connector-impl-sql-mysql/tests/common/mod.rs`,
+  `philharmonic-connector-impl-sql-postgres/tests/common/mod.rs`.
+- Each consumer Cargo.toml `testcontainers` /
+  `testcontainers-modules` dev-deps dropped; `dockerlet =
+  "0.1"` added; consumer patch-bumped + CHANGELOG entry.
+- `deny.toml` `rustls-native-certs` switched from
+  wrapper-allowed to no-wrapper full ban.
+
+### Claude post-Codex (this turn)
+
+1. **`tokio` runtime IO**: dockerlet's Drop runtime was
+   built with `enable_time()` only; bollard's Unix-socket
+   transport needs IO, panicking with "A Tokio 1.x context
+   was found, but IO is disabled." Fixed: added
+   `enable_io()` to the Drop runtime + bumped
+   `dockerlet/Cargo.toml`'s tokio features to include
+   `net` + `io-util`.
+2. **`sql-postgres` `multi_thread` flavor**: pre-existing
+   tests use `#[tokio::test(flavor = "multi_thread")]` but
+   the crate's dev-dep tokio features didn't include
+   `rt-multi-thread` — Codex's
+   `testcontainers` → `dockerlet` swap inadvertently
+   removed the feature unification path that previously
+   pulled it in. Fixed: added `rt-multi-thread` to
+   sql-postgres's dev-dep tokio.
+3. **Warm-container pivot** (Yuka, 2026-05-13): the per-
+   test container model was wasteful — 28 tests in
+   `philharmonic-store-sqlx-mysql` each started a fresh
+   MySQL container (~30s wall clock per start). Pivoted
+   to a per-binary warm container shared across all
+   tests, with per-test isolation by unique database
+   name. Each consumer's setup() now:
+   - acquires the shared container via
+     `tokio::sync::OnceCell<SharedMysql/Postgres>`,
+   - creates a `CREATE DATABASE <dl_t_$pid_$counter>`,
+   - returns a TestContext whose Drop spawns a
+     short-lived runtime to `DROP DATABASE`.
+
+   Result on `philharmonic-store-sqlx-mysql`: 28 tests in
+   ~17s wall clock (vs. timing out at 180s × 28 ÷ 4
+   threads = many minutes pre-pivot).
+4. **`wait_for_log` fail-fast on exit**: when a container
+   dies during init (e.g. AIO exhaustion on parallel
+   MySQL pulls before Yuka's `fs.aio-max-nr` bump),
+   bollard's `logs`-follow stream returns historical
+   lines then EOFs. The previous retry-on-stream-end
+   loop reopened the stream and re-read the same dead
+   logs until the deadline. Now: on stream end,
+   `inspect_container` checks the running state; if
+   exited, return `Error::ReadinessFailed` immediately
+   with the exit code embedded.
+
+### Verification
+
+- `cargo check --workspace --tests` → clean.
+- `./scripts/cargo-deny.sh` → `bans ok` with
+  `rustls-native-certs` as a no-wrapper full ban; only
+  `quinn-proto` wrapper for `ring` remains (upstream
+  h3-quinn 0.0.10 feature-unification bug).
+- `./scripts/pre-landing.sh` → all checks passed,
+  including the `--ignored` testcontainer phases against
+  the migrated consumers. (Multiple iterations during
+  the post-Codex debugging session; final clean run is
+  the dispatch's lands-state.)
+- `cargo tree --workspace --invert rustls-native-certs -e all --target all`
+  → **empty**.
+
+### Known follow-up
+
+**Container leak on test-binary exit.** The warm-
+container pattern stores the `Container` inside a static
+`OnceCell`, and Rust doesn't run `Drop` on statics at
+process exit. The container stays running after the test
+binary terminates; Docker reaps the underlying mysqld
+process only when the container is explicitly stopped or
+removed. Pragmatic effect: `docker ps` lists
+`dockerlet-` containers from prior test runs until the
+user manually `docker rm -f`s them.
+
+Fix queued as a separate dispatch / commit: dockerlet
+registers a process-level `libc::atexit` hook that stops
+each spawned container; combined with Docker's
+`auto_remove: true`, the daemon then removes them
+cleanly. Not blocking for D23's "remove the
+`rustls-native-certs` wrapper" objective, but a real
+dockerlet quality issue to land next.
+
+### Sequencing follow-up to D23
+
+§3.J ordering becomes **D24 next** (workspace-wide
+`default-features = false` audit). D23's atexit
+cleanup ships as a `dockerlet 0.1.1` patch release
+ahead of D24.
 
 ## Prompt (verbatim)
 

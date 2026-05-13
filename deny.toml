@@ -198,23 +198,18 @@ deny = [
     # No OS-native trust, no platform-supplied roots.
     "rustls-platform-verifier",
 
-    # `rustls-native-certs` enters via one remaining upstream-
-    # blocked path: `bollard`'s `ssl_providerless` feature
-    # unconditionally pulls `rustls-native-certs` even when its
-    # `aws-lc-rs` provider variant is selected. `testcontainers`
-    # (workspace integration-test dev-dep) uses that bollard
-    # feature for Docker registry TLS validation. Removing this
-    # wrapper requires either forking bollard's feature config
-    # or replacing testcontainers.
-    { crate = "rustls-native-certs", wrappers = ["bollard"] },
+    # D23 replaced `testcontainers` with `dockerlet`, which uses
+    # bollard's Unix-socket-only `pipe` feature and does not enable
+    # `ssl_providerless`. No wrapper exception remains.
+    "rustls-native-certs",
 
     # Crypto provider — workspace is `aws-lc-rs` only
     # (post-D20 / D22-client / D22-server). All directly-fixable
     # `ring` sources eliminated: `reqwest` dev-dep migrated to
     # mhc; `rcgen` switched to `aws_lc_rs`; `ureq` + embed
     # `build.rs` use `rustls-no-provider` + explicit aws-lc-rs
-    # provider install; `testcontainers` / `bollard` switched
-    # to the `aws-lc-rs` feature.
+    # provider install; `testcontainers` removed in favour of
+    # `dockerlet`.
     #
     # The one remaining wrapper is `quinn-proto`: `h3-quinn
     # 0.0.10` declares its `quinn` dep without
