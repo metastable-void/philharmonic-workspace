@@ -329,28 +329,36 @@ full in `CONTRIBUTING.md`. Read the full section before acting
   pass for the commit. A re-run after fixing a real failure
   is fine; a tight edit/re-run loop in one turn just burns
   time. ([§11](CONTRIBUTING.md#11-pre-landing-checks))
-- **Don't re-run a costly script just because you lost
-  context** — re-read the captured output file instead. The
-  Bash tool's `run_in_background` mode and every foreground
-  invocation already write the full stdout+stderr to
+- **Don't re-run a Rust-build-heavy script just because you
+  lost context** — re-read the captured output file instead.
+  Every foreground Bash invocation and every `run_in_background`
+  task writes its full stdout+stderr to
   `/tmp/claude-*/.../tasks/<id>.output`; read that file rather
-  than spawning the script again. The "costly" set includes
-  `pre-landing.sh`, `miri-test.sh`, `release-build.sh`,
-  `webui-build.sh`, `cargo-audit.sh`, `check-api-breakage.sh`,
-  the full `cargo test --workspace`, and any background task
-  that took longer than ~30 s to finish — each re-run burns
-  minutes and competes for `target-main/` with concurrent work.
-- **Never pipe a costly script through `head` or `tail`.**
-  Those truncate the output before it reaches the captured
-  file, so the lines you trimmed away are gone and the next
-  question you ask the output has no way to answer — forcing
-  a re-run, the exact thing the previous bullet forbids.
-  Redirect to a file (`./scripts/foo.sh > /tmp/foo.log 2>&1`)
-  or run the script bare and let the Bash tool capture
-  everything; then `grep` / `Read` the file with offset+limit
-  to inspect specific sections. `head` / `tail` are fine on
-  small/cheap commands (`status.sh`, `heads.sh`, `git log`,
-  individual `cargo tree`) where re-running is free.
+  than spawning the script again. The "Rust-build-heavy" set is
+  anything that drives a full workspace `cargo build` /
+  `cargo check` / `cargo test`: `pre-landing.sh`,
+  `miri-test.sh`, `release-build.sh`, `check-api-breakage.sh`,
+  any bare `cargo test --workspace` / `cargo build --workspace`
+  / `cargo check --workspace`, plus any background task that
+  took more than ~30 s to finish. Each re-run burns minutes and
+  competes for `target-main/` with concurrent work. Lighter
+  scripts (`webui-build.sh` at ~12 s, `cargo-audit.sh`,
+  per-crate `cargo check -p <one>`) are fine to re-run when
+  convenient — they're not in the "painful" bucket. The
+  workspace's particular pain points are `aws-lc-rs` C builds
+  and the Boa engine.
+- **Never pipe a Rust-build-heavy script through `head` or
+  `tail`.** Those truncate the output before the Bash tool's
+  capture file is written, so the lines you trimmed are gone
+  and the next question you ask the output has no way to
+  answer — forcing a re-run, the exact thing the previous
+  bullet forbids. Redirect to a file
+  (`./scripts/foo.sh > /tmp/foo.log 2>&1`) or run the script
+  bare and let the Bash tool capture everything; then `grep` /
+  `Read` the file with offset+limit to inspect specific
+  sections. `head` / `tail` are fine on cheap commands
+  (`status.sh`, `heads.sh`, `git log`, single `cargo tree`,
+  `webui-build.sh` tail, etc.) where re-running costs nothing.
 - **Run `./scripts/miri-test.sh` on the crypto crate set at
   every checkpoint** — before publishing crypto-touching
   crates, after completing a phase/sub-phase with crypto

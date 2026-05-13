@@ -339,24 +339,30 @@ runs match CI. Raw `cargo <subcommand>` drifts.
   `cargo test <name>`; save the full pre-landing for the
   hand-off. A re-run after fixing a real failure is fine.
   See [`CONTRIBUTING.md §11`](CONTRIBUTING.md#11-pre-landing-checks).
-  **Don't re-run a costly script just because you lost
-  context** — re-read the captured output. Every background
-  task and every foreground Bash invocation writes its full
-  stdout+stderr to a `/tmp/.../tasks/<id>.output` file; read
-  that rather than spawning the script again. Costly =
-  `pre-landing.sh`, `miri-test.sh`, `release-build.sh`,
-  `webui-build.sh`, `cargo-audit.sh`,
-  `check-api-breakage.sh`, full `cargo test --workspace`,
-  anything that took more than ~30 s on its previous run.
-  **Never pipe a costly script through `head` / `tail`** —
-  those truncate before the file is captured, so the lines
-  you trimmed are gone and you'll be tempted to re-run.
-  Redirect to a file or let the Bash tool capture
-  everything, then `grep` / `Read` the file with
-  offset+limit to inspect specific sections. `head` / `tail`
-  are fine on cheap commands (`status.sh`, `heads.sh`,
-  `git log`, single `cargo tree`) where re-running costs
-  nothing.
+  **Don't re-run a Rust-build-heavy script just because you
+  lost context** — re-read the captured output. Every
+  background task and every foreground Bash invocation
+  writes its full stdout+stderr to a
+  `/tmp/.../tasks/<id>.output` file; read that rather than
+  spawning the script again. The Rust-build-heavy set is
+  anything driving a full workspace `cargo build` / `check` /
+  `test`: `pre-landing.sh`, `miri-test.sh`,
+  `release-build.sh`, `check-api-breakage.sh`, bare
+  `cargo {build,check,test} --workspace`, plus any
+  background task that took more than ~30 s on its previous
+  run. Lighter scripts (`webui-build.sh` ~12 s,
+  `cargo-audit.sh`, per-crate `cargo check -p <one>`) are
+  fine to re-run when convenient. The workspace's particular
+  pain points are `aws-lc-rs` C builds and the Boa engine.
+  **Never pipe a Rust-build-heavy script through `head` /
+  `tail`** — those truncate before the capture file is
+  written, so the lines you trimmed are gone and you'll be
+  tempted to re-run. Redirect to a file or let the Bash
+  tool capture everything, then `grep` / `Read` the file
+  with offset+limit to inspect specific sections. `head` /
+  `tail` are fine on cheap commands (`status.sh`,
+  `heads.sh`, `git log`, single `cargo tree`,
+  `webui-build.sh` tail) where re-running costs nothing.
 - `./scripts/rust-lint.sh [<crate>]`,
   `./scripts/rust-test.sh [--include-ignored|--ignored] [<crate>]`
   — individual phases.
