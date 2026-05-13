@@ -6,14 +6,22 @@
 #                                                if rustup is installed, runs
 #                                                `rustup check` to surface
 #                                                pending toolchain updates)
-#   1. ./scripts/rust-lint.sh                   (fmt + check + clippy -D warnings + doc)
-#   2. ./scripts/rust-test.sh                   (cargo test --workspace --exclude xtask, skips #[ignore])
-#   3. ./scripts/rust-test.sh --ignored <X>     for each modified non-xtask crate X
+#   1. ./scripts/cargo-deny.sh                  (cargo deny check bans —
+#                                                Cargo.lock-only, no compile;
+#                                                fail-fast for banned crates)
+#   2. ./scripts/rust-lint.sh                   (fmt + check + clippy -D warnings + doc)
+#   3. ./scripts/rust-test.sh                   (cargo test --workspace --exclude xtask, skips #[ignore])
+#   4. ./scripts/rust-test.sh --ignored <X>     for each modified non-xtask crate X
 #
-# Step 3 exercises the `#[ignore]`-gated integration tests (the
+# Step 4 exercises the `#[ignore]`-gated integration tests (the
 # testcontainers / live-service ones) for crates you actually
-# changed — the workspace-level run in step 2 skips them for
+# changed — the workspace-level run in step 3 skips them for
 # speed.
+#
+# Step 1 only runs the `bans` cargo-deny check (banned crates).
+# Licenses and advisories are intentionally not part of the
+# pre-landing path: licenses are a release-time concern handled
+# manually, and advisory scanning lives in `cargo-audit.sh`.
 #
 # Auto-detects modified crates as workspace members with a dirty
 # working tree (unstaged changes, staged changes, or untracked
@@ -24,7 +32,7 @@
 # below, not the workspace flow. Pass crate names explicitly to
 # override auto-detection.
 #
-# Dep-aware narrowing of step 2 (ROADMAP D21): when dirty crates
+# Dep-aware narrowing of step 3 (ROADMAP D21): when dirty crates
 # are known, the test phase narrows from `cargo test --workspace`
 # to the union of dirty crates and their transitive reverse-
 # dependency closure (computed via the `affected-crates` xtask
@@ -50,14 +58,14 @@
 #   `target-xtask` throughout. The two modes are mutually
 #   exclusive: `--xtask` is incompatible with positional crate
 #   names and with `--no-ignored` (xtask has no `#[ignore]`-gated
-#   integration tests, so there is no step 3).
+#   integration tests, so there is no step 4).
 #
 # Usage:
 #   ./scripts/pre-landing.sh                    # workspace minus xtask, auto-detect modified crates
 #   ./scripts/pre-landing.sh <crate>...         # explicit list (xtask not allowed here; use --xtask)
-#   ./scripts/pre-landing.sh --no-ignored       # skip step 3 (rare; fast iteration)
+#   ./scripts/pre-landing.sh --no-ignored       # skip step 4 (rare; fast iteration)
 #   ./scripts/pre-landing.sh --no-ignored <crate>...
-#   ./scripts/pre-landing.sh --full             # force workspace-wide step 2 (disable D21 narrowing)
+#   ./scripts/pre-landing.sh --full             # force workspace-wide step 3 (disable D21 narrowing)
 #   ./scripts/pre-landing.sh --xtask            # ONLY xtask, target-xtask, no --ignored phase
 #
 # Run before every commit that touches Rust code. GitHub CI runs
@@ -98,6 +106,7 @@ if [ "$xtask_only" -eq 1 ]; then
     printf '%s=== pre-landing (--xtask): scope = xtask only, CARGO_TARGET_DIR=target-xtask ===%s\n' \
         "$C_HEADER" "$C_RESET"
     ./scripts/check-toolchain.sh
+    ./scripts/cargo-deny.sh
     ./scripts/rust-lint.sh --xtask
     ./scripts/rust-test.sh --xtask
     printf '%s=== pre-landing: xtask checks passed ===%s\n' "$C_OK" "$C_RESET"
@@ -139,6 +148,7 @@ else
 fi
 
 ./scripts/check-toolchain.sh
+./scripts/cargo-deny.sh
 ./scripts/rust-lint.sh
 
 # Step 2: dep-aware test phase (ROADMAP D21).
@@ -173,7 +183,7 @@ else
 fi
 
 if [ "$narrow" -eq 0 ]; then
-    printf '%s=== pre-landing: step 2 workspace-wide (%s) ===%s\n' \
+    printf '%s=== pre-landing: step 3 workspace-wide (%s) ===%s\n' \
         "$C_HEADER" "$narrow_reason" "$C_RESET"
     ./scripts/rust-test.sh
 else
@@ -189,12 +199,12 @@ else
         # Defensive: the dirty crates are not workspace members
         # `cargo metadata` recognises (e.g. recently-removed). Fall
         # back to workspace-wide rather than skip silently.
-        printf '%s=== pre-landing: step 2 workspace-wide (affected-crates returned empty for non-empty dirty set) ===%s\n' \
+        printf '%s=== pre-landing: step 3 workspace-wide (affected-crates returned empty for non-empty dirty set) ===%s\n' \
             "$C_HEADER" "$C_RESET"
         ./scripts/rust-test.sh
     else
         # shellcheck disable=SC2086
-        printf '%s=== pre-landing: step 2 narrowed to affected crates: %s ===%s\n' \
+        printf '%s=== pre-landing: step 3 narrowed to affected crates: %s ===%s\n' \
             "$C_HEADER" "$(printf '%s ' $affected)" "$C_RESET"
         # shellcheck disable=SC2086
         for c in $affected; do
@@ -204,7 +214,7 @@ else
 fi
 
 if [ "$no_ignored" -eq 1 ]; then
-    printf '%s=== pre-landing: --no-ignored; skipping step 3 ===%s\n' "$C_HEADER" "$C_RESET"
+    printf '%s=== pre-landing: --no-ignored; skipping step 4 ===%s\n' "$C_HEADER" "$C_RESET"
 elif [ -n "$crates" ]; then
     # shellcheck disable=SC2086
     for c in $crates; do

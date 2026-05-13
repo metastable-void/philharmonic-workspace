@@ -324,9 +324,9 @@ encode the mandated flags (`-D warnings`, `--all-targets`,
 per-crate scoping, auto-install of optional tools) so your local
 runs match CI. Raw `cargo <subcommand>` drifts.
 
-- `./scripts/pre-landing.sh` — canonical fmt + check + clippy
-  (`-D warnings`) + rustdoc + test. Run before finishing any
-  Rust-touching task. Default flow runs
+- `./scripts/pre-landing.sh` — canonical cargo-deny bans + fmt
+  + check + clippy (`-D warnings`) + rustdoc + test. Run before
+  finishing any Rust-touching task. Default flow runs
   `--workspace --exclude xtask` throughout; xtask is gated
   behind `pre-landing.sh --xtask` (uses `target-xtask/` so
   xtask checks don't share the build cache with workspace

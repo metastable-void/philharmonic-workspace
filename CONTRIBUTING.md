@@ -103,8 +103,8 @@ After setup, the typical flow for any change:
 1. Edit files across whichever submodules the change spans.
    Leave the working tree dirty; don't manually `git add` /
    `git commit`.
-2. `./scripts/pre-landing.sh` — fmt + check + clippy (`-D
-   warnings`) + test on every modified crate.
+2. `./scripts/pre-landing.sh` — cargo-deny bans + fmt + check +
+   clippy (`-D warnings`) + test on every modified crate.
 3. `./scripts/commit-all.sh "message"` — submodules first, then
    the parent bumps pointers.
 4. `./scripts/push-all.sh` — submodules first, then the parent.
@@ -858,11 +858,12 @@ The inventory:
 
 | Wrapper | Wraps | Notes |
 |---|---|---|
-| `./scripts/pre-landing.sh [<crate>...] [--no-ignored]` | `cargo fmt --check` + `cargo check` + `cargo clippy --all-targets -- -D warnings` + `cargo test --workspace` + `cargo test --ignored -p <crate>` per modified crate | The canonical pre-commit flow. Auto-detects modified crates via `show-dirty.sh`. CI runs the same script. See §11. |
+| `./scripts/pre-landing.sh [<crate>...] [--no-ignored]` | `cargo deny check bans` + `cargo fmt --check` + `cargo check` + `cargo clippy --all-targets -- -D warnings` + `cargo test --workspace` + `cargo test --ignored -p <crate>` per modified crate | The canonical pre-commit flow. Auto-detects modified crates via `show-dirty.sh`. CI runs the same script. See §11. |
 | `./scripts/rust-lint.sh [<crate>]` | `cargo fmt --check` + `cargo check` + `cargo clippy --all-targets -- -D warnings` | Workspace (no arg) or per-crate. |
 | `./scripts/rust-test.sh [--include-ignored\|--ignored] [<crate>]` | `cargo test` with ignored-test control | `--ignored` runs *only* `#[ignore]`-gated; `--include-ignored` runs everything. |
 | `./scripts/miri-test.sh --workspace \| <crate>...` | `cargo +nightly miri test` | Slow; not in `pre-landing.sh`. See §10.7. |
 | `./scripts/cargo-audit.sh [...]` | `cargo audit` | Auto-installs `cargo-audit` on first run. |
+| `./scripts/cargo-deny.sh [...]` | `cargo deny check bans` by default; pass through to other subcommands (`check all`, `check licenses`, …). Auto-installs `cargo-deny` on first run. Step 1 of `pre-landing.sh`. |
 | `./scripts/check-api-breakage.sh <crate> [<baseline>]` | `cargo semver-checks check-release -p <crate> --baseline-version <ver>` | Per-crate; crates.io baseline (default: newest published). See §12.3. |
 | `./scripts/publish-crate.sh [--dry-run] <crate>` | `cargo publish -p <crate>` + signed release tag | Enforces clean tree, branch-HEAD, no-existing-tag invariants. Tag created only on publish success. |
 | `./scripts/verify-tag.sh <crate> [<tag>]` | Three-way check that a release tag is locally present, signed, and on origin at the same commit | Run after `publish-crate.sh` + `push-all.sh`. See §12.4. |
@@ -1999,21 +2000,27 @@ command covers the full flow:
 Auto-detects modified crates (submodules with a dirty working
 tree) and runs, in order:
 
-1. `./scripts/rust-lint.sh` — fmt-check + check + clippy
+1. `./scripts/cargo-deny.sh` — `cargo deny check bans`, reading
+   `deny.toml` at the workspace root. Cargo.lock-only, no
+   compilation; fail-fast for banned crates (`pyo3`, `maturin`,
+   `openssl-sys`, …). Licenses and advisories are intentionally
+   not part of pre-landing — licenses are a release-time concern,
+   advisory scanning lives in `cargo-audit.sh`.
+2. `./scripts/rust-lint.sh` — fmt-check + check + clippy
    (`-D warnings`) + rustdoc (`-D missing_docs`),
    `--workspace --exclude xtask` throughout.
-2. `./scripts/rust-test.sh` — `cargo test --workspace
+3. `./scripts/rust-test.sh` — `cargo test --workspace
    --exclude xtask` (skips `#[ignore]`-gated tests).
-3. `./scripts/rust-test.sh --ignored <crate>` for every modified
+4. `./scripts/rust-test.sh --ignored <crate>` for every modified
    non-xtask crate — exercises integration tests for what you
    actually changed.
 
 Pass crate names to `pre-landing.sh` to override auto-detection;
-pass `--no-ignored` to skip step 3 (rare, for fast iteration
+pass `--no-ignored` to skip step 4 (rare, for fast iteration
 when you're certain the slow tests aren't affected).
 
 GitHub CI runs the same script on a clean checkout (no dirty
-submodules → step 3 naturally empty) so contributor and CI
+submodules → step 4 naturally empty) so contributor and CI
 behaviour don't drift.
 
 ### 11.0.1 xtask is gated behind `--xtask`
@@ -2041,7 +2048,7 @@ This pins `CARGO_TARGET_DIR=target-xtask` for the entire run
 and scopes to `cargo … -p xtask` for fmt/check/clippy/doc/test.
 `--xtask` is mutually exclusive with positional crate names
 and with `--no-ignored` (xtask has no `#[ignore]`-gated
-integration tests, so step 3 is N/A). `rust-lint.sh --xtask`
+integration tests, so step 4 is N/A). `rust-lint.sh --xtask`
 and `rust-test.sh --xtask` are equivalent narrower entry
 points if you only need one phase.
 

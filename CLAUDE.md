@@ -312,8 +312,9 @@ full in `CONTRIBUTING.md`. Read the full section before acting
   wrapper covers your case, extend one.
   ([§5](CONTRIBUTING.md#5-script-wrappers-over-raw-cargo))
 - **Run `./scripts/pre-landing.sh` before every commit that
-  touches Rust.** fmt + check + clippy (`-D warnings`) +
-  rustdoc + test, auto-detecting modified crates. The default
+  touches Rust.** cargo-deny bans + fmt + check + clippy
+  (`-D warnings`) + rustdoc + test, auto-detecting modified
+  crates. The default
   flow runs `--workspace --exclude xtask` throughout — xtask
   is gated behind `pre-landing.sh --xtask` (uses
   `target-xtask/` instead of `target-main/`, so xtask checks
