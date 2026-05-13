@@ -24,6 +24,20 @@
 # below, not the workspace flow. Pass crate names explicitly to
 # override auto-detection.
 #
+# Dep-aware narrowing of step 2 (ROADMAP D21): when dirty crates
+# are known, the test phase narrows from `cargo test --workspace`
+# to the union of dirty crates and their transitive reverse-
+# dependency closure (computed via the `affected-crates` xtask
+# bin from `cargo metadata --no-deps`). Crates outside the
+# closure can't have been affected by the change, so their tests
+# are skipped. The earlier phases (fmt, check, clippy, rustdoc)
+# stay workspace-wide — they're cheap and catch feature-
+# unification surprises that don't respect modified-crate
+# boundaries. Three escape hatches fall back to the pre-D21
+# workspace-wide test phase: `--full`, a parent-side dirty file
+# under `scripts/` / root `Cargo.toml` / `Cargo.lock`, and the
+# clean-checkout path (no dirty crates at all — typical for CI).
+#
 # xtask mode (`--xtask`):
 #   xtask is the in-tree dev-tooling crate. It carries its own
 #   `target-xtask/` build cache (CONTRIBUTING.md §8.1) so workspace
@@ -43,6 +57,7 @@
 #   ./scripts/pre-landing.sh <crate>...         # explicit list (xtask not allowed here; use --xtask)
 #   ./scripts/pre-landing.sh --no-ignored       # skip step 3 (rare; fast iteration)
 #   ./scripts/pre-landing.sh --no-ignored <crate>...
+#   ./scripts/pre-landing.sh --full             # force workspace-wide step 2 (disable D21 narrowing)
 #   ./scripts/pre-landing.sh --xtask            # ONLY xtask, target-xtask, no --ignored phase
 #
 # Run before every commit that touches Rust code. GitHub CI runs
@@ -59,10 +74,12 @@ set -eu
 
 no_ignored=0
 xtask_only=0
+full_test=0
 while [ $# -gt 0 ]; do
     case "$1" in
         --no-ignored) no_ignored=1; shift ;;
         --xtask)      xtask_only=1; shift ;;
+        --full)       full_test=1; shift ;;
         --)                           shift; break ;;
         -*) printf 'unknown flag: %s\n' "$1" >&2; exit 2 ;;
         *) break ;;
@@ -123,7 +140,68 @@ fi
 
 ./scripts/check-toolchain.sh
 ./scripts/rust-lint.sh
-./scripts/rust-test.sh
+
+# Step 2: dep-aware test phase (ROADMAP D21).
+#
+# Fall back to workspace-wide when:
+#   - `--full` was passed.
+#   - The parent has dirty changes under `scripts/`, root
+#     `Cargo.toml`, `Cargo.lock`, or `.cargo/`. Any of those
+#     plausibly affects every member's build/test universe, so
+#     narrowing isn't safe.
+#   - No dirty crates were detected and no positional crates
+#     were given (clean checkout / CI path — test everything).
+# Otherwise: compute the affected-crate closure via the
+# `affected-crates` xtask bin and run `rust-test.sh <crate>` per
+# member in the closure. xtask is filtered out of the loop the
+# same way the auto-detected list filters it.
+narrow=1
+narrow_reason=''
+if [ "$full_test" -eq 1 ]; then
+    narrow=0
+    narrow_reason='--full'
+elif [ -z "$crates" ]; then
+    narrow=0
+    narrow_reason='no dirty crates / clean checkout'
+else
+    wide_dirty=$(git status --porcelain -- \
+        Cargo.toml Cargo.lock .cargo scripts 2>/dev/null || true)
+    if [ -n "$wide_dirty" ]; then
+        narrow=0
+        narrow_reason='parent dirty under scripts/ | Cargo.toml | Cargo.lock | .cargo/'
+    fi
+fi
+
+if [ "$narrow" -eq 0 ]; then
+    printf '%s=== pre-landing: step 2 workspace-wide (%s) ===%s\n' \
+        "$C_HEADER" "$narrow_reason" "$C_RESET"
+    ./scripts/rust-test.sh
+else
+    # Affected = dirty ∪ transitive reverse-dep closure of dirty.
+    # The xtask bin reads dirty crate names from stdin, walks
+    # `cargo metadata --no-deps` reverse-dep edges, prints the
+    # affected set one name per line.
+    # shellcheck disable=SC2086
+    affected=$(printf '%s\n' $crates \
+        | ./scripts/xtask.sh affected-crates \
+        | grep -v -x -F xtask || :)
+    if [ -z "$affected" ]; then
+        # Defensive: the dirty crates are not workspace members
+        # `cargo metadata` recognises (e.g. recently-removed). Fall
+        # back to workspace-wide rather than skip silently.
+        printf '%s=== pre-landing: step 2 workspace-wide (affected-crates returned empty for non-empty dirty set) ===%s\n' \
+            "$C_HEADER" "$C_RESET"
+        ./scripts/rust-test.sh
+    else
+        # shellcheck disable=SC2086
+        printf '%s=== pre-landing: step 2 narrowed to affected crates: %s ===%s\n' \
+            "$C_HEADER" "$(printf '%s ' $affected)" "$C_RESET"
+        # shellcheck disable=SC2086
+        for c in $affected; do
+            ./scripts/rust-test.sh "$c"
+        done
+    fi
+fi
 
 if [ "$no_ignored" -eq 1 ]; then
     printf '%s=== pre-landing: --no-ignored; skipping step 3 ===%s\n' "$C_HEADER" "$C_RESET"

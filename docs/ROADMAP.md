@@ -347,17 +347,16 @@ protocol (§2).
 
 Total: **21 Codex dispatches plus 1 Gate-1 proposal.**
 **D1, D2, D3, D4, D5, D6, D10, D11, D12, D13, D14, D15, D16,
-D17 are done** (14 of 21). Gate 1 and Gate 2 both approved.
+D17, D21 are done** (15 of 21; D21 landed via Claude-direct
+implementation on 2026-05-13). Gate 1 and Gate 2 both
+approved.
 Remaining: D7, D8, D9, D19 (Tier 2/3 connectors — D19 is
 the new DNS connector surfaced 2026-05-12 via HUMANS.md), D18
 (`mechanics-core` module-surface refactor: feature gating +
 new `mime`/`url`/`console`/`html` modules), D20 (workspace-wide
 webpki-roots-only TLS trust posture surfaced 2026-05-12 — sqlx
 already aws-lc-rs+webpki-roots after the ring removal, reqwest
-still picks up platform-native via rustls-platform-verifier),
-D21 (`pre-landing.sh` dep-aware test filtering — skip tests for
-member crates that aren't dirty and aren't transitive reverse-
-dependencies of any dirty crate).
+still picks up platform-native via rustls-platform-verifier).
 
 ### A. Embedding datasets (6 dispatches + 1 Gate-1) — DONE
 
@@ -730,9 +729,11 @@ is frozen at compile time.
   No crypto-review gate — trust-store config only, no
   changes to AAD/AEAD/SCK/COSE paths.
 
-### H. Workspace tooling (1 dispatch)
+### H. Workspace tooling (1 dispatch) — DONE
 
-- **D21** `scripts/pre-landing.sh` dep-aware test filtering.
+- **D21** `scripts/pre-landing.sh` dep-aware test filtering —
+  **DONE 2026-05-13** (Claude direct, not Codex; user override
+  during the same-day implementation pass).
   Today the script's `--ignored` phase only runs ignored tests
   on auto-detected modified crates, but the default (non-
   ignored) test phase still runs `cargo test --workspace`
@@ -795,8 +796,8 @@ guide expansion, audit-log producer gap closed)
 summarised in the Current state preamble at the top of
 this file with the same archive pointer.
 
-**Next dispatchable**: D7 / D8 / D9 / D18 / D19 / D20 / D21,
-all seven independent and parallel-safe.
+**Next dispatchable**: D7 / D8 / D9 / D18 / D19 / D20, all
+six independent and parallel-safe. D21 landed 2026-05-13.
 
 - **D7** is unblocked — the `email_send` wire shape locked
   in [`docs/design/08-connector-architecture.md` §SMTP](design/08-connector-architecture.md#smtp)
