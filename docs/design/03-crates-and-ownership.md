@@ -251,7 +251,8 @@ philharmonic-connector-impl-api   → philharmonic-connector-common
 philharmonic-connector-impl-*     → philharmonic-connector-impl-api,
                                     philharmonic-connector-common,
                                     (per-implementation deps:
-                                    reqwest, sqlx, lettre, tract, …)
+                                    mechanics-http-client, sqlx,
+                                    lettre, tract, …)
 
 philharmonic-api                  → philharmonic-types,
                                     philharmonic-store,

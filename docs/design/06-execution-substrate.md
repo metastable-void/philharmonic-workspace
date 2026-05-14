@@ -176,12 +176,14 @@ uses `TimeoutJob` internally to drive Promise resolution and
 microtask draining. The constraint is on the **script-visible
 surface**, not the host's implementation details.
 
-Future `mechanics:*` modules (the D18 batch ships
-`mechanics:mime` / `mechanics:url` / `mechanics:console` /
-`mechanics:html`) must be designed against this constraint:
-they expose ECMAScript-shaped APIs (named exports, no
-implicit globals) and never re-export WHATWG-shaped surfaces
-even if the underlying Rust crate happens to mirror one.
+The D18 module batch (`mechanics:mime` / `mechanics:url` /
+`mechanics:console` / `mechanics:html`) shipped in
+mechanics-core 0.6.0 under this constraint: ECMAScript-shaped
+APIs (named exports for stateless functions, default-exported
+classes for `URL`/`URLSearchParams`/`console`), no implicit
+globals, and no re-export of WHATWG-shaped surfaces even where
+the underlying Rust crate mirrors one. Any future
+`mechanics:*` module must follow the same posture.
 
 ### Tail-promise polling
 
@@ -234,11 +236,15 @@ is added to `mechanics-core`, that counter is the natural place
 to bridge tail rejections into telemetry. Until then, only the
 deadline-abort `tracing::warn!` is visible.
 
-This is a 2026-05-12 design choice; the implementation lands as
-ROADMAP item **D17**. Pre-D17 behavior was that `run_jobs()` was
-called unconditionally between `main.call(...)` and reading the
-promise state, so the response was held open until every queue
-drained to quiescence.
+D17 (mechanics-core 0.4.1, 2026-05-12) landed this. Pre-D17
+behavior was that `run_jobs()` was called unconditionally
+between `main.call(...)` and reading the promise state, so
+the response was held open until every queue drained to
+quiescence. D17 also briefly added a `setTimeout` realm
+global; that addition was reversed in D18 (mechanics-core
+0.5.1) per the "no non-ES globals" hard rule above, and
+tail-poll behavior continues to be exercised via Promise-
+based test fixtures.
 
 ### Dependencies
 

@@ -194,11 +194,32 @@ into the crates.
   pure-Rust `tract` + `tokenizers` stack with default-bundled
   bge-m3 model. The workspace-internal `inline-blob 0.1.0`
   proc-macro (large-blob ELF embedding helper) also shipped
-  2026-04-27. Tier 2 (`email-smtp`) and Tier 3 (`llm-anthropic`,
-  `llm-gemini`, deferred until on or after 2026-05-07
-  post-Golden-Week) follow Phase 8 + Phase 9 prototype per
-  the macro sequence.
+  2026-04-27. Tier 2/3 connectors (`email-smtp`,
+  `llm-anthropic`, `llm-gemini`, `dns`) are tracked as
+  ROADMAP dispatches D7 / D8 / D9 / D19; all four are
+  independent and parallel-safe, with `0.0.x` placeholders
+  reserved on crates.io.
 - API layer: implemented. Published as `philharmonic-api` 0.1.0
   (2026-04-28, Phase 8). Real `ConfigLowerer` and `StepExecutor`
   added in Phase 9 (2026-04-30). Three bin targets, WebUI, e2e
   tests, Docker compose, and `install` subcommand all landed.
+- Reference deployment operational since **2026-05-02**.
+- **Post-v1 dispatches (done)**: D1–D6 embedding datasets,
+  D10/D11/D13/D14/D15 WebUI + workflow-authoring guide
+  (en+jp), D12 + D16 connector enhancements, D17 tail-promise
+  polling, D18 mechanics-core 0.6.0 module-surface refactor
+  (`mechanics:html` / `:console` no-op / `:url` WHATWG /
+  `:mime`; setTimeout realm global reversed per "no non-ES
+  globals"), D20 workspace-wide webpki-roots TLS via
+  `mechanics-http-client` (reqwest evicted), D21 pre-landing
+  dep-aware test filtering, D22 HTTP/3 client + server-lib +
+  server-integration + streaming via `H3RequestBody`, D23
+  `dockerlet` replacing testcontainers, D24 default-features
+  audit (banned: `pyo3` / `maturin` / `openssl-sys` /
+  `native-tls` / `rustls-platform-verifier` /
+  `rustls-native-certs` / `ring`), D25 hickory CVE bump.
+  `mechanics-h3-quinn` in-tree vendored fork + generic
+  `vendor-upstream` xtask + `check-no-registry` workspace-
+  hardening guard + dev-profile incremental disable round out
+  the 2026-05-14 batch. **Post-v1 remaining**: D7 SMTP, D8
+  Anthropic, D9 Gemini, D19 DNS.

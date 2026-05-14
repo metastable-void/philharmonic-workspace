@@ -2,11 +2,17 @@
 
 What a first shipping release includes, and what's deferred.
 
-**Phase 9 complete (2026-04-30).** All items in "Core
+**Phase 9 complete (2026-04-30); reference deployment
+operational since 2026-05-02.** All items in "Core
 infrastructure" and "API + deployment" below are shipped.
-25 crates on crates.io, three bin targets with key generation,
-musl static builds, Docker compose, full-pipeline e2e tests.
-Remaining: Tier 2 SMTP + Tier 3 LLM providers (post-Golden-Week).
+29 published-crate names on crates.io (cascade-publish on
+2026-05-14 brought 22 of them to current versions; per-crate
+state lives in each `CHANGELOG.md`). Three bin targets with
+key generation, musl static builds, Docker compose, full-
+pipeline e2e tests, opportunistic HTTP/3 on all three bins.
+Remaining v1-adjacent work is the Tier 2/3 connectors —
+D7 SMTP, D8 Anthropic, D9 Gemini, D19 DNS — all independent
+and parallel-safe.
 
 ## Core infrastructure
 
@@ -454,8 +460,10 @@ Summary of where v1 stands:
 - Phase 7 Tier 1 implementations (`sql_postgres`,
   `sql_mysql`, `embed`, `vector_search`) are published.
 - Phase 7 Tier 2/3 (`email_smtp`, `llm_anthropic`,
-  `llm_gemini`) are deferred post-Golden-Week 2026; their
-  crate names are reserved as `0.0.x` placeholders on
+  `llm_gemini`, `dns_query`) are the remaining connector
+  work, scheduled as ROADMAP dispatches D7 / D8 / D9 / D19
+  respectively. All four are independent and parallel-safe;
+  their crate names are reserved as `0.0.x` placeholders on
   crates.io.
 - `philharmonic-api` and the three deployment binaries
   (`philharmonic-api-server`, `mechanics-worker`,

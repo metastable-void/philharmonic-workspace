@@ -54,10 +54,15 @@ Settled since the previous draft:
 - **`http_forward`** — reuses `mechanics_config::HttpEndpoint`
   verbatim; full spec in `08-connector-architecture.md`
   §Generic HTTP. Phase 6 Task 1 0.1.0 (2026-04-24).
-- **`llm_generate`** — three dialects
-  (`openai_native` / `vllm_native` / `tool_call_fallback`)
-  with `strict: true` token-level schema enforcement.
-  Phase 6 Task 2 `llm_openai_compat` 0.1.0 (2026-04-24).
+- **`llm_generate`** — four dialects on
+  `llm_openai_compat`: `openai_native`, `vllm_native`,
+  `tool_call_fallback`, and `tool_call_fallback_auto`
+  (D16; uses `tool_choice: "auto"` for upstreams that reject
+  the forced-function form). `strict: true` token-level schema
+  enforcement on the native dialects. Phase 6 Task 2
+  `llm_openai_compat` 0.1.0 (2026-04-24); D12 `custom_headers`
+  + D16 `tool_call_fallback_auto` landed pre-2026-05-14
+  cascade.
 - **`sql_query`** — driver-native placeholder syntax (`?`
   for MySQL, `$1` for Postgres), dict-per-row response with
   `columns` populated even on empty results, `UpstreamError

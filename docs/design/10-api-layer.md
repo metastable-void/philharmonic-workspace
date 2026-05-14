@@ -599,10 +599,16 @@ deployment shape. Not designed against in v1.
 
 ## Status
 
-**Implemented.** Published as `philharmonic-api 0.1.0` on
-crates.io (2026-04-28, Phase 8). All endpoint families landed:
-workflow templates/instances, endpoint configs, principals,
-roles, memberships, minting authorities, token minting, tenant
-admin, audit log, operator endpoints. 86+ integration tests.
-Real `ConfigLowerer` (COSE_Sign1 + COSE_Encrypt0) and
-`StepExecutor` (HTTP dispatch) added in Phase 9 (2026-04-30).
+**Implemented.** Initial release as `philharmonic-api 0.1.0`
+on crates.io (2026-04-28, Phase 8). All endpoint families
+landed: workflow templates/instances, endpoint configs,
+principals, roles, memberships, minting authorities, token
+minting, tenant admin, audit log, operator endpoints. 86+
+integration tests. Real `ConfigLowerer` (COSE_Sign1 +
+COSE_Encrypt0) and `StepExecutor` (HTTP dispatch) added in
+Phase 9 (2026-04-30); reference deployment operational since
+2026-05-02. Current published version is tracked in
+[`philharmonic-api/CHANGELOG.md`](https://github.com/metastable-void/philharmonic-api/blob/main/CHANGELOG.md);
+the workspace's
+[`docs/ROADMAP.md`](../ROADMAP.md) carries post-v1 dispatch
+status.

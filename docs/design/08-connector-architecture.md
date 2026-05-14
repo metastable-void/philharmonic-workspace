@@ -296,10 +296,14 @@ claims) and little else from the philharmonic namespace.
 
 One crate per implementation. Each implements the
 `Implementation` trait from `connector-impl-api`. Each carries
-its own external dependencies — `reqwest` with `rustls-tls`
-for HTTP (per the workspace rule in CONTRIBUTING.md §10.9,
-which forbids `ureq` in runtime crates), `sqlx`, `lettre`,
-`qdrant-client`, etc., as the concern requires.
+its own external dependencies — `mechanics-http-client`
+(hyper-rustls + webpki-roots + aws-lc-rs; opportunistic HTTP/3
+via the optional `http3` feature) for HTTP, `sqlx` for SQL,
+`lettre` for SMTP, `tract`/`ndarray` for embed, etc., as the
+concern requires. Runtime HTTP impls share the
+`mechanics-http-client` transport — `reqwest` is forbidden
+workspace-wide and `ureq` is restricted to xtask tooling
+(CONTRIBUTING.md §10.9).
 
 Implementation crates depend only on `connector-impl-api`
 (and transitively `connector-common`); they don't see
@@ -960,6 +964,16 @@ compat mode, local compatible servers).
     arguments as the output. Fallback dialect for servers
     that support neither native path. Relies only on the
     OpenAI tool-calling contract.
+  - `tool_call_fallback_auto` — same shape as
+    `tool_call_fallback` but emits `tool_choice: "auto"`
+    instead of `tool_choice: {type: "function", function:
+    {name: ...}}`. Some OpenAI-compatible inference providers
+    (notably some local servers and some Hugging Face
+    Inference Providers) reject the forced-function form;
+    with only one tool offered (the synthetic `emit_output`
+    function) the model still effectively has to pick it,
+    so the structured-output contract is preserved. Added
+    in D16.
 - `timeout_ms` — optional, default 60s.
 
 The dialect is an endpoint-level decision in static
@@ -1251,11 +1265,17 @@ rewriting, no DKIM/SPF-relevant header injection).
 #### MIME composition helper
 
 Workflow authors hand-write the `body` string by default.
-A non-default `mechanics:mime` module in `mechanics-core`
-is planned for structured MIME composition / parsing
-(Base64, multipart, standards-compliant output) — useful
-for authors who want type-safe assembly rather than
-templated strings.
+The non-default `mechanics:mime` module in `mechanics-core`
+(shipped in 0.6.0 under the `mime` Cargo feature; transitively
+enabled by Philharmonic's `mechanics` feature) provides
+structured MIME composition and parsing via `compose(message)`
+and `parse(raw)`. Compose emits CRLF line endings, auto-adds
+`MIME-Version: 1.0`, generates multipart boundaries, encodes
+non-ASCII headers as RFC 2047 UTF-8 encoded-words, and chooses
+content-transfer-encoding per part (ASCII → `7bit`, non-ASCII
+text → `quoted-printable`, binary → `base64`; overridable).
+Useful for workflow authors who want type-safe assembly rather
+than templated strings.
 
 ### DNS
 
