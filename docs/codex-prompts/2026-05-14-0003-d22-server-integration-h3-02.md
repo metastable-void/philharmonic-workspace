@@ -246,7 +246,25 @@ Same as round 01:
 
 ## Outcome
 
-Pending — will be updated after Codex round 02 run.
+Round 02 completed. The previous Codex turn landed
+`mechanics-http-server/src/body.rs` with the public
+`H3RequestBody` / `H3RequestBodyError` request-body adapter plus
+the 0.1.3 version/dependency/re-export groundwork. This turn
+finished the remaining mhs scope: `Http3Server::start` now
+accepts `Request<H3RequestBody>` services and generic
+`http_body::Body<Data = Bytes>` responses, the HTTP/3 accept loop
+splits h3 streams into recv/send halves and drives response DATA
+and trailers frames through `send_data` / `send_trailers` /
+`finish`, and `axum_compat::router_into_h3_service` is now a
+thin streaming shim from `H3RequestBody` to `axum::body::Body`
+with no response buffering cap. The old
+`DEFAULT_H3_RESPONSE_BODY_LIMIT_BYTES` constant and
+`router_into_h3_service_with_response_limit` helper were removed,
+`CHANGELOG.md` now describes the 0.1.3 breaking API change and
+new public types, and the test suite includes an ignored
+in-process HTTP/3 streaming E2E that sends an 8 MiB request body
+and receives an 8 MiB chunked response body while asserting
+multi-frame streaming in both directions.
 
 ---
 
