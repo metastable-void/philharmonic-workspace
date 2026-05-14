@@ -2,6 +2,19 @@
 //!
 //! This module implements QUIC traits with Quinn.
 #![deny(missing_docs)]
+// Vendored from upstream h3-quinn 0.0.10. The upstream code
+// predates several rust 1.95 clippy lints; allowing them here
+// keeps the vendored source byte-for-byte identical to upstream
+// except for these top-of-file allow declarations.
+//
+// Re-vendor caveat: the `vendor-upstream` xtask bin overwrites
+// `src/**/*.rs` from upstream on re-run. When a future
+// `./scripts/xtask.sh vendor-upstream` lands a newer h3-quinn,
+// re-add these `#![allow]` lines (or remove them if upstream
+// has been cleaned up). The hand-maintained Cargo.toml is
+// preserved across re-vendor, but src/ is not.
+#![allow(clippy::redundant_closure)]
+#![allow(clippy::redundant_field_names)]
 
 use std::{
     convert::TryInto,
