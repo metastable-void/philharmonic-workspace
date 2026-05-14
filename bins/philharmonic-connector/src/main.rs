@@ -132,6 +132,7 @@ fn default_command() -> BaseCommand {
         config: None,
         config_dir: None,
         bind: None,
+        bind_h3: None,
     })
 }
 
@@ -140,6 +141,9 @@ async fn serve(args: BaseArgs) -> Result<(), String> {
     let mut config = load_connector_config(&primary, &drop_in, &args)?;
     if let Some(bind) = args.bind {
         config.bind = bind;
+    }
+    if let Some(bind_h3) = args.bind_h3 {
+        config.bind_h3 = Some(bind_h3);
     }
 
     let runtime = build_runtime(&config)?;
@@ -152,9 +156,15 @@ async fn serve(args: BaseArgs) -> Result<(), String> {
     let app = router(app_state.clone());
 
     let bind = config.bind;
+    let bind_h3 = config.bind_h3;
     let protocol = start_server(app, &config).await?;
     let mut counts = runtime.counts;
-    eprintln!("philharmonic-connector listening on {bind} ({protocol})");
+    match bind_h3 {
+        Some(addr) => {
+            eprintln!("philharmonic-connector listening on {bind} ({protocol}, h3 {addr})")
+        }
+        None => eprintln!("philharmonic-connector listening on {bind} ({protocol})"),
+    }
     eprintln!("service realm: {}", config.realm_id);
     log_loaded_counts(counts, implementation_count);
 
@@ -167,6 +177,9 @@ async fn serve(args: BaseArgs) -> Result<(), String> {
             Ok(mut reloaded) => {
                 if let Some(bind) = args.bind {
                     reloaded.bind = bind;
+                }
+                if let Some(bind_h3) = args.bind_h3 {
+                    reloaded.bind_h3 = Some(bind_h3);
                 }
                 match build_runtime(&reloaded) {
                     Ok(runtime) => {
@@ -480,8 +493,16 @@ fn decode_hex_header(value: &str, label: &str) -> Result<Vec<u8>, String> {
 async fn start_server(app: Router, config: &ConnectorConfig) -> Result<&'static str, String> {
     #[cfg(feature = "https")]
     if let Some(tls) = &config.tls {
-        start_tls_server(app, config.bind, tls).await?;
-        return Ok("https");
+        start_tls_server(app, config.bind, tls, config.bind_h3).await?;
+        return Ok(if config.bind_h3.is_some() {
+            "https+h3"
+        } else {
+            "https"
+        });
+    }
+
+    if config.bind_h3.is_some() {
+        return Err("HTTP/3 requires TLS; configure `[tls]`".to_string());
     }
 
     let listener = TcpListener::bind(config.bind)
@@ -500,49 +521,93 @@ async fn start_tls_server(
     app: Router,
     bind: std::net::SocketAddr,
     tls: &config::TlsFileConfig,
+    bind_h3: Option<std::net::SocketAddr>,
 ) -> Result<(), String> {
     use hyper_util::rt::{TokioExecutor, TokioIo};
     use hyper_util::server::conn::auto::Builder;
     use hyper_util::service::TowerToHyperService;
+    use mechanics_http_server::axum_compat::router_into_h3_service;
+    use mechanics_http_server::{AltSvcLayer, Http3Server, Http3ServerConfig};
     use tokio_rustls::TlsAcceptor;
 
-    let tls_config = read_tls_server_config(tls)?;
-    let acceptor = TlsAcceptor::from(Arc::new(tls_config));
+    let tls_material = read_tls_server_material(tls)?;
+    let acceptor = TlsAcceptor::from(Arc::new(tls_material.config));
     let listener = TcpListener::bind(bind)
         .await
         .map_err(|error| format!("failed to bind connector HTTPS listener: {error}"))?;
+    let h3_handle = if let Some(bind_h3) = bind_h3 {
+        let h3_config = Http3ServerConfig {
+            bind_h3: Some(bind_h3),
+            ..Http3ServerConfig::default()
+        };
+        Some(
+            Http3Server::new(h3_config)
+                .start(
+                    router_into_h3_service(app.clone()),
+                    tls_material.cert_chain,
+                    tls_material.private_key,
+                )
+                .map_err(|error| format!("failed to start connector HTTP/3 listener: {error}"))?,
+        )
+    } else {
+        None
+    };
     // HSTS scoped to the HTTPS server only (RFC 6797 §7.2 forbids it on
     // HTTP). start_http_server uses `app` unmodified.
     let app = app.layer(axum::middleware::from_fn(add_hsts_header));
+    let app = if let Some(bind_h3) = bind_h3 {
+        app.layer(AltSvcLayer::new(
+            bind_h3.port(),
+            Http3ServerConfig::default().alt_svc_max_age_secs,
+        ))
+    } else {
+        app
+    };
 
     tokio::spawn(async move {
-        loop {
-            let (stream, _) = match listener.accept().await {
-                Ok(accepted) => accepted,
-                Err(error) => {
-                    eprintln!("philharmonic-connector HTTPS accept failed: {error}");
-                    continue;
-                }
-            };
-            let acceptor = acceptor.clone();
-            let app = app.clone();
-            tokio::spawn(async move {
-                let tls_stream = match acceptor.accept(stream).await {
-                    Ok(stream) => stream,
+        let tcp_server = async move {
+            loop {
+                let (stream, _) = match listener.accept().await {
+                    Ok(accepted) => accepted,
                     Err(error) => {
-                        eprintln!("philharmonic-connector TLS handshake failed: {error}");
-                        return;
+                        eprintln!("philharmonic-connector HTTPS accept failed: {error}");
+                        continue;
                     }
                 };
-                let service = TowerToHyperService::new(app);
-                let builder = Builder::new(TokioExecutor::new());
-                if let Err(error) = builder
-                    .serve_connection_with_upgrades(TokioIo::new(tls_stream), service)
-                    .await
-                {
-                    eprintln!("philharmonic-connector HTTPS connection failed: {error}");
+                let acceptor = acceptor.clone();
+                let app = app.clone();
+                tokio::spawn(async move {
+                    let tls_stream = match acceptor.accept(stream).await {
+                        Ok(stream) => stream,
+                        Err(error) => {
+                            eprintln!("philharmonic-connector TLS handshake failed: {error}");
+                            return;
+                        }
+                    };
+                    let service = TowerToHyperService::new(app);
+                    let builder = Builder::new(TokioExecutor::new());
+                    if let Err(error) = builder
+                        .serve_connection_with_upgrades(TokioIo::new(tls_stream), service)
+                        .await
+                    {
+                        eprintln!("philharmonic-connector HTTPS connection failed: {error}");
+                    }
+                });
+            }
+        };
+
+        if let Some(mut h3_handle) = h3_handle {
+            tokio::select! {
+                () = tcp_server => {}
+                result = &mut h3_handle => {
+                    if let Err(error) = result {
+                        eprintln!("philharmonic-connector HTTP/3 listener stopped: {error}");
+                    }
                 }
-            });
+            }
+            h3_handle.shutdown();
+        } else {
+            tcp_server.await;
         }
     });
 
@@ -550,9 +615,14 @@ async fn start_tls_server(
 }
 
 #[cfg(feature = "https")]
-fn read_tls_server_config(
-    tls: &config::TlsFileConfig,
-) -> Result<tokio_rustls::rustls::ServerConfig, String> {
+struct TlsServerMaterial {
+    config: tokio_rustls::rustls::ServerConfig,
+    cert_chain: Vec<tokio_rustls::rustls::pki_types::CertificateDer<'static>>,
+    private_key: tokio_rustls::rustls::pki_types::PrivateKeyDer<'static>,
+}
+
+#[cfg(feature = "https")]
+fn read_tls_server_material(tls: &config::TlsFileConfig) -> Result<TlsServerMaterial, String> {
     use tokio_rustls::rustls::pki_types::{CertificateDer, PrivateKeyDer, pem::PemObject};
 
     let cert_bytes = std::fs::read(&tls.cert_path).map_err(|error| {
@@ -578,6 +648,8 @@ fn read_tls_server_config(
     let private_key = PrivateKeyDer::from_pem_slice(&key_bytes)
         .map_err(|error| format!("failed to parse TLS private key: {error}"))?;
 
+    let h3_cert_chain = cert_chain.clone();
+    let h3_private_key = private_key.clone_key();
     let provider = Arc::new(aes256_chacha20_only_provider());
     let mut config = tokio_rustls::rustls::ServerConfig::builder_with_provider(provider)
         .with_safe_default_protocol_versions()
@@ -586,7 +658,18 @@ fn read_tls_server_config(
         .with_single_cert(cert_chain, private_key)
         .map_err(|error| format!("failed to build TLS server config: {error}"))?;
     config.alpn_protocols = vec![b"h2".to_vec(), b"http/1.1".to_vec()];
-    Ok(config)
+    Ok(TlsServerMaterial {
+        config,
+        cert_chain: h3_cert_chain,
+        private_key: h3_private_key,
+    })
+}
+
+#[cfg(feature = "https")]
+fn read_tls_server_config(
+    tls: &config::TlsFileConfig,
+) -> Result<tokio_rustls::rustls::ServerConfig, String> {
+    read_tls_server_material(tls).map(|material| material.config)
 }
 
 /// Build a rustls CryptoProvider that's the aws-lc-rs default minus
@@ -807,5 +890,29 @@ fn implementation_error_kind(error: &ImplementationError) -> &'static str {
         ImplementationError::ResponseTooLarge { .. } => "response_too_large",
         ImplementationError::InvalidRequest { .. } => "invalid_request",
         ImplementationError::Internal { .. } => "internal",
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::net::SocketAddr;
+
+    use axum::Router;
+
+    use super::{ConnectorConfig, start_server};
+
+    #[tokio::test]
+    async fn bind_h3_without_tls_errors_before_binding_http() {
+        let mut config = ConnectorConfig {
+            bind: SocketAddr::from(([127, 0, 0, 1], 0)),
+            ..ConnectorConfig::default()
+        };
+        config.bind_h3 = Some(SocketAddr::from(([127, 0, 0, 1], 0)));
+
+        let error = start_server(Router::new(), &config)
+            .await
+            .expect_err("HTTP/3 without TLS must fail");
+
+        assert_eq!(error, "HTTP/3 requires TLS; configure `[tls]`");
     }
 }

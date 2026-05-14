@@ -3,9 +3,9 @@
 //! This module implements the traits defined in h3-datagram for the quinn crate.
 
 use std::future::Future;
-use std::task::{ready, Poll};
+use std::task::{Poll, ready};
 
-use futures::{stream, StreamExt};
+use futures::{StreamExt, stream};
 use h3_datagram::datagram::EncodedDatagram;
 use h3_datagram::quic_traits::{
     DatagramConnectionExt, RecvDatagram, SendDatagram, SendDatagramErrorIncoming,
@@ -16,7 +16,7 @@ use h3_datagram::ConnectionErrorIncoming;
 use bytes::{Buf, Bytes};
 use quinn::{ReadDatagram, SendDatagramError};
 
-use crate::{convert_connection_error, BoxStreamSync, Connection};
+use crate::{BoxStreamSync, Connection, convert_connection_error};
 
 /// A Struct which allows to send datagrams over a QUIC connection.
 pub struct SendDatagramHandler {

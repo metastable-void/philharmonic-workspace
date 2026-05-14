@@ -27,9 +27,8 @@ use std::{
 use bytes::{Buf, Bytes};
 
 use futures::{
-    ready,
+    Stream, StreamExt, ready,
     stream::{self},
-    Stream, StreamExt,
 };
 
 use quinn::ReadError;

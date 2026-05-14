@@ -74,6 +74,7 @@ fn default_command() -> BaseCommand {
         config: None,
         config_dir: None,
         bind: None,
+        bind_h3: None,
     })
 }
 
@@ -82,6 +83,9 @@ async fn serve(args: BaseArgs) -> Result<(), String> {
     let mut config = load_worker_config(&primary, &drop_in, &args)?;
     if let Some(bind) = args.bind {
         config.bind = bind;
+    }
+    if let Some(bind_h3) = args.bind_h3 {
+        config.bind_h3 = Some(bind_h3);
     }
 
     let pool_config = build_pool_config(&config)?;
@@ -93,9 +97,13 @@ async fn serve(args: BaseArgs) -> Result<(), String> {
     }
 
     let bind = config.bind;
+    let bind_h3 = config.bind_h3;
     let protocol = start_server(&server, &config)?;
     let mut token_count = normalized_token_count(&config.tokens);
-    eprintln!("mechanics-worker listening on {bind} ({protocol})");
+    match bind_h3 {
+        Some(addr) => eprintln!("mechanics-worker listening on {bind} ({protocol}, h3 {addr})"),
+        None => eprintln!("mechanics-worker listening on {bind} ({protocol})"),
+    }
     eprintln!("loaded {token_count} bearer token(s)");
 
     let reload_handle = ReloadHandle::new()
@@ -107,6 +115,9 @@ async fn serve(args: BaseArgs) -> Result<(), String> {
             Ok(mut reloaded) => {
                 if let Some(bind) = args.bind {
                     reloaded.bind = bind;
+                }
+                if let Some(bind_h3) = args.bind_h3 {
+                    reloaded.bind_h3 = Some(bind_h3);
                 }
                 let new_token_count = normalized_token_count(&reloaded.tokens);
                 log_tls_reload_note(&reloaded);
@@ -165,10 +176,24 @@ fn start_server(
     #[cfg(feature = "https")]
     if let Some(tls) = &config.tls {
         let tls_config = read_tls_config(tls)?;
+        if let Some(bind_h3) = config.bind_h3 {
+            let h3_config = philharmonic::mechanics::Http3ServerConfig {
+                bind_h3: Some(bind_h3),
+                ..philharmonic::mechanics::Http3ServerConfig::default()
+            };
+            server
+                .run_tls_with_h3(config.bind, tls_config, Some(h3_config))
+                .map_err(|error| format!("failed to start HTTPS/H3 mechanics server: {error}"))?;
+            return Ok("https+h3");
+        }
         server
             .run_tls(config.bind, tls_config)
             .map_err(|error| format!("failed to start HTTPS mechanics server: {error}"))?;
         return Ok("https");
+    }
+
+    if config.bind_h3.is_some() {
+        return Err("HTTP/3 requires TLS; configure `[tls]`".to_string());
     }
 
     server
@@ -230,3 +255,25 @@ fn log_tls_reload_note(config: &MechanicsWorkerConfig) {
 
 #[cfg(not(feature = "https"))]
 fn log_tls_reload_note(_config: &MechanicsWorkerConfig) {}
+
+#[cfg(test)]
+mod tests {
+    use std::net::SocketAddr;
+
+    use super::{MechanicsWorkerConfig, start_server};
+
+    #[test]
+    fn bind_h3_without_tls_errors_before_binding_http() {
+        let mut config = MechanicsWorkerConfig {
+            bind: SocketAddr::from(([127, 0, 0, 1], 0)),
+            ..MechanicsWorkerConfig::default()
+        };
+        config.bind_h3 = Some(SocketAddr::from(([127, 0, 0, 1], 0)));
+        let server =
+            philharmonic::mechanics::MechanicsServer::new(Default::default()).expect("server");
+
+        let error = start_server(&server, &config).expect_err("HTTP/3 without TLS must fail");
+
+        assert_eq!(error, "HTTP/3 requires TLS; configure `[tls]`");
+    }
+}

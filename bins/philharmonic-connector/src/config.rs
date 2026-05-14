@@ -7,6 +7,7 @@ use philharmonic::connector_service::UnixMillis;
 #[serde(default)]
 pub(crate) struct ConnectorConfig {
     pub(crate) bind: SocketAddr,
+    pub(crate) bind_h3: Option<SocketAddr>,
     pub(crate) realm_id: String,
     pub(crate) minting_keys: Vec<MintingKeyConfig>,
     pub(crate) realm_keys: Vec<RealmKeyConfig>,
@@ -18,6 +19,7 @@ impl Default for ConnectorConfig {
     fn default() -> Self {
         Self {
             bind: SocketAddr::from(([127, 0, 0, 1], 3002)),
+            bind_h3: None,
             realm_id: "default".to_string(),
             minting_keys: Vec::new(),
             realm_keys: Vec::new(),

@@ -20,6 +20,7 @@ http = { version = "1", default-features = false, features = ["std"] }
 hyper-util = { version = "0.1", default-features = false, features = ["http1", "http2", "server", "tokio"] }
 rand_core = { version = "0.6", default-features = false, features = ["getrandom"] }
 mechanics-http-client = { version = "0.2", default-features = false, features = ["http3"] } # kept: preserves opportunistic HTTP/3 endpoint transport.
+mechanics-http-server = { version = "0.1", default-features = false, optional = true }
 serde = { version = "1", default-features = false, features = ["derive", "std"] }
 serde_json = { version = "1", default-features = false, features = ["std"] }
 sqlx = { version = "0.8", default-features = false, features = ["mysql", "runtime-tokio"] }
@@ -32,4 +33,4 @@ zeroize = { version = "1", default-features = false, features = ["alloc", "deriv
 
 [features]
 default = []
-https = ["philharmonic/https", "dep:tokio-rustls"]
+https = ["philharmonic/https", "dep:mechanics-http-server", "dep:tokio-rustls"]

@@ -9,6 +9,7 @@ use philharmonic::types::UnixMillis;
 #[serde(default)]
 pub(crate) struct ApiConfig {
     pub(crate) bind: SocketAddr,
+    pub(crate) bind_h3: Option<SocketAddr>,
     pub(crate) database_url: String,
     pub(crate) signing_key_path: Option<PathBuf>,
     pub(crate) signing_key_kid: Option<String>,
@@ -55,6 +56,7 @@ impl Default for ApiConfig {
     fn default() -> Self {
         Self {
             bind: SocketAddr::from(([127, 0, 0, 1], 3000)),
+            bind_h3: None,
             database_url: "mysql://root@localhost/philharmonic".to_string(),
             signing_key_path: None,
             signing_key_kid: None,

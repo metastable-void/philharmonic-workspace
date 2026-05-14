@@ -2979,16 +2979,18 @@ dependencies = [
 
 [[package]]
 name = "mechanics"
-version = "0.5.1"
+version = "0.5.2"
 dependencies = [
  "http-body-util",
  "hyper",
  "hyper-util",
  "mechanics-core",
+ "mechanics-http-server",
  "parking_lot",
  "serde_json",
  "tokio",
  "tokio-rustls",
+ "tower",
 ]
 
 [[package]]
@@ -3066,8 +3068,9 @@ dependencies = [
 
 [[package]]
 name = "mechanics-http-server"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
+ "axum",
  "bytes",
  "h3",
  "http",
@@ -3791,6 +3794,7 @@ dependencies = [
  "http",
  "hyper-util",
  "mechanics-http-client",
+ "mechanics-http-server",
  "philharmonic",
  "rand_core 0.6.4",
  "serde",
@@ -3813,6 +3817,7 @@ dependencies = [
  "clap",
  "hex",
  "hyper-util",
+ "mechanics-http-server",
  "philharmonic",
  "serde",
  "serde_json",

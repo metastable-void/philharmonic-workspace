@@ -271,7 +271,32 @@ Same as the D24 round 03 + h3-quinn vendor rounds:
 
 ## Outcome
 
-Pending — will be updated after Codex round 01 run.
+Round 01 wired opportunistic HTTP/3 into `mechanics-worker`,
+`philharmonic-api-server`, and `philharmonic-connector`. The
+`mechanics-http-server` crate is bumped to 0.1.2 with
+`mechanics_http_server::axum_compat::router_into_h3_service`,
+and `mechanics` is bumped to 0.5.2 with
+`MechanicsServer::run_tls_with_h3`; all three bins accept
+`bind_h3`, reject HTTP/3 without configured TLS, reuse the same
+parsed TLS certificate/key for QUIC, and advertise Alt-Svc on
+the TCP+TLS path when HTTP/3 is enabled.
+
+Validation passed for `./scripts/pre-landing.sh`,
+`CARGO_TARGET_DIR=target-main cargo deny check bans`, and
+`CARGO_TARGET_DIR=target-main cargo tree --workspace --invert
+ring --target x86_64-unknown-linux-gnu` (empty except for
+Cargo profile warnings). The round is still incomplete against
+the original completeness contract because no new per-bin
+network integration test was added to prove an HTTP/3 client
+gets 200 from the release bins; the existing ignored
+`mechanics-http-server` end-to-end h3 test does pass.
+
+Residual: the new axum adapter buffers response bodies up to
+16 MiB because the current `Http3Server` public service shape is
+`Request<()> -> Response<Bytes>`. Consequently, the
+`mechanics` h3-side request handler can only support
+body-less/request-metadata paths until the mhs public API grows
+request-body streaming.
 
 ---
 
