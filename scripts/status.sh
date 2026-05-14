@@ -146,8 +146,13 @@ while IFS= read -r path; do
     ) > "$tmpdir/${seq}-${name}.out" &
 done < "$tmpdir/.paths"
 
-wait
+# wait may return non-zero if a backgrounded probe exited with
+# an error (e.g. a submodule with an unusual remote config). The
+# block was still written to its temp file, so don't propagate.
+wait || true
 
 for f in "$tmpdir"/[0-9]*.out; do
     [ -s "$f" ] && cat "$f"
 done
+
+exit 0
