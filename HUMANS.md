@@ -17,19 +17,15 @@ this file, but never edit this file.
 
 ## HTTP/3 support notes
 
-- HTTP/3 is enabled for a server whenever it is configured
-  with the HTTP/3 UDP bind port (the convention would be the top-level `bind_h3: Option<SockAddr>`).
-- HTTP/3 is auto-discovered for any remote services (with HTTPS RRs, and
-  alt-svc headers) by the client. Forgetting HTTP/3 support statuses across
-  statelessness boundaries is fine, but static LazyLock/Mutex states can be kept
-  by the lib crate.
+- Make sure HTTP/3 server side is done.
 
-```
-pub static MUTEX: Mutex<MyType> = Mutex::new(MyType::new());
-// or
-pub static MUTEX: LazyLock<Arc<Mutex<MyType>>> =
-  LazyLock::new(|| Arc::new(Mutex::new(MyType::new())));
-```
+## h3-quinn should be vendored
+
+h3-quinn should be vendored - write an xtask/script that
+copies the latest release behind the 3d cooldown into a
+non-submodule in-tree crate, and applies a Cargo.toml patches.
+
+patch.crates-io should point to this for h3-quinn.
 
 ## SMTP connector
 
