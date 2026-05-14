@@ -594,7 +594,10 @@ their final output. Chat workflows usually keep `done: false`.
 ### Built-in modules
 
 Scripts can import only built-in modules exposed by
-`mechanics-core/ts-types/`.
+`mechanics-core`. Type declarations for the stable subset live
+under `mechanics-core/ts-types/`; modules added in
+mechanics-core 0.6.0 (`html`, `console`, `url`, `mime`) ship
+without `.d.ts` files yet.
 
 | Module | Exports |
 |---|---|
@@ -605,6 +608,192 @@ Scripts can import only built-in modules exposed by
 | `mechanics:form-urlencoded` | `encode`, `decode`. |
 | `mechanics:rand` | Default `fillRandom(buffer)` helper. |
 | `mechanics:uuid` | Default UUID generator for `v3`, `v4`, `v5`, `v6`, `v7`, `nil`, or `max`. |
+| `mechanics:html` | `escapeText`, `escapeAttribute`, `unescapeText`, `unescapeAttribute`. |
+| `mechanics:console` | Default `console` object with no-op `log`, `info`, `warn`, `error`, `debug` methods. |
+| `mechanics:url` | Default `URL` class; named `URLSearchParams`. WHATWG-style. |
+| `mechanics:mime` | `compose(message)`, `parse(raw)` for structured MIME messages. |
+
+The defaults-on subset is `rand`, `encoding` (base64 / base32 /
+hex / form-urlencoded), `html`, `console`, `url`. The `mime`
+module is opt-in at the Rust feature level; Philharmonic's
+`mechanics` Cargo feature enables it transitively, so scripts
+running under `mechanics-worker` and the api-server have it
+available. Embedders that depend on `mechanics-core` directly
+can opt out per-module with `default-features = false`.
+
+#### `mechanics:html`
+
+HTML-entity escape / unescape, backed by `htmlize`. Pure
+text-in / text-out; no DOM, no parser.
+
+```javascript
+import {
+  escapeText, escapeAttribute,
+  unescapeText, unescapeAttribute,
+} from "mechanics:html";
+
+const safe = escapeText("<a href='/'>hi & bye</a>");
+// "&lt;a href='/'&gt;hi &amp; bye&lt;/a&gt;"
+
+const attr = escapeAttribute(`alert("xss")`);
+// `alert(&quot;xss&quot;)`
+```
+
+Use `escapeAttribute` for values you splice into HTML attributes
+and `escapeText` for text-content interpolation. `unescapeText`
+and `unescapeAttribute` are the inverses for parsing already-
+escaped fragments.
+
+#### `mechanics:console`
+
+`console` default-export with `log`, `info`, `warn`, `error`,
+`debug` methods. **Currently all methods are no-ops** — the
+realm performs no host-side I/O for any console call. The
+module exists so existing JS idioms compile and run; future
+versions may capture pre-return `console` writes into the
+`RunJobResponse` (a possibly-breaking change called out in the
+0.6.0 release notes), but today's behaviour is silence.
+
+```javascript
+import console from "mechanics:console";
+
+console.log("ignored today; may be captured later");
+```
+
+Do not rely on console for diagnostics in production scripts —
+return values, endpoint side effects, and rejected promises
+are the only observable signals from a job.
+
+#### `mechanics:url`
+
+WHATWG `URL` and `URLSearchParams`, backed by the `url` crate.
+
+```javascript
+import URL, { URLSearchParams } from "mechanics:url";
+
+const url = new URL("https://example.test/path?a=1");
+url.searchParams.append("b", "2");
+url.toString();
+// "https://example.test/path?a=1&b=2"
+
+const params = new URLSearchParams("x=1&y=hello%20world");
+params.get("y");
+// "hello world"
+```
+
+Most WHATWG accessors (`href`, `origin`, `protocol`,
+`username`, `password`, `host`, `hostname`, `port`, `pathname`,
+`search`, `searchParams`, `hash`) are present. Static
+`URL.canParse(input)` and `URL.parse(input)` are available.
+`URLSearchParams` supports `append`, `delete`, `get`, `getAll`,
+`has`, `set`, `sort`, `toString`, `entries`, `keys`, `values`,
+`forEach`, and `size`.
+
+#### `mechanics:mime`
+
+Pure format-only MIME compose / parse for structured message
+objects. No I/O. Emits CRLF line endings, auto-adds
+`MIME-Version: 1.0`, generates multipart boundaries, encodes
+non-ASCII headers as RFC 2047 UTF-8 encoded-words, and handles
+`7bit`, `8bit`, `binary`, `quoted-printable`, and `base64`
+content-transfer-encodings on body parts.
+
+Compose rule for the body encoding when you don't set it:
+ASCII text → `7bit`; non-ASCII text → `quoted-printable`
+(preferred over base64 because spam filters trip less on q-p);
+binary `Uint8Array`/`ArrayBuffer` → `base64`. Set `encoding`
+on a part to override.
+
+```javascript
+import { compose, parse } from "mechanics:mime";
+
+const raw = compose({
+  headers: {
+    "From": "alice@example.test",
+    "To": "bob@example.test",
+    "Subject": "Hello",
+    "Content-Type": "text/plain; charset=utf-8",
+  },
+  body: "Hello, world! こんにちは。",
+});
+// raw is a string with CRLF line endings, MIME-Version added,
+// body emitted as quoted-printable because of the non-ASCII text.
+
+const parsed = parse(raw);
+// { headers: { ... }, body: "Hello, world! こんにちは。" }
+```
+
+Multipart compose: pass a `parts` array instead of a `body`;
+omit the `Content-Type` header to default to
+`multipart/mixed`, or set it explicitly (e.g. `multipart/
+alternative`) and `compose` will generate a boundary.
+
+```javascript
+const raw = compose({
+  headers: {
+    "From": "alice@example.test",
+    "To": "bob@example.test",
+    "Subject": "With attachment",
+  },
+  parts: [
+    {
+      headers: { "Content-Type": "text/plain; charset=utf-8" },
+      body: "See attachment.",
+    },
+    {
+      headers: {
+        "Content-Type": "application/octet-stream",
+        "Content-Disposition": "attachment; filename=data.bin",
+      },
+      body: new Uint8Array([0x00, 0x01, 0x02, 0xFF]),
+    },
+  ],
+});
+```
+
+Residual RFC scope is deliberately narrow. Header encoded-word
+handling supports UTF-8 `B` and `Q` encoded words only —
+legacy charsets are rejected. Header folding is whitespace-
+based. Multipart parse ignores preamble and epilogue content
+and recurses into nested parts. These are acceptable for the
+initial module surface but are not a full email-
+interoperability layer; if you need that, transform the
+parsed structure into your own model.
+
+### JavaScript runtime notes
+
+The realm is intentionally minimal:
+
+- **No browser globals.** No `window`, no `document`, no
+  `globalThis` DOM, no Web APIs unless imported as a
+  `mechanics:*` module.
+- **No timers.** `setTimeout` and `setInterval` are not
+  available as globals. (mechanics-core 0.5.1 removed a
+  short-lived `setTimeout` shim from 0.4.1.) Use Promise-based
+  patterns:
+  - `Promise.resolve().then(() => { ... })` — microtask
+    deferral.
+  - `(async () => { ... })()` — fire-and-forget async block
+    whose tail polling keeps running after `main` returns.
+  - Endpoint promises with `.then(...)` — async side effects
+    scheduled from a synchronous `main`.
+  The tail-poll behaviour (mechanics-core 0.4.1) keeps
+  unawaited promises and endpoint calls running on the worker
+  thread until quiescence or `max_execution_time`, so
+  unawaited work still completes; it's just not blocked on a
+  timer.
+- **No `console` global.** Import `mechanics:console` if you
+  want the no-op stubs; see above.
+- **ES modules only.** `script_source` is parsed as an ES
+  module — `import`, `export`, and a `default` export are
+  required. CommonJS (`require`, `module.exports`) is not
+  recognised.
+- **Stage-3+ proposals enabled.** Boa's `temporal`, `float16`,
+  and `xsum` features are on, so `Temporal`, `Float16Array`,
+  and `Math.sumPrecise` are available to scripts. ECMA-402
+  (`Intl`) is currently disabled because of a transient
+  upstream dependency conflict; re-attempt when Boa relaxes
+  its `icu_provider` pin.
 
 ### Sandbox limits
 
