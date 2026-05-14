@@ -165,6 +165,36 @@ shape:
   crate). Plus any task-specific `cargo tree` greps. Tell Codex
   not to run raw `cargo fmt/check/clippy/test` when the scripts
   cover it.
+- **Always** ask Codex to write a report at
+  `docs/codex-reports/YYYY-MM-DD-NNNN-<slug>.md` for any
+  outstanding important questions or concerns surfaced during
+  the dispatch — non-obvious design calls, blocker-then-
+  resolution sequences, residual risks worth preserving past
+  the session summary, cross-dependency gotchas, flag-vs-fix
+  policy items. The report follows the rules in
+  [`docs/codex-reports/README.md`](../../../docs/codex-reports/README.md)
+  (per-directory daily counter; same journal filename format as
+  the prompt archive; Codex leaves it dirty for Claude to
+  commit alongside the implementation diff). Routine,
+  well-specified, no-surprises work doesn't need a report —
+  the session-summary covers it. The prompt should explicitly
+  permit Codex to skip the report when nothing report-worthy
+  came up, but should make clear that "if something would
+  outlive the session summary, write it down before returning."
+
+  Suggested prompt language (paste into the `<task>` block or
+  the verification checklist):
+
+  > **Codex report (optional but encouraged):** if anything
+  > non-obvious surfaced during this round — a design call
+  > you had to make on the fly, a blocker you worked around,
+  > a residual concern Yuka should know about — write a
+  > short report to
+  > `docs/codex-reports/YYYY-MM-DD-NNNN-<slug>.md` per
+  > [`docs/codex-reports/README.md`](docs/codex-reports/README.md).
+  > Routine specified-and-shipped work doesn't need one; the
+  > session summary covers it. Codex leaves the report dirty
+  > in the working tree for Claude to commit.
 
 ## Do not
 
