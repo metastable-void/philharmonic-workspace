@@ -427,7 +427,56 @@ trimmed too aggressively.
 
 ## Outcome
 
-Pending — will be updated after Codex run.
+**REVERTED — round 02 supersedes** (`2026-05-14-0001-d24-default-features-audit-02.md`).
+
+Codex executed through tier 4 edits (22 of 24 published-crate
+Cargo.tomls modified: tier 1 leaves, tier 2 foundations, tier 3
+mid-tier, tier 4 connector impls — see prompt §"Concrete tasks").
+Per-crate `cargo check -p <crate> --all-targets` passed for
+tiers 1, 2, 3, and tier 4 (the slow `embed` crate's check
+finished green). A workspace-wide `cargo check --workspace
+--all-targets` post-revert-decision also completed exit 0.
+However, the Codex process **died mid-tier-4** before reaching
+tier 5/6/7, before adding any CHANGELOG entries, and before
+running `pre-landing.sh` — no `task_complete` event fired, and
+no commits landed (the parent's pre-commit hooks never ran).
+
+The structural shape of Codex's edits was correct: every direct
+dep got `default-features = false` + an explicit feature list,
+22 published crates were patch-bumped, and `tokio-rustls` was
+narrowed to `["aws_lc_rs", "logging", "tls12"]` — a forbidden-
+dep elimination (dropping the upstream `ring` default), which
+is exactly the kind of trim the audit wants.
+
+**Why reverted:** on review with Yuka (2026-05-14 mid-morning),
+the audit's stated bias was clarified: **"unused / non-exposed
+features should be removed"** — not preserved verbatim from the
+upstream default. Codex's round-01 pass instead re-listed every
+upstream default explicitly without grep-checking whether the
+crate's `src/` actually exercises each feature. Examples:
+`boa_engine` re-listed both `float16` and `xsum` (boa's
+defaults) verbatim, but mechanics-core's JS workload doesn't
+appear to exercise either; `uuid` re-listed every v3/v4/v5/v6/v7
+variant mentioned in the original `features = [...]` array
+without grep-checking which are actually used at call sites.
+This is the inverse of what Yuka wanted: the audit should drop
+unused / non-exposed defaults, while still keeping features
+that (a) are runtime-required, (b) are exposed via the crate's
+own `pub` API surface, or (c) if dropped would pull a banned
+dep.
+
+Round 02 (`-02.md`) re-runs the same audit with the corrected
+bias. The version-bump targets and the structural
+`default-features = false` shape carry over verbatim; the
+delta is which features end up in each crate's explicit list
+(narrower than round 01).
+
+Round-01 commit landed: only the prompt-archive commit
+(`0048d3e`). No Cargo.toml edits made it past the dirty tree;
+those were reverted with `git checkout -- Cargo.toml` per
+submodule and `git checkout -- Cargo.lock` at the parent. The
+workspace returned to the clean post-`2da8e18` state before
+round 02 was drafted.
 
 ---
 
