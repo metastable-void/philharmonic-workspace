@@ -15,22 +15,20 @@ active work now lives in the post-v1 dispatch plan (§3 below).
 - **Dispatches done** (post-v1): D1, D2, D3, D4, D5, D6
   (embedding-datasets feature), D10, D11, D12, D13, D14, D15,
   D16 (WebUI + connector enhancements), D17 (mechanics-core
-  tail-promise polling), D20 (workspace-wide webpki-roots TLS
+  tail-promise polling), D18 (mechanics-core module-surface
+  refactor: feature gates + `console` no-op + `html` +
+  `url` WHATWG + `mime` compose/parse + workflow-authoring
+  guide refresh en+jp; setTimeout-removal sub-piece reverted
+  D17's non-ES global), D20 (workspace-wide webpki-roots TLS
   via `mechanics-http-client`), D21 (`pre-landing.sh`
   dep-aware test filtering), D22 (HTTP/3 client + server-lib +
   server-integration + streaming; `mechanics-http-server
   0.1.3` published), D23 (`dockerlet` replaces testcontainers),
   D24 (workspace-wide `default-features = false` audit), D25
-  (`mhc` hickory CVE bump). Plus the **setTimeout-removal
-  sub-piece of D18** + the `mechanics-h3-quinn` in-tree
-  vendored fork + generic `vendor-upstream` xtask +
+  (`mhc` hickory CVE bump). Plus the `mechanics-h3-quinn`
+  in-tree vendored fork + generic `vendor-upstream` xtask +
   `check-no-registry` workspace-hardening guard + dev-profile
   incremental-build disable (2026-05-14 batch).
-- **In progress**: D18 (mechanics-core module-surface refactor)
-  — R01 landed (feature-gating + `console` no-op + `html`
-  htmlize wrapper); R02 dispatched (`url` module); R03
-  (`mime`) + R04 (workflow-authoring guide refresh en+jp)
-  queued.
 - **Pending**: D7 / D8 / D9 / D19 (Tier 2/3 connectors —
   SMTP, Anthropic, Gemini, DNS).
 - **§3.J production-security cleanup arc closed 2026-05-14**:
@@ -119,11 +117,11 @@ drafts the proposal, Yuka reviews per the two-gate crypto-review
 protocol (§2).
 
 Total: **26 Codex dispatches plus 1 Gate-1 proposal.**
-Done / in-progress / pending breakdown lives in the
+Done / pending breakdown lives in the
 **Current state** block at the top of this file. Done arcs
-trim to one-line done-pointers below (§3.A, C, D, E, G,
-H, I, J); the still-pending sections (§3.B, §3.F) carry
-the full dispatch specs.
+trim to one-line done-pointers below (§3.A, C, D, E, F, G,
+H, I, J); the still-pending §3.B carries the full dispatch
+specs.
 
 ### A. Embedding datasets (6 dispatches + 1 Gate-1) — DONE
 
@@ -272,141 +270,27 @@ behaviour spec at
 Per-dispatch detail at
 [`docs/archive/2026-05-12-roadmap-d17-done-d7-spec-d18-added.md`](archive/2026-05-12-roadmap-d17-done-d7-spec-d18-added.md).
 
-### F. Mechanics module surface (1 dispatch)
+### F. Mechanics module surface (1 dispatch) — DONE
 
-Surfaced via HUMANS.md §"MIME module at `mechanics-core`" and
-the surrounding directive on feature-gating non-endpoint
-modules.
-
-- **D18** `mechanics-core` module-surface refactor. Make every
-  non-endpoint built-in module feature-gated and ship four
-  new modules (one non-default, three default):
-
-  - **Refactor**: every existing non-endpoint module
-    (`mechanics:rand`, `mechanics:uuid`, `mechanics:encoding`)
-    moves behind a Cargo feature flag. Pre-existing modules
-    keep their previous availability by being members of
-    default features.
-  - **Feature `rand`** (default) — `mechanics:rand` +
-    `mechanics:uuid`. Without it, `Math.random()` is seeded
-    with zero (per HUMANS.md).
-  - **Feature `encoding`** (default) — form-urlencoded,
-    base64, base32, hex. Existing surface; gets gated.
-  - **Feature `html`** (default, **new**) — wraps the
-    `htmlize` crate: `htmlize::escape_text` → `escapeText`,
-    `htmlize::escape_all_quotes` → `escapeAttribute`,
-    `htmlize::unescape` → `unescapeText`,
-    `htmlize::unescape_attribute` → `unescapeAttribute`.
-  - **Feature `url`** (default, **new**) — WHATWG-compliant
-    `mechanics:url`. Default export `URL`; named export
-    `URLSearchParams`. Backed by the `url` crate.
-  - **Feature `console`** (default, **new**) — minimal
-    WHATWG-compliant `mechanics:console`. Levels: `log`,
-    `info`, `warn`, `error`, `debug`. **No I/O of any
-    kind** — no stdout, no stderr, no host-side
-    `tracing` emission. Per Yuka 2026-05-14: workflows
-    run in a sandboxed realm where any direct I/O would
-    violate the stateless-per-job contract and leak host
-    information. Initial implementation is a complete
-    no-op: the level methods exist with the expected
-    WHATWG signatures (variadic args, format-spec
-    handling) and silently return `undefined`. **Future
-    work** (separate dispatch, possibly breaking): capture
-    `console.*` invocations made before the script's
-    `return` into a structured field on the worker
-    response (e.g. `RunJobResponse.logs: Vec<ConsoleEntry>`).
-    The capture window is *pre-return*; D17's tail-promise
-    polling phase is post-return and won't capture
-    further `console.*` calls (they continue to no-op).
-    This means workflow authors can use `console.log` for
-    structured debugging during development without
-    needing a worker-config knob, and operators don't
-    have to worry about runaway log emission from
-    malicious workflows.
-  - **Feature `mime`** (non-default, **new**) —
-    structured MIME composer + parser at `mechanics:mime`.
-    `import { compose, parse } from 'mechanics:mime'`.
-    Handles Base64 and multipart cleanly; emits
-    standards-compliant MIME messages. Format-only;
-    does **not** know about HTML, headers semantics, or
-    SMTP. Useful both standalone and as a workflow-author
-    helper for the D7 `email_smtp` connector
-    (workflows can keep hand-writing the `body` string
-    when `mime` isn't enabled).
-
-  **setTimeout-removal sub-piece: DONE 2026-05-14** (parent
-  commit `796f83e`; mechanics-core submodule `cf4f9c6`). The
-  non-ES `setTimeout` global that D17 had inadvertently added
-  to the Mechanics realm is now gone — closes the design-06
-  §"Realm surface (no non-ES globals)" hard-rule violation.
-  The full D18 module-surface refactor below is the remaining
-  scope.
-
-  Original captured scope: **remove the non-ES `setTimeout`
-  global** that D17 inadvertently added to the Mechanics
-  realm. Per HUMANS.md the rule is "no non-ES globals" (hard
-  rule, just reiterated 2026-05-13); `setTimeout` and
-  `setInterval` are WHATWG/Web Platform globals, not
-  ECMAScript spec, so neither belongs in the realm's global
-  object or in any `mechanics:*` module export. Engine-level
-  timer plumbing (Boa's `TimeoutJob` queue + the D17
-  tail-promise polling loop) stays — it's needed for
-  spec-conformant Promise microtask handling and shouldn't
-  be torn out. The fix landed verbatim as captured:
-  - Drop `set_timeout` + `install_timer_builtins` from
-    `mechanics-core/src/internal/runtime.rs` (D17's
-    additions; ~25 lines).
-  - Rewrite the two `setTimeout`-using fixtures in
-    `mechanics-core/src/internal/pool/tests/runtime_behavior.rs`
-    (the D17 tail-poll behavior tests) to exercise the same
-    invariants via Promise-based async patterns (e.g.
-    `new Promise(resolve => endpoint(...).then(resolve))`)
-    so D17's tail-poll behavior remains tested without the
-    `setTimeout` surface.
-  - Update `docs/design/06-execution-substrate.md`
-    §Tail-promise polling to drop the `setTimeout`
-    callback bullet (Promise chains + endpoint calls remain
-    as the only legitimate sources of tail work).
-  - Update `docs/ROADMAP.md` §2 daily-log (2026-05-12 D17
-    entry) and §3.E to note the `setTimeout` addition was
-    reversed under D18.
-  - `mechanics-core/CHANGELOG.md`: new `[0.6.0]` entry
-    naming the global-removal as a breaking change
-    (alongside the rest of D18's surface).
-  - Add an `Outcome` addendum to the D17 prompt archive +
-    the 2026-05-12 ROADMAP trim archive linking forward
-    here, so future readers tracing the D17 reversal don't
-    chase a phantom feature.
-
-  Hard constraints:
-
-  - `jsdom` won't work with Mechanics — the runtime has no
-    non-ES globals on purpose. Modules expose ES-style
-    `import`s only; no implicit globals. This is a **hard
-    rule** (reiterated by Yuka 2026-05-13). `setTimeout`,
-    `setInterval`, `requestAnimationFrame`, `queueMicrotask`,
-    and anything else from the Web Platform / WHATWG global
-    surface MUST NOT appear as Mechanics realm globals or
-    as `mechanics:*` module exports. Engine-internal job
-    queue plumbing is fine — the constraint is the user-
-    facing surface, not the runtime's internals.
-  - No new public-API breakage on the Rust side beyond the
-    feature gates themselves and the `setTimeout`-global
-    removal (existing Rust consumers stay green with default
-    features on; JS workflows that called `setTimeout()`
-    explicitly will fail — that's the intended behavior).
-  - All modules respect Mechanics's per-job stateless
-    contract — no cross-job state, no globalThis
-    mutations that persist.
-  - Workflow-authoring guide (en + jp) re-synced as part of
-    the dispatch per HUMANS.md §"Keep the workflow authoring
-    guide up-to-date" — the new modules need recipe-shaped
-    documentation alongside the existing connector
-    walkthroughs.
-
-  Claude drafts the Codex prompt; Codex implements + tests.
-  No crypto-review gate — runtime module surface only.
-  Independent of D7-D9.
+DONE 2026-05-14. D18 — `mechanics-core 0.6.0` module-surface
+refactor across four rounds. R01 added `[features]` gating
+(`rand`, `encoding`, `html`, `console`, `url` default-on;
+`mime` opt-in), the `mechanics:console` no-op module, and the
+`mechanics:html` htmlize wrapper. R02 added `mechanics:url`
+(WHATWG `URL` + `URLSearchParams`). R03 added `mechanics:mime`
+(pure format-only `compose` / `parse`; q-p preferred over
+base64 for non-ASCII text). R04 refreshed the workflow-authoring
+guide en+jp under §"Built-in modules" and added a "JavaScript
+runtime notes" subsection covering the setTimeout-removal +
+Promise-based replacement patterns. The setTimeout-removal
+sub-piece (parent `796f83e`, mechanics-core `cf4f9c6`) closed
+the design-06 §"Realm surface (no non-ES globals)" hard-rule
+violation that D17 had inadvertently introduced. Codex prompt
+archives at
+[`docs/codex-prompts/`](codex-prompts/) (search for
+`d18-mechanics-module-surface`); R03 backing-crate trade-off
+notes at
+[`docs/codex-reports/2026-05-14-0001-d18-mechanics-mime.md`](codex-reports/2026-05-14-0001-d18-mechanics-mime.md).
 
 ### G. HTTP-client transport + TLS trust posture (1 dispatch) — DONE
 
@@ -465,15 +349,9 @@ and
 
 ### Suggested sequencing
 
-**Next dispatchable**: D18 (in flight; R02 dispatched, R03
-+ R04 queued) → then D7 / D8 / D9 / D19 (Tier 2/3
+**Next dispatchable**: D7 / D8 / D9 / D19 (Tier 2/3
 connectors; all four independent + parallel-safe).
 
-- **D18** (`mechanics-core` module-surface refactor) is
-  fully spec'd from §3.F above. Rounds 01 + setTimeout-
-  removal sub-piece landed 2026-05-14; R02 (url) dispatched;
-  R03 (mime) + R04 (workflow-authoring guide refresh)
-  queued.
 - **D7** (`philharmonic-connector-impl-email-smtp`,
   Tier 2) — `email_send` wire shape locked in
   [`docs/design/08-connector-architecture.md` §SMTP](design/08-connector-architecture.md#smtp);

@@ -154,23 +154,22 @@ in one workflow). Authentication / authorisation / audit-log /
 permission-aware WebUI / transport hardening (HTTP/3 +
 HSTS-on-TLS + aws-lc-rs + webpki-roots) all in place.
 
-**Current state (2026-05-14):** 18 post-v1 dispatches landed
+**Current state (2026-05-14):** post-v1 dispatches landed
 (D1-D6 embedding-datasets, D10/D11/D13/D14/D15 WebUI,
 D12/D16 connector enhancements, D17 mechanics-core tail-promise
-polling, D20 webpki-roots TLS, D21 pre-landing dep-aware test
+polling, D18 mechanics-core module-surface refactor
+(`mechanics:html` + `:console` no-op + `:url` WHATWG + `:mime`
+compose/parse + workflow-authoring guide refresh en+jp; the
+setTimeout-removal sub-piece reverted D17's non-ES global),
+D20 webpki-roots TLS, D21 pre-landing dep-aware test
 filtering, D22 HTTP/3 client+server+streaming, D23 dockerlet,
 D24 default-features audit, D25 hickory CVE bump). Plus the
-setTimeout-removal sub-piece of D18, the in-tree vendored
-`mechanics-h3-quinn` (first non-submodule publishable crate),
-the generic `vendor-upstream` xtask, `check-no-registry`
-workspace-hardening guard, and dev-profile incremental-build
-disable (2026-05-14 batch). `mechanics-http-server 0.1.3`
-published to crates.io 2026-05-14.
-
-**In flight**: D18 (mechanics-core module-surface refactor) —
-R01 landed (feature-gating + `console` no-op + `html` htmlize
-wrapper); R02 dispatched (`url` module); R03 (`mime`) + R04
-(workflow-authoring guide refresh en+jp) queued.
+in-tree vendored `mechanics-h3-quinn` (first non-submodule
+publishable crate), the generic `vendor-upstream` xtask,
+`check-no-registry` workspace-hardening guard, and dev-profile
+incremental-build disable (2026-05-14 batch).
+`mechanics-http-server 0.1.3` published to crates.io
+2026-05-14.
 
 **Remaining post-v1**: D7 SMTP, D8 Anthropic, D9 Gemini, D19
 DNS (Tier 2/3 connectors — independent + parallel-safe).
