@@ -182,6 +182,76 @@ printf '%s=== %s %s ===%s\n' "$C_HEADER" "$crate" "$tag" "$C_RESET"
 CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-target-publish}"
 export CARGO_TARGET_DIR
 
+# `cargo publish` builds the packaged tarball in a fresh subdir
+# every time; sccache can never have a cache hit for these
+# compiles (the source paths differ, defeating sccache's
+# content-derived keys for the lib root), but routing rustc
+# through the sccache wrapper still costs per-invocation memory
+# on the sccache server. Empirically this is enough to OOM the
+# `philharmonic-connector-impl-embed` compile on a 96-core /
+# 188 GiB host: 31 parallel rustc invocations × inline-blob's
+# multi-GiB literal parse × sccache buffering overflows host
+# RAM even with the -j cap below. publish-crate.sh therefore
+# always runs without the wrapper. This isn't toggling within
+# a single target dir — target-publish stays consistently
+# no-sccache; target-main / target-xtask keep their normal
+# sccache posture.
+RUSTC_WRAPPER=
+export RUSTC_WRAPPER
+
+# Cap cargo parallelism for memory-heavy verify-builds.
+#
+# Some workspace crates compile with a much larger peak RSS than the
+# typical Rust crate. The biggest one is
+# `philharmonic-connector-impl-embed`: `inline-blob` emits the
+# bundled BGE-M3 ONNX model as a multi-hundred-MiB `[u8; N]` literal,
+# and `tract-onnx-*` parses heavy generics with the workspace's
+# `[profile.dev.package."*"] opt-level = 3` override. Per-rustc peaks
+# land around 5-6 GiB on these. Cargo's default of `-j num_cpus`
+# therefore exceeds host RAM on the workspace's CI-class boxes
+# (96-core / 188 GiB hits OOM under the default), and on smaller
+# laptops the situation is worse.
+#
+# Heuristic: if the caller already set `CARGO_BUILD_JOBS`, respect
+# it. Otherwise pick `min(num_cpus, available_memory_gib / 6)` so
+# the verify-build fits even when several heavy crates compile
+# concurrently. `./scripts/xtask.sh system-resources` is the
+# portable data source — it prints `<cpus>\t<mem_avail_bytes>/<mem_total_bytes>`
+# and handles platform differences (Linux /proc, BSD sysctl, etc.)
+# in Rust so this shell stays POSIX.
+if [ -z "${CARGO_BUILD_JOBS:-}" ]; then
+    # xtask.sh inherits CARGO_TARGET_DIR; explicitly route to
+    # target-xtask so this query doesn't build xtask inside the
+    # publish target dir.
+    sys_resources=$(CARGO_TARGET_DIR=target-xtask ./scripts/xtask.sh system-resources 2>/dev/null) \
+        || sys_resources=""
+    if [ -n "$sys_resources" ]; then
+        ncpu=$(printf '%s' "$sys_resources" | awk '{ print $1 }')
+        mem_avail=$(printf '%s' "$sys_resources" \
+            | awk '{ split($2, a, "/"); print a[1] }')
+        if [ -n "$ncpu" ] && [ -n "$mem_avail" ] \
+            && [ "$ncpu" -gt 0 ] && [ "$mem_avail" -gt 0 ]; then
+            # 8 GiB = 8589934592 bytes. Conservative per-job budget
+            # covering the workspace's heaviest crates; lighter
+            # crates leave it unused but never OOM.
+            mem_jobs=$((mem_avail / 8589934592))
+            if [ "$mem_jobs" -lt 1 ]; then
+                mem_jobs=1
+            fi
+            if [ "$ncpu" -lt "$mem_jobs" ]; then
+                jobs=$ncpu
+            else
+                jobs=$mem_jobs
+            fi
+            CARGO_BUILD_JOBS=$jobs
+            export CARGO_BUILD_JOBS
+            mem_gib=$((mem_avail / 1073741824))
+            printf '%s=== CARGO_BUILD_JOBS=%s auto (min(%s cpus, %s GiB / 6 GiB-per-job); export CARGO_BUILD_JOBS to override) ===%s\n' \
+                "$C_NOTE" "$jobs" "$ncpu" "$mem_gib" "$C_RESET"
+        fi
+    fi
+fi
+
 verify_flag=""
 if [ "$no_verify" -eq 1 ]; then
     verify_flag="--no-verify"

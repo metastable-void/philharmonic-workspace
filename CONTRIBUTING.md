@@ -2454,6 +2454,42 @@ When a broken release ships:
    workspace's protection against `cargo update`
    accidentally picking the broken release.
 
+**`--no-verify` for crates that transitively pull
+`philharmonic-connector-impl-embed`.** `cargo publish --verify`
+(the default) re-compiles the packaged tarball under the dev
+profile to sanity-check it. For `philharmonic` (and any other
+crate that pulls `impl-embed` by default through the meta-
+crate's `connector-embed` feature), this verify-build runs the
+inline-blob BGE-M3 literal parse plus the `tract-onnx-*`
+generic-heavy compile under `[profile.dev.package."*"]
+opt-level = 3` + `debuginfo = 2`. A single rustc process on
+`impl-embed` peaks around **150 GiB resident** in this
+configuration. Even on a 96-core / 188 GiB host with `-j`
+auto-tuned by `publish-crate.sh`, the verify-build can OOM
+before any parallel scheduling helps.
+
+The workspace's pre-landing pass already covers this source
+under the same dev profile via `cargo check`, which skips
+codegen — that's why pre-landing succeeds where publish-verify
+fails. So:
+
+- For `philharmonic` (and any future crate that transitively
+  pulls `impl-embed` at publish time): use
+  `./scripts/publish-crate.sh --no-verify <crate>` after a
+  clean pre-landing pass. Pre-landing is the verification;
+  publish-verify is duplicate work that the host can't afford.
+- For every other crate: keep the default verify on.
+  `publish-crate.sh` runs `cargo publish` (not `--no-verify`)
+  by default; the flag is opt-in per invocation.
+
+`publish-crate.sh` always runs without `RUSTC_WRAPPER` (sccache
+provides no benefit for publish-verify's tarball-fresh compiles
+but adds per-invocation memory overhead) and auto-tunes
+`CARGO_BUILD_JOBS` to `min(num_cpus, available_memory_GiB / 6)`
+unless the caller has already set `CARGO_BUILD_JOBS`. Both
+defaults are in-script and documented at the top of the
+script's logic.
+
 ---
 
 ## 13. Licensing
