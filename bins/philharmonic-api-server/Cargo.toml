@@ -35,6 +35,12 @@ zeroize = { version = "1", default-features = false, features = ["alloc", "deriv
 # Default-on so `cargo check --workspace` (and pre-landing.sh)
 # compiles the `#[cfg(feature = "https")]` HTTPS / HTTP/3 code
 # path. Release builds keep https on; testing flows that don't
-# need TLS can `--no-default-features`.
+# need TLS can `--no-default-features`. The bin uses
+# `mechanics-http-server` (mhs) directly for the H3 listener
+# and `mechanics-http-client` (mhc) for outbound calls to
+# `mechanics-worker`; it does NOT use the `mechanics` Rust
+# crate, so the `https` feature doesn't pull `philharmonic/https`
+# (which would drag in the `mechanics` re-export tree
+# unnecessarily).
 default = ["https"]
-https = ["philharmonic/https", "dep:mechanics-http-server", "dep:tokio-rustls"]
+https = ["dep:mechanics-http-server", "dep:tokio-rustls"]
