@@ -52,19 +52,37 @@ fi
 
 crate=$1
 
-# Refuse to publish in-tree (non-submodule) workspace members.
-# They're dev tooling with `publish = false`, have no separate
-# git repo for release tags, and running this script against one
-# would (at best) fail at `cargo publish` and (worse) place a
-# `v<version>` tag in the parent repo instead of the submodule —
-# polluting the parent's tag namespace with a spurious release
-# marker. Submodules carry a `.git` file at their root; in-tree
-# members don't.
+# In-tree (non-submodule) workspace members fall into two
+# buckets:
+#
+#  1. Dev tooling (`xtask`, `bins/*`) with `publish = false`.
+#     These are not publishable by design; this script refuses
+#     them up-front.
+#
+#  2. In-tree but publishable crates (vendored forks like
+#     `mechanics-h3-quinn`). These have no `publish = false`
+#     line in their Cargo.toml. The script proceeds, but with
+#     two adaptations for the "no separate git repo" shape:
+#       - Submodule-dirty-state check (`cd "$crate"; git diff
+#         --quiet`) naturally falls through to the parent's
+#         working tree (the crate dir IS in the parent repo),
+#         which is what we want.
+#       - The release tag is placed in the parent repo with a
+#         crate-prefixed name (`<crate>-v<version>`) to avoid
+#         collisions across multiple in-tree publishables.
+#
+# Submodules carry a `.git` file at their root; in-tree members
+# don't.
+in_tree=0
 if [ -d "$crate" ] && [ ! -f "$crate/.git" ]; then
-    printf '%s!!! %s: in-tree workspace member (not a submodule). publish-crate.sh%s\n' "$C_ERR" "$crate" "$C_RESET" >&2
-    printf '    only supports submodule-backed crates; in-tree tooling like\n' >&2
-    printf '    `xtask` is `publish = false` by design.\n' >&2
-    exit 1
+    if grep -qE '^\s*publish\s*=\s*false\b' "$crate/Cargo.toml" 2>/dev/null; then
+        printf '%s!!! %s: in-tree workspace member with `publish = false`%s\n' "$C_ERR" "$crate" "$C_RESET" >&2
+        printf '    (dev tooling like `xtask`). Not publishable by design.\n' >&2
+        exit 1
+    fi
+    in_tree=1
+    printf '%s=== %s: in-tree publishable crate; tag goes in parent repo as <crate>-v<version> ===%s\n' \
+        "$C_HEADER" "$crate" "$C_RESET"
 fi
 
 # `crate-version.sh` validates that $crate/Cargo.toml exists and
@@ -72,7 +90,16 @@ fi
 # if either step fails.
 version=$(./scripts/crate-version.sh "$crate")
 
-tag="v$version"
+if [ "$in_tree" -eq 1 ]; then
+    # Prefixed tag name in the parent repo so multiple in-tree
+    # publishable crates can coexist without colliding on
+    # `v<version>`. Submodule-backed crates keep the bare
+    # `v<version>` shape because each lives in its own repo's
+    # tag namespace.
+    tag="$crate-v$version"
+else
+    tag="v$version"
+fi
 
 printf '%s=== %s %s ===%s\n' "$C_HEADER" "$crate" "$tag" "$C_RESET"
 
