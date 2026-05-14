@@ -33,13 +33,21 @@ someone later has a concrete need.
 
 ### Per-implementation wire-protocol details
 
-Only one v1 capability still has its wire shape pending:
+All v1 + Tier 2/3 capability wire shapes are now locked. Full
+specs in
+[`08-connector-architecture.md`](08-connector-architecture.md).
 
-- **`email_send`** — SMTP submission shape. Tier 2; deferred
-  to after Tier 1 closes (i.e., after the embed tract pivot
-  lands and Tier 1 publishes as a coherent set). Sketch
-  against `lettre`'s submission API when the impl crate
-  starts.
+Settled 2026-05-12: **`email_send`** — SMTP submission shape
+locked via HUMANS.md. See
+[`08-connector-architecture.md` §SMTP](08-connector-architecture.md#smtp).
+Ready for D7 implementation dispatch.
+
+Settled 2026-05-12: **`dns_query`** (new Tier 2 capability) —
+arbitrary DNS query connector for any standard RR, IN class
+only, system-resolver via `/etc/resolv.conf`, optional RR
+allowlist / blocklist + zone allowlist / blocklist. See
+[`08-connector-architecture.md` §DNS](08-connector-architecture.md#dns).
+Ready for D19 implementation dispatch.
 
 Settled since the previous draft:
 

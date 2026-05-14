@@ -168,6 +168,22 @@ pending):
   cleanup pass). Added 2026-05-13 (D23). `libc::atexit`
   cleanup hook + Docker `auto_remove: true` so containers
   don't leak across test runs.
+- **`mechanics-h3-quinn`** — vendored fork of upstream
+  `h3-quinn 0.0.10` with the `quinn` dep pinned to drop the
+  upstream `rustls-ring` default. Eliminates the last
+  `ring` wrapper exception from the workspace's TLS
+  posture. **Unique shape**: lives in-tree as a workspace
+  member, NOT a git submodule, but IS published to
+  crates.io (first crate in the workspace with this
+  shape). Maintained via the `./scripts/xtask.sh
+  vendor-upstream` bin (reads `vendor/vendor.toml`; 3-day
+  release-age cooldown; SHA-256 verify against crates.io
+  index). The hand-written `Cargo.toml` is preserved
+  across re-vendor; `src/` is overwritten from upstream
+  tarballs. Added 2026-05-14. Consumed by
+  `mechanics-http-client` and `mechanics-http-server` via
+  the cargo `package = "mechanics-h3-quinn"` rename so
+  consumer code keeps writing `use h3_quinn::*`.
 
 ### API and meta
 

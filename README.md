@@ -139,199 +139,52 @@ auto-discovered from `xtask/src/bin/*.rs`; run with
 
 ## Status
 
-Design is substantially settled and the v1 implementation path is
-complete through Phase 9. The reference deployment is operational
-since 2026-05-02: a WebUI-created workflow has run through the full
-production path from API server to mechanics worker, connector
-router, connector service, and an OpenAI-compatible upstream LLM
-via `llm_openai_compat`.
+Design is substantially settled. v1 implementation path is
+**complete through Phase 9**; reference deployment operational
+since 2026-05-02 (a WebUI-created workflow runs end-to-end
+through API → mechanics worker → connector router → connector
+service → an OpenAI-compatible upstream LLM).
 
-**End-to-end PoC milestone — 2026-05-11**: a complete chatbot
-use-case ran successfully across the full stack: an embedding
-dataset + `embed` + `vector_search` retrieval path, a
-`sql_postgres` DB connector endpoint, and an OpenAI-compatible
-LLM (OVHCloud HF-endpoint serving `Qwen/Qwen3-32B`) — all in
-one workflow, all through the production API + mechanics + connector
-chain. This is the first full real-world chatbot RAG flow on the
-platform; the platform's stated use-case (RAG-grounded chat
-backed by a vector index and a relational DB, served by a
-self-or-partner-hosted LLM) is now verified end-to-end against an
-actual deployment, not just integration tests. The deployment-time
-fixes that landed earlier in the day (mechanics-core 0.4.0
-unhandled-rejection runtime fix, WebUI permission-aware
-nav/buttons, audit-log producer gap close, connector body cap
-2 MiB → 32 MiB) all surfaced from and were validated against
-this same PoC session.
+The platform's stated use-case — RAG-grounded chat backed by a
+vector index and a relational DB, served by a
+self-or-partner-hosted LLM — is verified end-to-end against the
+deployment via the 2026-05-11 PoC milestone (embedding-dataset +
+`embed` + `vector_search` + `sql_postgres` + `llm_openai_compat`
+in one workflow). Authentication / authorisation / audit-log /
+permission-aware WebUI / transport hardening (HTTP/3 +
+HSTS-on-TLS + aws-lc-rs + webpki-roots) all in place.
 
-The **embedding-datasets feature** is fully shipped end-to-end
-as of 2026-05-10 — data layer, workflow-engine integration,
-API CRUD, WebUI, both crypto gates cleared. The **chat-style
-testing UI (D13)** also landed 2026-05-10: one-click create-
-and-chat from a workflow template, in-WebUI chat tab on
-`InstanceDetail`, runtime structural detection of the OpenAI-
-style `{messages: [{role, content}, ...]}` shape. The
-**workflow authoring guide (D11)** was rewritten the same
-day with three load-bearing recipes (D13 chat,
-embedding-datasets, combined RAG); 2026-05-11 added
-per-connector request/response shape tables across all
-shipped connectors. The three 2026-05-11 HUMANS.md
-follow-ups (D14 markdown rendering with DOMPurify in the
-chat UI; D15 `abstract_config` structured editor; D16
-`tool_choice: "auto"` for `llm_openai_compat`) all landed
-that day.
+**Current state (2026-05-14):** 18 post-v1 dispatches landed
+(D1-D6 embedding-datasets, D10/D11/D13/D14/D15 WebUI,
+D12/D16 connector enhancements, D17 mechanics-core tail-promise
+polling, D20 webpki-roots TLS, D21 pre-landing dep-aware test
+filtering, D22 HTTP/3 client+server+streaming, D23 dockerlet,
+D24 default-features audit, D25 hickory CVE bump). Plus the
+setTimeout-removal sub-piece of D18, the in-tree vendored
+`mechanics-h3-quinn` (first non-submodule publishable crate),
+the generic `vendor-upstream` xtask, `check-no-registry`
+workspace-hardening guard, and dev-profile incremental-build
+disable (2026-05-14 batch). `mechanics-http-server 0.1.3`
+published to crates.io 2026-05-14.
 
-**Deployment-time testing on 2026-05-11** drove additional
-fixes that aren't numbered Codex dispatches but are
-worth knowing about: `mechanics-core` 0.4.0 (runtime no
-longer overrides `main`-fulfilled success with
-"unhandled promise rejection" for workflows whose
-`try { await endpoint(...) } catch { }` correctly handled
-the error); WebUI permission-aware navigation + disabled
-non-actionable buttons + sticky sidebar footer
-(`philharmonic-api` 0.1.8 `WhoamiResponse` extended with
-`permissions: Vec<String>`); audit-log producer gap
-closed (`philharmonic-policy` 0.2.3
-`audit_event_type` module with 17 canonical
-discriminants; `philharmonic-api` wired 19 producer
-call sites with privacy-restricted token-mint payloads
-enforced by absence-assertion tests); connector-path
-body cap raised 2 MiB → 32 MiB
-(`philharmonic-connector-router` 0.1.2).
+**In flight**: D18 (mechanics-core module-surface refactor) —
+R01 landed (feature-gating + `console` no-op + `html` htmlize
+wrapper); R02 dispatched (`url` module); R03 (`mime`) + R04
+(workflow-authoring guide refresh en+jp) queued.
 
-Remaining post-v1 scope (five dispatches; mostly independent
-and parallel-safe):
+**Remaining post-v1**: D7 SMTP, D8 Anthropic, D9 Gemini, D19
+DNS (Tier 2/3 connectors — independent + parallel-safe).
 
-- **Tier 2/3 connector implementations** — D7 SMTP, D8
-  Anthropic, D9 Gemini, D19 DNS (new crate; submodule wired
-  + crates.io 0.0.0 placeholder published 2026-05-12).
-- **D18** — `mechanics-core` module-surface refactor: feature
-  gating + new `mime`/`url`/`console`/`html` modules (per
-  HUMANS.md). The setTimeout-global removal portion landed
-  2026-05-14; the module-surface redesign is the remaining
-  scope.
-
-2026-05-12 wins landed end-to-end: `mechanics-core` 0.4.0 →
-0.4.1 with tail-promise polling (D17) moved the worker run-job
-response fence from quiescence to the script's `return`;
-`mechanics` 0.4.1 → 0.4.2 added HSTS on HTTPS-only paths and
-pruned AES128 from the rustls cipher-suite list; sqlx switched
-to aws-lc-rs+webpki-roots so `ring` is gone from the runtime
-tree of all three release bins; sql-postgres NUMERIC overflow
-now correctly surfaces as `UpstreamError`.
-
-2026-05-13 wins landed end-to-end (the
-production-security cleanup arc, §3.J's first two thirds
-plus D20–D22):
-
-- **D20** introduced the new `mechanics-http-client` crate
-  (hyper-rustls + webpki-roots + aws-lc-rs) and migrated
-  all four outbound-HTTP call sites to it, dropping
-  `reqwest`, `rustls-platform-verifier`,
-  `rustls-native-certs` from the runtime tree of all
-  three release bins.
-- **D21** added dep-aware test filtering to
-  `scripts/pre-landing.sh`.
-- **D22 client + server-lib** landed: `mechanics-http-client`
-  gained opportunistic HTTP/3 via the optional `http3`
-  feature (HTTPS RR discovery, Alt-Svc caching, fallback
-  to hyper); `mechanics-http-server 0.1.0` shipped as a
-  new submodule, providing an opt-in HTTP/3 listener +
-  Alt-Svc tower middleware that sits alongside the
-  existing TCP+TLS HTTP/1.1+HTTP/2 path.
-- **Workspace ring / native-tls / platform-verifier bans
-  tightening** — `deny.toml` gained `ring`, `native-tls`,
-  `rustls-platform-verifier`, `rustls-native-certs`.
-  Whole crates evicted from the dep tree: `reqwest`,
-  `testcontainers`, `testcontainers-modules`,
-  `rustls-platform-verifier`, `rustls-native-certs`.
-  `ring` reduced from 5+ pulling paths to one (upstream
-  `h3-quinn 0.0.10` feature-unification bug; wrappered).
-- **D25** — `mechanics-http-client 0.2.1` cleared
-  `RUSTSEC-2026-0118` + `RUSTSEC-2026-0119` (hickory-
-  resolver 0.25.2 → 0.26.1 + upstream `hickory-proto` →
-  `hickory-net` rename).
-- **D23** — `dockerlet 0.1.0` (new in-tree dev-tooling
-  crate) replaced `testcontainers` in six consumer test
-  fixtures. The pattern pivoted from per-test container
-  starts to per-binary warm-container + per-test unique
-  database, with a `libc::atexit` cleanup hook and
-  `auto_remove: true` so containers don't leak across
-  test runs. Pre-landing's `--ignored` testcontainer
-  phase wall clock for the 28-test
-  `philharmonic-store-sqlx-mysql/tests/integration.rs`
-  dropped from minutes to ~17s.
-
-2026-05-14 wins (§3.J close-out + full D22 server-integration
-+ first in-tree vendored fork + setTimeout design-rule fix):
-
-- **D24** — workspace-wide `default-features = false`
-  audit closes the §3.J production-security cleanup arc.
-  24 published-crate patch-bumps; every direct dep in every
-  workspace `Cargo.toml` now declares
-  `default-features = false` with a grep-narrowed
-  `features = [...]` list. Inline `# kept: <reason>`
-  annotations record principled keeps (HTTP/3 transport on
-  every `mechanics-http-client` consumer, tokio-rustls'
-  aws-lc-rs provider on `mechanics` + the API bin,
-  `boa_engine`'s `["float16", "temporal", "xsum"]` as
-  JS-runtime API contract on `mechanics-core`).
-
-- **`mechanics-h3-quinn 0.0.10` vendored + published** to
-  crates.io (first in-tree non-submodule publishable
-  crate). Vendored from upstream `h3-quinn 0.0.10` with
-  `quinn` pinned to `default-features = false, features =
-  ["futures-io", "runtime-tokio", "rustls-aws-lc-rs"]` to
-  drop the upstream `rustls-ring` default. mhc + mhs
-  consumers use cargo's `package = "mechanics-h3-quinn"`
-  rename so their `src/` is unchanged. Combined with
-  `deny.toml`'s new `[graph] targets` restriction to
-  `x86_64-unknown-linux-{gnu,musl}` (the only targets we
-  ship to), the `ring` wrapper exception is now gone —
-  `ring` is a clean no-wrapper full ban. A new generic
-  `vendor-upstream` xtask bin (with `vendor/vendor.toml`
-  manifest, 3-day cooldown, SHA-256 verify) covers
-  future vendored forks. `scripts/publish-crate.sh` was
-  extended to publish in-tree members that aren't
-  `publish = false`, using crate-prefixed tags
-  (`<crate>-v<version>`) to avoid collisions with
-  submodule-backed crates.
-
-- **`setTimeout` realm-global removed** from
-  `mechanics-core` (the urgent D18 sub-piece). Closes the
-  design-06 §"Realm surface (no non-ES globals)" hard-rule
-  violation D17 had inadvertently introduced. Two D17 tests
-  using setTimeout were rewritten to Promise-based fixtures
-  (including a new `HangingEndpointHttpClient` returning
-  `std::future::pending()` for the deadline-during-tail-poll
-  case). Tail-promise polling itself is unchanged for
-  Promise-driven work.
-
-- **D22 fully done**: server-integration round 01 (parent
-  `0191e5a`) wired all three release bins
-  (`mechanics-worker`, `philharmonic-api-server`,
-  `philharmonic-connector`) with `bind_h3:
-  Option<SocketAddr>` config + Alt-Svc tower middleware;
-  round 02 (`73adc9f`, mhs 0.1.3 published) replaced the
-  round-01 16 MiB response-body buffer cap with proper
-  `http_body::Body` streaming. New
-  `mechanics_http_server::H3RequestBody` public type wraps
-  h3's RecvStream as `http_body::Body`. The
-  `axum_compat::router_into_h3_service` adapter is now a
-  thin streaming shim; arbitrary-large bidirectional bodies
-  flow with natural backpressure. 8 MiB bidirectional
-  E2E test (`#[ignore]`'d) verifies streaming.
-  `mechanics-http-server 0.1.3` live on crates.io.
+§3.J production-security cleanup arc closed 2026-05-14. Banned-
+dep posture: `pyo3` / `maturin` / `openssl-sys` / `native-tls` /
+`rustls-platform-verifier` / `rustls-native-certs` / `ring` all
+no-wrapper full bans on the workspace's ship targets
+(`x86_64-unknown-linux-{gnu,musl}`).
 
 The authoritative task list lives in
-[`docs/ROADMAP.md` §3](docs/ROADMAP.md#3-post-v1-dispatch-plan)
-with verbatim pre-trim ROADMAP content at
-[`docs/archive/2026-05-11-roadmap-completed-arc-trim.md`](docs/archive/2026-05-11-roadmap-completed-arc-trim.md),
-[`docs/archive/2026-05-12-roadmap-d17-done-d7-spec-d18-added.md`](docs/archive/2026-05-12-roadmap-d17-done-d7-spec-d18-added.md),
-[`docs/archive/2026-05-13-roadmap-d20-done.md`](docs/archive/2026-05-13-roadmap-d20-done.md),
-[`docs/archive/2026-05-13-roadmap-d23-d25-done.md`](docs/archive/2026-05-13-roadmap-d23-d25-done.md),
-and
-[`docs/archive/2026-05-14-roadmap-d24-done.md`](docs/archive/2026-05-14-roadmap-d24-done.md).
-Per-day Codex prompt archives under
+[`docs/ROADMAP.md` §3](docs/ROADMAP.md#3-post-v1-dispatch-plan).
+Per-arc done-state snapshots + daily-log history in
+[`docs/archive/`](docs/archive/); Codex prompt archives in
 [`docs/codex-prompts/`](docs/codex-prompts/).
 
 All 29 published-crate names are reserved on crates.io
