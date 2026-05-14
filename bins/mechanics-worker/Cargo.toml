@@ -7,10 +7,10 @@ publish = false
 
 [dependencies]
 philharmonic = { path = "../../philharmonic", default-features = false, features = ["mechanics"] }
-clap = { version = "4", features = ["derive"] }
-serde = { version = "1", features = ["derive"] }
-tokio = { version = "1", features = ["full"] }
-toml = "0.8"
+clap = { version = "4", default-features = false, features = ["color", "derive", "error-context", "help", "std", "suggestions", "usage"] }
+serde = { version = "1", default-features = false, features = ["derive", "std"] }
+tokio = { version = "1", default-features = false, features = ["macros", "rt-multi-thread"] }
+toml = { version = "0.8", default-features = false, features = ["display", "parse"] }
 
 [features]
 default = []

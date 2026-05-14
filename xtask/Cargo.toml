@@ -8,24 +8,24 @@ description = "In-tree workspace dev tooling for philharmonic-workspace. Not pub
 publish = false
 
 [dependencies]
-clap = { version = "4", features = ["derive"] }
-uuid = { version = "1", features = ["v4"] }
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
+clap = { version = "4", default-features = false, features = ["color", "derive", "error-context", "help", "std", "suggestions", "usage"] }
+uuid = { version = "1", default-features = false, features = ["std", "v4"] }
+serde = { version = "1", default-features = false, features = ["derive", "std"] }
+serde_json = { version = "1", default-features = false, features = ["std"] }
 ureq = { version = "3", default-features = false, features = ["rustls-no-provider", "rustls-webpki-roots", "gzip"] }
 rustls = { version = "0.23", default-features = false, features = ["std", "tls12", "aws_lc_rs"] }
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
-chrono-tz = "0.10"
-yasumi = "0.2"
-anyhow = "1"
-sha2 = "0.10"
-sysinfo = "0.38"
-tokei = "14"
-tar = "0.4"
-flate2 = "1"
-zstd = { version = "0.13", features = ["zstdmt"] }
-poloto = "19"
-tagu = "0.1"
+chrono-tz = { version = "0.10", default-features = false, features = ["std"] }
+yasumi = { version = "0.2", default-features = false, features = [] }
+anyhow = { version = "1", default-features = false, features = ["std"] }
+sha2 = { version = "0.10", default-features = false, features = ["std"] }
+sysinfo = { version = "0.38", default-features = false, features = ["system"] }
+tokei = { version = "14", default-features = false, features = [] }
+tar = { version = "0.4", default-features = false, features = [] }
+flate2 = { version = "1", default-features = false, features = ["rust_backend"] }
+zstd = { version = "0.13", default-features = false, features = ["arrays", "legacy", "zdict_builder", "zstdmt"] }
+poloto = { version = "19", default-features = false, features = [] }
+tagu = { version = "0.1", default-features = false, features = [] }
 
 # Used only by `xtask/src/bin/detect-virt.rs`'s CPUID-based VM
 # probe; gated to x86 / x86_64 targets so non-x86 build hosts
@@ -34,4 +34,4 @@ tagu = "0.1"
 # non-x86 it returns `None` immediately and never references
 # any `raw_cpuid::*` symbol.
 [target.'cfg(any(target_arch = "x86", target_arch = "x86_64"))'.dependencies]
-raw-cpuid = "11"
+raw-cpuid = { version = "11", default-features = false, features = ["std"] }

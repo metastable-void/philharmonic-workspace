@@ -25,7 +25,8 @@ h3-quinn should be vendored - write an xtask/script that
 copies the latest release behind the 3d cooldown into a
 non-submodule in-tree crate, and applies a Cargo.toml patches.
 
-patch.crates-io should point to this for h3-quinn.
+patch.crates-io should point to this for h3-quinn, or use our
+own name (mechanics-h3-quinn or so), published at crates.io.
 
 ## SMTP connector
 
