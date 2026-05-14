@@ -451,7 +451,89 @@ Recommended order (Codex picks within reason):
 
 ## Outcome
 
-Pending — will be updated after Codex round 01 run.
+DONE 2026-05-14 via Codex round 01 + Claude post-Codex partial
+revert + simplification.
+
+**Codex round 01 delivered three things:**
+
+- Part A — `xtask/src/bin/vendor-upstream.rs`: generic
+  vendor-upstream bin, reads `vendor/vendor.toml`, downloads
+  tarballs from `static.crates.io` via the workspace's `ureq +
+  rustls-no-provider + aws-lc-rs` pattern, enforces ≥3-day
+  release-age cooldown, verifies SHA-256 against the crates.io
+  sparse index, syncs per-entry `sync = [...]` globs into
+  `target_path/`, writes `.vendor-stamp.toml`, never
+  overwrites the hand-maintained Cargo.toml. CLI: bare /
+  `--entry <name>` / `--check`. Exit-code-coded errors. **Kept.**
+- Part B — `mechanics-h3-quinn` in-tree workspace member
+  vendored from upstream `h3-quinn 0.0.10` with the targeted
+  patch `quinn = { default-features = false, features =
+  ["futures-io", "runtime-tokio", "rustls-aws-lc-rs"] }` to
+  drop the `rustls-ring` default. Consumer rewires:
+  `mechanics-http-client` and `mechanics-http-server` reference
+  it via the cargo `package = "mechanics-h3-quinn"` rename so
+  consumer `src/` stays unchanged. **Kept.**
+- Part C (EXTRA, NOT in the prompt) — `mechanics-quinn-proto`:
+  Codex also vendored quinn-proto (the indirect dep) to strip
+  its wasm-conditional `ring` dep so `cargo tree --target all`
+  would be ring-free. **Reverted by Claude per Yuka's
+  2026-05-14 directive**: "vendoring an indirect dep is wrong;
+  quinn-proto should not be vendored just for wasm; deny.toml
+  should only list linux x86_64 targets (GNU and musl)." The
+  workspace doesn't ship to wasm; the right fix for the
+  target-all visibility of wasm-only paths is restricting
+  `deny.toml`'s `[graph] targets` block to the actual ship
+  targets.
+
+**Claude's post-Codex changes (over Codex's dirty tree):**
+
+1. Removed `mechanics-quinn-proto/` directory.
+2. Removed `mechanics-quinn-proto` from `[workspace] members`
+   and `quinn-proto = { path = ... }` from
+   `[patch.crates-io]` in the workspace root `Cargo.toml`.
+3. Removed the `quinn-proto` entry from `vendor/vendor.toml`;
+   the manifest now carries only the h3-quinn entry.
+4. Removed `publish = false` from
+   `mechanics-h3-quinn/Cargo.toml` per Yuka's "vendored crates
+   need to be publishable ASAP because they block downstream
+   publishes" directive.
+5. Restored `deny.toml`'s `[graph] targets` block to
+   `[{ triple = "x86_64-unknown-linux-gnu" },
+   { triple = "x86_64-unknown-linux-musl" }]` (was empty,
+   meaning target-all). Updated the surrounding ring-entry
+   comment to record the new posture: mechanics-h3-quinn fixes
+   the upstream feature-unification bug at the source; the
+   target restriction eliminates wasm-only ring concerns; the
+   ring ban is enforceable as a no-wrapper full ban.
+
+**Verification (post-revert + target restriction):**
+
+- `cargo check --workspace --all-targets`: PASS.
+- `cargo deny check bans`: PASS (`bans ok`).
+- `cargo tree --workspace --invert ring --target
+  x86_64-unknown-linux-gnu`: empty (ring not in tree).
+- `cargo tree --workspace --invert ring --target
+  x86_64-unknown-linux-musl`: empty (ring not in tree).
+
+**Outstanding:**
+
+- Claude publishes `mechanics-h3-quinn` to crates.io (its
+  first publish) at the right moment to unblock `mhc 0.2.2` /
+  `mhs 0.1.1` publishes.
+- mechanics-h3-quinn's metadata (`authors`,
+  `repository`, `homepage`) currently credit upstream — review
+  before publish to decide whether to update to mark the
+  vendored-fork status or add Yuka as a maintainer.
+
+**Residual risks:**
+
+- mechanics-h3-quinn is a frozen snapshot of upstream
+  `h3-quinn 0.0.10`. Future upstream releases need re-vendoring
+  via `./scripts/xtask.sh vendor-upstream` (covered by the bin
+  now in-tree); the hand-maintained Cargo.toml is preserved
+  across re-vendors.
+- If we ever ship to wasm32, the deny.toml `targets` block
+  must be expanded and the ring posture re-examined.
 
 ---
 

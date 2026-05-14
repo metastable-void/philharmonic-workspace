@@ -1,0 +1,6 @@
+upstream_name = "h3-quinn"
+upstream_version = "0.0.10"
+upstream_sha256 = "8b2e732c8d91a74731663ac8479ab505042fbf547b9a207213ab7fbcbfc4f8b4"
+vendored_at = "2026-05-14T03:17:07Z"
+vendor_tool = "vendor-upstream"
+reason = "Drop quinn's rustls-ring default to eliminate ring from the workspace dependency tree."

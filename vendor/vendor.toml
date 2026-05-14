@@ -1,0 +1,10 @@
+[[entry]]
+upstream_name = "h3-quinn"
+upstream_version = "0.0.10"
+target_path = "mechanics-h3-quinn"
+sync = [
+    "src/**/*.rs",
+    "LICENSE",
+    "README.md",
+]
+reason = "Drop quinn's rustls-ring default to eliminate ring from the workspace dependency tree."

@@ -23,13 +23,15 @@
 # dependencies not shared by any other crates, would be ignored, as the target
 # list here is effectively saying which targets you are building for.
 targets = [
-    # The triple can be any string, but only the target triples built in to
-    # rustc (as of 1.40) can be checked against actual config expressions
-    #"x86_64-unknown-linux-musl",
-    # You can also specify which target_features you promise are enabled for a
-    # particular target. target_features are currently not validated against
-    # the actual valid features supported by the target architecture.
-    #{ triple = "wasm32-unknown-unknown", features = ["atomics"] },
+    # The workspace ships only to Linux x86_64 (GNU + musl).
+    # Restricting deny's dependency-graph analysis to these
+    # targets keeps wasm-only / cross-platform paths out of
+    # `cargo deny check` (e.g. quinn-proto's wasm-conditional
+    # ring dep, which never enters the runtime trees we
+    # actually ship). Add additional targets here only when
+    # the workspace starts shipping to them.
+    { triple = "x86_64-unknown-linux-gnu" },
+    { triple = "x86_64-unknown-linux-musl" },
 ]
 # When creating the dependency graph used as the source of truth when checks are
 # executed, this field can be used to prune crates from the graph, removing them
@@ -209,20 +211,16 @@ deny = [
     # mhc; `rcgen` switched to `aws_lc_rs`; `ureq` + embed
     # `build.rs` use `rustls-no-provider` + explicit aws-lc-rs
     # provider install; `testcontainers` removed in favour of
-    # `dockerlet`.
-    #
-    # The one remaining wrapper is `quinn-proto`: `h3-quinn
-    # 0.0.10` declares its `quinn` dep without
-    # `default-features = false`, so quinn defaults (which
-    # include `rustls-ring`) leak in via cargo feature
-    # unification, pulling `quinn-proto/rustls-ring → ring`.
-    # `mechanics-http-client` / `mechanics-http-server` both
-    # explicitly select `rustls-aws-lc-rs` but feature
-    # unification can't unset another consumer's enable.
-    # Removing this wrapper requires either an upstream h3-quinn
-    # fix (no newer version available as of 2026-05-13) or a
-    # vendored fork via `[patch.crates-io]`.
-    { crate = "ring", wrappers = ["quinn-proto"] },
+    # `dockerlet`; `h3-quinn 0.0.10` is vendored as
+    # `mechanics-h3-quinn` with quinn defaults disabled so the
+    # upstream feature-unification bug (quinn's `rustls-ring`
+    # default leaking into the dep tree via h3-quinn) no longer
+    # applies. Combined with the workspace's `[graph] targets`
+    # restriction above to `x86_64-unknown-linux-{gnu,musl}`,
+    # the wasm-only ring path in `quinn-proto` never enters the
+    # graphs we actually ship to, so this ban is enforceable
+    # as a no-wrapper full ban.
+    { crate = "ring" },
 ]
 
 # List of features to allow/deny

@@ -8,6 +8,7 @@ members = [
     "mechanics-core",
     "mechanics",
     "mechanics-http-client",
+    "mechanics-h3-quinn",
     "philharmonic",
     "philharmonic-policy",
     "philharmonic-workflow",
@@ -68,6 +69,7 @@ philharmonic-connector-impl-api = { path = "philharmonic-connector-impl-api" }
 inline-blob = { path = "inline-blob" }
 philharmonic-connector-impl-dns = { path = "philharmonic-connector-impl-dns" }
 mechanics-http-client = { path = "mechanics-http-client" }
+mechanics-h3-quinn = { path = "mechanics-h3-quinn" }
 mechanics-http-server = { path = "mechanics-http-server" }
 dockerlet = { path = "dockerlet" }
 

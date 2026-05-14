@@ -1,0 +1,40 @@
+[package]
+name = "mechanics-h3-quinn"
+version = "0.0.10"
+edition = "2024"
+rust-version = "1.88"
+authors = ["Jean-Christophe BEGUE <jc.begue@pm.me>"]
+description = "Vendored fork of h3-quinn 0.0.10 with quinn's rustls-ring default dropped, eliminating ring from the workspace dependency tree."
+documentation = "https://docs.rs/h3-quinn"
+repository = "https://github.com/hyperium/h3"
+homepage = "https://github.com/hyperium/h3"
+readme = "README.md"
+keywords = ["http3", "quic", "h3"]
+categories = ["network-programming", "web-programming"]
+license = "MIT"
+
+[lib]
+name = "h3_quinn"
+path = "src/lib.rs"
+
+[dependencies]
+bytes = { version = "1", default-features = false, features = ["std"] }
+futures = { version = "0.3.28", default-features = false, features = ["async-await", "std"] }
+h3 = { version = "0.0.8", default-features = false, features = [] }
+h3-datagram = { version = "0.0.2", default-features = false, features = [], optional = true }
+quinn = { version = "0.11.9", default-features = false, features = ["futures-io", "runtime-tokio", "rustls-aws-lc-rs"] }
+tokio = { version = "1", default-features = false, features = ["io-util"] }
+tokio-util = { version = "0.7.9", default-features = false, features = [] }
+tracing = { version = "0.1.40", default-features = false, features = ["attributes", "std"], optional = true }
+
+[features]
+datagram = ["dep:h3-datagram"]
+tracing = ["dep:tracing"]
+
+[profile.release]
+opt-level = 3
+lto = true
+strip = true
+codegen-units = 1
+panic = "abort"
+overflow-checks = true
