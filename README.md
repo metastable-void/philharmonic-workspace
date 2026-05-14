@@ -188,12 +188,9 @@ enforced by absence-assertion tests); connector-path
 body cap raised 2 MiB → 32 MiB
 (`philharmonic-connector-router` 0.1.2).
 
-Remaining post-v1 scope (seven dispatches; mostly independent
+Remaining post-v1 scope (six dispatches; mostly independent
 and parallel-safe):
 
-- **D24** — workspace-wide `default-features = false` audit
-  (top priority; closes §3.J production-security cleanup
-  arc).
 - **D22 server-integration** — wire `mechanics-http-server`
   into `mechanics` + `philharmonic-api` +
   `philharmonic-connector-service` + the three release
@@ -258,14 +255,32 @@ plus D20–D22):
   `philharmonic-store-sqlx-mysql/tests/integration.rs`
   dropped from minutes to ~17s.
 
+2026-05-14 wins (the §3.J production-security cleanup
+arc's final third — arc now closed):
+
+- **D24** — workspace-wide `default-features = false`
+  audit. 24 published-crate patch-bumps; every direct dep
+  in every workspace `Cargo.toml` now declares
+  `default-features = false` with a grep-narrowed
+  `features = [...]` list. Inline `# kept: <reason>`
+  annotations record principled keeps (HTTP/3 transport
+  on every `mechanics-http-client` consumer, tokio-rustls'
+  aws-lc-rs provider on `mechanics` + the API bin,
+  `boa_engine`'s `["float16", "temporal", "xsum"]` as
+  JS-runtime API contract on `mechanics-core`).
+  Verification clean: cargo deny + banned-dep tree
+  inverts (`ring` only via `quinn-proto` wrapper), rust-
+  lint, pre-landing.sh --xtask.
+
 The authoritative task list lives in
 [`docs/ROADMAP.md` §3](docs/ROADMAP.md#3-post-v1-dispatch-plan)
 with verbatim pre-trim ROADMAP content at
 [`docs/archive/2026-05-11-roadmap-completed-arc-trim.md`](docs/archive/2026-05-11-roadmap-completed-arc-trim.md),
 [`docs/archive/2026-05-12-roadmap-d17-done-d7-spec-d18-added.md`](docs/archive/2026-05-12-roadmap-d17-done-d7-spec-d18-added.md),
 [`docs/archive/2026-05-13-roadmap-d20-done.md`](docs/archive/2026-05-13-roadmap-d20-done.md),
+[`docs/archive/2026-05-13-roadmap-d23-d25-done.md`](docs/archive/2026-05-13-roadmap-d23-d25-done.md),
 and
-[`docs/archive/2026-05-13-roadmap-d23-d25-done.md`](docs/archive/2026-05-13-roadmap-d23-d25-done.md).
+[`docs/archive/2026-05-14-roadmap-d24-done.md`](docs/archive/2026-05-14-roadmap-d24-done.md).
 
 All 28 published-crate names are reserved on crates.io
 (2026-05-13 added `mechanics-http-server`, published 0.1.0;

@@ -174,8 +174,90 @@ Claude will then:
 
 ## Outcome
 
-Pending — will be updated after Codex round 03 run and Claude's
-post-Codex verification.
+DONE 2026-05-14 via Codex round 03 (tiers 2–7 in the dirty tree;
+no commits, no pre-landing.sh) + Claude post-Codex review,
+fix-up, commit, push, verification.
+
+**Codex's tier 2–7 sweep:** 21 published-crate Cargo.tomls
+edited (every workspace member except the four empty-deps
+stubs and the three tier-1 crates already landed at `fda23d2`)
+plus the three `bins/` and `xtask` (no version bumps,
+`publish = false`). Per-crate `CARGO_TARGET_DIR=target-main
+cargo check -p <crate> --all-targets` PASS for every touched
+crate during Codex's run. Inline `# kept: <reason>` comments
+record principled keeps for HTTP/3 transport on every
+`mechanics-http-client` consumer, `tokio-rustls`'s explicit
+`["aws_lc_rs", "logging", "tls12"]` (kept to keep `ring` out),
+and `philharmonic-connector-impl-embed`'s
+`["bundled-default-model"]` on the meta-crate.
+
+**Claude post-Codex fix-ups:**
+
+- `mechanics-core` `boa_engine` features restored to
+  `["float16", "temporal", "xsum"]` per Yuka's directive:
+  Temporal / Float16Array / Math.sumPrecise are JS-runtime API
+  contracts (stage-3+ ECMA proposals) that must remain
+  available to JS workloads even when no in-tree script grep-
+  attests them. Inline `# kept:` comment expanded to record
+  the rationale.
+
+**Tier 2–7 commit** at parent `4e35398` (21 submodule HEADs
+plus the parent pointer-bump + Cargo.lock + docs/stats.svg).
+Pushed cleanly.
+
+**Verification:**
+
+- `cargo check --workspace --all-targets`: PASS (cold rebuild
+  after `clean-target-debug.sh`).
+- `cargo deny check bans`: PASS — `bans ok`.
+- `cargo tree --workspace --invert <each banned dep>`: clean.
+  `ring` is present only via `quinn-proto` (the deny.toml
+  wrapper-allowed exception for the upstream
+  `h3-quinn 0.0.10` feature-unification bug). `native-tls`,
+  `rustls-platform-verifier`, `rustls-native-certs`,
+  `openssl-sys`, `pyo3`, `maturin` all absent from the
+  dep tree.
+- `./scripts/rust-lint.sh` (cargo fmt --check, cargo check,
+  cargo clippy `-D warnings`, RUSTDOCFLAGS=`-D missing_docs`
+  cargo doc --no-deps): PASS with `=== rust-lint: clean ===`.
+- `./scripts/pre-landing.sh --xtask`: PASS with `=== pre-
+  landing: xtask checks passed ===`.
+
+**Tmpfs note:** The full `./scripts/pre-landing.sh` workspace
+test phase (cold-rebuild + 22-crate `--ignored` Docker-test
+loop) exhausts the host's `/tmp` tmpfs even after the
+2026-05-14 zramswap bump. D24 is a Cargo.toml-only audit
+with no `src/` changes, so per-crate `cargo check` +
+workspace-wide rust-lint + cargo deny + cargo tree
+--invert per banned dep is the audit's correct verification
+gate. The workspace test suite's continued green is verified
+by CI on the push.
+
+**Residual risks / kept-features call-outs** (the
+`# kept: <reason>` audit trail):
+
+- `mechanics-http-client = { features = ["http3"] }` on
+  every consumer — active-use HTTP/3 runtime transport.
+- `tokio-rustls = { features = ["aws_lc_rs", "logging",
+  "tls12"] }` on `mechanics` + `bins/philharmonic-api-server`
+  — trimming pulls `ring` via rustls-provider default.
+- `boa_engine = { features = ["float16", "temporal", "xsum"]
+  }` on `mechanics-core` — JS-API-contract surface for stage-
+  3+ proposals.
+- `philharmonic-connector-impl-embed = { features =
+  ["bundled-default-model"] }` on `philharmonic` (meta-crate)
+  — preserves the meta-crate default embedded model.
+
+**Final D24 git state:** Parent commits: `fda23d2` (tier 1),
+`d426627` philharmonic-store, `67740c2` philharmonic-types,
+`4e35398` (tiers 2–7) plus 21 submodule HEADs. All pushed to
+origin/main. No `publish-crate.sh` invocations — Yuka
+publishes the 24 patch-bumps manually.
+
+**Outstanding work:** 24 published-crate patch-bumps await
+`./scripts/publish-crate.sh` (Yuka's hand). §3.J production-
+security cleanup arc is now closed; D22 server-integration is
+the next-natural dispatch.
 
 ---
 

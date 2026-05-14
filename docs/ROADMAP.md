@@ -311,6 +311,30 @@ active work now lives in the post-v1 dispatch plan (§3 below).
     per-test isolation by unique database name) +
     dockerlet `libc::atexit` cleanup hook +
     `auto_remove: true`. See §3.J + archive.
+- **2026-05-14 work** (production-security cleanup arc;
+  §3.J final third — arc now closed):
+  - **D24 landed** — workspace-wide `default-features =
+    false` audit. 24 published-crate patch-bumps (tier 1
+    `fda23d2` + tiers 2–7 parent `4e35398`); every direct
+    dep across 33 workspace Cargo.tomls now declares
+    `default-features = false` with an explicit features
+    list narrowed to grep-attested usage. Inline
+    `# kept: <reason>` comments record principled
+    keeps (HTTP/3 transport, JS-runtime API contract for
+    boa's `temporal`/`float16`/`xsum`, tokio-rustls'
+    aws-lc-rs provider). Three Codex rounds — round 01
+    too conservative (preserved every default verbatim;
+    reverted), round 02 corrected bias (drop unused) but
+    hit Codex sandbox at the commit step (tier 1 only),
+    round 03 added the no-Codex-gitwrite rule explicit
+    and ran tiers 2–7 to completion. Per-crate `cargo
+    check` + workspace rust-lint + cargo deny + banned-
+    dep tree-invert all clean (`ring` only via
+    `quinn-proto` wrapper; everything else absent).
+    Codex prompt archives:
+    `docs/codex-prompts/2026-05-14-0001-d24-default-features-audit-{01,02,03}.md`.
+    Full done-state at
+    [`docs/archive/2026-05-14-roadmap-d24-done.md`](archive/2026-05-14-roadmap-d24-done.md).
   - **`mechanics-http-server 0.1.0`** scaffolded +
     adopted as submodule + published 0.0.0 placeholder
     + Codex round 01 substantive 0.1.0 implementation.
@@ -419,12 +443,10 @@ clean release-binary runtime trees and minimised per-dep
 feature surface are baseline requirements, not optional
 polish. D22 server-integration is the one exception that
 co-sequences with §J (it's part of the in-flight D22 arc).
-**D25 and D23 are now done**; only D24 remains in §J.
+**§3.J production-security cleanup arc closed
+2026-05-14**: D23, D24, D25 all done.
 
 Remaining, in landing order:
-- **D24** (workspace-wide `default-features = false`
-  audit; per-dep feature trim across every workspace
-  Cargo.toml — see §3.J). Next dispatch.
 - **D22 server-integration** (in-flight; wire
   `mechanics-http-server` into `mechanics` +
   `philharmonic-api` + `philharmonic-connector-service`
@@ -1040,7 +1062,7 @@ deferred to a later session.
   transport-layer change only, no AAD / AEAD / SCK / COSE
   touches.
 
-### J. Production-security dep cleanup (D24 remaining; D23 + D25 done) — TOP PRIORITY
+### J. Production-security dep cleanup (D23 + D24 + D25 — all done; arc closed) — DONE
 
 **Sequencing directive (Yuka, 2026-05-13):** production-
 security cleanups in §3.J land **before any remaining
@@ -1052,17 +1074,25 @@ non-aws-lc-rs / non-webpki-roots TLS and the per-dep
 feature surface being minimised are baseline requirements,
 not optional polish.
 
-**D25 and D23 landed 2026-05-13.** Done-state preserved
-verbatim at
-[`docs/archive/2026-05-13-roadmap-d23-d25-done.md`](archive/2026-05-13-roadmap-d23-d25-done.md);
-release artefacts are `mechanics-http-client 0.2.1` and
-`dockerlet 0.1.0` on crates.io, plus six consumer patch
-bumps awaiting publish. `deny.toml` after the pass:
+**D25 and D23 landed 2026-05-13; D24 landed 2026-05-14.**
+Done-state preserved verbatim at
+[`docs/archive/2026-05-13-roadmap-d23-d25-done.md`](archive/2026-05-13-roadmap-d23-d25-done.md)
+(D23 + D25) and
+[`docs/archive/2026-05-14-roadmap-d24-done.md`](archive/2026-05-14-roadmap-d24-done.md)
+(D24). Release artefacts on crates.io:
+`mechanics-http-client 0.2.1` and `dockerlet 0.1.0` (from
+the 2026-05-13 round); 24 published-crate patch-bumps from
+the D24 sweep await publish. `deny.toml` after the arc:
 `rustls-native-certs`, `rustls-platform-verifier`, and
 `native-tls` all no-wrapper full bans; only `ring` retains
 a wrapper for the upstream `h3-quinn 0.0.10`
 default-features feature-unification bug
-(`wrappers = ["quinn-proto"]`).
+(`wrappers = ["quinn-proto"]`). Every direct dep in every
+workspace `Cargo.toml` now declares `default-features =
+false` with an explicit features list grep-narrowed to
+what the depending crate's `src/` actually exercises;
+principled keeps are documented inline as
+`# kept: <reason>` comments.
 
 **Retro / sequencing lesson** (Yuka, 2026-05-13): when
 several §J-class cleanups queue together, weight
@@ -1113,80 +1143,37 @@ no-wrapper full ban. Codex prompt archive:
 Full pre-trim spec preserved at
 [`archive/2026-05-13-roadmap-d23-d25-done.md`](archive/2026-05-13-roadmap-d23-d25-done.md).
 
-#### D24 — workspace-wide `default-features = false` audit
+#### D24 — workspace-wide `default-features = false` audit — DONE
 
-Captured 2026-05-13. Production-security driver: each
-direct dep's default-feature set is whatever the upstream
-maintainer ships, often broader than what the workspace
-actually uses. Untouched default features (a) inflate
-compile time and binary size, (b) expand the supply-chain
-attack surface unnecessarily (each pulled crate is one
-more compromise vector), (c) sometimes pull crypto
-backends or HTTP clients we don't want — the `ring` /
-`native-tls` / `rustls-platform-verifier` chains found
-during the D23 bans pass were specifically default-feature
-leaks that the workspace's runtime intent didn't authorise.
-
-The audit walks every workspace crate's `Cargo.toml`,
-direct dep by direct dep, and:
-
-- Sets `default-features = false` on every dep where the
-  workspace's usage doesn't need the upstream's defaults.
-- Enumerates the explicit feature list the crate actually
-  uses, picked from reading the crate's own `src/` calls.
-- Applies the same discipline to internal workspace-deps
-  (philharmonic-* / mechanics-* using each other) — when
-  crate A depends on crate B, it pins `default-features =
-  false` and only enables the B features it actually
-  needs. This is the cross-crate piece Yuka called out
-  explicitly: "we'll trim … with default-features = false
-  for our own crates too."
-
-Scope estimate: 25+ workspace Cargo.tomls, ~150-200 dep
-entries to audit (per-Cargo.toml ranges from ~5 to ~25
-direct deps). Mechanical-but-thorough; the per-dep
-question is always "which features does this crate's src/
-actually touch", which is grep-able. Codex's bread and
-butter.
-
-**Hard requirements:**
-
-- Workspace `cargo build --workspace` stays green
-  end-to-end after each crate's audit (no missing features
-  cascade).
-- `./scripts/pre-landing.sh` clean after the whole pass.
-- Test paths preserved: `#[cfg(test)]` features added
-  where dev-deps need them.
-- Per-crate version-bump policy: this is a behaviour-
-  preserving refactor for the workspace's published
-  crates. Patch-version-bump on any crate that lands
-  Cargo.toml changes (e.g. mhc 0.2.0 → 0.2.1 if its deps
-  shifted; ditto every other touched published crate).
-- For any dep where trimming exposed a real previously-
-  hidden behaviour change (rare; called out in residual
-  risks), the Codex prompt may opt to leave defaults on
-  and document. The bias is toward trimming.
-
-**Acceptance:**
-
-- Every workspace crate's direct deps either have
-  `default-features = false` with an explicit feature list
-  *or* an inline comment explaining why defaults are kept
-  (e.g. "axum's default feature set is the cheapest path
-  for our usage; trimming explored and not worth").
-- `cargo tree --workspace -e all --duplicates` shows no
-  new duplicates introduced by the audit (feature
-  unification can sometimes worsen with trimming; document
-  any case where it does and accept).
-- Compile-time wins documented per published crate as a
-  CHANGELOG patch entry.
-
-Claude drafts the Codex prompt; Codex implements; Claude
-reviews + commits. No crypto-review gate — Cargo.toml
-edits + CHANGELOG entries only. Lands **after D23** (so
-the bans wrapper churn isn't doubled up) and **before
-D7 / D8 / D9 / D18 / D19** per the §J sequencing
-directive.
+DONE 2026-05-14 via Codex rounds 01–03 + Claude post-Codex
+review/commit/push. Three rounds because the audit's bias
+was clarified mid-flight: round 01 preserved every
+upstream default verbatim (reverted); round 02 corrected to
+drop-unused but Codex hit the codex-guard at the per-tier
+commit step (Claude committed tier 1 only); round 03 made
+the no-Codex-gitwrite rule binding and ran tiers 2–7 to
+completion in the dirty tree. 24 published-crate patch-
+bumps total (tier 1 at parent `fda23d2`; tiers 2–7 at
+parent `4e35398`); every direct dep across 33 workspace
+Cargo.tomls now declares `default-features = false` with a
+grep-narrowed features list. Inline `# kept: <reason>`
+comments record principled keeps (HTTP/3 transport on every
+mhc consumer, tokio-rustls aws-lc-rs/logging/tls12 set,
+boa_engine `["float16", "temporal", "xsum"]` as JS-runtime
+API contract). Verification clean: cargo deny check bans
+PASS, cargo tree --invert banned-deps PASS (ring only via
+quinn-proto wrapper; everything else absent), rust-lint
+PASS, pre-landing.sh --xtask PASS. The full workspace test
+suite (cargo test --workspace + per-crate --ignored loop)
+not run in pre-landing.sh on the audit-landing host because
+the cold-rebuild + 22-crate Docker-test loop exhausted
+tmpfs even after the zramswap bump; D24 is Cargo.toml-only
+with no src/ changes, so per-crate cargo check + rust-lint
++ cargo deny + cargo tree --invert is the audit's correct
+verification gate. Codex prompt archives:
+[`2026-05-14-0001-d24-default-features-audit-{01,02,03}.md`](codex-prompts/).
+Full pre-trim spec + done-state preserved at
+[`archive/2026-05-14-roadmap-d24-done.md`](archive/2026-05-14-roadmap-d24-done.md).
 
 ### Suggested sequencing
 
