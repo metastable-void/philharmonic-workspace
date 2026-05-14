@@ -407,7 +407,18 @@ which, if any, deserve a writeup):
 
 ## Outcome
 
-Pending — will be updated after Codex round 03 run.
+Implemented `mechanics:mime` behind a non-default `mime` feature
+in `mechanics-core`, registered the synthetic module, and added
+named `compose` / `parse` exports for structured `{ headers,
+body }` and `{ headers, parts }` MIME objects. The implementation
+uses in-module MIME composition/parsing with the existing
+`data-encoding` crate for Base64, covers 7bit/8bit/binary/
+quoted-printable/base64 transfer decoding, emits CRLF output,
+adds multipart boundaries, handles RFC 2047 UTF-8 encoded-word
+headers, and stays no-I/O/no-globals/stateless. `philharmonic`'s
+`mechanics` feature now activates `mechanics-core/mime`; tests
+cover compose, parse, multipart, Uint8Array body, round-trip, and
+malformed-input TypeError paths.
 
 ---
 
