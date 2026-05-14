@@ -376,6 +376,35 @@ Same as R01 / R02:
 - **Codex CAN run `./scripts/pre-landing.sh`** at the end.
 - Every cargo invocation needs `CARGO_TARGET_DIR=target-main`.
 
+## Codex report (optional but encouraged)
+
+New convention 2026-05-14 (per Yuka): if anything non-obvious
+surfaces during this round — a design call you had to make on
+the fly, a blocker you worked around, a residual concern Yuka
+should know about — write a short report to
+`docs/codex-reports/2026-05-14-NNNN-d18-mechanics-mime.md`
+per [`docs/codex-reports/README.md`](../codex-reports/README.md).
+Pick the lowest unused `NNNN` (four-digit daily counter, this
+directory's sequence is independent of the prompt archive).
+Routine specified-and-shipped work doesn't need one; the
+session summary covers it. Codex leaves the report dirty in
+the working tree for Claude to commit alongside the
+implementation diff.
+
+Candidate report-worthy items for this round (Codex picks
+which, if any, deserve a writeup):
+- Backing-crate trade-off rationale (why mailparse vs.
+  mail-builder vs. hand-rolled).
+- RFC 5322 / RFC 2045-7 corner cases that surfaced
+  (header folding, encoded-word boundaries, multipart
+  preamble / epilogue / nested boundaries).
+- Q-P vs. base64 auto-detect edge cases (the explicit-
+  encoding override is the escape hatch; what counts as
+  "non-ASCII text" in practice).
+- Round-trip stability: if `parse(compose(msg))` doesn't
+  return an exactly-equivalent object for some input
+  class, that's worth flagging.
+
 ## Outcome
 
 Pending — will be updated after Codex round 03 run.
@@ -553,6 +582,24 @@ stop, document, report INCOMPLETE. Acceptable fallback for
 round 03: ship `compose` only, leave `parse` as a TODO,
 document inline + in CHANGELOG. Then round 04 can pick up
 the parse half before the workflow-authoring guide refresh.
+
+**Codex report (optional but encouraged; new 2026-05-14
+convention):** if anything non-obvious surfaces during this
+round — a design call you had to make on the fly, a
+blocker you worked around, a residual concern Yuka should
+know about — write a short report to
+`docs/codex-reports/2026-05-14-NNNN-d18-mechanics-mime.md`
+per [`docs/codex-reports/README.md`](../codex-reports/README.md).
+Pick the lowest unused `NNNN` for the codex-reports
+directory (independent counter from codex-prompts).
+Routine specified-and-shipped work doesn't need one; the
+session summary covers it. Codex leaves the report dirty
+in the working tree for Claude to commit alongside the
+implementation diff. Candidates worth a writeup: backing-
+crate trade-off rationale, RFC corner cases (header
+folding, encoded-word boundaries, multipart
+preamble/epilogue/nested boundaries), q-p-vs-base64 auto-
+detect edge cases, round-trip stability gaps.
 </default_follow_through_policy>
 
 <completeness_contract>
