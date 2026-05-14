@@ -121,6 +121,16 @@ during the §3.J production-security cleanup pass on
 
 **Meta-crate:** `philharmonic`.
 
+**In-tree vendored fork (published, not a submodule):**
+`mechanics-h3-quinn` — vendored from upstream `h3-quinn 0.0.10`
+with the `quinn` dep pinned to drop the upstream `rustls-ring`
+default. Eliminates the last `ring` wrapper exception from the
+workspace's TLS posture. Maintained via the
+`./scripts/xtask.sh vendor-upstream` bin (reads
+`vendor/vendor.toml`; 3-day cooldown; SHA-256 verify). The
+hand-written `Cargo.toml` is preserved across re-vendor;
+`src/` is overwritten from upstream tarballs.
+
 **In-tree workspace tooling (not published, not a submodule):**
 `xtask` — multi-bin crate for dev tools written in Rust. Bins are
 auto-discovered from `xtask/src/bin/*.rs`; run with
@@ -188,21 +198,17 @@ enforced by absence-assertion tests); connector-path
 body cap raised 2 MiB → 32 MiB
 (`philharmonic-connector-router` 0.1.2).
 
-Remaining post-v1 scope (six dispatches; mostly independent
+Remaining post-v1 scope (five dispatches; mostly independent
 and parallel-safe):
 
-- **D22 server-integration** — wire `mechanics-http-server`
-  into `mechanics` + `philharmonic-api` +
-  `philharmonic-connector-service` + the three release
-  bins' `bind_h3: Option<SocketAddr>` config (D22 client
-  + D22 server-lib both landed 2026-05-13).
 - **Tier 2/3 connector implementations** — D7 SMTP, D8
   Anthropic, D9 Gemini, D19 DNS (new crate; submodule wired
   + crates.io 0.0.0 placeholder published 2026-05-12).
 - **D18** — `mechanics-core` module-surface refactor: feature
-  gating + new `mime`/`url`/`console`/`html` modules + the
-  D17 `setTimeout`-global removal (per HUMANS.md's
-  "no non-ES globals" hard rule).
+  gating + new `mime`/`url`/`console`/`html` modules (per
+  HUMANS.md). The setTimeout-global removal portion landed
+  2026-05-14; the module-surface redesign is the remaining
+  scope.
 
 2026-05-12 wins landed end-to-end: `mechanics-core` 0.4.0 →
 0.4.1 with tail-promise polling (D17) moved the worker run-job
@@ -255,22 +261,66 @@ plus D20–D22):
   `philharmonic-store-sqlx-mysql/tests/integration.rs`
   dropped from minutes to ~17s.
 
-2026-05-14 wins (the §3.J production-security cleanup
-arc's final third — arc now closed):
+2026-05-14 wins (§3.J close-out + full D22 server-integration
++ first in-tree vendored fork + setTimeout design-rule fix):
 
 - **D24** — workspace-wide `default-features = false`
-  audit. 24 published-crate patch-bumps; every direct dep
-  in every workspace `Cargo.toml` now declares
+  audit closes the §3.J production-security cleanup arc.
+  24 published-crate patch-bumps; every direct dep in every
+  workspace `Cargo.toml` now declares
   `default-features = false` with a grep-narrowed
   `features = [...]` list. Inline `# kept: <reason>`
-  annotations record principled keeps (HTTP/3 transport
-  on every `mechanics-http-client` consumer, tokio-rustls'
+  annotations record principled keeps (HTTP/3 transport on
+  every `mechanics-http-client` consumer, tokio-rustls'
   aws-lc-rs provider on `mechanics` + the API bin,
   `boa_engine`'s `["float16", "temporal", "xsum"]` as
   JS-runtime API contract on `mechanics-core`).
-  Verification clean: cargo deny + banned-dep tree
-  inverts (`ring` only via `quinn-proto` wrapper), rust-
-  lint, pre-landing.sh --xtask.
+
+- **`mechanics-h3-quinn 0.0.10` vendored + published** to
+  crates.io (first in-tree non-submodule publishable
+  crate). Vendored from upstream `h3-quinn 0.0.10` with
+  `quinn` pinned to `default-features = false, features =
+  ["futures-io", "runtime-tokio", "rustls-aws-lc-rs"]` to
+  drop the upstream `rustls-ring` default. mhc + mhs
+  consumers use cargo's `package = "mechanics-h3-quinn"`
+  rename so their `src/` is unchanged. Combined with
+  `deny.toml`'s new `[graph] targets` restriction to
+  `x86_64-unknown-linux-{gnu,musl}` (the only targets we
+  ship to), the `ring` wrapper exception is now gone —
+  `ring` is a clean no-wrapper full ban. A new generic
+  `vendor-upstream` xtask bin (with `vendor/vendor.toml`
+  manifest, 3-day cooldown, SHA-256 verify) covers
+  future vendored forks. `scripts/publish-crate.sh` was
+  extended to publish in-tree members that aren't
+  `publish = false`, using crate-prefixed tags
+  (`<crate>-v<version>`) to avoid collisions with
+  submodule-backed crates.
+
+- **`setTimeout` realm-global removed** from
+  `mechanics-core` (the urgent D18 sub-piece). Closes the
+  design-06 §"Realm surface (no non-ES globals)" hard-rule
+  violation D17 had inadvertently introduced. Two D17 tests
+  using setTimeout were rewritten to Promise-based fixtures
+  (including a new `HangingEndpointHttpClient` returning
+  `std::future::pending()` for the deadline-during-tail-poll
+  case). Tail-promise polling itself is unchanged for
+  Promise-driven work.
+
+- **D22 fully done**: server-integration round 01 (parent
+  `0191e5a`) wired all three release bins
+  (`mechanics-worker`, `philharmonic-api-server`,
+  `philharmonic-connector`) with `bind_h3:
+  Option<SocketAddr>` config + Alt-Svc tower middleware;
+  round 02 (`73adc9f`, mhs 0.1.3 published) replaced the
+  round-01 16 MiB response-body buffer cap with proper
+  `http_body::Body` streaming. New
+  `mechanics_http_server::H3RequestBody` public type wraps
+  h3's RecvStream as `http_body::Body`. The
+  `axum_compat::router_into_h3_service` adapter is now a
+  thin streaming shim; arbitrary-large bidirectional bodies
+  flow with natural backpressure. 8 MiB bidirectional
+  E2E test (`#[ignore]`'d) verifies streaming.
+  `mechanics-http-server 0.1.3` live on crates.io.
 
 The authoritative task list lives in
 [`docs/ROADMAP.md` §3](docs/ROADMAP.md#3-post-v1-dispatch-plan)
@@ -281,10 +331,15 @@ with verbatim pre-trim ROADMAP content at
 [`docs/archive/2026-05-13-roadmap-d23-d25-done.md`](docs/archive/2026-05-13-roadmap-d23-d25-done.md),
 and
 [`docs/archive/2026-05-14-roadmap-d24-done.md`](docs/archive/2026-05-14-roadmap-d24-done.md).
+Per-day Codex prompt archives under
+[`docs/codex-prompts/`](docs/codex-prompts/).
 
-All 28 published-crate names are reserved on crates.io
+All 29 published-crate names are reserved on crates.io
 (2026-05-13 added `mechanics-http-server`, published 0.1.0;
-and `dockerlet`, published 0.1.0).
+and `dockerlet`, published 0.1.0. 2026-05-14 added
+`mechanics-h3-quinn`, published 0.0.10 as the workspace's
+first in-tree non-submodule vendored fork.
+`mechanics-http-server` is now at 0.1.3).
 Foundational, API,
 connector-triangle, and Phase 6/7 Tier 1 implementation crates
 have published substantive releases at `0.1.0` or higher. The

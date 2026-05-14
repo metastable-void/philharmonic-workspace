@@ -311,10 +311,12 @@ active work now lives in the post-v1 dispatch plan (§3 below).
     per-test isolation by unique database name) +
     dockerlet `libc::atexit` cleanup hook +
     `auto_remove: true`. See §3.J + archive.
-- **2026-05-14 work** (production-security cleanup arc;
-  §3.J final third — arc now closed):
+- **2026-05-14 work** — multiple landed arcs (§3.J close-out
+  + D22 server-integration round-1+round-2 + first in-tree
+  vendored fork + design-rule-violation closure):
   - **D24 landed** — workspace-wide `default-features =
-    false` audit. 24 published-crate patch-bumps (tier 1
+    false` audit closes the §3.J production-security
+    cleanup arc. 24 published-crate patch-bumps (tier 1
     `fda23d2` + tiers 2–7 parent `4e35398`); every direct
     dep across 33 workspace Cargo.tomls now declares
     `default-features = false` with an explicit features
@@ -335,20 +337,115 @@ active work now lives in the post-v1 dispatch plan (§3 below).
     `docs/codex-prompts/2026-05-14-0001-d24-default-features-audit-{01,02,03}.md`.
     Full done-state at
     [`docs/archive/2026-05-14-roadmap-d24-done.md`](archive/2026-05-14-roadmap-d24-done.md).
-  - **`mechanics-http-server 0.1.0`** scaffolded +
-    adopted as submodule + published 0.0.0 placeholder
-    + Codex round 01 substantive 0.1.0 implementation.
-  - **scripts/clean-target-debug.sh** added — frees
-    `target-main/debug` (POSIX-clean rm-rf wrapper for
-    the new `target-main -> /tmp tmpfs symlink`
-    introduced in `f4c66e8`). See
-    [`CONTRIBUTING.md §5.5`](../CONTRIBUTING.md#55-reclaiming-tmpfs-when-tmp-fills-up).
-  - **CONTRIBUTING.md §3.1** gained a
-    "Per-setting rationale for `[profile.release]`"
-    subsection documenting the workspace's canonical
-    `[profile.release]` block (`codegen-units = 1`,
-    `panic = "abort"`, etc.) so future maintainers
-    don't silently revert.
+  - **`mechanics-h3-quinn 0.0.10` vendored + published**
+    (parent `c26050e` + crates.io publish 13:55 JST,
+    signed tag `mechanics-h3-quinn-v0.0.10`). Vendored
+    from upstream `h3-quinn 0.0.10` as a workspace
+    in-tree (non-submodule) publishable crate. The
+    hand-written Cargo.toml pins
+    `quinn = { default-features = false, features =
+    ["futures-io", "runtime-tokio", "rustls-aws-lc-rs"] }`
+    to drop the upstream `rustls-ring` default that was
+    leaking `ring` into the dep tree via h3-quinn's
+    feature-unification bug. Combined with the new
+    `[graph] targets` restriction in `deny.toml` to
+    `x86_64-unknown-linux-{gnu,musl}` (the only targets
+    we ship to), the `ring` wrapper exception is gone
+    — `cargo deny check bans` sees `ring` as a clean
+    no-wrapper full ban. mhc + mhs consumers use cargo's
+    `package = "mechanics-h3-quinn"` rename trick so
+    their `src/` keeps writing `use h3_quinn::*`
+    unchanged. Codex round 01 over-vendored
+    `quinn-proto` (the indirect dep) for the wasm-only
+    ring path; Claude reverted that partial-overreach
+    per Yuka's directive ("vendoring an indirect dep is
+    wrong; deny.toml should only list linux x86_64
+    targets"). Round-01 archive:
+    `docs/codex-prompts/2026-05-14-0002-vendor-upstream-h3-quinn-01.md`.
+  - **`vendor-upstream` xtask bin landed** (part of the
+    h3-quinn vendoring commit). New generic
+    `xtask/src/bin/vendor-upstream.rs` reads a
+    `vendor/vendor.toml` manifest, downloads crates.io
+    tarballs via the workspace's `ureq +
+    rustls-no-provider + aws-lc-rs` HTTP pattern,
+    verifies SHA-256 against the crates.io sparse
+    index, enforces ≥3-day-release-age cooldown,
+    extracts and syncs per-entry `sync = [...]` globs
+    into `target_path/` (never overwriting the
+    hand-maintained Cargo.toml), writes
+    `.vendor-stamp.toml` recording the vendor event.
+    CLI: bare runs all entries, `--entry <name>`
+    narrows, `--check` is read-only. Reusable
+    framework for future vendored forks.
+  - **scripts/publish-crate.sh extended for in-tree
+    publishable crates** (parent `4ff0323`). Previously
+    refused any non-submodule member up-front; now
+    permits in-tree members that don't have
+    `publish = false` (workspace tooling like `xtask`
+    is still refused). For in-tree publishable crates,
+    the release tag uses a crate-prefixed name
+    (`<crate>-v<version>`) in the parent repo to avoid
+    collisions with submodule-backed crates' bare
+    `v<version>` tags. Driver: `mechanics-h3-quinn`
+    needed to publish through the standard script.
+  - **`setTimeout` realm-global removed from
+    mechanics-core** (parent `796f83e`; mechanics
+    `cf4f9c6` — `mechanics-core/src/internal/runtime.rs`
+    + the two D17 setTimeout-using tests in
+    `internal/pool/tests/runtime_behavior.rs` rewritten
+    to Promise-based fixtures, including a new
+    `HangingEndpointHttpClient` that returns
+    `std::future::pending()` to replace the long-running
+    setTimeout pattern in the deadline-during-tail-poll
+    test). This is the urgent §3.F D18 sub-dispatch —
+    closes the design-06 "no non-ES globals" hard-rule
+    violation that D17 had inadvertently introduced.
+    The broader D18 module-surface refactor (mechanics:*
+    feature gating + new url/console/mime/html modules)
+    is still pending; this round only landed the
+    setTimeout removal. mechanics-core remains at
+    0.5.1 (no further bump per the no-publish-mid-work
+    rule; eventual 0.5.1 publish carries both the D24
+    audit and the setTimeout removal).
+  - **D22 server-integration round 01 landed** (parent
+    `0191e5a`; mhs `19b00f1`; mechanics `581577f`;
+    philharmonic `31a2b3f`). `mechanics-http-server`
+    grew a public `axum_compat::router_into_h3_service`
+    helper (with a 16 MiB response-body buffer cap —
+    superseded in round 02). `mechanics 0.5.1 → 0.5.2`
+    added `MechanicsServer::run_tls_with_h3`. All three
+    release bins (`mechanics-worker`,
+    `philharmonic-api-server`, `philharmonic-connector`)
+    gained `bind_h3: Option<SocketAddr>` config + clap
+    `--bind-h3 <addr>` (via the shared
+    `philharmonic::server::cli::BaseArgs` shape) +
+    Alt-Svc tower middleware on the TCP+TLS axum router.
+    When `bind_h3` is set + TLS configured, the bin
+    spawns mhs's `Http3Server` alongside the TCP+TLS
+    listener, sharing the same cert/key. When `bind_h3`
+    is set without TLS, the bin errors at startup
+    ("HTTP/3 requires TLS"). Codex prompt archive:
+    `docs/codex-prompts/2026-05-14-0003-d22-server-integration-h3-01.md`.
+  - **D22 server-integration round 02 landed** (parent
+    `73adc9f`; mhs `397730f` + crates.io publish
+    `v0.1.3` 13:55 JST). Closes round 01's
+    16 MiB-buffer-cap incompleteness per Yuka's
+    "streaming must be supported in mhs h3"
+    directive. `Http3Server::start`'s service shape
+    breaking-changed from `Service<Request<()>,
+    Response = Response<Bytes>>` to the streaming
+    shape `Service<Request<H3RequestBody>, Response =
+    Response<RespBody>>` where `RespBody:
+    http_body::Body<Data = Bytes>`. New
+    `mechanics_http_server::H3RequestBody` public type
+    wraps h3's RecvStream and implements
+    `http_body::Body`. `axum_compat::router_into_h3_service`
+    rewritten as a thin streaming shim;
+    `DEFAULT_H3_RESPONSE_BODY_LIMIT_BYTES` constant
+    and the `_with_response_limit` variant deleted.
+    Tests grew an `#[ignore]`'d 8 MiB bidirectional
+    streaming E2E. Codex prompt archive:
+    `docs/codex-prompts/2026-05-14-0003-d22-server-integration-h3-02.md`.
 
 Authoritative sources for things this file used to restate but
 now cross-references:
@@ -444,18 +541,18 @@ feature surface are baseline requirements, not optional
 polish. D22 server-integration is the one exception that
 co-sequences with §J (it's part of the in-flight D22 arc).
 **§3.J production-security cleanup arc closed
-2026-05-14**: D23, D24, D25 all done.
+2026-05-14**: D23, D24, D25 all done. **D22 also fully
+done 2026-05-14**: client + server-lib + server-integration
+(rounds 01 + 02 streaming); mhs 0.1.3 published. The
+setTimeout-global removal sub-piece of D18 also landed
+2026-05-14.
 
 Remaining, in landing order:
-- **D22 server-integration** (in-flight; wire
-  `mechanics-http-server` into `mechanics` +
-  `philharmonic-api` + `philharmonic-connector-service`
-  + the three bins' `bind_h3: Option<SocketAddr>` config
-  fields).
 - D18 (`mechanics-core` module-surface refactor: feature
-  gating + new `mime`/`url`/`console`/`html` modules + the
-  2026-05-13 setTimeout-global removal per HUMANS.md's
-  "no non-ES globals" hard rule — see §3.F).
+  gating + new `mime`/`url`/`console`/`html` modules per
+  HUMANS.md — see §3.F). The setTimeout-global removal
+  portion of D18 landed 2026-05-14; the module-surface
+  redesign is still ahead.
 - D7 / D8 / D9 / D19 (Tier 2/3 connectors: SMTP /
   Anthropic / Gemini / DNS).
 
@@ -674,12 +771,11 @@ under "Evening trim — 2026-05-11".
   `tracing::warn!` line with job ID + in-flight + queued
   counts. `setTimeout(callback, delayMs)` was added as a
   global builtin inside the script realm during D17 (the
-  realm had no timer surface pre-D17); **this global will
-  be reverted under D18** (2026-05-13 clarification per
-  HUMANS.md's "no non-ES globals" hard rule — `setTimeout`
-  is WHATWG, not ECMAScript spec; the D17 tail-promise
-  polling *behavior* stays, only the user-facing
-  `setTimeout` *surface* leaves). See §3.F.
+  realm had no timer surface pre-D17); **this global was
+  reverted 2026-05-14** as the urgent D18 sub-dispatch
+  (parent commit `796f83e`; mechanics-core `cf4f9c6`). The
+  D17 tail-promise polling behavior stays; only the user-
+  facing `setTimeout` surface was removed. See §3.F.
   Authoritative behavior spec landed at
   [`docs/design/06-execution-substrate.md` §Tail-promise
   polling](design/06-execution-substrate.md#tail-promise-polling).
@@ -718,9 +814,27 @@ modules.
     `URLSearchParams`. Backed by the `url` crate.
   - **Feature `console`** (default, **new**) — minimal
     WHATWG-compliant `mechanics:console`. Levels: `log`,
-    `info`, `warn`, `error`, `debug`. Stdout/stderr
-    routing per worker config (out of scope for first
-    pass — default to host-side `tracing` emission).
+    `info`, `warn`, `error`, `debug`. **No I/O of any
+    kind** — no stdout, no stderr, no host-side
+    `tracing` emission. Per Yuka 2026-05-14: workflows
+    run in a sandboxed realm where any direct I/O would
+    violate the stateless-per-job contract and leak host
+    information. Initial implementation is a complete
+    no-op: the level methods exist with the expected
+    WHATWG signatures (variadic args, format-spec
+    handling) and silently return `undefined`. **Future
+    work** (separate dispatch, possibly breaking): capture
+    `console.*` invocations made before the script's
+    `return` into a structured field on the worker
+    response (e.g. `RunJobResponse.logs: Vec<ConsoleEntry>`).
+    The capture window is *pre-return*; D17's tail-promise
+    polling phase is post-return and won't capture
+    further `console.*` calls (they continue to no-op).
+    This means workflow authors can use `console.log` for
+    structured debugging during development without
+    needing a worker-config knob, and operators don't
+    have to worry about runaway log emission from
+    malicious workflows.
   - **Feature `mime`** (non-default, **new**) —
     structured MIME composer + parser at `mechanics:mime`.
     `import { compose, parse } from 'mechanics:mime'`.
@@ -732,17 +846,25 @@ modules.
     (workflows can keep hand-writing the `body` string
     when `mime` isn't enabled).
 
-  Additional scope folded in 2026-05-13: **remove the
-  non-ES `setTimeout` global** that D17 inadvertently added
-  to the Mechanics realm. Per HUMANS.md the rule is "no
-  non-ES globals" (hard rule, just reiterated 2026-05-13);
-  `setTimeout` and `setInterval` are WHATWG/Web Platform
-  globals, not ECMAScript spec, so neither belongs in the
-  realm's global object or in any `mechanics:*` module
-  export. Engine-level timer plumbing (Boa's `TimeoutJob`
-  queue + the D17 tail-promise polling loop) stays — it's
-  needed for spec-conformant Promise microtask handling
-  and shouldn't be torn out. The fix is narrowly:
+  **setTimeout-removal sub-piece: DONE 2026-05-14** (parent
+  commit `796f83e`; mechanics-core submodule `cf4f9c6`). The
+  non-ES `setTimeout` global that D17 had inadvertently added
+  to the Mechanics realm is now gone — closes the design-06
+  §"Realm surface (no non-ES globals)" hard-rule violation.
+  The full D18 module-surface refactor below is the remaining
+  scope.
+
+  Original captured scope: **remove the non-ES `setTimeout`
+  global** that D17 inadvertently added to the Mechanics
+  realm. Per HUMANS.md the rule is "no non-ES globals" (hard
+  rule, just reiterated 2026-05-13); `setTimeout` and
+  `setInterval` are WHATWG/Web Platform globals, not
+  ECMAScript spec, so neither belongs in the realm's global
+  object or in any `mechanics:*` module export. Engine-level
+  timer plumbing (Boa's `TimeoutJob` queue + the D17
+  tail-promise polling loop) stays — it's needed for
+  spec-conformant Promise microtask handling and shouldn't
+  be torn out. The fix landed verbatim as captured:
   - Drop `set_timeout` + `install_timer_builtins` from
     `mechanics-core/src/internal/runtime.rs` (D17's
     additions; ~25 lines).
@@ -881,10 +1003,56 @@ modules.
   Claude drafts the Codex prompt; Codex implements + tests.
   No crypto-review gate.
 
-### I. HTTP/3 client + server (1 dispatch, future session)
+### I. HTTP/3 client + server (D22 — 4 rounds across 2 sessions) — DONE
 
-Captured 2026-05-13 alongside the D20 revision; explicitly
-deferred to a later session.
+Captured 2026-05-13 alongside the D20 revision; landed in
+four rounds over two sessions (2026-05-13 client + server-lib;
+2026-05-14 server-integration round 01 wiring + round 02
+streaming).
+
+**Round summary:**
+
+- **D22 client** (2026-05-13, mhc 0.2.0, commit `c7efa37`)
+  — opportunistic HTTP/3 in `mechanics-http-client` with HTTPS
+  RR + Alt-Svc discovery; aws-lc-rs + webpki-roots TLS posture.
+- **D22 server-lib** (2026-05-13, mhs 0.1.0, commit `5397d8b`)
+  — `mechanics-http-server` crate scaffolded as new submodule;
+  `Http3Server` + `Http3Handle` + `Http3ServerConfig` + Alt-Svc
+  tower middleware + 0-RTT replay-safety helpers.
+- **D22 server-integration round 01** (2026-05-14, parent
+  commit `0191e5a`) — three release bins wired with
+  `bind_h3: Option<SocketAddr>` + `MechanicsServer::run_tls_with_h3`
+  + axum-Router-to-mhs-service adapter via mhs's new
+  `axum_compat::router_into_h3_service`. mhs 0.1.1 → 0.1.2,
+  mechanics 0.5.1 → 0.5.2. The adapter buffered response
+  bodies up to 16 MiB (acknowledged incompleteness; addressed
+  in round 02).
+- **D22 server-integration round 02** (2026-05-14, parent
+  commit `73adc9f`, mhs 0.1.3 published 13:55 JST tag
+  `v0.1.3`) — `Http3Server::start`'s service shape
+  breaking-changed from `Service<Request<()>, Response =
+  Response<Bytes>>` to the streaming `Service<Request<H3RequestBody>,
+  Response = Response<RespBody>>` shape where `RespBody:
+  http_body::Body<Data = Bytes>`. New public
+  `H3RequestBody` type wraps h3's RecvStream as
+  `http_body::Body`. `axum_compat` rewritten as a thin
+  streaming shim; `DEFAULT_H3_RESPONSE_BODY_LIMIT_BYTES`
+  and the `_with_response_limit` variant removed. Tests grew
+  an `#[ignore]`'d 8 MiB bidirectional streaming E2E. mhs
+  0.1.2 → 0.1.3.
+
+Codex prompt archives:
+- `docs/codex-prompts/2026-05-13-0001-d22-mechanics-http-client-http3-client-01.md`
+- `docs/codex-prompts/2026-05-13-0002-d22-mechanics-http-server-lib-01.md`
+- `docs/codex-prompts/2026-05-14-0003-d22-server-integration-h3-01.md`
+- `docs/codex-prompts/2026-05-14-0003-d22-server-integration-h3-02.md`
+
+The full design spec (HTTPS RR primary discovery + Alt-Svc
+fallback + HTTP/1.1 must-keep-working contract + zero-RTT
+posture + ALPN list + the three HTTP/1.1 modes the workspace
+preserves) is preserved verbatim below for reference.
+
+**Full spec (preserved; what landed implements this):**
 
 - **D22** HTTP/3 (QUIC) support on both the outbound HTTP
   client side and the inbound HTTPS server side. Sequenced
