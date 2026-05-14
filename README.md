@@ -167,9 +167,26 @@ D24 default-features audit, D25 hickory CVE bump). Plus the
 in-tree vendored `mechanics-h3-quinn` (first non-submodule
 publishable crate), the generic `vendor-upstream` xtask,
 `check-no-registry` workspace-hardening guard, and dev-profile
-incremental-build disable (2026-05-14 batch).
-`mechanics-http-server 0.1.3` published to crates.io
-2026-05-14.
+incremental-build disable (2026-05-14 batch). On 2026-05-14 a
+full workspace cascade-publish shipped 22 crates to crates.io
+— the four mechanics crates (`mechanics-config 0.1.2`,
+`mechanics-http-client 0.2.2`, `mechanics-core 0.6.0`,
+`mechanics 0.5.3`), the foundational crates
+(`philharmonic-types 0.3.7`, `philharmonic-store 0.1.3`,
+`philharmonic-store-sqlx-mysql 0.1.5`, `philharmonic-policy
+0.2.5`, `philharmonic-workflow 0.1.6`), the connector
+framework (`philharmonic-connector-common 0.2.2`, `-client
+0.1.2`, `-service 0.2.2`, `-router 0.1.3`), the Tier 1
+connector impls (`-impl-api 0.1.3`, `-impl-http-forward 0.2.1`,
+`-impl-llm-openai-compat 0.2.1`, `-impl-sql-postgres 0.1.2`,
+`-impl-sql-mysql 0.1.2`, `-impl-embed 0.1.1`,
+`-impl-vector-search 0.1.1`), `philharmonic-api 0.1.10`, and
+the meta-crate `philharmonic 0.3.2`. `mechanics 0.5.2` shipped
+mid-cascade with a `handle_h3_request` signature that didn't
+compile against `mhs 0.1.3`'s streaming-body API; that
+release was yanked and `mechanics 0.5.3` supersedes it (root
+cause: pre-landing.sh was skipped on the 0.5.2 commit — see
+[CONTRIBUTING.md §12.5](CONTRIBUTING.md#125-publish-checklist)).
 
 **Remaining post-v1**: D7 SMTP, D8 Anthropic, D9 Gemini, D19
 DNS (Tier 2/3 connectors — independent + parallel-safe).
@@ -186,20 +203,18 @@ Per-arc done-state snapshots + daily-log history in
 [`docs/archive/`](docs/archive/); Codex prompt archives in
 [`docs/codex-prompts/`](docs/codex-prompts/).
 
-All 29 published-crate names are reserved on crates.io
-(2026-05-13 added `mechanics-http-server`, published 0.1.0;
-and `dockerlet`, published 0.1.0. 2026-05-14 added
-`mechanics-h3-quinn`, published 0.0.10 as the workspace's
-first in-tree non-submodule vendored fork.
-`mechanics-http-server` is now at 0.1.3).
-Foundational, API,
-connector-triangle, and Phase 6/7 Tier 1 implementation crates
-have published substantive releases at `0.1.0` or higher. The
-remaining connector names (`philharmonic-connector-impl-email-smtp`,
+All 29 published-crate names are reserved on crates.io.
+Foundational, API, connector-triangle, and Phase 6/7 Tier 1
+implementation crates have published substantive releases at
+`0.1.0` or higher. The remaining connector names
+(`philharmonic-connector-impl-email-smtp`,
 `philharmonic-connector-impl-llm-anthropic`,
 `philharmonic-connector-impl-llm-gemini`,
 `philharmonic-connector-impl-dns`) are published placeholders
 at `0.0.x` until their implementations land.
+`mechanics-h3-quinn 0.0.10` is the workspace's first in-tree
+non-submodule vendored fork. Per-crate version history lives
+in each crate's `CHANGELOG.md`.
 
 ## Working in the repo
 

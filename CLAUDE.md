@@ -330,6 +330,30 @@ full in `CONTRIBUTING.md`. Read the full section before acting
   pass for the commit. A re-run after fixing a real failure
   is fine; a tight edit/re-run loop in one turn just burns
   time. ([§11](CONTRIBUTING.md#11-pre-landing-checks))
+- **Pre-landing.sh before every publish is non-negotiable.**
+  The publish flow is the highest-stakes Rust-touching commit
+  the workspace makes. `cargo publish`'s own `--dry-run`
+  only verifies the packaged tarball against
+  currently-published deps; it does NOT catch a type-mismatch
+  against a workspace-internal dep that's still being staged
+  for the same cascade. Skipping pre-landing on a release
+  commit has shipped broken crates and forced a yank
+  (mechanics 0.5.2 → 0.5.3 on 2026-05-14). No "publishing is
+  Claude's work" framing makes this optional. If you're
+  about to call `./scripts/publish-crate.sh` and you haven't
+  run pre-landing in the same session against the
+  about-to-be-published crate, stop and run it first.
+  ([§12.5](CONTRIBUTING.md#125-publish-checklist))
+- **Yanks aren't Claude's job.** The crates.io token
+  available on shared machines is publish-and-owner-read
+  scoped only; `cargo yank` from here returns 403. When a
+  broken release ships: fix forward with a new patch, bump
+  consumer-crate dep floors to the fixed version, and ask
+  Yuka to perform the yank from her separately-held
+  yank-scoped token or via the crates.io web UI. Do not
+  attempt to work around the 403 — the scope split is
+  deliberate.
+  ([§12.5](CONTRIBUTING.md#125-publish-checklist))
 - **Don't re-run a Rust-build-heavy script just because you
   lost context** — re-read the captured output file instead.
   Every foreground Bash invocation and every `run_in_background`

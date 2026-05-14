@@ -2350,6 +2350,18 @@ reference for release-to-release API-breakage checks.
 
 The correct sequence for a crate release is:
 
+0. **`./scripts/pre-landing.sh` must pass.** This is the most
+   important step of the publish flow, not an afterthought.
+   `cargo publish`'s `--dry-run` only verifies the *packaged*
+   tarball compiles against the *currently published* deps;
+   it does not catch a type-signature mismatch with deps still
+   pending in the same publish cascade (e.g., a consumer of
+   `mhs 0.1.3` not updated for the new `Http3Server::start`
+   service contract). Pre-landing covers the workspace-as-a-
+   whole, including reverse-dep closure. Skipping it before
+   publish has shipped broken releases (`mechanics 0.5.2` on
+   2026-05-14 — yanked, superseded by `0.5.3`). No publish
+   pass is fast enough to justify skipping this.
 1. **Version bump** in `Cargo.toml`.
 2. **CHANGELOG update** — add a `## [<version>]` section with
    what changed.
@@ -2358,7 +2370,7 @@ The correct sequence for a crate release is:
    creates the signed release tag.
 5. **`./scripts/push-all.sh`** — pushes the tag.
 
-Steps 1–3 must happen **before** step 4. The CHANGELOG is part
+Steps 0–3 must happen **before** step 4. The CHANGELOG is part
 of the published crate artifact — publishing first means the
 crate on crates.io has an empty or stale CHANGELOG.
 
@@ -2367,6 +2379,26 @@ crate on crates.io has an empty or stale CHANGELOG.
 presence, signature verifying with the local keyring, and
 origin having the same tag pointing at the same commit. Run it
 after `publish-crate.sh` + `push-all.sh`.
+
+**Token-scope split (yanks).** The crates.io API token
+installed on shared / agent-accessible machines is restricted
+to **publish-and-owner-read scope** for security — it can
+publish new versions but cannot yank existing ones. `cargo
+yank` from such a machine fails with `403 Forbidden`. Yanks
+are performed by Yuka either via a separately-stored
+yank-scoped token or directly through the crates.io web UI.
+When a broken release ships:
+
+1. Fix forward with a new patch version (e.g. `0.5.2` broken →
+   publish `0.5.3` with the fix and a CHANGELOG entry naming
+   what 0.5.2 got wrong).
+2. Update any consumer crates' dep floors to the fixed
+   version so stale lockfiles can't resolve back to the
+   broken release.
+3. Ask Yuka to yank the broken version. Until the yank
+   lands, the dep-floor bump from step 2 is the
+   workspace's protection against `cargo update`
+   accidentally picking the broken release.
 
 ---
 
