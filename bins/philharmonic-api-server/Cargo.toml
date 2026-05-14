@@ -32,5 +32,9 @@ tracing = { version = "0.1", default-features = false, features = ["std"] }
 zeroize = { version = "1", default-features = false, features = ["alloc", "derive"] }
 
 [features]
-default = []
+# Default-on so `cargo check --workspace` (and pre-landing.sh)
+# compiles the `#[cfg(feature = "https")]` HTTPS / HTTP/3 code
+# path. Release builds keep https on; testing flows that don't
+# need TLS can `--no-default-features`.
+default = ["https"]
 https = ["philharmonic/https", "dep:mechanics-http-server", "dep:tokio-rustls"]

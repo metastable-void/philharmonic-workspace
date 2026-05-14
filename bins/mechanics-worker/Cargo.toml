@@ -13,5 +13,9 @@ tokio = { version = "1", default-features = false, features = ["macros", "rt-mul
 toml = { version = "0.8", default-features = false, features = ["display", "parse"] }
 
 [features]
-default = []
+# Default-on so `cargo check --workspace` (and pre-landing.sh)
+# compiles the `#[cfg(feature = "https")]` HTTPS / HTTP/3 code
+# path. Release builds keep https on; testing flows that don't
+# need TLS can `--no-default-features`.
+default = ["https"]
 https = ["philharmonic/https"]

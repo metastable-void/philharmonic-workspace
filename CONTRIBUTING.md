@@ -2064,8 +2064,8 @@ is not limited to:
 
 - `Cargo.toml` `[dependencies]`: no `philharmonic-*` crate.
   `mechanics-core` depends on `mechanics-config` + Boa +
-  generic transport (`reqwest`, etc.); nothing else from
-  this workspace.
+  generic transport (`mechanics-http-client`, etc.); nothing
+  else from this workspace.
 - Type signatures and trait bounds: no use of
   `philharmonic-types::*`, `philharmonic-policy::*`,
   `philharmonic-connector-*::*`, or any other workspace type.
@@ -2112,6 +2112,60 @@ Cross-references:
   AI-coding best practices into reusable templates;
   `mechanics-*` is a precedent for that pattern — its
   independence keeps the precedent intact.
+
+### 10.13 Feature defaults: include what the workspace uses
+
+**Rule.** A crate's `[features] default = [...]` set MUST
+include every feature that any workspace consumer actually
+exercises. Consumers (other workspace crates, in-tree bins,
+external embedders) opt out via `default-features = false`
+plus an explicit feature list.
+
+**Why.** `pre-landing.sh` runs `cargo check --workspace`
+with each crate's *default* features. Features that gate
+code (`#[cfg(feature = "https")] fn …`) but are off-by-
+default are never compiled by that pass, so type-mismatches
+against newer dep versions slip through silently. This
+happened twice in 2026-05-14:
+
+- `mechanics 0.5.2`: `handle_h3_request` was
+  `#[cfg(feature = "https")]`, `https` was non-default, the
+  signature became incompatible with `mhs 0.1.3`'s
+  streaming-body service contract, the published release
+  failed to compile. Yanked; superseded by `0.5.3`.
+- `mechanics 0.5.3`: same gap, different mismatch
+  (`Response<Bytes>` vs. `Response<Full<Bytes>>` for the H3
+  service). Caught by pre-landing only after `https` moved
+  to the default set; fixed in `0.5.4`.
+
+**The discipline.**
+
+- Inside each crate's `Cargo.toml`, list in `default` every
+  feature whose `#[cfg(feature = "X")]` code path is
+  reachable from anything the workspace builds. If feature
+  `X` only gates a `dep:` line with no gated code, it's
+  fine to leave non-default — but err on the side of
+  including it; the pre-landing cost is bounded and the
+  hidden-mismatch cost isn't.
+- On the dep side, every dep on a workspace-internal crate
+  uses `default-features = false` plus an explicit
+  `features = [...]` list. This way, widening the
+  upstream's defaults doesn't accidentally pull new
+  features into a consumer that didn't ask for them; and
+  removing a feature from the upstream's defaults can't
+  silently break a consumer that relied on it.
+- Per-crate exceptions exist (e.g. unshipped placeholder
+  features stay off-by-default until their 0.1.0 lands so
+  downstream `cargo add` doesn't pull a placeholder).
+  Document the exception inline in the `[features]` block.
+
+This is a workspace-internal convention. Published crates
+keep the same `default` set on crates.io — external
+embedders that disagree opt out the same way the workspace
+bins do.
+
+See [§12.5 Publish checklist](#125-publish-checklist) for
+why pre-landing is non-negotiable before any publish.
 
 ---
 

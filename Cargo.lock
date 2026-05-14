@@ -2992,7 +2992,7 @@ dependencies = [
 
 [[package]]
 name = "mechanics"
-version = "0.5.3"
+version = "0.5.4"
 dependencies = [
  "http-body-util",
  "hyper",
@@ -3018,7 +3018,7 @@ dependencies = [
 
 [[package]]
 name = "mechanics-core"
-version = "0.6.0"
+version = "0.6.1"
 dependencies = [
  "boa_engine",
  "boa_gc",
@@ -3730,7 +3730,7 @@ dependencies = [
 
 [[package]]
 name = "philharmonic"
-version = "0.3.2"
+version = "0.3.3"
 dependencies = [
  "axum",
  "clap",
