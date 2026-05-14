@@ -86,6 +86,53 @@ speculatively constrains consumers.
 **Door stays open**: possibly connectors for spawning workflows
 recursively.
 
+### ECMA-402 (`Intl`) in the Mechanics realm
+
+**What it would be**: enable Boa's `intl` feature so scripts
+have access to `Intl.NumberFormat`, `Intl.DateTimeFormat`,
+`Intl.Collator`, etc. Locale-aware formatting is genuinely
+useful for workflow authors emitting human-readable output.
+
+**Why deferred**: boa 0.21 pins `icu_provider = "~2.0.0"` while
+the workspace's `url` / `idna_adapter` / `icu_normalizer` chain
+already locks `icu_provider 2.2.0`. Enabling `boa/intl` forces
+a version-unification conflict that no current cargo resolution
+can satisfy. Documented inline in `mechanics-core/Cargo.toml`.
+
+**Door stays open**: re-attempt when boa relaxes its tilde
+constraint (typically a future boa minor release). No code or
+API design hinges on this; flipping the feature on when boa
+unblocks it is a one-line `Cargo.toml` change.
+
+### JS realm `console` output capture
+
+**What it would be**: capture pre-return `console.log` /
+`console.info` / `console.warn` / `console.error` /
+`console.debug` invocations into a structured field on the
+`RunJobResponse` (e.g. `RunJobResponse.logs:
+Vec<ConsoleEntry>`), so workflow authors can use `console`
+for structured debugging during development without needing
+a worker-config knob.
+
+**Why deferred from D18**: `mechanics:console` shipped in
+0.6.0 as a complete no-op (level methods exist with WHATWG
+signatures, silently return `undefined`, perform no I/O of
+any kind). The no-op posture preserves the stateless-per-job
+contract and prevents host-information leaks; designing the
+capture surface requires committing to a serialised log shape
+(value formatting, argument count, level filtering) that
+deserves its own dispatch and possibly a breaking-change bump.
+
+**Door stays open**: the capture is a possibly-breaking
+change to `RunJobResponse` called out in the
+`mechanics-core 0.6.0` release notes. Pre-return-only capture
+is the design intent — D17's tail-promise polling phase is
+post-return and won't capture further `console.*` calls (they
+continue to no-op). Operators don't have to worry about
+runaway log emission from malicious workflows because the
+capture window is bounded to script execution time, not
+tail-poll lifetime.
+
 ## Storage substrate
 
 ### Tenant scoping in the substrate

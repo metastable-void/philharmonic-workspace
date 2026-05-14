@@ -24,7 +24,7 @@ external I/O mediated by tenant-scoped connectors.
 | Connector model | generic HTTP + specialized implementations |
 | Storage model | append-only, content-addressed workflow state |
 | AI stance | LLMs are ordinary connectors, not privileged architecture |
-| Authoring | JS today; visual/AI-assisted authoring planned |
+| Authoring | JS today; visual / AI-assisted authoring is a possible future direction (no plan-of-record yet) |
 | Deployment | framework/crates, not SaaS-first |
 | Best fit | secure internal tools, AI workflows, tenant-scoped automation, auditable app backends |
 | Not best fit | huge off-the-shelf SaaS connector marketplace, pure no-code business automation, Temporal-style durable sagas |

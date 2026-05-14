@@ -1003,17 +1003,59 @@ mechanism.
 
 Uses Gemini's native `responseSchema` in `generationConfig`.
 
+Supports two upstream surfaces — Google AI Studio and Vertex
+AI on GCP — via a `mode` discriminator. Both modes carry
+their auth material *inside* the SCK-encrypted endpoint
+config, consistent with how `llm_openai_compat` carries its
+`api_key`; encryption-at-rest is the existing SCK boundary,
+and per-tenant credential rotation flows through the endpoint-
+config rotation path.
+
+**Mode 1: Google AI Studio** (API-key auth, simplest single-
+tenant deployment, free-tier-friendly).
+
 ```json
 {
   "realm": "llm",
   "impl": "llm_gemini",
   "config": {
+    "mode": "ai_studio",
     "base_url": "https://generativelanguage.googleapis.com/v1",
     "api_key": "...",
     "timeout_ms": 60000
   }
 }
 ```
+
+**Mode 2: Vertex AI on GCP** (Service Account JSON auth, full
+GCP project + region scoping).
+
+```json
+{
+  "realm": "llm",
+  "impl": "llm_gemini",
+  "config": {
+    "mode": "vertex_ai",
+    "project_id": "my-gcp-project",
+    "region": "us-central1",
+    "service_account_json": "{ ... full SA key JSON ... }",
+    "timeout_ms": 60000
+  }
+}
+```
+
+Endpoint shape under
+`<region>-aiplatform.googleapis.com/v1/projects/<project>/`.
+The Vertex-mode impl caches OAuth2 access tokens derived from
+the SA JSON and refreshes them as they approach expiry; the
+SA JSON itself never leaves the connector-service process
+memory in plaintext form (decrypted from SCK on use, dropped
+on idle).
+
+The exact field names (`mode` discriminator value spelling,
+project/region/SA-JSON field naming, OAuth2 access-token
+caching key shape) are finalised at D9 prompt-drafting time
+per ROADMAP §3.B; the shape above is the design intent.
 
 ### SQL
 
@@ -1286,6 +1328,20 @@ lookups via the system's stub resolver (consults
 maintain caches beyond what the host OS provides — it's a
 thin wrapper that delegates to whatever the host is
 configured to do for normal-process DNS.
+
+**Resolv.conf fallback.** When `/etc/resolv.conf` is
+absent (`ENOENT`) — a normal situation in minimal-base
+container images, distroless containers, and some scratch
+deployments — the impl falls back to a fixed set of
+Cloudflare public resolvers:
+`2606:4700:4700::1111`, `2606:4700:4700::1001`,
+`1.1.1.1`, `1.0.0.1`. The fallback fires only on ENOENT;
+any other read error (permission denied, malformed file,
+I/O error) surfaces as a startup error rather than
+silently falling back. The fallback list is hardcoded —
+operators who need a different resolver set should
+provide `/etc/resolv.conf` (or use the host's preferred
+mechanism for installing one).
 
 All queries are `IN`-class only. Other DNS classes
 (`CH`, `HS`) are not exposed.

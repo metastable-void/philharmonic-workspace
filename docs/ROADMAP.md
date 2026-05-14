@@ -201,6 +201,16 @@ to implement the `Implementation` trait.
   - Arbitrary DNS querying via the system's stub
     resolver (consults `/etc/resolv.conf`). No custom
     recursive resolver, no caching layer beyond the OS.
+  - **Resolv.conf fallback**: when `/etc/resolv.conf` is
+    `ENOENT` (typical in minimal-base / distroless /
+    scratch container images), fall back to a hardcoded
+    Cloudflare resolver set:
+    `2606:4700:4700::1111`,
+    `2606:4700:4700::1001`,
+    `1.1.1.1`,
+    `1.0.0.1`. Any other read error
+    (permission denied, malformed file, I/O) surfaces as
+    a startup error — fallback fires only on ENOENT.
   - `IN` class only.
   - Endpoint config carries optional `allowed_types`
     (RR type allowlist), `allowlist_zones`, and

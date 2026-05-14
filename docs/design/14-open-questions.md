@@ -37,15 +37,27 @@ All v1 + Tier 2/3 capability wire shapes are now locked. Full
 specs in
 [`08-connector-architecture.md`](08-connector-architecture.md).
 
-Settled 2026-05-12: **`email_send`** — SMTP submission shape
-locked via HUMANS.md. See
+Settled 2026-05-12: **`email_send` capability** (impl
+`email_smtp` — `philharmonic-connector-impl-email-smtp`) —
+SMTP submission shape locked via HUMANS.md. Hard requirements:
+port 25 rejected, username + password required (anonymous
+submission refused at config validation), explicit
+`connection_mode` knob (`starttls` / `smtps` / `auto`), four-
+valued `tls_strictness` (`strict` / `sloppy` / `opportunistic`
+/ `opportunistic_sloppy`), request shape
+`{mail_from, recipients[], body}` with minimal MIME envelope
+fixing, transport `lettre` over rustls. See
 [`08-connector-architecture.md` §SMTP](08-connector-architecture.md#smtp).
 Ready for D7 implementation dispatch.
 
 Settled 2026-05-12: **`dns_query`** (new Tier 2 capability) —
 arbitrary DNS query connector for any standard RR, IN class
-only, system-resolver via `/etc/resolv.conf`, optional RR
-allowlist / blocklist + zone allowlist / blocklist. See
+only, system-resolver via `/etc/resolv.conf` with a hardcoded
+Cloudflare fallback (`2606:4700:4700::1111`,
+`2606:4700:4700::1001`, `1.1.1.1`, `1.0.0.1`) when
+`/etc/resolv.conf` is ENOENT (typical in minimal-base /
+distroless / scratch containers), optional RR allowlist /
+blocklist + zone allowlist / blocklist. See
 [`08-connector-architecture.md` §DNS](08-connector-architecture.md#dns).
 Ready for D19 implementation dispatch.
 
