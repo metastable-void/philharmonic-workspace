@@ -265,7 +265,20 @@ Same as R01:
 
 ## Outcome
 
-Pending — will be updated after Codex round 02 run.
+Round 02 landed `mechanics:url` in `mechanics-core` 0.6.0
+behind the new default-on `url` feature. The synthetic module
+exports `URL` as default and `URLSearchParams` as a named class,
+with URL state backed by `url::Url` / `url::quirks` and
+URL-backed search params reparsing and writing through the shared
+query state so `url.search` and `url.searchParams` stay
+bidirectionally bound. Verification passed for the requested
+`mechanics-core` feature matrix, `./scripts/pre-landing.sh`,
+`cargo deny check bans`, and the Linux x86_64 `ring` reverse-tree
+check; no commits were made. Residual WHATWG deviations:
+`URLSearchParams` supports strings, plain objects, and array-like
+pair iterables but not arbitrary generic iterables such as `Map`,
+and the module intentionally enforces strict string inputs rather
+than full Web IDL string coercion for non-string values.
 
 ---
 
