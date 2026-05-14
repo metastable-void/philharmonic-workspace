@@ -148,6 +148,7 @@ else
 fi
 
 ./scripts/check-toolchain.sh
+./scripts/check-no-registry.sh
 ./scripts/cargo-deny.sh
 ./scripts/rust-lint.sh
 

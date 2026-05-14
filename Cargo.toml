@@ -73,6 +73,20 @@ mechanics-h3-quinn = { path = "mechanics-h3-quinn" }
 mechanics-http-server = { path = "mechanics-http-server" }
 dockerlet = { path = "dockerlet" }
 
+[profile.dev]
+# Disable incremental compilation in debug builds. Incremental
+# state in `target-main/debug/incremental/` accretes per-crate
+# graph fragments + many small per-query files; on this
+# workspace (~33 crates, heavy deps via tract/sqlx/axum/boa) it
+# materially worsens /tmp tmpfs pressure when `target-main` is
+# the RAM-backed symlink (see `scripts/lib/cargo-target-dir.sh`)
+# and slows down `target-main/debug` cleanups. The cost of
+# disabling is full re-compile on every dep-graph change; on
+# CI/pre-landing that's already the norm, and on local dev the
+# cargo build cache + sccache (if configured) cover the common
+# unchanged-rebuild path.
+incremental = false
+
 [profile.release]
 opt-level = 3
 lto = true

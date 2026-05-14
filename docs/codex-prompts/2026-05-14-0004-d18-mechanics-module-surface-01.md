@@ -281,7 +281,21 @@ Same as recent rounds:
 
 ## Outcome
 
-Pending — will be updated after Codex round 01 run.
+Round 01 implementation landed as `mechanics-core 0.6.0`: the
+crate now has default-on `rand`, `encoding`, `html`, and
+`console` features; existing rand/uuid and encoding modules are
+conditionally compiled and registered; `mechanics:html` and
+`mechanics:console` were added as synthetic modules without
+adding any realm globals. `mechanics:console` is a no-I/O no-op
+surface only; WHATWG format-spec parsing and future capture into
+`RunJobResponse` remain deferred. Verification is incomplete:
+the requested mechanics-core cargo-check matrix, single-feature
+checks, standalone cargo-deny bans, and `ring` reverse-tree check
+passed, but `./scripts/pre-landing.sh` failed in the workspace
+test phase after multiple heavy test links were killed with
+signal 9; a focused `mechanics-core` test run also hit signal 9
+while compiling Boa after the box became swap-saturated. No
+commits were made.
 
 ---
 

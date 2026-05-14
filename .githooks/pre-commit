@@ -75,6 +75,28 @@ git diff --cached --name-only --diff-filter=A | while IFS= read -r f; do
     fi
 done
 
+# Refuse any tracked Cargo.toml that carries a
+# `registry = "..."` directive. Registry-routing belongs in
+# `.cargo/config.toml`, never in a tracked Cargo.toml — see
+# `scripts/check-no-registry.sh` for the full rationale.
+# Resolve the script relative to the repo root (hooks run from
+# the repo's working directory, which may be a submodule). For
+# submodule commits, the parent repo holds the script; for parent
+# commits, the current toplevel does.
+_hook_root="$(git rev-parse --show-superproject-working-tree 2>/dev/null || git rev-parse --show-toplevel 2>/dev/null || true)"
+if [ -n "$_hook_root" ] && [ -x "$_hook_root/scripts/check-no-registry.sh" ]; then
+    if ! (cd "$_hook_root" && ./scripts/check-no-registry.sh) >&2; then
+        printf 'Commit aborted: forbidden `registry = ...` directive in tracked Cargo.toml.\n' >&2
+        exit 1
+    fi
+elif [ -x "scripts/check-no-registry.sh" ]; then
+    if ! ./scripts/check-no-registry.sh >&2; then
+        printf 'Commit aborted: forbidden `registry = ...` directive in tracked Cargo.toml.\n' >&2
+        exit 1
+    fi
+fi
+unset _hook_root
+
 if [ "${WORKSPACE_GIT_WRAPPER:-}" = "1" ]; then
     # Called through the wrapper. Proceed.
     echo "Good: Git called through the proper wrapper." >&2
