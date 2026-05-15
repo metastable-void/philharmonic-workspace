@@ -133,10 +133,9 @@ Total: **27 Codex dispatches plus 1 Gate-1 proposal.**
 Done / pending breakdown lives in the
 **Current state** block at the top of this file. Done arcs
 trim to one-line done-pointers below (§3.A, C, D, E, F, G,
-H, I, J); the still-pending arcs §3.B (Tier-2 + Tier-3
-connectors) and §3.L (`mechanics-dns` extraction + mhc
-resolver migration) carry the full dispatch specs. §3.K is
-the in-flight Audit & refactor priority that gates §3.B.
+H, I, J, L); the still-pending arc §3.B (Tier-2 + Tier-3
+connectors) carries the full dispatch specs. §3.K is the
+in-flight Audit & refactor priority that gates §3.B.
 
 ### A. Embedding datasets (6 dispatches + 1 Gate-1) — DONE
 
@@ -391,10 +390,18 @@ Chat UI relocation deferred ([§14](design/14-open-questions.md#crates-and-organ
 Done-state is whatever Yuka signals.
 
 **Pending extraction candidates:**
-`bins/philharmonic-api-server/src/{lowerer,embed_job,scope}.rs`
-(the SCK-decrypt / endpoint-payload paths in `lowerer` and
-parts of `embed_job` are crypto-review-aware and want a
-slice of their own).
+- `scope.rs` — Codex drafted a plan for this in
+  [`docs/codex-reports/2026-05-15-0007-header-tenant-scope-resolver-plan.md`](codex-reports/2026-05-15-0007-header-tenant-scope-resolver-plan.md):
+  move `HeaderTenantScopeResolver` into `philharmonic-api`
+  as a generic helper over `IdentityStore` (no new deps,
+  no feature flag — the API crate already pulls
+  `http` / `philharmonic-policy` / `philharmonic-store` /
+  `philharmonic-types`). The bin keeps its `SqlStore`
+  ownership; only the resolver moves. Slice 4 candidate.
+- `lowerer.rs` and parts of `embed_job.rs` — touch SCK
+  decrypt/encrypt and endpoint payload handling; want
+  their own crypto-review-aware slice rather than
+  incidental cleanup.
 
 **Gate on §3.B.** The Tier-2 batch (D7 SMTP + D19 DNS) is
 dispatchable only after the sweep is signalled complete.
@@ -411,57 +418,14 @@ feature, surfaced via meta-crate `api-mechanics-worker-executor`):
 
 ### L. `mechanics-dns` extraction + mhc resolver migration (1 dispatch) — DONE
 
-DONE 2026-05-15. D26 scaffolded the in-tree `mechanics-dns`
-crate and migrated `mechanics-http-client`'s HTTPS-RR lookup,
-HTTP/3 socket-address fallback, and hyper-util h1/h2/HTTPS
-connector resolver onto it. `mechanics-dns` exposes IN-class
-generic DNS query, HTTPS RR, A, AAAA, combined IP, and
-socket-address lookup helpers. It loads the host resolver
-configuration when present,
-falls back to the documented Cloudflare resolver set only on
-missing `/etc/resolv.conf`, and surfaces other system-config
-failures during resolver construction. See
-[`docs/codex-reports/2026-05-15-0005-mechanics-dns-extraction.md`](codex-reports/2026-05-15-0005-mechanics-dns-extraction.md)
-for implementation notes.
-
-The current `mechanics-http-client` is fragile on hosts
-without `/etc/resolv.conf` (typical in distroless / scratch
-container images): its HTTPS-RR lookup uses
-`hickory_resolver::TokioResolver` which errors on
-`read_system_conf` ENOENT, and its h1/h2/HTTPS dial path
-uses `tokio::net::lookup_host` (libc `getaddrinfo`) which
-fails the same way. The D19 DNS connector
-([§3.B](#b-phase-7-tier-23-connector-implementations-4-dispatches))
-is spec'd to fall back to Cloudflare resolvers on ENOENT;
-mhc currently isn't. Both need the same behaviour, and the
-list shouldn't live in two places.
-
-- **D26** (`mechanics-dns`, new in-tree non-submodule
-  crate). Scaffold a new workspace member at
-  `./mechanics-dns/` (same shape as
-  `mechanics-h3-quinn`: in-tree, no git submodule, but
-  published to crates.io so external consumers of mhc /
-  the D19 connector resolve it normally). Library API:
-  - Generic DNS query support for connector-impl-dns
-  - HTTPS-RR lookup
-  - A / AAAA lookup
-  - `IN`-class only
-  - On `/etc/resolv.conf` ENOENT, fall back to the
-    [Cloudflare fallback resolver set](design/08-connector-architecture.md#cloudflare-fallback-resolver-set);
-    any other read error surfaces as a startup-level
-    failure rather than silently falling back.
-
-  Migrate `mechanics-http-client`'s HTTPS-RR call site
-  and its `tokio::net::lookup_host` callers (HTTP/3
-  `first_socket_addr`, h1/h2/HTTPS hyper-util connector)
-  to use `mechanics-dns`. Behaviour on hosts with
-  `/etc/resolv.conf` is unchanged; behaviour on ENOENT
-  hosts becomes "use the Cloudflare set" instead of
-  "fail."
-
-  Dispatches independently of the Tier-2 batch. D19 now
-  consumes `mechanics-dns` directly rather than
-  re-implementing the fallback.
+DONE 2026-05-15. D26 scaffolded the in-tree
+`mechanics-dns` crate (HTTPS-RR / A / AAAA / combined IP /
+socket-address helpers, IN-class only, Cloudflare fallback
+only on `/etc/resolv.conf` ENOENT) and migrated mhc's
+resolver call sites onto it. Per-dispatch detail at
+[`docs/codex-reports/2026-05-15-0005-mechanics-dns-extraction.md`](codex-reports/2026-05-15-0005-mechanics-dns-extraction.md);
+verbatim pre-trim §3.L preserved at
+[`docs/archive/2026-05-15-roadmap-l-d26-done.md`](archive/2026-05-15-roadmap-l-d26-done.md).
 
 ### Suggested sequencing
 
