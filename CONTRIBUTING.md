@@ -930,7 +930,7 @@ The inventory:
 
 | Wrapper | Wraps | Notes |
 |---|---|---|
-| `./scripts/pre-landing.sh [<crate>...] [--no-ignored]` | `cargo deny check bans` + `cargo fmt --check` + `cargo check` + `cargo clippy --all-targets -- -D warnings` + `cargo test --workspace` + `cargo test --ignored -p <crate>` per modified crate | The canonical pre-commit flow. Auto-detects modified crates via `show-dirty.sh`. CI runs the same script. See §11. |
+| `./scripts/pre-landing.sh [<crate>...] [--no-ignored] [-v\|--verbose]` | `cargo deny check bans` + `cargo fmt --check` + `cargo check` + `cargo clippy --all-targets -- -D warnings` + `cargo test --workspace` + `cargo test --ignored -p <crate>` per modified crate | The canonical pre-commit flow. Auto-detects modified crates via `show-dirty.sh`. Default `cargo-deny` invocation hides the inclusion graph for less noise; pass `-v` / `--verbose` to print it. CI runs the same script. See §11. |
 | `./scripts/rust-lint.sh [<crate>]` | `cargo fmt --check` + `cargo check` + `cargo clippy --all-targets -- -D warnings` | Workspace (no arg) or per-crate. |
 | `./scripts/rust-test.sh [--include-ignored\|--ignored] [<crate>]` | `cargo test` with ignored-test control | `--ignored` runs *only* `#[ignore]`-gated; `--include-ignored` runs everything. |
 | `./scripts/miri-test.sh --workspace \| <crate>...` | `cargo +nightly miri test` | Slow; not in `pre-landing.sh`. See §10.7. |
@@ -2283,7 +2283,9 @@ tree) and runs, in order:
 
 Pass crate names to `pre-landing.sh` to override auto-detection;
 pass `--no-ignored` to skip step 4 (rare, for fast iteration
-when you're certain the slow tests aren't affected).
+when you're certain the slow tests aren't affected); pass
+`-v` / `--verbose` to print the `cargo-deny` inclusion graph
+(default is the quieter `--hide-inclusion-graph` form).
 
 GitHub CI runs the same script on a clean checkout (no dirty
 submodules → step 4 naturally empty) so contributor and CI

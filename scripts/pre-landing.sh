@@ -83,16 +83,25 @@ set -eu
 no_ignored=0
 xtask_only=0
 full_test=0
+verbose=0
+
 while [ $# -gt 0 ]; do
     case "$1" in
         --no-ignored) no_ignored=1; shift ;;
         --xtask)      xtask_only=1; shift ;;
         --full)       full_test=1; shift ;;
+	-v)           verbose=1; shift ;;
+	--verbose)    verbose=1; shift ;;
         --)                           shift; break ;;
         -*) printf 'unknown flag: %s\n' "$1" >&2; exit 2 ;;
         *) break ;;
     esac
 done
+
+denyflags="--hide-inclusion-graph check bans"
+if [ "$verbose" -eq 1 ] ; then
+    denyflags="check bans"
+fi
 
 if [ "$xtask_only" -eq 1 ]; then
     if [ $# -gt 0 ]; then
@@ -106,7 +115,8 @@ if [ "$xtask_only" -eq 1 ]; then
     printf '%s=== pre-landing (--xtask): scope = xtask only, CARGO_TARGET_DIR=target-xtask ===%s\n' \
         "$C_HEADER" "$C_RESET"
     ./scripts/check-toolchain.sh
-    ./scripts/cargo-deny.sh
+    # shellcheck disable=SC2086
+    ./scripts/cargo-deny.sh $denyflags
     ./scripts/rust-lint.sh --xtask
     ./scripts/rust-test.sh --xtask
     printf '%s=== pre-landing: xtask checks passed ===%s\n' "$C_OK" "$C_RESET"
@@ -149,7 +159,8 @@ fi
 
 ./scripts/check-toolchain.sh
 ./scripts/check-no-registry.sh
-./scripts/cargo-deny.sh
+# shellcheck disable=SC2086
+./scripts/cargo-deny.sh $denyflags
 ./scripts/rust-lint.sh
 
 # Step 2: dep-aware test phase (ROADMAP D21).
