@@ -28,6 +28,8 @@ use philharmonic::server::cli::{
     BaseArgs, BaseCommand, BootstrapArgs, default_serve_command, resolve_config_paths,
 };
 use philharmonic::server::config::load_config_defaulting_missing;
+#[cfg(feature = "https")]
+use philharmonic::server::https::{start_tls_axum_server, validate_tls_server_files};
 use philharmonic::server::install::{self, InstallPlan};
 use philharmonic::server::key_material::{read_fixed_key_file, read_fixed_secret_file};
 use philharmonic::server::reload::ReloadHandle;
@@ -843,7 +845,16 @@ fn response_with_status(status: StatusCode, body: &'static str) -> Response<Body
 async fn start_server(app: Router, config: &ApiConfig) -> Result<&'static str, String> {
     #[cfg(feature = "https")]
     if let Some(tls) = &config.tls {
-        start_tls_server(app, config.bind, tls, config.bind_h3).await?;
+        start_tls_axum_server(
+            app,
+            config.bind,
+            config.bind_h3,
+            &tls.cert_path,
+            &tls.key_path,
+            "philharmonic-api",
+            "API",
+        )
+        .await?;
         return Ok(if config.bind_h3.is_some() {
             "https+h3"
         } else {
@@ -866,196 +877,6 @@ async fn start_server(app: Router, config: &ApiConfig) -> Result<&'static str, S
     Ok("http")
 }
 
-#[cfg(feature = "https")]
-async fn start_tls_server(
-    app: Router,
-    bind: std::net::SocketAddr,
-    tls: &config::TlsFileConfig,
-    bind_h3: Option<std::net::SocketAddr>,
-) -> Result<(), String> {
-    use hyper_util::rt::{TokioExecutor, TokioIo};
-    use hyper_util::server::conn::auto::Builder;
-    use hyper_util::service::TowerToHyperService;
-    use mechanics_http_server::axum_compat::router_into_h3_service;
-    use mechanics_http_server::{AltSvcLayer, Http3Server, Http3ServerConfig};
-    use tokio_rustls::TlsAcceptor;
-
-    let tls_material = read_tls_server_material(tls)?;
-    let acceptor = TlsAcceptor::from(Arc::new(tls_material.config));
-    let listener = TcpListener::bind(bind)
-        .await
-        .map_err(|error| format!("failed to bind API HTTPS listener: {error}"))?;
-    let h3_handle = if let Some(bind_h3) = bind_h3 {
-        let h3_config = Http3ServerConfig {
-            bind_h3: Some(bind_h3),
-            ..Http3ServerConfig::default()
-        };
-        Some(
-            Http3Server::new(h3_config)
-                .start(
-                    router_into_h3_service(app.clone()),
-                    tls_material.cert_chain,
-                    tls_material.private_key,
-                )
-                .map_err(|error| format!("failed to start API HTTP/3 listener: {error}"))?,
-        )
-    } else {
-        None
-    };
-    // HSTS applies only to HTTPS-served responses; HTTP responses must NOT
-    // carry it (RFC 6797 §7.2). Adding the layer here scopes it to the
-    // HTTPS server only — start_http_server uses `app` unmodified.
-    let app = app.layer(axum::middleware::from_fn(add_hsts_header));
-    let app = if let Some(bind_h3) = bind_h3 {
-        app.layer(AltSvcLayer::new(
-            bind_h3.port(),
-            Http3ServerConfig::default().alt_svc_max_age_secs,
-        ))
-    } else {
-        app
-    };
-
-    tokio::spawn(async move {
-        let tcp_server = async move {
-            loop {
-                let (stream, _) = match listener.accept().await {
-                    Ok(accepted) => accepted,
-                    Err(error) => {
-                        eprintln!("philharmonic-api HTTPS accept failed: {error}");
-                        continue;
-                    }
-                };
-                let acceptor = acceptor.clone();
-                let app = app.clone();
-                tokio::spawn(async move {
-                    let tls_stream = match acceptor.accept(stream).await {
-                        Ok(stream) => stream,
-                        Err(error) => {
-                            eprintln!("philharmonic-api TLS handshake failed: {error}");
-                            return;
-                        }
-                    };
-                    let service = TowerToHyperService::new(app);
-                    let builder = Builder::new(TokioExecutor::new());
-                    if let Err(error) = builder
-                        .serve_connection_with_upgrades(TokioIo::new(tls_stream), service)
-                        .await
-                    {
-                        eprintln!("philharmonic-api HTTPS connection failed: {error}");
-                    }
-                });
-            }
-        };
-
-        if let Some(mut h3_handle) = h3_handle {
-            tokio::select! {
-                () = tcp_server => {}
-                result = &mut h3_handle => {
-                    if let Err(error) = result {
-                        eprintln!("philharmonic-api HTTP/3 listener stopped: {error}");
-                    }
-                }
-            }
-            h3_handle.shutdown();
-        } else {
-            tcp_server.await;
-        }
-    });
-
-    Ok(())
-}
-
-#[cfg(feature = "https")]
-struct TlsServerMaterial {
-    config: tokio_rustls::rustls::ServerConfig,
-    cert_chain: Vec<tokio_rustls::rustls::pki_types::CertificateDer<'static>>,
-    private_key: tokio_rustls::rustls::pki_types::PrivateKeyDer<'static>,
-}
-
-#[cfg(feature = "https")]
-fn read_tls_server_material(tls: &config::TlsFileConfig) -> Result<TlsServerMaterial, String> {
-    use tokio_rustls::rustls::pki_types::{CertificateDer, PrivateKeyDer, pem::PemObject};
-
-    let cert_bytes = std::fs::read(&tls.cert_path).map_err(|error| {
-        format!(
-            "failed to read TLS certificate file {}: {error}",
-            tls.cert_path.display()
-        )
-    })?;
-    let key_bytes = std::fs::read(&tls.key_path).map_err(|error| {
-        format!(
-            "failed to read TLS private key file {}: {error}",
-            tls.key_path.display()
-        )
-    })?;
-
-    let cert_chain: Vec<CertificateDer<'static>> = CertificateDer::pem_slice_iter(&cert_bytes)
-        .collect::<Result<Vec<_>, _>>()
-        .map_err(|error| format!("failed to parse TLS certificate chain: {error}"))?;
-    if cert_chain.is_empty() {
-        return Err("failed to parse TLS certificate chain: no certificates found".to_string());
-    }
-
-    let private_key = PrivateKeyDer::from_pem_slice(&key_bytes)
-        .map_err(|error| format!("failed to parse TLS private key: {error}"))?;
-
-    let h3_cert_chain = cert_chain.clone();
-    let h3_private_key = private_key.clone_key();
-    let provider = Arc::new(aes256_chacha20_only_provider());
-    let mut config = tokio_rustls::rustls::ServerConfig::builder_with_provider(provider)
-        .with_safe_default_protocol_versions()
-        .map_err(|error| format!("failed to build TLS provider config: {error}"))?
-        .with_no_client_auth()
-        .with_single_cert(cert_chain, private_key)
-        .map_err(|error| format!("failed to build TLS server config: {error}"))?;
-    config.alpn_protocols = vec![b"h2".to_vec(), b"http/1.1".to_vec()];
-    Ok(TlsServerMaterial {
-        config,
-        cert_chain: h3_cert_chain,
-        private_key: h3_private_key,
-    })
-}
-
-#[cfg(feature = "https")]
-fn read_tls_server_config(
-    tls: &config::TlsFileConfig,
-) -> Result<tokio_rustls::rustls::ServerConfig, String> {
-    read_tls_server_material(tls).map(|material| material.config)
-}
-
-/// Build a rustls CryptoProvider that's the aws-lc-rs default minus
-/// every AES128-class cipher suite. Leaves AES256 and CHACHA20 suites
-/// (TLS 1.3 and TLS 1.2) untouched. Other provider defaults (KX groups,
-/// signature schemes, etc.) are unchanged.
-#[cfg(feature = "https")]
-fn aes256_chacha20_only_provider() -> tokio_rustls::rustls::crypto::CryptoProvider {
-    let mut provider = tokio_rustls::rustls::crypto::aws_lc_rs::default_provider();
-    provider
-        .cipher_suites
-        .retain(|suite| !format!("{:?}", suite.suite()).contains("AES_128"));
-    provider
-}
-
-/// Tower middleware that stamps every HTTPS response with HSTS.
-///
-/// `max-age=63072000` (2 years) matches the hstspreload.org minimum;
-/// `includeSubDomains` is intentionally omitted so deployments that
-/// host non-HTTPS services on adjacent subdomains aren't accidentally
-/// broken. Operators that want subdomain coverage can override at the
-/// upstream proxy.
-#[cfg(feature = "https")]
-async fn add_hsts_header(
-    request: axum::extract::Request,
-    next: axum::middleware::Next,
-) -> axum::response::Response {
-    let mut response = next.run(request).await;
-    response.headers_mut().insert(
-        axum::http::header::STRICT_TRANSPORT_SECURITY,
-        axum::http::HeaderValue::from_static("max-age=63072000"),
-    );
-    response
-}
-
 fn log_loaded_counts(counts: RuntimeCounts) {
     eprintln!(
         "loaded {} API verifying key(s), {} connector realm(s)",
@@ -1073,7 +894,7 @@ fn log_reload(old: RuntimeCounts, new: RuntimeCounts) {
 #[cfg(feature = "https")]
 fn log_tls_reload_note(config: &ApiConfig) {
     if let Some(tls) = &config.tls {
-        match read_tls_server_config(tls) {
+        match validate_tls_server_files(&tls.cert_path, &tls.key_path) {
             Ok(_) => eprintln!(
                 "philharmonic-api re-read TLS certificate/key; restart required to apply TLS changes"
             ),

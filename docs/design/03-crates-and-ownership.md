@@ -198,19 +198,30 @@ pending):
   [`02-design-principles.md` §Bins are thin](02-design-principles.md#bins-are-thin)
   these own only their Clap CLI types and `main()` glue;
   substantive implementation lives in libraries. The first
-  Audit & refactor slice (2026-05-15, slice 1) extracted the
-  default-serve command construction, the "missing primary
-  config → defaults" handling, and the raw-or-hex key-material
-  file parsing — those now live under `philharmonic::server`
-  (`cli::default_serve_command()` + `BaseArgs::default()`,
-  `config::load_config_defaulting_missing()`,
-  `key_material::{read_key_file, read_fixed_key_file,
-  read_fixed_secret_file}`). Remaining extraction candidates
-  not yet touched:
+  two Audit & refactor slices (2026-05-15) extracted:
+  - slice 1 — default-serve command construction, the
+    "missing primary config → defaults" handling, and the
+    raw-or-hex key-material file parsing, into
+    `philharmonic::server::cli::default_serve_command()` +
+    `BaseArgs::default()`,
+    `philharmonic::server::config::load_config_defaulting_missing()`,
+    and a new `philharmonic::server::key_material` module
+    (`read_key_file` / `read_fixed_key_file` /
+    `read_fixed_secret_file`);
+  - slice 2 — the duplicated HTTPS + HTTP/3 axum accept
+    loop in the API and connector bins, into a new
+    `philharmonic::server::https` module
+    (`start_tls_axum_server`, `validate_tls_server_files`).
+    The `philharmonic::server` module is now feature-gated
+    by three finer-grained features: `server`,
+    `server-key-material`, `server-https` (the last
+    intentionally separate from the existing `https`
+    feature, which carries the mechanics TLS re-export
+    tree).
+
+  Remaining extraction candidates not yet touched:
   `bins/philharmonic-api-server/src/lowerer.rs`,
-  `embed_job.rs`, `executor.rs`, `scope.rs`; plus the
-  duplicated HTTPS/H3 accept-loop code in both deployment
-  bins. Tracked under
+  `embed_job.rs`, `executor.rs`, `scope.rs`. Tracked under
   [`ROADMAP.md` §3.K](../ROADMAP.md#k-audit--refactor-in-flight-yuka-direct-codex-dispatch).
 
 ### Naming history

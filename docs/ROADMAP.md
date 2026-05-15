@@ -452,15 +452,26 @@ shifts. Done-state is whatever Yuka signals.
   `read_fixed_secret_file`). Bins lose ~152 lines net.
   Behaviour unchanged. Detail:
   [`docs/codex-reports/2026-05-15-0003-audit-refactor-server-helpers.md`](codex-reports/2026-05-15-0003-audit-refactor-server-helpers.md).
+- **Slice 2 (2026-05-15) — HTTPS/HTTP-3 listener
+  helper.** The duplicated HTTPS + HTTP/3 axum accept loop
+  in the API and connector bins is extracted to a new
+  `philharmonic::server::https` module
+  (`start_tls_axum_server`, `validate_tls_server_files`).
+  The meta-crate's `server` module also gains finer-grained
+  feature gates so a bin opts into just what it needs:
+  `server` (CLI / config / install / keygen / reload),
+  `server-key-material` (slice-1 helpers), `server-https`
+  (slice-2 helpers). `server-https` is intentionally
+  separate from the existing `https` feature, which means
+  the mechanics TLS re-export path. Bin diffs: +41 / −404
+  lines net across api-server and connector bins;
+  `hyper-util` / `mechanics-http-server` / `tokio-rustls`
+  drop out of the bins and arrive via the meta-crate.
+  Behaviour unchanged. Detail:
+  [`docs/codex-reports/2026-05-15-0004-audit-refactor-https-helper.md`](codex-reports/2026-05-15-0004-audit-refactor-https-helper.md).
 
 **Slices flagged for future.**
 
-- **HTTPS/H3 accept-loop deduplication.** The API and
-  connector bins both carry near-identical HTTPS/H3 accept
-  loops; extracting that would touch `axum`,
-  `hyper-util`, `tokio-rustls`, and `mechanics-http-server`
-  feature surfaces. Held out of slice 1 to keep the slice
-  reviewable; tracked for a later slice.
 - **API-server logic extractions.**
   `bins/philharmonic-api-server/src/lowerer.rs`,
   `embed_job.rs`, `executor.rs`, `scope.rs` predate the
