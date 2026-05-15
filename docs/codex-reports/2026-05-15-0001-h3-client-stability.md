@@ -7,7 +7,7 @@
 
 The investigation focused on preserving HTTP/3 as the preferred transport when api-bin advertises it, while ensuring that H3 cannot stall or break ordinary mechanics job HTTP calls. Enabling `bind_h3` makes api-bin advertise `Alt-Svc: h3=...` on HTTPS responses. After the worker observes that header, subsequent `https://.../connector/...` requests can be routed through the mechanics HTTP client's opportunistic HTTP/3 path.
 
-Six HTTP-path hazards were identified:
+Eight HTTP-path hazards were identified:
 
 1. A stale cached H3 sender could surface as `Error::Cancelled` when reused after the underlying QUIC/H3 connection had closed.
 2. The cached per-origin H3 `SendRequest` mutex was held for the full request/response lifetime, accidentally serializing all H3 requests to the same origin. One long connector-router call could therefore block later H3 calls even though QUIC and H3 are meant to multiplex streams.
@@ -15,10 +15,16 @@ Six HTTP-path hazards were identified:
 4. The connector router's mhc-based forwarder buffered the entire inbound request body before opening the upstream connector-service connection. With api-server receiving the mechanics call over the new mechanics HTTP server path, this meant a stall in inbound body completion could occur before any TCP connection to `127.0.0.1:3002`, explaining a quiet `tcpdump -i lo 'port 3002'` even though mechanics had reached the public connector-router endpoint.
 5. The connector router still buffered the entire upstream response body before returning response headers to mechanics-worker. Long-running or streaming connector responses could therefore make the public connector-router request appear idle until the mechanics 300 second timeout, even after the upstream connector service had accepted the request.
 6. The api-server dynamic connector route held `connector_dispatch.read().await` across the whole awaited forwarding path. Tokio's `RwLock` is fair/write-preferring, so a config reload waiting for the write lock can make later connector requests wait behind the reload while an earlier connector request is still in flight. In that state the later request has reached api-server but has not reached the connector forwarder, which matches the observed quiet `tcpdump -i lo 'port 3002'`.
+7. A cached H3 sender whose underlying QUIC/H3 connection had gone stale could hang while opening a new bidirectional request stream. That hang happens before request headers or body bytes are sent, so it can consume the full mechanics HTTP timeout without any api-server connector-router trace.
+8. Cached `Alt-Svc` was checked only after the client probed HTTPS DNS records. That made non-first requests vulnerable to a slow HTTPS-RR lookup even though the first response had already advertised a usable H3 alternative.
 
 ## Changes
 
 The H3 client path now treats pooled H3 connections as disposable. If opening a request stream fails before request bytes are sent, the client evicts the cached H3 sender, retries once on a fresh H3 connection, then falls back to the normal HTTPS path if that also fails. If failure happens after the request stream has started, the client evicts the H3 sender but does not replay the request, avoiding duplicate non-idempotent connector calls.
+
+Opening an H3 request stream is now bounded by a short timeout. This makes the stale-sender path produce the same retryable pre-request error as an immediate stream-open failure, instead of waiting for the outer mechanics endpoint timeout. The stream-open and H3 connect/setup budgets are intentionally sub-second because the support-chat path must fall back quickly when H3 is stale or unreachable.
+
+Cached `Alt-Svc` entries are now tried before HTTPS DNS records, so the normal second-and-later request path avoids DNS probing. HTTPS-RR lookup is also bounded by a short timeout before falling through to TCP HTTPS.
 
 The H3 stream-opening lock in `mechanics-http-client/src/http3.rs` was narrowed so it is held only while calling `send_request`. Request body upload, response header receive, and response body read now happen after the lock is released, allowing concurrent H3 streams to the same origin.
 
