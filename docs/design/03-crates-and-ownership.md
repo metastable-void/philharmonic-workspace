@@ -197,13 +197,21 @@ pending):
   `xtask/` crate. Under
   [`02-design-principles.md` §Bins are thin](02-design-principles.md#bins-are-thin)
   these own only their Clap CLI types and `main()` glue;
-  substantive implementation lives in libraries. Current
-  contents that predate the principle (e.g.
+  substantive implementation lives in libraries. The first
+  Audit & refactor slice (2026-05-15, slice 1) extracted the
+  default-serve command construction, the "missing primary
+  config → defaults" handling, and the raw-or-hex key-material
+  file parsing — those now live under `philharmonic::server`
+  (`cli::default_serve_command()` + `BaseArgs::default()`,
+  `config::load_config_defaulting_missing()`,
+  `key_material::{read_key_file, read_fixed_key_file,
+  read_fixed_secret_file}`). Remaining extraction candidates
+  not yet touched:
   `bins/philharmonic-api-server/src/lowerer.rs`,
-  `embed_job.rs`, `executor.rs`, `scope.rs`) are
-  candidates for extraction into library crates during the
-  Audit & refactor sweep (`HUMANS.md §Priority: Audit &
-  refactor`).
+  `embed_job.rs`, `executor.rs`, `scope.rs`; plus the
+  duplicated HTTPS/H3 accept-loop code in both deployment
+  bins. Tracked under
+  [`ROADMAP.md` §3.K](../ROADMAP.md#k-audit--refactor-in-flight-yuka-direct-codex-dispatch).
 
 ### Naming history
 

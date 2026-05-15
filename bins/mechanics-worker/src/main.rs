@@ -8,8 +8,10 @@ use std::time::Duration;
 use clap::Parser;
 use philharmonic::mechanics::{MechanicsPoolConfig, MechanicsServer};
 use philharmonic::mechanics_core::job::MechanicsExecutionLimits;
-use philharmonic::server::cli::{BaseArgs, BaseCommand, resolve_config_paths};
-use philharmonic::server::config::{ConfigError, load_config};
+use philharmonic::server::cli::{
+    BaseArgs, BaseCommand, default_serve_command, resolve_config_paths,
+};
+use philharmonic::server::config::load_config_defaulting_missing;
 use philharmonic::server::install::{self, InstallPlan};
 use philharmonic::server::reload::ReloadHandle;
 
@@ -46,7 +48,7 @@ async fn main() {
 }
 
 async fn run(cli: Cli) -> Result<(), String> {
-    match cli.command.unwrap_or_else(default_command) {
+    match cli.command.unwrap_or_else(default_serve_command) {
         BaseCommand::Version => {
             println!("{}", env!("CARGO_PKG_VERSION"));
             Ok(())
@@ -67,15 +69,6 @@ async fn run(cli: Cli) -> Result<(), String> {
             Err("bootstrap is only supported by philharmonic-api".to_string())
         }
     }
-}
-
-fn default_command() -> BaseCommand {
-    BaseCommand::Serve(BaseArgs {
-        config: None,
-        config_dir: None,
-        bind: None,
-        bind_h3: None,
-    })
 }
 
 async fn serve(args: BaseArgs) -> Result<(), String> {
@@ -137,19 +130,19 @@ fn load_worker_config(
     drop_in: &Path,
     args: &BaseArgs,
 ) -> Result<MechanicsWorkerConfig, String> {
-    match load_config::<MechanicsWorkerConfig>(primary, drop_in) {
-        Ok(config) => Ok(config),
-        Err(ConfigError::Io(error))
-            if error.kind() == std::io::ErrorKind::NotFound && args.config.is_none() =>
-        {
-            eprintln!(
-                "mechanics-worker config {} not found; using built-in defaults",
-                primary.display()
-            );
-            Ok(MechanicsWorkerConfig::default())
-        }
-        Err(error) => Err(error.to_string()),
+    let (config, defaulted) = load_config_defaulting_missing::<MechanicsWorkerConfig>(
+        primary,
+        drop_in,
+        args.config.is_none(),
+    )
+    .map_err(|error| error.to_string())?;
+    if defaulted {
+        eprintln!(
+            "mechanics-worker config {} not found; using built-in defaults",
+            primary.display()
+        );
     }
+    Ok(config)
 }
 
 fn build_pool_config(config: &MechanicsWorkerConfig) -> Result<MechanicsPoolConfig, String> {

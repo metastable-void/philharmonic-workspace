@@ -98,7 +98,7 @@ while [ $# -gt 0 ]; do
     esac
 done
 
-denyflags="--hide-inclusion-graph check bans"
+denyflags="check --hide-inclusion-graph bans"
 if [ "$verbose" -eq 1 ] ; then
     denyflags="check bans"
 fi

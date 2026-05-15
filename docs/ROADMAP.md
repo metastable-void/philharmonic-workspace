@@ -436,6 +436,38 @@ Code maintains the docs in step (this file, CONTRIBUTING.md,
 design docs, CLAUDE.md / AGENTS.md cross-refs) as scope
 shifts. Done-state is whatever Yuka signals.
 
+**Slices landed.**
+
+- **Slice 1 (2026-05-15) — server-side bin-thinning.**
+  Default-serve command construction, "missing primary config
+  → use built-in defaults" handling, and raw-or-hex key-
+  material file parsing were duplicated across
+  `bins/mechanics-worker`, `bins/philharmonic-api-server`,
+  and `bins/philharmonic-connector`. Extracted to
+  `philharmonic::server::cli::default_serve_command()` +
+  `BaseArgs::default()`,
+  `philharmonic::server::config::load_config_defaulting_missing()`,
+  and a new `philharmonic::server::key_material` module
+  (`read_key_file` / `read_fixed_key_file` /
+  `read_fixed_secret_file`). Bins lose ~152 lines net.
+  Behaviour unchanged. Detail:
+  [`docs/codex-reports/2026-05-15-0003-audit-refactor-server-helpers.md`](codex-reports/2026-05-15-0003-audit-refactor-server-helpers.md).
+
+**Slices flagged for future.**
+
+- **HTTPS/H3 accept-loop deduplication.** The API and
+  connector bins both carry near-identical HTTPS/H3 accept
+  loops; extracting that would touch `axum`,
+  `hyper-util`, `tokio-rustls`, and `mechanics-http-server`
+  feature surfaces. Held out of slice 1 to keep the slice
+  reviewable; tracked for a later slice.
+- **API-server logic extractions.**
+  `bins/philharmonic-api-server/src/lowerer.rs`,
+  `embed_job.rs`, `executor.rs`, `scope.rs` predate the
+  "Bins are thin" principle and remain extraction
+  candidates. Slice scope and target library crate(s) TBD
+  at dispatch time.
+
 **Gate on §3.B.** Tier-2 connectors (D7 SMTP, D8 Anthropic,
 D9 Gemini, D19 DNS) are dispatchable only after Yuka signals
 this sweep complete. Until then, Claude Code's connector

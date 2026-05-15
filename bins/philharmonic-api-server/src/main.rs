@@ -24,9 +24,12 @@ use philharmonic::policy::{
     RoleDefinition, RoleMembership, Sck, Tenant, TenantStatus, TokenHash, VerifyingKey,
     generate_api_token, validate_subdomain_name,
 };
-use philharmonic::server::cli::{BaseArgs, BaseCommand, BootstrapArgs, resolve_config_paths};
-use philharmonic::server::config::{ConfigError, load_config};
+use philharmonic::server::cli::{
+    BaseArgs, BaseCommand, BootstrapArgs, default_serve_command, resolve_config_paths,
+};
+use philharmonic::server::config::load_config_defaulting_missing;
 use philharmonic::server::install::{self, InstallPlan};
+use philharmonic::server::key_material::{read_fixed_key_file, read_fixed_secret_file};
 use philharmonic::server::reload::ReloadHandle;
 use philharmonic::store::{
     ContentStore, ContentStoreExt, EntityRefValue, EntityStoreExt, RevisionInput, StoreExt,
@@ -112,7 +115,7 @@ async fn main() {
 }
 
 async fn run(cli: Cli) -> Result<(), String> {
-    match cli.command.unwrap_or_else(default_command) {
+    match cli.command.unwrap_or_else(default_serve_command) {
         BaseCommand::Version => {
             println!("{}", env!("CARGO_PKG_VERSION"));
             Ok(())
@@ -258,15 +261,6 @@ async fn bootstrap(args: BootstrapArgs) -> Result<(), String> {
     Ok(())
 }
 
-fn default_command() -> BaseCommand {
-    BaseCommand::Serve(BaseArgs {
-        config: None,
-        config_dir: None,
-        bind: None,
-        bind_h3: None,
-    })
-}
-
 fn resolve_bootstrap_config_paths(args: &BootstrapArgs) -> (PathBuf, PathBuf) {
     let primary = args
         .config
@@ -284,19 +278,16 @@ fn load_bootstrap_config(
     drop_in: &Path,
     args: &BootstrapArgs,
 ) -> Result<ApiConfig, String> {
-    match load_config::<ApiConfig>(primary, drop_in) {
-        Ok(config) => Ok(config),
-        Err(ConfigError::Io(error))
-            if error.kind() == std::io::ErrorKind::NotFound && args.config.is_none() =>
-        {
-            eprintln!(
-                "philharmonic-api config {} not found; using built-in defaults",
-                primary.display()
-            );
-            Ok(ApiConfig::default())
-        }
-        Err(error) => Err(error.to_string()),
+    let (config, defaulted) =
+        load_config_defaulting_missing::<ApiConfig>(primary, drop_in, args.config.is_none())
+            .map_err(|error| error.to_string())?;
+    if defaulted {
+        eprintln!(
+            "philharmonic-api config {} not found; using built-in defaults",
+            primary.display()
+        );
     }
+    Ok(config)
 }
 
 async fn count_principals(pool: &SinglePool) -> Result<i64, String> {
@@ -407,19 +398,16 @@ async fn serve(args: BaseArgs) -> Result<(), String> {
 }
 
 fn load_api_config(primary: &Path, drop_in: &Path, args: &BaseArgs) -> Result<ApiConfig, String> {
-    match load_config::<ApiConfig>(primary, drop_in) {
-        Ok(config) => Ok(config),
-        Err(ConfigError::Io(error))
-            if error.kind() == std::io::ErrorKind::NotFound && args.config.is_none() =>
-        {
-            eprintln!(
-                "philharmonic-api config {} not found; using built-in defaults",
-                primary.display()
-            );
-            Ok(ApiConfig::default())
-        }
-        Err(error) => Err(error.to_string()),
+    let (config, defaulted) =
+        load_config_defaulting_missing::<ApiConfig>(primary, drop_in, args.config.is_none())
+            .map_err(|error| error.to_string())?;
+    if defaulted {
+        eprintln!(
+            "philharmonic-api config {} not found; using built-in defaults",
+            primary.display()
+        );
     }
+    Ok(config)
 }
 
 fn build_runtime(config: &ApiConfig, state: &LongLivedState) -> Result<Runtime, String> {
@@ -430,6 +418,7 @@ fn build_runtime(config: &ApiConfig, state: &LongLivedState) -> Result<Runtime, 
     let config_lowerer = build_config_lowerer(config, state)?;
     let embed_job_lowerer = build_embed_job_lowerer(config, state)?;
     let store = Arc::new(SqlStore::new(state.pool.clone()));
+    let embed_dataset_caps = build_embed_dataset_caps(config);
 
     let mut builder = PhilharmonicApiBuilder::new()
         .request_scope_resolver(Arc::new(HeaderBasedScopeResolver::new(
@@ -442,16 +431,7 @@ fn build_runtime(config: &ApiConfig, state: &LongLivedState) -> Result<Runtime, 
         .step_executor(step_executors.workflow)
         .config_lowerer(config_lowerer)
         .key_version(config.sck_key_version)
-        .embed_dataset_caps(EmbedDatasetCaps {
-            max_items: config.embed_dataset_max_items,
-            max_text_bytes: config.embed_dataset_max_text_bytes,
-            max_payload_bytes: config.embed_dataset_max_payload_bytes,
-            max_source_items_blob_bytes: config.embed_dataset_max_source_items_blob_bytes,
-            max_corpus_items: config.embed_dataset_max_corpus_items,
-            max_corpus_vector_dimension: config.embed_dataset_max_corpus_vector_dimension,
-            max_corpus_blob_bytes: config.embed_dataset_max_corpus_blob_bytes,
-            max_mechanics_response_bytes: config.embed_dataset_max_mechanics_response_bytes,
-        })
+        .embed_dataset_caps(embed_dataset_caps)
         .rate_limit_config(rate_limit)
         .brand_name(config.webui_brand_name.as_str());
     if let Some(sck_bytes) = &state.sck_bytes {
@@ -467,16 +447,7 @@ fn build_runtime(config: &ApiConfig, state: &LongLivedState) -> Result<Runtime, 
             lowerer,
             executor,
             Arc::new(Sck::from_bytes(**sck_bytes)),
-            EmbedDatasetCaps {
-                max_items: config.embed_dataset_max_items,
-                max_text_bytes: config.embed_dataset_max_text_bytes,
-                max_payload_bytes: config.embed_dataset_max_payload_bytes,
-                max_source_items_blob_bytes: config.embed_dataset_max_source_items_blob_bytes,
-                max_corpus_items: config.embed_dataset_max_corpus_items,
-                max_corpus_vector_dimension: config.embed_dataset_max_corpus_vector_dimension,
-                max_corpus_blob_bytes: config.embed_dataset_max_corpus_blob_bytes,
-                max_mechanics_response_bytes: config.embed_dataset_max_mechanics_response_bytes,
-            },
+            embed_dataset_caps,
         )));
     }
 
@@ -491,6 +462,19 @@ fn build_runtime(config: &ApiConfig, state: &LongLivedState) -> Result<Runtime, 
             connector_realms: config.connector_dispatch.len(),
         },
     })
+}
+
+fn build_embed_dataset_caps(config: &ApiConfig) -> EmbedDatasetCaps {
+    EmbedDatasetCaps {
+        max_items: config.embed_dataset_max_items,
+        max_text_bytes: config.embed_dataset_max_text_bytes,
+        max_payload_bytes: config.embed_dataset_max_payload_bytes,
+        max_source_items_blob_bytes: config.embed_dataset_max_source_items_blob_bytes,
+        max_corpus_items: config.embed_dataset_max_corpus_items,
+        max_corpus_vector_dimension: config.embed_dataset_max_corpus_vector_dimension,
+        max_corpus_blob_bytes: config.embed_dataset_max_corpus_blob_bytes,
+        max_mechanics_response_bytes: config.embed_dataset_max_mechanics_response_bytes,
+    }
 }
 
 fn build_verifying_key_registry(
@@ -1070,74 +1054,6 @@ async fn add_hsts_header(
         axum::http::HeaderValue::from_static("max-age=63072000"),
     );
     response
-}
-
-fn read_fixed_key_file<const N: usize>(path: &Path, label: &str) -> Result<[u8; N], String> {
-    let bytes = read_key_file(path, N)?;
-    <[u8; N]>::try_from(bytes.as_slice()).map_err(|_| {
-        format!(
-            "{label} file {} did not contain exactly {N} decoded bytes",
-            path.display()
-        )
-    })
-}
-
-fn read_fixed_secret_file<const N: usize>(
-    path: &Path,
-    label: &str,
-) -> Result<Zeroizing<[u8; N]>, String> {
-    let bytes = read_key_file(path, N)?;
-    let fixed = <[u8; N]>::try_from(bytes.as_slice()).map_err(|_| {
-        format!(
-            "{label} file {} did not contain exactly {N} decoded bytes",
-            path.display()
-        )
-    })?;
-    Ok(Zeroizing::new(fixed))
-}
-
-fn read_key_file(path: &Path, expected_len: usize) -> Result<Zeroizing<Vec<u8>>, String> {
-    let bytes = Zeroizing::new(
-        std::fs::read(path)
-            .map_err(|error| format!("failed to read key file {}: {error}", path.display()))?,
-    );
-    if bytes.len() == expected_len {
-        return Ok(bytes);
-    }
-
-    let hex_len = expected_len
-        .checked_mul(2)
-        .ok_or_else(|| "expected key length overflowed usize".to_string())?;
-    let Ok(text) = std::str::from_utf8(bytes.as_slice()) else {
-        return Err(format!(
-            "key file {} has {} bytes; expected {expected_len} raw bytes",
-            path.display(),
-            bytes.len()
-        ));
-    };
-    let compact = text
-        .chars()
-        .filter(|character| !character.is_whitespace())
-        .collect::<String>();
-    if compact.len() == hex_len
-        && compact
-            .chars()
-            .all(|character| character.is_ascii_hexdigit())
-    {
-        return hex::decode(&compact).map(Zeroizing::new).map_err(|error| {
-            format!(
-                "failed to decode hex key file {} as {expected_len} bytes: {error}",
-                path.display()
-            )
-        });
-    }
-
-    Err(format!(
-        "key file {} has {} raw bytes and {} hex characters; expected {expected_len} raw bytes or {hex_len} hex characters",
-        path.display(),
-        bytes.len(),
-        compact.len()
-    ))
 }
 
 fn log_loaded_counts(counts: RuntimeCounts) {

@@ -3735,6 +3735,7 @@ dependencies = [
  "axum",
  "clap",
  "ed25519-dalek",
+ "hex",
  "mechanics",
  "mechanics-config",
  "mechanics-core",
