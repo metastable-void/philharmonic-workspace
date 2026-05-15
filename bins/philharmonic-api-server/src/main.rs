@@ -17,7 +17,7 @@ use philharmonic::api::{
 use philharmonic::connector_client::LowererSigningKey;
 use philharmonic::connector_common::{MLKEM768_PUBLIC_KEY_LEN, RealmId, RealmPublicKey};
 use philharmonic::connector_router::{
-    DispatchConfig, Forwarder, HyperForwarder, dispatch_to_realm,
+    DispatchConfig, DispatchConfigError, Forwarder, HyperForwarder, dispatch_to_upstream,
 };
 use philharmonic::policy::{
     ApiSigningKey, ApiVerifyingKeyEntry, ApiVerifyingKeyRegistry, Principal, PrincipalKind,
@@ -783,8 +783,25 @@ async fn dispatch_dynamic(
         .filter(|s| !s.is_empty())
     {
         let realm = realm.to_owned();
-        let guard = state.connector_dispatch.read().await;
-        if let Some(config) = guard.as_ref() {
+        let upstream = {
+            let guard = state.connector_dispatch.read().await;
+            guard
+                .as_ref()
+                .map(|config| config.select_upstream_for_realm(&realm))
+        };
+        if let Some(upstream) = upstream {
+            let upstream = match upstream {
+                Ok(upstream) => upstream,
+                Err(DispatchConfigError::UnknownRealm { .. }) => {
+                    return response_with_status(StatusCode::NOT_FOUND, "unknown connector realm");
+                }
+                Err(_) => {
+                    return response_with_status(
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        "router configuration is invalid",
+                    );
+                }
+            };
             let rewritten_uri = match rewrite_connector_uri(request.uri(), &realm) {
                 Ok(uri) => uri,
                 Err(_) => {
@@ -797,7 +814,7 @@ async fn dispatch_dynamic(
             let mut request = request;
             *request.uri_mut() = rewritten_uri;
 
-            return dispatch_to_realm(config, state.connector_forwarder.as_ref(), &realm, request)
+            return dispatch_to_upstream(state.connector_forwarder.as_ref(), request, &upstream)
                 .await;
         }
     }
@@ -1155,8 +1172,13 @@ fn log_tls_reload_note(_config: &ApiConfig) {}
 #[cfg(test)]
 mod tests {
     use std::net::SocketAddr;
+    use std::sync::{Arc, Mutex};
+    use std::time::Duration;
 
     use super::*;
+    use axum::body::Body;
+    use philharmonic::connector_router::ForwardFuture;
+    use tokio::sync::{oneshot, watch};
 
     #[tokio::test]
     async fn bind_h3_without_tls_errors_before_binding_http() {
@@ -1171,6 +1193,85 @@ mod tests {
             .expect_err("HTTP/3 without TLS must fail");
 
         assert_eq!(error, "HTTP/3 requires TLS; configure `[tls]`");
+    }
+
+    #[tokio::test]
+    async fn connector_dispatch_drops_config_read_lock_before_forwarding() {
+        struct BlockingForwarder {
+            entered: Mutex<Option<oneshot::Sender<()>>>,
+            release: watch::Receiver<bool>,
+        }
+
+        impl Forwarder for BlockingForwarder {
+            fn forward(&self, _request: Request<Body>) -> ForwardFuture {
+                let entered = self.entered.lock().expect("test mutex should lock").take();
+                let mut release = self.release.clone();
+                Box::pin(async move {
+                    if let Some(entered) = entered {
+                        let _ = entered.send(());
+                    }
+                    while !*release.borrow() {
+                        release
+                            .changed()
+                            .await
+                            .expect("test release sender should stay alive");
+                    }
+                    Ok(Response::new(Body::from("ok")))
+                })
+            }
+        }
+
+        let mut dispatch = DispatchConfig::new("example.com").expect("config should initialize");
+        dispatch
+            .insert_realm(
+                "prod",
+                vec![
+                    "http://connector-prod:3002"
+                        .parse()
+                        .expect("URI should parse"),
+                ],
+            )
+            .expect("realm insertion should succeed");
+
+        let connector_dispatch = Arc::new(RwLock::new(Some(dispatch)));
+        let (entered_tx, entered_rx) = oneshot::channel();
+        let (release_tx, release_rx) = watch::channel(false);
+        let app = dynamic_router(DynamicRouter {
+            api: Arc::new(RwLock::new(Router::new())),
+            connector_dispatch: Arc::clone(&connector_dispatch),
+            connector_forwarder: Arc::new(BlockingForwarder {
+                entered: Mutex::new(Some(entered_tx)),
+                release: release_rx,
+            }),
+        });
+
+        let request_task = tokio::spawn(async move {
+            app.oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/connector/prod")
+                    .body(Body::from("{}"))
+                    .expect("request should build"),
+            )
+            .await
+            .expect("dynamic router should handle request")
+        });
+
+        entered_rx
+            .await
+            .expect("forwarder should be entered before release");
+        let write_guard = tokio::time::timeout(Duration::from_secs(1), connector_dispatch.write())
+            .await
+            .expect("config write lock should not wait for forwarder completion");
+        drop(write_guard);
+
+        release_tx
+            .send(true)
+            .expect("request task should still be waiting");
+        let response = request_task
+            .await
+            .expect("request task should join successfully");
+        assert_eq!(response.status(), StatusCode::OK);
     }
 
     #[test]
