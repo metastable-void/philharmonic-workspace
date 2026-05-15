@@ -15,18 +15,23 @@ this file, but never edit this file.
   workspace repo into a reusable template/Rust crate/etc.
   this can happen after the MVP work is done.
 
+## Priority: Maintainability sweep
+
+Sweep through the whole workspace (spawning subagents is
+preferred) for maintainability/dirty spagetti code issues.
+
+Refactor codes to make the code structured, small, de-duplicated.
+Fixing the actual bugs mid-run is okay; don't change the bahavior
+otherwise.
+
+This is done by Yuka's direct Codex dispatch.
+
+After it is fully completed, continue to Tier-2 connectors
+(DNS + SMTP).
+
 ## HTTP/3 support notes
 
 - Make sure HTTP/3 server side is done.
-
-## h3-quinn should be vendored
-
-h3-quinn should be vendored - write an xtask/script that
-copies the latest release behind the 3d cooldown into a
-non-submodule in-tree crate, and applies a Cargo.toml patches.
-
-patch.crates-io should point to this for h3-quinn, or use our
-own name (mechanics-h3-quinn or so), published at crates.io.
 
 ## SMTP connector
 
@@ -59,57 +64,10 @@ introducing security holes, if it is really necessary for
 mails to accepted by submission servers. If it is usually
 handled correctly by SMTP servers, we can skip that.
 
-### MIME module at `mechanics-core`
-
-If it is not too offtopic, add a structured MIME composer
-(it doesn't need to know about HTML, etc., just formats)
-to `mechanics-core`: `mechanics:mime`. It should handle
-Base64, multipart messages, etc, cleanly, emitting standard
-compiant MIME messages.
-
-```js
-import { compose, parse } from `mechanics:mime`;
-```
-
-Let's make every non-endpoint module feature-gated:
-
-- Pre-existing modules are enabled by default.
-- features:
-  - `rand` (default): enables `mechanics:rand` and
-   `mechanics:uuid`.
-    without it, `Math.random()` is seeded with zero.
-  - `encoding` (default): form-urlencoded, base64, base32,
-    hex.
-  - `url` (default): a new WHATWG URL API-compliant API.
-  - `console` (default): a minimal WHATWG-compliant console
-    API.
-  - `mime` (non-default): see the above.
-  - `html` (default): the new `html` (`htmlize::escape_text()`
-    to `escapeText()`, `htmlize::escape_all_quotes()` to
-    `escapeAttribute()`, `htmlize::unescape()` to 
-    `unescapeText()`, `htmlize::unescape_attribute()`
-    to `unescapeAttribute()`) module.
-
-Please note that `jsdom` would not work with Mechanics,
-which on purpose doesn't have any non-ES globals.
-
-```js
-import URL, { URLSearchParams } from `mechanics:url`;
-import console from `mechanics:console`;
-```
-
-Please note that philharmonic ecosystem enables
-mechanics-rs's `mime` feature unconditionally.
-
 ## WebUI
 
 Note: Keep WebUI up-to-date with any API features added
 in the future.
-
-- Fix one regression from Chat UI: it should call the step
-  execution with `{}` when it is first created with the chat
-  UI. Currently the greeting disappeared. No regression for
-  non-chat workflows.
 
 ## New connector: DNS (Tier 2)
 
