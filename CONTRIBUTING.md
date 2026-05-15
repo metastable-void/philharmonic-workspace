@@ -1644,6 +1644,82 @@ and commit. Never regenerate.
 
 ## 10. Rust code conventions
 
+### 10.0 Posture: maintainability over speed
+
+**Default to slow, careful, structured code; never trade
+maintainability for keystrokes.** Every §10 subsection below
+is specific guidance; this is the umbrella principle that
+applies even when a specific rule hasn't been written down.
+
+What this looks like in practice:
+
+- **Read before you write.** When touching a module, scan the
+  surrounding code for an existing helper, type, or pattern
+  that already does what you need. Duplication is the
+  single biggest source of drift bugs in this workspace — the
+  mhc → connector-router 502 / Cancelled chain on 2026-05-14
+  through 15 cost multiple respins precisely because
+  framing-and-headers logic was written twice in slightly
+  different shapes. Reuse over rewrite.
+- **Small, focused units.** Functions do one thing. Modules
+  group cohesive concerns. If a function is long enough that
+  you have to scroll to read it, it's probably long enough to
+  split. If a module is long enough that you can't hold the
+  whole API in your head, it's probably long enough to split.
+- **Deduplicate as the third occurrence arrives.** Two
+  near-identical code paths can stay separate; on the third
+  appearance, lift the shared shape into a helper. Don't
+  pre-extract abstractions speculatively — that's the
+  opposite failure mode (premature generalization).
+- **Refactor in-place, behavior-preserving.** Per HUMANS.md
+  §"Priority: Maintainability sweep", refactors don't change
+  behavior unless the refactor reveals an actual bug
+  (memory leak, deadlock, race, off-by-one). Fixing
+  bugs-encountered-mid-refactor is fine and encouraged; gold-
+  plating or "while I'm here" feature work is not.
+- **Don't ship to escape a review cycle.** If a fix needs a
+  rebuild before it lands, that's the cost. The workspace's
+  pre-landing-then-commit discipline (§11, §12.5) is the floor,
+  not the ceiling; "the pre-landing passed" doesn't mean "the
+  code is good" — it means "the code typechecks and the
+  existing tests pass."
+- **Comments where the why isn't obvious.** Identifiers and
+  structure carry the what. Reserve comments for the
+  surprising bit: a workaround for a specific upstream bug,
+  a constraint imposed by an external protocol, a subtle
+  invariant a careless edit would violate. Don't describe
+  what the code does; that's the code's job.
+- **The Codex gate exists for this.** Substantive code
+  changes route through Codex with an archived prompt
+  (CLAUDE.md "Claude vs. Codex division of labour"). The
+  design-then-implement split is the workspace's mechanism
+  for sustaining quality at agent-coding velocity; bypassing
+  it because "this is small" or "I can fix it faster myself"
+  accumulates exactly the spaghetti the §"Maintainability
+  sweep" directive in HUMANS.md asks us to undo.
+
+When in doubt, slow down. The 2026-05-15 H3 stability
+follow-on (mhc 0.2.4 / mhs 0.1.4) and the parallel
+connector-router 0.1.5 fix together took several iterations
+across two days, including a couple of false starts where
+the speed-over-quality response was "ship a workaround now,
+diagnose later" — every one of those false starts had to be
+unpicked. The eventual fixes (proper pre-wire fallback +
+connect timeout + send_request mutex scope + QUIC keep-alives
++ body-framing-and-hop-by-hop header stripping) were
+fundamentally diagnosis work, not coding work, and the
+coding part was small once the diagnosis was right.
+
+Cross-references:
+
+- [`CLAUDE.md`](CLAUDE.md) and [`AGENTS.md`](AGENTS.md) both
+  carry pointers to this section.
+- [`HUMANS.md`](HUMANS.md) §"Priority: Maintainability sweep"
+  is the workspace's current operational priority while v1 is
+  in stabilization. Section 10.0 here is the long-term
+  posture; the maintainability-sweep is the short-term
+  application.
+
 ### 10.1 Edition and MSRV
 
 - **Edition 2024.**

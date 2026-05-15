@@ -45,6 +45,24 @@ Developer: Yuka MORI.
   edits into whatever commit is being made; that's the only way
   `HUMANS.md` changes reach the repo.
 
+## Posture: maintainability over speed
+
+Default to slow, careful, structured code; never trade
+maintainability for keystrokes. Read existing modules before
+adding new ones; reuse over rewrite; small focused units;
+deduplicate at the third occurrence; refactor in place,
+behavior-preserving; route substantive changes through the
+Codex gate even when "small" feels tempting. The umbrella
+rule lives at
+[`CONTRIBUTING.md §10.0`](CONTRIBUTING.md#100-posture-maintainability-over-speed);
+the current operational application is
+[`HUMANS.md`](HUMANS.md) §"Priority: Maintainability sweep"
+(workspace sweep underway by Yuka's direct Codex dispatch
+while v1 stabilises). When in doubt, slow down. The H3
+stability work in mid-May 2026 was fundamentally diagnosis,
+not coding; every speed-over-quality detour had to be
+unpicked.
+
 ## Hard stops before doing anything
 
 - **POSIX-ish host required.** Before running any script, spawning

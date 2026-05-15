@@ -52,6 +52,21 @@
 - [`CLAUDE.md`](CLAUDE.md) / [`AGENTS.md`](AGENTS.md) —
   agent-targeted rules (e.g. the `HUMANS.md` read-only rule).
 
+## Posture: maintainability over speed
+
+Default to slow, careful, structured code; never trade
+maintainability for keystrokes. Read existing modules before
+adding new ones; prefer reuse over rewrite; small focused
+units; deduplicate at the third occurrence; refactor
+behavior-preserving — fixing bugs encountered mid-task is
+fine, gold-plating or "while I'm here" feature work is not.
+The umbrella rule lives at
+[`CONTRIBUTING.md §10.0`](CONTRIBUTING.md#100-posture-maintainability-over-speed);
+the current operational application is
+[`HUMANS.md`](HUMANS.md) §"Priority: Maintainability sweep"
+(the workspace-wide sweep Yuka dispatches you for directly
+while v1 stabilises). When in doubt, slow down.
+
 ## Hard stops
 
 ### POSIX-ish host required
