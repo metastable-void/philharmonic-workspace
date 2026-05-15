@@ -392,98 +392,41 @@ and
 
 ### K. Audit & refactor (in flight, Yuka direct Codex dispatch)
 
-Workspace-wide audit + refactor sweep. Per
-[`HUMANS.md` §Priority: Audit & refactor](../HUMANS.md):
+Workspace-wide sweep dispatched by Yuka directly (not via
+Claude's prompt-and-dispatch flow; no
+`docs/codex-prompts/` archives). Authoritative scope:
+[`HUMANS.md` §Priority: Audit & refactor](../HUMANS.md).
+Two named sub-directives: **Maintainability sweep**
+(refactor for structured / small / deduplicated code; fix
+bugs mid-run; no other behaviour change) and **Clean
+separation of concerns** (bins thin, logic in libraries —
+see [§10.14](../CONTRIBUTING.md#1014-unpublished-bin-crates-minimal-cli-logic-in-libraries)
+and [§Bins are thin](design/02-design-principles.md#bins-are-thin)).
+Chat UI relocation is **deferred** (decided 2026-05-15;
+[design/14 §Questions already answered](design/14-open-questions.md#crates-and-organization)).
+Done-state is whatever Yuka signals.
 
-- **Maintainability sweep.** Sub-agent / subdirectory pass
-  for spaghetti code, dirty bits, memory leaks, deadlocks,
-  races, and other quality issues. Refactor for structured /
-  small / deduplicated units. Bug-fixes encountered mid-run
-  are landed; no other behaviour change is permitted in the
-  same pass.
-- **Clean separation of concerns.** Unpublished bin crates
-  under `bins/` are reduced to Clap CLI + `main()` glue;
-  substantive logic moves into library crates (existing or
-  new). Discipline rule:
-  [`CONTRIBUTING.md §10.14`](../CONTRIBUTING.md#1014-unpublished-bin-crates-minimal-cli-logic-in-libraries).
-  Design principle:
-  [`docs/design/02-design-principles.md` §Bins are thin](design/02-design-principles.md#bins-are-thin).
-  Current extraction candidates flagged in
-  [`docs/design/03-crates-and-ownership.md`](design/03-crates-and-ownership.md):
-  `bins/philharmonic-api-server/src/lowerer.rs`,
-  `embed_job.rs`, `executor.rs`, `scope.rs`.
-- **Chat UI relocation (deferred, decided
-  2026-05-15).** Chats are workflow knowledge; the
-  framework in principle should not know anything about
-  workflows. The current `philharmonic/webui/` Chat UI
-  (bundled into the `philharmonic` meta-crate via
-  `rust-embed` behind the `webui` feature) is structurally
-  in the wrong place by this rule, but is retained because
-  it is useful for testing the end-to-end stack. The
-  decided future home is **either** an in-tree
-  `philharmonic-chat-app` bin (frontend + backend unified)
-  **or** a separate project — Yuka picks at relocation time.
-  **No removal this pass**: the old Chat UI stays in place
-  during the Audit & refactor sweep; the relocation is its
-  own follow-on. Recorded in
-  [`docs/design/14-open-questions.md` §Questions already
-  answered](design/14-open-questions.md#questions-already-answered).
+**Slices landed (2026-05-15):**
 
-**Dispatch model.** This arc is not driven by Claude's
-prompt-and-dispatch flow (no `docs/codex-prompts/` archives).
-Yuka spawns Codex directly, scoping each pass herself; Claude
-Code maintains the docs in step (this file, CONTRIBUTING.md,
-design docs, CLAUDE.md / AGENTS.md cross-refs) as scope
-shifts. Done-state is whatever Yuka signals.
+- **Slice 1** — server-side bin-thinning: default-serve
+  command, missing-config-defaults handling, and raw-or-hex
+  key-material parsing extracted to `philharmonic::server`
+  (`cli` / `config` / new `key_material` module).
+  [Detail](codex-reports/2026-05-15-0003-audit-refactor-server-helpers.md).
+- **Slice 2** — HTTPS+HTTP-3 axum accept loop extracted to
+  new `philharmonic::server::https`. `philharmonic::server`
+  now feature-gated by `server` / `server-key-material` /
+  `server-https`; `server-https` is separate from the
+  mechanics-runtime `https` feature.
+  [Detail](codex-reports/2026-05-15-0004-audit-refactor-https-helper.md).
 
-**Slices landed.**
+**Pending extraction candidates:**
+`bins/philharmonic-api-server/src/{lowerer,embed_job,executor,scope}.rs`.
 
-- **Slice 1 (2026-05-15) — server-side bin-thinning.**
-  Default-serve command construction, "missing primary config
-  → use built-in defaults" handling, and raw-or-hex key-
-  material file parsing were duplicated across
-  `bins/mechanics-worker`, `bins/philharmonic-api-server`,
-  and `bins/philharmonic-connector`. Extracted to
-  `philharmonic::server::cli::default_serve_command()` +
-  `BaseArgs::default()`,
-  `philharmonic::server::config::load_config_defaulting_missing()`,
-  and a new `philharmonic::server::key_material` module
-  (`read_key_file` / `read_fixed_key_file` /
-  `read_fixed_secret_file`). Bins lose ~152 lines net.
-  Behaviour unchanged. Detail:
-  [`docs/codex-reports/2026-05-15-0003-audit-refactor-server-helpers.md`](codex-reports/2026-05-15-0003-audit-refactor-server-helpers.md).
-- **Slice 2 (2026-05-15) — HTTPS/HTTP-3 listener
-  helper.** The duplicated HTTPS + HTTP/3 axum accept loop
-  in the API and connector bins is extracted to a new
-  `philharmonic::server::https` module
-  (`start_tls_axum_server`, `validate_tls_server_files`).
-  The meta-crate's `server` module also gains finer-grained
-  feature gates so a bin opts into just what it needs:
-  `server` (CLI / config / install / keygen / reload),
-  `server-key-material` (slice-1 helpers), `server-https`
-  (slice-2 helpers). `server-https` is intentionally
-  separate from the existing `https` feature, which means
-  the mechanics TLS re-export path. Bin diffs: +41 / −404
-  lines net across api-server and connector bins;
-  `hyper-util` / `mechanics-http-server` / `tokio-rustls`
-  drop out of the bins and arrive via the meta-crate.
-  Behaviour unchanged. Detail:
-  [`docs/codex-reports/2026-05-15-0004-audit-refactor-https-helper.md`](codex-reports/2026-05-15-0004-audit-refactor-https-helper.md).
-
-**Slices flagged for future.**
-
-- **API-server logic extractions.**
-  `bins/philharmonic-api-server/src/lowerer.rs`,
-  `embed_job.rs`, `executor.rs`, `scope.rs` predate the
-  "Bins are thin" principle and remain extraction
-  candidates. Slice scope and target library crate(s) TBD
-  at dispatch time.
-
-**Gate on §3.B.** Tier-2 connectors (D7 SMTP, D8 Anthropic,
-D9 Gemini, D19 DNS) are dispatchable only after Yuka signals
-this sweep complete. Until then, Claude Code's connector
-work is limited to docs / design / prompt-drafting; no
-substantive coding dispatch lands.
+**Gate on §3.B.** Tier-2 connectors (D7 / D8 / D9 / D19)
+are dispatchable only after Yuka signals this sweep
+complete; until then Claude Code's connector work is
+docs / design / prompt-drafting only.
 
 ### Suggested sequencing
 

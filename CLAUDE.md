@@ -49,28 +49,18 @@ Developer: Yuka MORI.
 
 Default to slow, careful, structured authorship; never trade
 maintainability for keystrokes. **Runtime speed is still a
-first-class goal** — what's deprioritised here is *coding
-velocity* (time-to-commit, typing speed, shipping the first
-plausible fix). Read existing modules before adding new
-ones; reuse over rewrite; small focused units; deduplicate
-at the third occurrence; refactor in place, behavior-
-preserving; route substantive changes through the Codex gate
-even when "small" feels tempting. The umbrella rule lives at
-[`CONTRIBUTING.md §10.0`](CONTRIBUTING.md#100-posture-maintainability-over-fast-coding);
-the current operational application is
-[`HUMANS.md`](HUMANS.md) §"Priority: Audit & refactor"
-(workspace audit + refactor underway by Yuka's direct Codex
-dispatch while v1 stabilises; two named sub-directives —
-Maintainability sweep and Clean separation of concerns —
-the latter is operationalised at
-[`CONTRIBUTING.md §10.14`](CONTRIBUTING.md#1014-unpublished-bin-crates-minimal-cli-logic-in-libraries)
-and the design principle
-[`docs/design/02-design-principles.md` §Bins are thin](docs/design/02-design-principles.md#bins-are-thin)).
-After the sweep fully completes, Claude Code continues to
-Tier-2 connectors (D7 SMTP, D19 DNS). When in doubt, slow
-down. The H3 stability work in mid-May 2026 was
-fundamentally diagnosis, not coding; every shipping-fast-
-to-escape-diagnosis detour had to be unpicked.
+first-class goal** — what's deprioritised is *coding
+velocity*. Read existing modules before adding new ones;
+reuse over rewrite; small focused units; deduplicate at the
+third occurrence; refactor behavior-preserving; route
+substantive changes through the Codex gate. Umbrella rule:
+[CONTRIBUTING §10.0](CONTRIBUTING.md#100-posture-maintainability-over-fast-coding).
+Current operational priority:
+[HUMANS.md §Priority: Audit & refactor](HUMANS.md) (Yuka
+direct Codex dispatch; gates Tier-2 connectors). When in
+doubt, slow down — the May 2026 H3 stability work was
+fundamentally diagnosis, and every ship-fast-to-escape-
+diagnosis detour had to be unpicked.
 
 ## Hard stops before doing anything
 

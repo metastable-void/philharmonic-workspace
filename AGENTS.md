@@ -56,27 +56,19 @@
 
 Default to slow, careful, structured authorship; never trade
 maintainability for keystrokes. **Runtime speed is still a
-first-class goal** — what's deprioritised here is *coding
-velocity* (time-to-commit, typing speed). Read existing
-modules before adding new ones; prefer reuse over rewrite;
-small focused units; deduplicate at the third occurrence;
-refactor behavior-preserving — fixing bugs encountered
-mid-task is fine, gold-plating or "while I'm here" feature
-work is not. The umbrella rule lives at
-[`CONTRIBUTING.md §10.0`](CONTRIBUTING.md#100-posture-maintainability-over-fast-coding);
-the current operational application is
-[`HUMANS.md`](HUMANS.md) §"Priority: Audit & refactor" (the
-workspace-wide audit + refactor Yuka dispatches you for
-directly while v1 stabilises). It carries two named sub-
-directives — **Maintainability sweep** (refactor for
-structured / small / deduplicated code; fix bugs
-encountered mid-run; no other behaviour change) and
-**Clean separation of concerns** (unpublished bin crates
-are thin: Clap CLI + `main()` glue only; implementation
-goes in libraries). The latter is operationalised at
-[`CONTRIBUTING.md §10.14`](CONTRIBUTING.md#1014-unpublished-bin-crates-minimal-cli-logic-in-libraries)
-and the design principle
-[`docs/design/02-design-principles.md` §Bins are thin](docs/design/02-design-principles.md#bins-are-thin).
+first-class goal** — what's deprioritised is *coding
+velocity*. Read existing modules first; prefer reuse over
+rewrite; small focused units; deduplicate at the third
+occurrence; refactor behavior-preserving — fixing bugs
+encountered mid-task is fine, gold-plating is not. Umbrella
+rule: [CONTRIBUTING §10.0](CONTRIBUTING.md#100-posture-maintainability-over-fast-coding).
+Current operational priority:
+[HUMANS.md §Priority: Audit & refactor](HUMANS.md) — Yuka
+dispatches you directly. Two sub-directives: **Maintainability
+sweep** (no behaviour change beyond fixing mid-run bugs) and
+**Clean separation of concerns** (bins thin, logic in
+libraries — see [§Bins are thin](docs/design/02-design-principles.md#bins-are-thin)
+and [CONTRIBUTING §10.14](CONTRIBUTING.md#1014-unpublished-bin-crates-minimal-cli-logic-in-libraries)).
 When in doubt, slow down.
 
 ## Hard stops

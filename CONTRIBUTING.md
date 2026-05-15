@@ -1720,22 +1720,12 @@ connect timeout + send_request mutex scope + QUIC keep-alives
 fundamentally diagnosis work, not coding work, and the
 coding part was small once the diagnosis was right.
 
-Cross-references:
-
-- [`CLAUDE.md`](CLAUDE.md) and [`AGENTS.md`](AGENTS.md) both
-  carry pointers to this section.
-- [`HUMANS.md`](HUMANS.md) §"Priority: Audit & refactor" is
-  the workspace's current operational priority while v1 is in
-  stabilization. It has two named sub-directives:
-  **Maintainability sweep** (refactor for structured / small /
-  deduplicated code; fix bugs encountered mid-run; no other
-  behaviour change) and **Clean separation of concerns**
-  (unpublished bin crates are thin — see §10.14 below). The
-  sweep is done by Yuka's direct Codex dispatch; after it
-  fully completes, the next planned work is Tier-2 connectors
-  (D7 SMTP, D19 DNS) per ROADMAP §3.B. Section 10.0 here is
-  the long-term posture; Audit & refactor is the short-term
-  application.
+Cross-references: [`CLAUDE.md`](CLAUDE.md) and
+[`AGENTS.md`](AGENTS.md) point here.
+[`HUMANS.md` §Priority: Audit & refactor](HUMANS.md) is the
+current operational priority — Maintainability sweep + Clean
+separation of concerns (§10.14). §10.0 is long-term posture;
+the sweep is short-term application.
 
 ### 10.1 Edition and MSRV
 
@@ -2262,76 +2252,31 @@ why pre-landing is non-negotiable before any publish.
 
 ### 10.14 Unpublished bin crates: minimal CLI, logic in libraries
 
-**Rule.** Bin crates under `bins/` (which all carry
-`publish = false` and are workspace-only by intent) own
-their Clap CLI types and the `main()` orchestration glue.
-Anything else — request lowering, signal handling, config
-shape transformations, runtime wiring, business logic —
-lives in a library crate; the bin reduces to argument
-parsing, config loading, building the library's runtime
-handle, and handing off to it. When no existing library
-fits, create one rather than growing the bin.
+Bin crates under `bins/` own only Clap CLI + `main()` glue;
+everything else (lowering, signal handling, config
+transformations, business logic) goes in a library. New
+library crates are created if no existing one fits. This is
+the operational check for [§Bins are thin](../docs/design/02-design-principles.md#bins-are-thin).
 
-This is the discipline-level corollary of
-[`docs/design/02-design-principles.md` §Bins are thin](../docs/design/02-design-principles.md#bins-are-thin).
-The design doc states the principle; this section is the
-operational check.
-
-**Why.** Bins are deliberately unpublished. Implementation
-in a bin is implementation through a side door —
-undeclarable to external consumers, off the SemVer release
-ladder, and unreachable from external integration tests. It
-also tends to accumulate: a bin module is the path of
-least resistance, and the workspace has repeatedly grown
-files under `bins/*/src/` that any second consumer would
-have to copy-paste. The
-[`HUMANS.md`](HUMANS.md) §"Priority: Audit & refactor" →
-Clean separation of concerns directive calls this out
-explicitly.
-
-**The discipline.**
-
-- Before adding a new module to a `bins/*/src/` tree, ask:
-  could anything else (a future bin variant, an integration
-  test, a downstream embedder) want this? If yes, the
-  module belongs in a library.
-- Clap derive types (`#[derive(Args)]`, `#[derive(Subcommand)]`)
-  stay in the bin. CLI surfaces are intentionally per-bin
-  — flags, env-var names, signal handling differ across
-  deployment shapes.
-- Shared CLI scaffolding that generalizes across bins
-  already lives in [`philharmonic/src/server/`](../philharmonic/src/server/)
-  (`cli`, `config`, `install`, `keygen`, `reload`); new
-  shared CLI pieces belong there or in a sibling module.
-- When extracting a bin module to a library, follow the
-  workspace's submodule + new-crate pattern (see
-  [`./scripts/new-submodule.sh`](../scripts/new-submodule.sh)
-  and the [Codex gate](CLAUDE.md#claude-vs-codex-division-of-labour)).
-  Don't extract speculatively — extract when a second
-  consumer materialises or when the audit sweep visits the
-  module.
-- Some current bin contents (e.g.
-  `bins/philharmonic-api-server/src/lowerer.rs`,
-  `embed_job.rs`, `executor.rs`, `scope.rs`) predate this
-  rule. They are extraction candidates under the Audit &
-  refactor sweep — not a current style violation that
-  blocks landing other work, but a tracked debt.
-- **Chat UI is a related but separate case.** The Chat UI
-  currently bundled into `philharmonic/webui/` (behind the
-  `webui` feature, served via `rust-embed`) is in the
-  framework for testing-utility reasons, not because it
-  belongs there — chats are workflow knowledge (per
-  [`docs/design/02-design-principles.md` §Layered ignorance](../docs/design/02-design-principles.md#layered-ignorance))
-  and the framework should not know about workflows. The
-  agreed future home is either an in-tree
-  `philharmonic-chat-app` bin (frontend + backend
-  unified) or a separate project. **Don't remove it during
-  the Audit & refactor sweep**; the relocation is its own
-  follow-on dispatch. Logic *additions* to
-  `philharmonic/webui/` should still avoid leaking
-  workflow-specific knowledge into the framework crates —
-  treat the current location as transitional, not as a
-  blessed home.
+- Before adding a `bins/*/src/` module, ask whether a future
+  bin variant, integration test, or external embedder might
+  want it. If yes, it belongs in a library.
+- Shared CLI scaffolding lives at
+  [`philharmonic/src/server/`](../philharmonic/src/server/);
+  new shared pieces belong there or in a sibling library.
+- Extraction routes through the
+  [Codex gate](CLAUDE.md#claude-vs-codex-division-of-labour);
+  use [`new-submodule.sh`](../scripts/new-submodule.sh) when
+  a new crate is warranted. Don't extract speculatively.
+- Pre-rule bin contents
+  (`bins/philharmonic-api-server/src/{lowerer,embed_job,executor,scope}.rs`)
+  are tracked-debt extraction candidates, not landing blockers.
+- The `philharmonic/webui/` Chat UI is a parallel case
+  (chats are workflow knowledge; framework shouldn't host
+  the UI). Retained for testing utility; relocation
+  deferred. **Don't remove during the sweep**; don't add
+  more workflow-specific knowledge to the framework crates
+  on edits there.
 
 ---
 

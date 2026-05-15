@@ -96,53 +96,27 @@ executor receives jobs with no instance ID in the protocol.
 
 ## Bins are thin
 
-Unpublished bin crates under `bins/` own their Clap CLI types and
-the `main()` orchestration glue, but no substantive logic.
-Anything reusable — request lowering, signal handling, config-
-shape transformations, runtime wiring — lives in a library crate;
-the bin reduces to argument parsing, config loading, building the
-library's runtime handle, and handing off to it. New library
-crates are created if the logic doesn't fit an existing one.
+Unpublished bin crates under `bins/` own their Clap CLI types
+and `main()` glue only. Substantive logic — request lowering,
+signal handling, config transformations, runtime wiring — lives
+in library crates. Bins reduce to argument parsing, config
+loading, building the library's runtime handle, and handing off.
 
-**Why.** Bins under `bins/` are deliberately unpublished
-(`publish = false`). Logic that lives there is invisible to
-external consumers, skips the SemVer release discipline the
-library crates enforce, and isn't testable from outside the
-workspace. Putting implementation in a bin is shipping code
-through a side door — undeclarable, unanchored to a versioned
-boundary, and a magnet for the kind of spaghetti the maintainability
-sweep exists to undo.
+Bins under `bins/` are `publish = false`. Logic that lives there
+is invisible to external consumers, off the SemVer ladder, and
+unreachable from external tests — implementation through a side
+door. CLI surfaces stay in the bin because they are intentionally
+per-deployment-shape; shared CLI scaffolding generalizes into
+`philharmonic::server::cli`.
 
-**Exception.** Clap CLI types (`#[derive(clap::Args)]` etc.) and
-`main()` glue stay in the bin. CLI surfaces are intentionally
-per-deployment-shape — not every consumer of `philharmonic-api`
-wants the same flags, environment-variable layout, or signal map.
-The rule is about implementation logic, not about argument
-parsing. The shared CLI scaffolding that does generalize lives in
-the `philharmonic` meta-crate's `server::cli` module already.
-
-**Consequence.** Some current bin contents (e.g. the lowerer in
-`bins/philharmonic-api-server/src/lowerer.rs`) predate this
-principle and live in the bin. The Audit & refactor sweep
-(`HUMANS.md §Priority: Audit & refactor`) extracts them into
-library crates incrementally as the sweep visits each module.
-`docs/design/03-crates-and-ownership.md` annotates which bin
-contents are anticipated to migrate.
-
-**Related: Chat UI relocation.** The same principle applies to
-the Chat UI currently at `philharmonic/webui/`. It is bundled
-into the `philharmonic` meta-crate via `rust-embed` behind the
-`webui` feature, but chats are workflow knowledge (see
-*Layered ignorance* above), not framework knowledge — a
-framework that re-exports a chat-shaped UI from its meta-
-crate has crossed a layer it shouldn't. The agreed future
-home is either an in-tree `philharmonic-chat-app` bin
-(frontend + backend unified) or a separate project; the
-current location is retained because end-to-end testing the
-stack needs *some* UI, and the relocation is a follow-on
-dispatch rather than a fix expected during the Audit &
-refactor sweep. See
-[`docs/design/14-open-questions.md` §Crates and organization → Chat UI relocation](14-open-questions.md#crates-and-organization).
+Some current bin contents predate this principle and are
+extraction candidates under the Audit & refactor sweep
+([HUMANS.md](../../HUMANS.md), [ROADMAP §3.K](../ROADMAP.md#k-audit--refactor-in-flight-yuka-direct-codex-dispatch));
+inventory lives in [§03 In-tree binaries](03-crates-and-ownership.md).
+The Chat UI at `philharmonic/webui/` is a parallel case:
+chats are workflow knowledge, so the framework shouldn't host
+the UI — but it's retained for testing utility, with relocation
+deferred ([§14 Questions already answered](14-open-questions.md#crates-and-organization)).
 
 ## Implementation uniformity
 
