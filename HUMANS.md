@@ -25,6 +25,17 @@ Refactor codes to make the code structured, small, de-duplicated.
 Fixing the actual bugs mid-run is okay; don't change the bahavior
 otherwise.
 
+**Clean separation of concerns**:
+
+- Unpublished bin crates should be minimal;
+  **they own Clap CLI** (that should not be upstreamed),
+  but any real codes should be upstreamed, creating
+  crates if really necessary.
+- Uncertain about how to treat the Chat UI; chats are
+  a workflow knowledge; the framework in principle should
+  not know anything about the workflows, but it's really
+  useful for testing.
+
 This is done by Yuka's direct Codex dispatch.
 
 After it is fully completed, Claude Code continues to Tier-2
