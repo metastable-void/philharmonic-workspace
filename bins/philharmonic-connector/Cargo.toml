@@ -10,7 +10,17 @@ name = "philharmonic-connector"
 path = "src/main.rs"
 
 [dependencies]
-philharmonic = { path = "../../philharmonic", default-features = false, features = ["connector-http-forward", "connector-llm-openai-compat", "connector-sql-postgres", "connector-sql-mysql", "connector-embed", "connector-vector-search"] }
+philharmonic = { path = "../../philharmonic", default-features = false, features = [
+    "connector-common",
+    "connector-impl-api",
+    "connector-service",
+    "connector-http-forward",
+    "connector-llm-openai-compat",
+    "connector-sql-postgres",
+    "connector-sql-mysql",
+    "connector-embed",
+    "connector-vector-search",
+] }
 async-trait = { version = "0.1", default-features = false, features = [] }
 axum = { version = "0.8", default-features = false, features = ["http1", "json", "tokio"] }
 clap = { version = "4", default-features = false, features = ["color", "derive", "error-context", "help", "std", "suggestions", "usage"] }
