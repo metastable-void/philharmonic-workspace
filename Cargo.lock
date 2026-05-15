@@ -3065,6 +3065,7 @@ dependencies = [
  "h3",
  "hickory-resolver",
  "http",
+ "http-body",
  "http-body-util",
  "hyper",
  "hyper-rustls",
@@ -4026,6 +4027,7 @@ name = "philharmonic-connector-router"
 version = "0.1.5"
 dependencies = [
  "axum",
+ "http-body",
  "http-body-util",
  "mechanics-http-client",
  "thiserror 2.0.18",

@@ -275,7 +275,7 @@ impl ConfigLowerer for ConnectorConfigLowerer {
             let token_hex = hex::encode(token_bytes);
             let payload_hex = hex::encode(encrypted_payload_bytes);
 
-            let endpoint_url = format!("{}/{realm}", self.connector_router_url);
+            let endpoint_url = connector_endpoint_url(&self.connector_router_url, &realm);
 
             let http_endpoint = json!({
                 "method": "post",
@@ -311,4 +311,29 @@ fn expiry(now: UnixMillis, lifetime_ms: u64) -> Result<UnixMillis, ConfigLowerin
                 "lowerer token expiry timestamp overflowed i64 milliseconds".to_string(),
             )
         })
+}
+
+fn connector_endpoint_url(connector_router_url: &str, realm: &str) -> String {
+    format!("{}/{realm}", connector_router_url.trim_end_matches('/'))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn connector_endpoint_url_accepts_base_without_trailing_slash() {
+        assert_eq!(
+            connector_endpoint_url("https://chat.innovatopia.jp/connector", "prod"),
+            "https://chat.innovatopia.jp/connector/prod"
+        );
+    }
+
+    #[test]
+    fn connector_endpoint_url_accepts_base_with_trailing_slash() {
+        assert_eq!(
+            connector_endpoint_url("https://chat.innovatopia.jp/connector/", "prod"),
+            "https://chat.innovatopia.jp/connector/prod"
+        );
+    }
 }
