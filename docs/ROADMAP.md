@@ -29,32 +29,18 @@ active work now lives in the post-v1 dispatch plan (§3 below).
   release notes live in each `CHANGELOG.md`.
 - **Post-D22 H3 client stability follow-on**: landed
   2026-05-15 in mhc + mhs (unpublished locally; api-server
-  picks up via workspace path-overrides). Pre-wire H3 stream
-  failures transparently fall back to HTTP/2 + retry-once on
-  fresh QUIC connection; cached `SendRequest` mutex scoped
-  to `send_request` only (streams multiplex naturally
-  thereafter); 3 s connect/setup timeout; client+server
-  QUIC keep-alive + 120 s max-idle. Detail at
+  picks up via workspace path-overrides). Connector-router
+  0.1.5 shipped same window with body-framing + hop-by-hop
+  header stripping. Detail:
   [`docs/codex-reports/2026-05-15-0001-h3-client-stability.md`](codex-reports/2026-05-15-0001-h3-client-stability.md).
-  Connector-router 0.1.5 shipped same window to strip
-  body-framing + hop-by-hop headers across the mhc-based
-  forwarder.
-- **Pending**: D7 / D8 / D9 / D19 (Tier 2/3 connectors —
-  SMTP, Anthropic, Gemini, DNS). **Gated** on the Audit &
+- **Pending**: Tier 2 = D7 (SMTP) + D19 (DNS), dispatched
+  as one batch. Tier 3 = D8 (Anthropic) + D9 (Gemini),
+  dispatched separately later. **Gated** on the Audit &
   refactor sweep (§3.K below) reaching its done-state;
-  Claude Code resumes Tier-2 dispatches only after Yuka
+  Claude Code resumes the Tier-2 batch only after Yuka
   signals the sweep complete.
-- **Priority: Audit & refactor** (in flight via Yuka's
-  direct Codex dispatch, per
-  [`HUMANS.md` §Priority: Audit & refactor](../HUMANS.md)):
-  workspace-wide pass for maintainability issues, dirty /
-  spaghetti code, memory leaks / deadlocks / races, and
-  enforcement of the new "bins are thin" principle
-  ([design/02 §Bins are thin](design/02-design-principles.md#bins-are-thin),
-  operationalised at
-  [CONTRIBUTING.md §10.14](../CONTRIBUTING.md#1014-unpublished-bin-crates-minimal-cli-logic-in-libraries)).
-  Bug-fixes encountered mid-run are landed; no other
-  behaviour change. Tracked under §3.K.
+- **Priority: Audit & refactor** (in flight): tracked under
+  §3.K; per [`HUMANS.md`](../HUMANS.md).
 - **§3.J production-security cleanup arc closed 2026-05-14**:
   D23 + D24 + D25 all done; combined with the
   mechanics-h3-quinn vendor + the `deny.toml` Linux-x86_64
@@ -64,8 +50,8 @@ active work now lives in the post-v1 dispatch plan (§3 below).
 Per-dispatch detail, daily-log entries, and per-arc
 done-state snapshots are preserved at
 [`docs/archive/`](archive/) — per-day archives 2026-05-10
-through 2026-05-14. The live ROADMAP carries only the
-current-state summary + the pending plans (§3.B, §3.F).
+through 2026-05-15. The live ROADMAP carries only the
+current-state summary + the pending plans (§3.B, §3.K).
 
 Authoritative sources for things this file used to restate but
 now cross-references:
@@ -392,68 +378,52 @@ and
 
 ### K. Audit & refactor (in flight, Yuka direct Codex dispatch)
 
-Workspace-wide sweep dispatched by Yuka directly (not via
-Claude's prompt-and-dispatch flow; no
-`docs/codex-prompts/` archives). Authoritative scope:
-[`HUMANS.md` §Priority: Audit & refactor](../HUMANS.md).
-Two named sub-directives: **Maintainability sweep**
-(refactor for structured / small / deduplicated code; fix
-bugs mid-run; no other behaviour change) and **Clean
-separation of concerns** (bins thin, logic in libraries —
-see [§10.14](../CONTRIBUTING.md#1014-unpublished-bin-crates-minimal-cli-logic-in-libraries)
-and [§Bins are thin](design/02-design-principles.md#bins-are-thin)).
-Chat UI relocation is **deferred** (decided 2026-05-15;
-[design/14 §Questions already answered](design/14-open-questions.md#crates-and-organization)).
+Workspace-wide sweep dispatched by Yuka directly. Scope:
+[`HUMANS.md` §Priority: Audit & refactor](../HUMANS.md) —
+Maintainability sweep + Clean separation of concerns
+([§10.14](../CONTRIBUTING.md#1014-unpublished-bin-crates-minimal-cli-logic-in-libraries),
+[§Bins are thin](design/02-design-principles.md#bins-are-thin)).
+Chat UI relocation deferred ([§14](design/14-open-questions.md#crates-and-organization)).
 Done-state is whatever Yuka signals.
-
-**Slices landed (2026-05-15):**
-
-- **Slice 1** — server-side bin-thinning: default-serve
-  command, missing-config-defaults handling, and raw-or-hex
-  key-material parsing extracted to `philharmonic::server`
-  (`cli` / `config` / new `key_material` module).
-  [Detail](codex-reports/2026-05-15-0003-audit-refactor-server-helpers.md).
-- **Slice 2** — HTTPS+HTTP-3 axum accept loop extracted to
-  new `philharmonic::server::https`. `philharmonic::server`
-  now feature-gated by `server` / `server-key-material` /
-  `server-https`; `server-https` is separate from the
-  mechanics-runtime `https` feature.
-  [Detail](codex-reports/2026-05-15-0004-audit-refactor-https-helper.md).
 
 **Pending extraction candidates:**
 `bins/philharmonic-api-server/src/{lowerer,embed_job,executor,scope}.rs`.
 
-**Gate on §3.B.** Tier-2 connectors (D7 / D8 / D9 / D19)
-are dispatchable only after Yuka signals this sweep
-complete; until then Claude Code's connector work is
-docs / design / prompt-drafting only.
+**Gate on §3.B.** The Tier-2 batch (D7 SMTP + D19 DNS) is
+dispatchable only after the sweep is signalled complete.
+Tier-3 (D8 Anthropic + D9 Gemini) is sequenced separately
+after Tier 2.
+
+Slices 1 + 2 landed 2026-05-15 (server-side bin-thinning +
+HTTPS/HTTP-3 listener extraction):
+[archive](archive/2026-05-15-roadmap-audit-refactor-slices-1-2.md).
 
 ### Suggested sequencing
 
 **Currently in flight**: §3.K Audit & refactor (Yuka direct
 Codex dispatch). Gates §3.B.
 
-**Next dispatchable (post-sweep)**: D7 / D8 / D9 / D19
-(Tier 2/3 connectors; all four independent + parallel-safe).
+**Next dispatchable (post-sweep)**: Tier-2 batch = D7 + D19,
+dispatched together. Tier 3 (D8 + D9) follows separately.
 
-- **D7** (`philharmonic-connector-impl-email-smtp`,
-  Tier 2) — `email_send` wire shape locked in
+- **D7** (`philharmonic-connector-impl-email-smtp`, Tier 2)
+  — `email_send` wire shape locked in
   [`docs/design/08-connector-architecture.md` §SMTP](design/08-connector-architecture.md#smtp);
   prompt draft ready.
-- **D8** (`philharmonic-connector-impl-llm-anthropic`,
-  Tier 2) — fully spec'd from
-  [`docs/design/08-connector-architecture.md` §llm_anthropic](design/08-connector-architecture.md#llm_anthropic--config);
-  prompt draft ready.
-- **D9** (`philharmonic-connector-impl-llm-gemini`, Tier 2)
-  carries the dual-mode AI Studio + Vertex AI requirement;
-  Claude proposes the discriminator field, Vertex-mode
-  field names, and OAuth2 access-token caching strategy in
-  the prompt; Yuka overrides at prompt-review time if she
-  has a preference.
-- **D19** (DNS connector) — fully spec'd from
+- **D19** (`philharmonic-connector-impl-dns`, Tier 2) —
+  fully spec'd from
   [`docs/design/08-connector-architecture.md` §DNS](design/08-connector-architecture.md#dns),
   setup-unblocked 2026-05-12 (submodule wired, crates.io
   `0.0.0` placeholder published). Prompt draft ready.
+- **D8** (`philharmonic-connector-impl-llm-anthropic`,
+  Tier 3) — fully spec'd from
+  [`docs/design/08-connector-architecture.md` §llm_anthropic](design/08-connector-architecture.md#llm_anthropic--config);
+  prompt draft ready.
+- **D9** (`philharmonic-connector-impl-llm-gemini`, Tier 3)
+  — dual-mode AI Studio + Vertex AI; Claude proposes the
+  discriminator field, Vertex-mode field names, and OAuth2
+  access-token caching strategy in the prompt; Yuka
+  overrides at prompt-review time if she has a preference.
 
 ### Dispatch discipline reminder
 
