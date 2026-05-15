@@ -7,7 +7,7 @@
 
 The investigation focused on preserving HTTP/3 as the preferred transport when api-bin advertises it, while ensuring that H3 cannot stall or break ordinary mechanics job HTTP calls. Enabling `bind_h3` makes api-bin advertise `Alt-Svc: h3=...` on HTTPS responses. After the worker observes that header, subsequent `https://.../connector/...` requests can be routed through the mechanics HTTP client's opportunistic HTTP/3 path.
 
-Eight HTTP-path hazards were identified:
+Eleven HTTP-path hazards were identified:
 
 1. A stale cached H3 sender could surface as `Error::Cancelled` when reused after the underlying QUIC/H3 connection had closed.
 2. The cached per-origin H3 `SendRequest` mutex was held for the full request/response lifetime, accidentally serializing all H3 requests to the same origin. One long connector-router call could therefore block later H3 calls even though QUIC and H3 are meant to multiplex streams.
@@ -17,6 +17,9 @@ Eight HTTP-path hazards were identified:
 6. The api-server dynamic connector route held `connector_dispatch.read().await` across the whole awaited forwarding path. Tokio's `RwLock` is fair/write-preferring, so a config reload waiting for the write lock can make later connector requests wait behind the reload while an earlier connector request is still in flight. In that state the later request has reached api-server but has not reached the connector forwarder, which matches the observed quiet `tcpdump -i lo 'port 3002'`.
 7. A cached H3 sender whose underlying QUIC/H3 connection had gone stale could hang while opening a new bidirectional request stream. That hang happens before request headers or body bytes are sent, so it can consume the full mechanics HTTP timeout without any api-server connector-router trace.
 8. Cached `Alt-Svc` was checked only after the client probed HTTPS DNS records. That made non-first requests vulnerable to a slow HTTPS-RR lookup even though the first response had already advertised a usable H3 alternative.
+9. Concurrent endpoint calls in the same mechanics job can share a cached H3 sender. If one task is already opening a stream, later tasks can wait on the sender mutex before their own stream-open timeout starts.
+10. The embedded connector router's upstream mhc client reused idle TCP connections to connector services. For local connector-service calls this stale-pool risk is not worth the small reuse win, and it can make non-first upstream forwards fail before a new loopback connection is visible.
+11. Connector implementations that call external HTTP services built mhc clients with default idle pooling. The OpenAI-compatible LLM path can therefore reuse a stale provider keep-alive connection on the second or later LLM request in a chat workflow.
 
 ## Changes
 
@@ -25,6 +28,8 @@ The H3 client path now treats pooled H3 connections as disposable. If opening a 
 Opening an H3 request stream is now bounded by a short timeout. This makes the stale-sender path produce the same retryable pre-request error as an immediate stream-open failure, instead of waiting for the outer mechanics endpoint timeout. The stream-open and H3 connect/setup budgets are intentionally sub-second because the support-chat path must fall back quickly when H3 is stale or unreachable.
 
 Cached `Alt-Svc` entries are now tried before HTTPS DNS records, so the normal second-and-later request path avoids DNS probing. HTTPS-RR lookup is also bounded by a short timeout before falling through to TCP HTTPS.
+
+The H3 stream-open timeout now covers waiting for the cached sender lock as well as the `send_request` call itself. Concurrent chat endpoint calls therefore cannot queue behind a stale H3 stream opener for the full outer endpoint timeout.
 
 The H3 stream-opening lock in `mechanics-http-client/src/http3.rs` was narrowed so it is held only while calling `send_request`. Request body upload, response header receive, and response body read now happen after the lock is released, allowing concurrent H3 streams to the same origin.
 
@@ -35,6 +40,12 @@ The H3 response path now drains trailers after the DATA frame loop before return
 `mechanics-http-client::Response` now exposes a raw streaming body path for forwarders. The connector router uses it to return upstream response headers immediately and stream response DATA frames back to the mechanics caller instead of waiting for upstream EOF. Because this path preserves the wire representation rather than using mhc's decompression helpers, the router now preserves representation headers such as `Content-Encoding` while continuing to drop hop-by-hop framing headers like `Content-Length` and `Transfer-Encoding`.
 
 The api-server connector dispatch path now selects the realm upstream while holding the dispatch config read lock, drops that guard, and only then awaits the connector forwarder. `philharmonic-connector-router` exposes `dispatch_to_upstream` for this already-selected URI case, so api-server does not have to borrow `DispatchConfig` across network I/O.
+
+The connector router's production forwarder now disables mhc idle connection reuse for upstream connector-service calls. The mechanics worker already does this for job endpoint traffic; applying the same policy inside the router avoids stale keep-alive reuse on the local connector-service hop.
+
+The OpenAI-compatible LLM connector and generic HTTP-forward connector now also disable mhc idle connection reuse for their upstream provider/client hops. This preserves request correctness for bursty chat workloads where a provider-side stale keep-alive is more harmful than reconnect cost.
+
+Mechanics endpoint transport errors now include the endpoint name in the JavaScript-visible error string, for example ``endpoint `llm` request failed: request timed out``. This is diagnostic rather than a transport fix, but it makes future chat-script failures attributable to `embed`, `vector_search`, `llm`, `db`, or another configured endpoint without guessing from timing.
 
 The QUIC/H3 setup path also gained a short connect/setup timeout. This prevents an advertised but unreachable UDP H3 path from consuming the full mechanics HTTP timeout before falling back to HTTPS. Separately, client and server QUIC transport policy was adjusted to use H3 keepalive and a longer idle timeout, reducing avoidable idle disconnects without depending on keepalive for correctness.
 
