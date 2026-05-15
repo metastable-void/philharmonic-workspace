@@ -411,10 +411,23 @@ Workspace-wide audit + refactor sweep. Per
   Current extraction candidates flagged in
   [`docs/design/03-crates-and-ownership.md`](design/03-crates-and-ownership.md):
   `bins/philharmonic-api-server/src/lowerer.rs`,
-  `embed_job.rs`, `executor.rs`, `scope.rs`. The Chat UI
-  question (chats are workflow knowledge, not framework
-  knowledge — testing usefulness vs. framework purity) is
-  flagged for later decision; no action this pass.
+  `embed_job.rs`, `executor.rs`, `scope.rs`.
+- **Chat UI relocation (deferred, decided
+  2026-05-15).** Chats are workflow knowledge; the
+  framework in principle should not know anything about
+  workflows. The current `philharmonic/webui/` Chat UI
+  (bundled into the `philharmonic` meta-crate via
+  `rust-embed` behind the `webui` feature) is structurally
+  in the wrong place by this rule, but is retained because
+  it is useful for testing the end-to-end stack. The
+  decided future home is **either** an in-tree
+  `philharmonic-chat-app` bin (frontend + backend unified)
+  **or** a separate project — Yuka picks at relocation time.
+  **No removal this pass**: the old Chat UI stays in place
+  during the Audit & refactor sweep; the relocation is its
+  own follow-on. Recorded in
+  [`docs/design/14-open-questions.md` §Questions already
+  answered](design/14-open-questions.md#questions-already-answered).
 
 **Dispatch model.** This arc is not driven by Claude's
 prompt-and-dispatch flow (no `docs/codex-prompts/` archives).

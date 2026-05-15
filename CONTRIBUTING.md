@@ -2316,6 +2316,22 @@ explicitly.
   rule. They are extraction candidates under the Audit &
   refactor sweep — not a current style violation that
   blocks landing other work, but a tracked debt.
+- **Chat UI is a related but separate case.** The Chat UI
+  currently bundled into `philharmonic/webui/` (behind the
+  `webui` feature, served via `rust-embed`) is in the
+  framework for testing-utility reasons, not because it
+  belongs there — chats are workflow knowledge (per
+  [`docs/design/02-design-principles.md` §Layered ignorance](../docs/design/02-design-principles.md#layered-ignorance))
+  and the framework should not know about workflows. The
+  agreed future home is either an in-tree
+  `philharmonic-chat-app` bin (frontend + backend
+  unified) or a separate project. **Don't remove it during
+  the Audit & refactor sweep**; the relocation is its own
+  follow-on dispatch. Logic *additions* to
+  `philharmonic/webui/` should still avoid leaking
+  workflow-specific knowledge into the framework crates —
+  treat the current location as transitional, not as a
+  blessed home.
 
 ---
 

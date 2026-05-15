@@ -129,6 +129,21 @@ library crates incrementally as the sweep visits each module.
 `docs/design/03-crates-and-ownership.md` annotates which bin
 contents are anticipated to migrate.
 
+**Related: Chat UI relocation.** The same principle applies to
+the Chat UI currently at `philharmonic/webui/`. It is bundled
+into the `philharmonic` meta-crate via `rust-embed` behind the
+`webui` feature, but chats are workflow knowledge (see
+*Layered ignorance* above), not framework knowledge — a
+framework that re-exports a chat-shaped UI from its meta-
+crate has crossed a layer it shouldn't. The agreed future
+home is either an in-tree `philharmonic-chat-app` bin
+(frontend + backend unified) or a separate project; the
+current location is retained because end-to-end testing the
+stack needs *some* UI, and the relocation is a follow-on
+dispatch rather than a fix expected during the Audit &
+refactor sweep. See
+[`docs/design/14-open-questions.md` §Crates and organization → Chat UI relocation](14-open-questions.md#crates-and-organization).
+
 ## Implementation uniformity
 
 All connector implementations are the same kind of thing: Rust code

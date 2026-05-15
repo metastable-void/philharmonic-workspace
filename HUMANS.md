@@ -33,10 +33,12 @@ otherwise.
   **they own Clap CLI** (that should not be upstreamed),
   but any real codes should be upstreamed, creating
   crates if really necessary.
-- Uncertain about how to treat the Chat UI; chats are
-  a workflow knowledge; the framework in principle should
-  not know anything about the workflows, but it's really
-  useful for testing.
+- Chats are a workflow knowledge; the framework in principle
+  should not know anything about the workflows, but it's really
+  useful for testing, so Chat UI will live elsewhere (in-tree
+  `philharmonic-chat-app` bin for frontend/backend unified, or
+  in another project) in the future, although we don't remove
+  the old Chat UI immediately right now.
 
 ### Methodology
 

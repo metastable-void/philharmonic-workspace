@@ -189,6 +189,22 @@ settled.
   common`.
 - **Policy crate boundaries**: one `philharmonic-policy` crate,
   not split.
+- **Chat UI relocation** (decided 2026-05-15): the Chat UI
+  currently at `philharmonic/webui/` (bundled into the
+  `philharmonic` meta-crate via `rust-embed` behind the
+  `webui` feature) does not structurally belong in the
+  framework — chats are workflow knowledge, and the
+  framework in principle should not know anything about
+  workflows ([§02 *Layered ignorance*](02-design-principles.md#layered-ignorance),
+  [§02 *Bins are thin*](02-design-principles.md#bins-are-thin)).
+  It is retained for now because it is useful for
+  end-to-end testing of the stack. The decided future home
+  is **either** an in-tree `philharmonic-chat-app` bin
+  (frontend + backend unified) **or** a separate project —
+  Yuka picks at relocation time. **No removal during the
+  Audit & refactor sweep**; the relocation is its own
+  follow-on dispatch. Tracked under
+  [`ROADMAP.md` §3.K](../ROADMAP.md#k-audit--refactor-in-flight-yuka-direct-codex-dispatch).
 
 ### Tenancy and principals
 
