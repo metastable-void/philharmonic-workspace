@@ -7,7 +7,7 @@
 
 The investigation focused on preserving HTTP/3 as the preferred transport when api-bin advertises it, while ensuring that H3 cannot stall or break ordinary mechanics job HTTP calls. Enabling `bind_h3` makes api-bin advertise `Alt-Svc: h3=...` on HTTPS responses. After the worker observes that header, subsequent `https://.../connector/...` requests can be routed through the mechanics HTTP client's opportunistic HTTP/3 path.
 
-Eleven HTTP-path hazards were identified:
+Thirteen HTTP-path hazards were identified:
 
 1. A stale cached H3 sender could surface as `Error::Cancelled` when reused after the underlying QUIC/H3 connection had closed.
 2. The cached per-origin H3 `SendRequest` mutex was held for the full request/response lifetime, accidentally serializing all H3 requests to the same origin. One long connector-router call could therefore block later H3 calls even though QUIC and H3 are meant to multiplex streams.
@@ -20,20 +20,24 @@ Eleven HTTP-path hazards were identified:
 9. Concurrent endpoint calls in the same mechanics job can share a cached H3 sender. If one task is already opening a stream, later tasks can wait on the sender mutex before their own stream-open timeout starts.
 10. The embedded connector router's upstream mhc client reused idle TCP connections to connector services. For local connector-service calls this stale-pool risk is not worth the small reuse win, and it can make non-first upstream forwards fail before a new loopback connection is visible.
 11. Connector implementations that call external HTTP services built mhc clients with default idle pooling. The OpenAI-compatible LLM path can therefore reuse a stale provider keep-alive connection on the second or later LLM request in a chat workflow.
+12. The H3 request and response adapters waited for optional trailers after DATA EOF even though the connector paths do not use trailers. If the h3 stack does not resolve the "no trailers" phase promptly, a complete POST body or response body can be held open indefinitely, which matches `endpoint("llm")` reaching the H3 path and then timing out without needing any durable replay or operator-tuned policy explanation.
+13. Reusing a cached H3 connection still leaves a non-first request vulnerable to failures after `send_request` succeeds but before api-server has received enough request bytes to enter connector dispatch. In that state a public connector-router request can consume the mechanics endpoint timeout while `tcpdump -i lo 'port 3002'` stays quiet, because the router never reaches the upstream connector-service dial.
 
 ## Changes
 
-The H3 client path now treats pooled H3 connections as disposable. If opening a request stream fails before request bytes are sent, the client evicts the cached H3 sender, retries once on a fresh H3 connection, then falls back to the normal HTTPS path if that also fails. If failure happens after the request stream has started, the client evicts the H3 sender but does not replay the request, avoiding duplicate non-idempotent connector calls.
+The H3 client path now treats H3 connections as per-request disposable transport state. The client still reuses its local QUIC endpoint and still prefers advertised H3 alternatives, but it does not share a cached `SendRequest` across separate mechanics endpoint calls. This removes the stale non-first H3 connection class without disabling H3, adding operator-facing knobs, or introducing durable request-deduplication state.
 
 Opening an H3 request stream is now bounded by a short timeout. This makes the stale-sender path produce the same retryable pre-request error as an immediate stream-open failure, instead of waiting for the outer mechanics endpoint timeout. The stream-open and H3 connect/setup budgets are intentionally sub-second because the support-chat path must fall back quickly when H3 is stale or unreachable.
 
 Cached `Alt-Svc` entries are now tried before HTTPS DNS records, so the normal second-and-later request path avoids DNS probing. HTTPS-RR lookup is also bounded by a short timeout before falling through to TCP HTTPS.
 
-The H3 stream-open timeout now covers waiting for the cached sender lock as well as the `send_request` call itself. Concurrent chat endpoint calls therefore cannot queue behind a stale H3 stream opener for the full outer endpoint timeout.
+The H3 stream-open timeout now covers only the fresh `send_request` call. Concurrent chat endpoint calls therefore cannot queue behind a stale per-origin sender lock, because that lock no longer exists.
 
-The H3 stream-opening lock in `mechanics-http-client/src/http3.rs` was narrowed so it is held only while calling `send_request`. Request body upload, response header receive, and response body read now happen after the lock is released, allowing concurrent H3 streams to the same origin.
+The older cached-sender lock is gone from `mechanics-http-client/src/http3.rs`. Concurrent endpoint calls now open independent H3 connections instead of queueing behind or sharing one per-origin `SendRequest`.
 
-The H3 response path now drains trailers after the DATA frame loop before returning a buffered `Response`. The current caller does not expose response trailers, so they are intentionally discarded, but reading them completes the response stream and keeps the persistent H3 connection in a reusable state for the next mechanics job request.
+The H3 response path now treats DATA EOF as response-body completion and does not wait for optional trailers that are not exposed to callers. This avoids turning a complete response body into a stuck mechanics endpoint future.
+
+The HTTP/3 server request-body adapter similarly treats DATA EOF as request-body completion. The connector router and connector services do not consume request trailers, so this keeps POST bodies flowing through axum and into the upstream connector service instead of waiting forever for a trailer phase that may never arrive.
 
 `mechanics-http-client` now accepts streaming request bodies in addition to empty and replayable byte bodies. The connector router uses that streaming body path, so it no longer has to collect the full request before dialing the connector service. Empty and byte-backed mhc requests remain eligible for opportunistic H3 retry/fallback; non-replayable streaming bodies use the negotiated TCP transport path so the client does not have to replay partially consumed bodies after an H3 failure.
 
@@ -51,10 +55,10 @@ The QUIC/H3 setup path also gained a short connect/setup timeout. This prevents 
 
 ## Intended Behavior
 
-When `bind_h3` is enabled and the H3 listener is reachable, mechanics-worker should use H3 successfully for api-bin connector-router calls. Completed H3 responses should be fully drained before the connection is reused. The embedded connector router should open its upstream connector-service connection without waiting for the entire inbound request body to buffer first, and it should return upstream response headers without waiting for the whole upstream body to finish. Config reloads must not make unrelated connector requests queue behind long-running connector forwarding. When H3 is stale, unreachable, or fails before the request starts, the client should recover quickly and continue over HTTPS. Once a request has begun on H3, the client must not blindly replay it on another transport.
+When `bind_h3` is enabled and the H3 listener is reachable, mechanics-worker should be able to use H3 for connector-router calls, including POST endpoints such as `llm`, without requiring operator-facing knobs or durable deduplication state. H3 should not depend on cross-request connection reuse for correctness; non-first connector-router calls should be fresh at the H3 connection layer so a stale previous QUIC/H3 connection cannot block the router before the `127.0.0.1:3002` upstream dial. Completed request and response DATA streams should be enough to complete the body when trailers are unused. The embedded connector router should open its upstream connector-service connection without waiting for the entire inbound request body to buffer first, and it should return upstream response headers without waiting for the whole upstream body to finish. Config reloads must not make unrelated connector requests queue behind long-running connector forwarding. When H3 is stale, unreachable, or fails before a request starts, the client should recover quickly and continue over HTTPS. Once a request has begun on H3, the client must not blindly replay it on another transport.
 
 The important invariant is that enabling H3 should improve transport options, not make connector-router requests less reliable than HTTPS-only operation.
 
 ## Validation
 
-Focused validation passed for `mechanics-http-client`, and full `./scripts/pre-landing.sh` passed after the H3 client changes. The pre-landing run included the ignored H3 client fixtures. The follow-up trailer-drain, request-streaming forwarder, response-streaming forwarder, and api-server dispatch-lock changes were also covered by focused `./scripts/rust-lint.sh` and `./scripts/rust-test.sh` runs for the affected crates, plus another successful `./scripts/pre-landing.sh`.
+Focused validation passed for `mechanics-http-client`, and full `./scripts/pre-landing.sh` passed after the H3 client changes. The pre-landing run included the ignored H3 client fixtures. The follow-up request/response trailer-wait removal, disposable H3 connection change, request-streaming forwarder, response-streaming forwarder, and api-server dispatch-lock changes were also covered by focused `./scripts/rust-lint.sh` and `./scripts/rust-test.sh` runs for the affected crates, plus another successful `./scripts/pre-landing.sh`.
