@@ -18,7 +18,8 @@ this file, but never edit this file.
 ## Priority: Maintainability sweep
 
 Sweep through the whole workspace (spawning subagents is
-preferred) for maintainability/dirty spagetti code issues.
+preferred) for maintainability issues, dirty/spagetti codes,
+and quality issues (e.g. memory leaks, etc.).
 
 Refactor codes to make the code structured, small, de-duplicated.
 Fixing the actual bugs mid-run is okay; don't change the bahavior
