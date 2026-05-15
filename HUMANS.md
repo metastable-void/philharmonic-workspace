@@ -26,8 +26,8 @@ otherwise.
 
 This is done by Yuka's direct Codex dispatch.
 
-After it is fully completed, continue to Tier-2 connectors
-(DNS + SMTP).
+After it is fully completed, Claude Code continues to Tier-2
+connectors (DNS + SMTP).
 
 ## HTTP/3 support notes
 
