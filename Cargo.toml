@@ -8,6 +8,7 @@ members = [
     "mechanics-core",
     "mechanics",
     "mechanics-http-client",
+    "mechanics-dns",
     "mechanics-h3-quinn",
     "philharmonic",
     "philharmonic-policy",
@@ -40,8 +41,8 @@ members = [
     #     overhead. Precedent: `mechanics-h3-quinn` (listed
     #     above among submodule members for grouping; in-tree
     #     non-submodule + published, maintained via the
-    #     `vendor-upstream` xtask). Planned: `mechanics-dns`
-    #     (ROADMAP §3.L / D26).
+    #     `vendor-upstream` xtask) and `mechanics-dns` (shared
+    #     resolver policy for mechanics runtime crates).
     "bins/mechanics-worker",
     "bins/philharmonic-connector",
     "bins/philharmonic-api-server",
@@ -76,6 +77,7 @@ philharmonic-connector-impl-api = { path = "philharmonic-connector-impl-api" }
 inline-blob = { path = "inline-blob" }
 philharmonic-connector-impl-dns = { path = "philharmonic-connector-impl-dns" }
 mechanics-http-client = { path = "mechanics-http-client" }
+mechanics-dns = { path = "mechanics-dns" }
 mechanics-h3-quinn = { path = "mechanics-h3-quinn" }
 mechanics-http-server = { path = "mechanics-http-server" }
 dockerlet = { path = "dockerlet" }

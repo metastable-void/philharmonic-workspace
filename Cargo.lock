@@ -3041,6 +3041,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "mechanics-dns"
+version = "0.1.0"
+dependencies = [
+ "hickory-resolver",
+ "thiserror 2.0.18",
+]
+
+[[package]]
 name = "mechanics-h3-quinn"
 version = "0.0.10"
 dependencies = [
@@ -3062,13 +3070,13 @@ dependencies = [
  "bytes",
  "flate2",
  "h3",
- "hickory-resolver",
  "http",
  "http-body",
  "http-body-util",
  "hyper",
  "hyper-rustls",
  "hyper-util",
+ "mechanics-dns",
  "mechanics-h3-quinn",
  "quinn",
  "rustls",
@@ -3076,6 +3084,7 @@ dependencies = [
  "serde_json",
  "thiserror 2.0.18",
  "tokio",
+ "tower-service",
  "webpki-roots 1.0.7",
  "wiremock",
 ]

@@ -184,20 +184,20 @@ pending):
   `mechanics-http-client` and `mechanics-http-server` via
   the cargo `package = "mechanics-h3-quinn"` rename so
   consumer code keeps writing `use h3_quinn::*`.
-- **`mechanics-dns`** *(planned, ROADMAP §3.L)* —
+- **`mechanics-dns`** —
   hickory-resolver wrapper with the shared
   [Cloudflare fallback resolver set](08-connector-architecture.md#cloudflare-fallback-resolver-set)
-  for `/etc/resolv.conf` ENOENT. Provides HTTPS-RR lookup
-  + A/AAAA lookup APIs; `IN`-class only. Same in-tree
+  for `/etc/resolv.conf` ENOENT. Provides generic DNS
+  query, HTTPS-RR lookup, and A/AAAA lookup APIs;
+  `IN`-class only. Same in-tree
   non-submodule + published shape as `mechanics-h3-quinn`
   (lives at `./mechanics-dns/` in the parent repo; no
-  separate git submodule lifecycle). To be consumed by
-  `mechanics-http-client` (replacing its `tokio::net::
-  lookup_host` and its inline `hickory_resolver::
-  TokioResolver` calls) and by
+  separate git submodule lifecycle). Consumed by
+  `mechanics-http-client` (replacing its previous
+  `tokio::net::lookup_host` and inline
+  `hickory_resolver::TokioResolver` calls) and by
   `philharmonic-connector-impl-dns` (D19) when D19
-  dispatches. Not yet created; D26 spec lives at
-  ROADMAP §3.L.
+  dispatches. Added 2026-05-15 under ROADMAP §3.L / D26.
 
 ### API and meta
 
@@ -240,13 +240,7 @@ mechanics-core                    → mechanics-config, boa_engine
 mechanics (bin)                   → mechanics-core
 
 mechanics-dns                     → hickory-resolver
-                                    (planned ROADMAP §3.L — not
-                                    yet created)
 mechanics-http-client             → mechanics-dns
-                                    (planned post §3.L; today the
-                                    client embeds the hickory call
-                                    inline + uses tokio's libc
-                                    lookup_host for A/AAAA)
 
 philharmonic-policy               → philharmonic-types,
                                     philharmonic-store

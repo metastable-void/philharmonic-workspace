@@ -22,7 +22,8 @@ active work now lives in the post-v1 dispatch plan (§3 below).
   server-integration + streaming), D23 (`dockerlet` replaces
   testcontainers), D24 (workspace-wide
   `default-features = false` audit), D25 (mhc hickory CVE
-  bump). Plus the `mechanics-h3-quinn` in-tree vendored fork,
+  bump), D26 (`mechanics-dns` extraction + mhc resolver
+  migration). Plus the `mechanics-h3-quinn` in-tree vendored fork,
   generic `vendor-upstream` xtask, `check-no-registry`
   workspace-hardening guard, and dev-profile
   incremental-build disable. Per-crate version state and
@@ -35,9 +36,8 @@ active work now lives in the post-v1 dispatch plan (§3 below).
   [`docs/codex-reports/2026-05-15-0001-h3-client-stability.md`](codex-reports/2026-05-15-0001-h3-client-stability.md).
 - **Pending**: Tier 2 = D7 (SMTP) + D19 (DNS), dispatched
   as one batch. Tier 3 = D8 (Anthropic) + D9 (Gemini),
-  dispatched separately later. Plus D26 (§3.L below) =
-  new `mechanics-dns` crate + mhc resolver migration;
-  dispatches independently of the Tier-2 batch.
+  dispatched separately later. D26 (§3.L below) is done;
+  D19 consumes the landed `mechanics-dns` resolver layer.
   **Gated** on the Audit & refactor sweep (§3.K below)
   reaching its done-state; Claude Code resumes
   prompt-and-dispatch work only after Yuka signals the
@@ -402,7 +402,20 @@ Slices 1 + 2 landed 2026-05-15 (server-side bin-thinning +
 HTTPS/HTTP-3 listener extraction):
 [archive](archive/2026-05-15-roadmap-audit-refactor-slices-1-2.md).
 
-### L. `mechanics-dns` extraction + mhc resolver migration (1 dispatch)
+### L. `mechanics-dns` extraction + mhc resolver migration (1 dispatch) — DONE
+
+DONE 2026-05-15. D26 scaffolded the in-tree `mechanics-dns`
+crate and migrated `mechanics-http-client`'s HTTPS-RR lookup,
+HTTP/3 socket-address fallback, and hyper-util h1/h2/HTTPS
+connector resolver onto it. `mechanics-dns` exposes IN-class
+generic DNS query, HTTPS RR, A, AAAA, combined IP, and
+socket-address lookup helpers. It loads the host resolver
+configuration when present,
+falls back to the documented Cloudflare resolver set only on
+missing `/etc/resolv.conf`, and surfaces other system-config
+failures during resolver construction. See
+[`docs/codex-reports/2026-05-15-0005-mechanics-dns-extraction.md`](codex-reports/2026-05-15-0005-mechanics-dns-extraction.md)
+for implementation notes.
 
 The current `mechanics-http-client` is fragile on hosts
 without `/etc/resolv.conf` (typical in distroless / scratch
@@ -422,6 +435,7 @@ list shouldn't live in two places.
   `mechanics-h3-quinn`: in-tree, no git submodule, but
   published to crates.io so external consumers of mhc /
   the D19 connector resolve it normally). Library API:
+  - Generic DNS query support for connector-impl-dns
   - HTTPS-RR lookup
   - A / AAAA lookup
   - `IN`-class only
@@ -438,11 +452,9 @@ list shouldn't live in two places.
   hosts becomes "use the Cloudflare set" instead of
   "fail."
 
-  Dispatches independently of the Tier-2 batch. When D19
-  later dispatches it consumes `mechanics-dns` directly
-  rather than re-implementing the fallback. If D26 hasn't
-  landed before the Tier-2 batch is dispatched, D19 takes
-  on the crate-creation work as a sub-task.
+  Dispatches independently of the Tier-2 batch. D19 now
+  consumes `mechanics-dns` directly rather than
+  re-implementing the fallback.
 
 ### Suggested sequencing
 
@@ -451,8 +463,6 @@ Codex dispatch). Gates §3.B.
 
 **Next dispatchable (post-sweep)**: Tier-2 batch = D7 + D19,
 dispatched together. Tier 3 (D8 + D9) follows separately.
-D26 (§3.L) is independent of the Tier-2 batch and can
-dispatch at any time after the sweep.
 
 - **D7** (`philharmonic-connector-impl-email-smtp`, Tier 2)
   — `email_send` wire shape locked in
@@ -462,15 +472,8 @@ dispatch at any time after the sweep.
   fully spec'd from
   [`docs/design/08-connector-architecture.md` §DNS](design/08-connector-architecture.md#dns),
   setup-unblocked 2026-05-12 (submodule wired, crates.io
-  `0.0.0` placeholder published). Consumes
-  `mechanics-dns` for the resolver layer if D26 has
-  landed; otherwise creates `mechanics-dns` as a
-  sub-task. Prompt draft ready.
-- **D26** (`mechanics-dns` extraction + mhc resolver
-  migration, §3.L) — new in-tree non-submodule published
-  crate; mhc loses its `tokio::net::lookup_host` + inline
-  hickory call sites in favour of `mechanics-dns`.
-  Independent of the Tier-2 batch; spec'd in §3.L.
+  `0.0.0` placeholder published). Consumes the landed
+  `mechanics-dns` resolver layer. Prompt draft ready.
 - **D8** (`philharmonic-connector-impl-llm-anthropic`,
   Tier 3) — fully spec'd from
   [`docs/design/08-connector-architecture.md` §llm_anthropic](design/08-connector-architecture.md#llm_anthropic--config);

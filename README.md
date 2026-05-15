@@ -47,6 +47,7 @@ philharmonic-workspace/
 ├── philharmonic-store/                        # submodule
 ├── philharmonic-store-sqlx-mysql/             # submodule
 ├── mechanics-config/                          # submodule
+├── mechanics-dns/                             # in-tree runtime crate
 ├── mechanics-http-client/                     # submodule
 ├── mechanics-http-server/                     # submodule
 ├── mechanics-core/                            # submodule
@@ -84,9 +85,12 @@ English-only rule per [`CONTRIBUTING.md §14.6`](CONTRIBUTING.md#146-english-as-
 `philharmonic-store-sqlx-mysql`.
 
 **Execution substrate:** `mechanics-config`, `mechanics-core`,
-`mechanics`, `mechanics-http-client` (workspace's outbound
-HTTP client; hyper-rustls + webpki-roots + aws-lc-rs;
-opportunistic HTTP/3 via the optional `http3` feature),
+`mechanics`, `mechanics-dns` (shared resolver policy: system
+configuration, Cloudflare fallback on missing `/etc/resolv.conf`,
+generic DNS / HTTPS RR / A / AAAA lookups), `mechanics-http-client`
+(workspace's outbound HTTP client; hyper-rustls + webpki-roots
++ aws-lc-rs; opportunistic HTTP/3 via the optional `http3`
+feature),
 `mechanics-http-server` (opportunistic HTTP/3 listener +
 Alt-Svc tower middleware that sits alongside the existing
 TCP+TLS HTTP/1.1+HTTP/2 path; added 2026-05-13 for D22).
@@ -131,6 +135,14 @@ workspace's TLS posture. Maintained via the
 hand-written `Cargo.toml` is preserved across re-vendor;
 `src/` is overwritten from upstream tarballs.
 
+**In-tree runtime crate (publishable, not a submodule):**
+`mechanics-dns` — reusable DNS resolver layer shared by
+`mechanics-http-client` and the planned DNS connector. It
+centralises the Cloudflare fallback resolver set used only when
+`/etc/resolv.conf` is absent, and exposes IN-class HTTPS RR,
+A, AAAA, generic DNS query, combined IP, and socket-address
+lookup helpers.
+
 **In-tree workspace tooling (not published, not a submodule):**
 `xtask` — multi-bin crate for dev tools written in Rust. Bins are
 auto-discovered from `xtask/src/bin/*.rs`; run with
@@ -164,7 +176,8 @@ polling), D18 (mechanics-core 0.6 module surface:
 filtering), D22 (HTTP/3 client + server + streaming), D23
 (`dockerlet` replacing testcontainers), D24
 (`default-features = false` audit), D25 (mhc hickory CVE
-bump). Plus the in-tree vendored `mechanics-h3-quinn`, the
+bump), D26 (`mechanics-dns` extraction + mhc resolver
+migration). Plus the in-tree vendored `mechanics-h3-quinn`, the
 generic `vendor-upstream` xtask, `check-no-registry`
 workspace-hardening guard, and dev-profile incremental-build
 disable. Per-crate version state and release notes live in
@@ -176,7 +189,8 @@ detail at
 [`docs/codex-reports/2026-05-15-0001-h3-client-stability.md`](docs/codex-reports/2026-05-15-0001-h3-client-stability.md)).
 
 **Remaining post-v1**: D7 SMTP, D8 Anthropic, D9 Gemini, D19
-DNS (Tier 2/3 connectors — independent + parallel-safe).
+DNS (Tier 2/3 connectors — independent + parallel-safe; D19
+now consumes `mechanics-dns` for resolver policy).
 
 §3.J production-security cleanup arc closed 2026-05-14. Banned-
 dep posture: `pyo3` / `maturin` / `openssl-sys` / `native-tls` /
@@ -190,7 +204,7 @@ Per-arc done-state snapshots + daily-log history in
 [`docs/archive/`](docs/archive/); Codex prompt archives in
 [`docs/codex-prompts/`](docs/codex-prompts/).
 
-All 29 published-crate names are reserved on crates.io.
+The original 29 published-crate names are reserved on crates.io.
 Foundational, API, connector-triangle, and Phase 6/7 Tier 1
 implementation crates have published substantive releases at
 `0.1.0` or higher. The remaining connector names
@@ -200,8 +214,9 @@ implementation crates have published substantive releases at
 `philharmonic-connector-impl-dns`) are published placeholders
 at `0.0.x` until their implementations land.
 `mechanics-h3-quinn 0.0.10` is the workspace's first in-tree
-non-submodule vendored fork. Per-crate version history lives
-in each crate's `CHANGELOG.md`.
+non-submodule vendored fork; `mechanics-dns 0.1.0` is the first
+in-tree non-submodule shared runtime helper crate. Per-crate
+version history lives in each crate's `CHANGELOG.md`.
 
 ## Working in the repo
 

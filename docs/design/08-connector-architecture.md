@@ -1462,12 +1462,14 @@ otherwise-permitted allowlisted zone.
 
 #### Implementation library
 
-`hickory-resolver` (formerly `trust-dns-resolver`) in
-system-config mode. Pure-Rust, async, no `unsafe`,
-parses `/etc/resolv.conf` natively. No DoH / DoT in v1
-— if the host system is configured to use those at the
-OS level (e.g. systemd-resolved with DNSOverTLS=yes),
-the stub-resolver path picks that up transparently.
+`mechanics-dns`, backed by `hickory-resolver` (formerly
+`trust-dns-resolver`) in system-config mode. Pure-Rust,
+async, no `unsafe`, parses `/etc/resolv.conf` natively,
+and shares the same ENOENT fallback semantics used by
+`mechanics-http-client`. No DoH / DoT in v1 — if the host
+system is configured to use those at the OS level (e.g.
+systemd-resolved with DNSOverTLS=yes), the stub-resolver
+path picks that up transparently.
 
 ### Embedding and vector search
 

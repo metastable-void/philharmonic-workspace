@@ -2278,6 +2278,103 @@ the operational check for [§Bins are thin](../docs/design/02-design-principles.
   more workflow-specific knowledge to the framework crates
   on edits there.
 
+### 10.15 Host-file dependencies: operator input or explicit fallback
+
+Runtime code (every crate that ships in a production
+deployment — libraries plus the three `bins/*` crates and
+their transitive deps) MUST NOT depend on a host file at
+a hardcoded path **implicitly**. Two acceptable shapes:
+
+- **Operator-given path.** The path comes from a CLI flag,
+  a config field, or an operator-set runtime parameter.
+  The code surfaces a useful error if the file is missing;
+  the operator chose the path and is responsible for it.
+- **Explicit fallback.** The code reads a default
+  location, but handles `ENOENT` by falling back to a
+  documented in-process default — e.g. the
+  [Cloudflare fallback resolver set](../docs/design/08-connector-architecture.md#cloudflare-fallback-resolver-set)
+  when `/etc/resolv.conf` is missing (see ROADMAP §3.L).
+
+Forbidden: a hardcoded `/etc/...` (or `/var/...`,
+`/usr/share/...`, etc.) read with no fallback and no
+operator-given alternative. **Why.** Production targets
+`x86_64-unknown-linux-musl` shipped in minimal-base /
+distroless / scratch container images where common
+`/etc/...` files may not exist. The resulting failure is
+one of: `getaddrinfo` silently returning empty, an opaque
+libc error, or a hard panic — depending on the call site
+— and each shape is hard to diagnose from logs.
+
+**Indirect reads are in scope.** Code that reaches the
+filesystem through libc inherits whatever files musl
+consults internally. Concrete examples we've audited
+(2026-05-15):
+
+- `getaddrinfo` (via `tokio::net::lookup_host`, hyper's
+  default connector, anything that resolves a hostname) →
+  reads `/etc/hosts` and `/etc/resolv.conf`. Also reads
+  `/etc/services` when the *port* argument is a service
+  name string rather than a number.
+- `getpwuid` / `getpwnam` / `getgrgid` / `getgrnam` (via
+  `whoami`, `users`, `dirs::home_dir` fallback path,
+  `nix::unistd::*`) → reads `/etc/passwd` / `/etc/group`.
+- `localtime` / `mktime` / `tzset` (via `chrono::Local::*`,
+  `time::OffsetDateTime::now_local()`, anything that
+  resolves the "local" zone) → reads `/etc/localtime` and
+  `/usr/share/zoneinfo/<zone>` when `TZ` is unset or a
+  named zone.
+- `getservbyname` / `getservbyport` → reads `/etc/services`.
+
+Practical consequences for runtime code today:
+
+- **Network**: bind / connect to **numeric ports**, never
+  service names. Resolve hostnames through `mechanics-dns`
+  once D26 lands (it carries the operator-fallback
+  contract); until then, treat `tokio::net::lookup_host`
+  call sites as a tracked debt that ROADMAP §3.L is
+  remediating.
+- **Time**: use `chrono::Utc::*` for runtime timestamps
+  (no system file reads). When a JST or other named-zone
+  rendering is needed, use `chrono_tz` (data bundled at
+  compile time), never `chrono::Local`.
+- **Identity**: don't call `getpwuid` / `getpwnam` /
+  similar from runtime code. The deployment shape doesn't
+  carry `/etc/passwd`; identity comes from the request
+  context, not the host user. Direct `libc::geteuid()` /
+  `libc::getuid()` are fine — they're syscalls, not file
+  reads.
+- **Locale**: not used today; if locale-aware behaviour
+  is ever needed, the data must be bundled at compile
+  time. musl's locale layer is minimal compared to
+  glibc's anyway.
+
+**Scope: runtime only.** This rule does NOT apply to:
+
+- `xtask/` (workspace dev tooling — see §8).
+- `scripts/` (POSIX-sh orchestration — see §6).
+- `dockerlet/` (dev-tooling for tests).
+- `build.rs` (build-time code; the host running `cargo
+  build` is allowed to differ from the deployment host).
+- `tests/` directories, `dev-dependencies`, and example
+  binaries.
+
+These exempt categories may freely read `/etc/...`,
+`/proc/...` (subject to the separate non-POSIX rule for
+scripts), `/usr/share/...`, and other host paths because
+they don't ship in production container images.
+
+**Workspace state at the time this rule was written
+(2026-05-15).** One outstanding runtime violation: mhc's
+`tokio::net::lookup_host` paths. ROADMAP §3.L / D26 is
+the in-flight remediation (extracts `mechanics-dns` with
+the Cloudflare fallback contract; mhc migrates to it).
+After D26 the workspace has no known runtime violations
+and runs cleanly on a musl container with no `/etc/`
+files at all (per the 2026-05-15 libc-file-expectations
+audit summarised in `docs/notes-to-humans/` if recorded).
+New runtime code introduced after D26 that breaks this
+rule should be pushed back at code-review time.
+
 ---
 
 ## 11. Pre-landing checks

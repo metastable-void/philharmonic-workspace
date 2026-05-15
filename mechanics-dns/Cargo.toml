@@ -1,0 +1,25 @@
+[package]
+name = "mechanics-dns"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.88"
+authors = ["metastable-void"]
+description = "Reusable DNS resolver helpers for Mechanics runtime crates, including HTTPS RR and Cloudflare fallback-on-ENOENT support."
+license = "Apache-2.0 OR MPL-2.0"
+readme = "README.md"
+repository = "https://github.com/metastable-void/mechanics-dns"
+homepage = "https://github.com/metastable-void/mechanics-dns"
+keywords = ["dns", "resolver", "https-rr", "mechanics"]
+categories = ["network-programming"]
+
+[dependencies]
+hickory-resolver = { version = "0.26.1", default-features = false, features = ["system-config", "tokio"] }
+thiserror = { version = "2", default-features = false, features = ["std"] }
+
+[profile.release]
+opt-level = 3
+lto = true
+strip = true
+codegen-units = 1
+panic = "abort"
+overflow-checks = true
