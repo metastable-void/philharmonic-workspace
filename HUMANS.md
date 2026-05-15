@@ -15,7 +15,9 @@ this file, but never edit this file.
   workspace repo into a reusable template/Rust crate/etc.
   this can happen after the MVP work is done.
 
-## Priority: Maintainability sweep
+## Priority: Audit & refactor
+
+### Maintainability sweep
 
 Sweep through the whole workspace (spawning subagents is
 preferred) for maintainability issues, dirty/spaghetti codes,
@@ -25,7 +27,7 @@ Refactor codes to make the code structured, small, de-duplicated.
 Fixing the actual bugs mid-run is okay; don't change the bahavior
 otherwise.
 
-**Clean separation of concerns**:
+### Clean separation of concerns
 
 - Unpublished bin crates should be minimal;
   **they own Clap CLI** (that should not be upstreamed),
@@ -35,6 +37,8 @@ otherwise.
   a workflow knowledge; the framework in principle should
   not know anything about the workflows, but it's really
   useful for testing.
+
+### Methodology
 
 This is done by Yuka's direct Codex dispatch.
 

@@ -1681,11 +1681,12 @@ What this looks like in practice:
   pre-extract abstractions speculatively — that's the
   opposite failure mode (premature generalization).
 - **Refactor in-place, behavior-preserving.** Per HUMANS.md
-  §"Priority: Maintainability sweep", refactors don't change
-  behavior unless the refactor reveals an actual bug
-  (memory leak, deadlock, race, off-by-one). Fixing
-  bugs-encountered-mid-refactor is fine and encouraged; gold-
-  plating or "while I'm here" feature work is not.
+  §"Priority: Audit & refactor" → Maintainability sweep,
+  refactors don't change behavior unless the refactor
+  reveals an actual bug (memory leak, deadlock, race,
+  off-by-one). Fixing bugs-encountered-mid-refactor is fine
+  and encouraged; gold-plating or "while I'm here" feature
+  work is not.
 - **Don't ship to escape a review cycle.** If a fix needs a
   rebuild before it lands, that's the cost. The workspace's
   pre-landing-then-commit discipline (§11, §12.5) is the floor,
@@ -1704,8 +1705,8 @@ What this looks like in practice:
   design-then-implement split is the workspace's mechanism
   for sustaining quality at agent-coding velocity; bypassing
   it because "this is small" or "I can fix it faster myself"
-  accumulates exactly the spaghetti the §"Maintainability
-  sweep" directive in HUMANS.md asks us to undo.
+  accumulates exactly the spaghetti the §"Priority: Audit &
+  refactor" directive in HUMANS.md asks us to undo.
 
 When in doubt, slow down. The 2026-05-15 H3 stability
 follow-on (mhc 0.2.4 / mhs 0.1.4) and the parallel
@@ -1723,10 +1724,17 @@ Cross-references:
 
 - [`CLAUDE.md`](CLAUDE.md) and [`AGENTS.md`](AGENTS.md) both
   carry pointers to this section.
-- [`HUMANS.md`](HUMANS.md) §"Priority: Maintainability sweep"
-  is the workspace's current operational priority while v1 is
-  in stabilization. Section 10.0 here is the long-term
-  posture; the maintainability-sweep is the short-term
+- [`HUMANS.md`](HUMANS.md) §"Priority: Audit & refactor" is
+  the workspace's current operational priority while v1 is in
+  stabilization. It has two named sub-directives:
+  **Maintainability sweep** (refactor for structured / small /
+  deduplicated code; fix bugs encountered mid-run; no other
+  behaviour change) and **Clean separation of concerns**
+  (unpublished bin crates are thin — see §10.14 below). The
+  sweep is done by Yuka's direct Codex dispatch; after it
+  fully completes, the next planned work is Tier-2 connectors
+  (D7 SMTP, D19 DNS) per ROADMAP §3.B. Section 10.0 here is
+  the long-term posture; Audit & refactor is the short-term
   application.
 
 ### 10.1 Edition and MSRV
@@ -2251,6 +2259,63 @@ bins do.
 
 See [§12.5 Publish checklist](#125-publish-checklist) for
 why pre-landing is non-negotiable before any publish.
+
+### 10.14 Unpublished bin crates: minimal CLI, logic in libraries
+
+**Rule.** Bin crates under `bins/` (which all carry
+`publish = false` and are workspace-only by intent) own
+their Clap CLI types and the `main()` orchestration glue.
+Anything else — request lowering, signal handling, config
+shape transformations, runtime wiring, business logic —
+lives in a library crate; the bin reduces to argument
+parsing, config loading, building the library's runtime
+handle, and handing off to it. When no existing library
+fits, create one rather than growing the bin.
+
+This is the discipline-level corollary of
+[`docs/design/02-design-principles.md` §Bins are thin](../docs/design/02-design-principles.md#bins-are-thin).
+The design doc states the principle; this section is the
+operational check.
+
+**Why.** Bins are deliberately unpublished. Implementation
+in a bin is implementation through a side door —
+undeclarable to external consumers, off the SemVer release
+ladder, and unreachable from external integration tests. It
+also tends to accumulate: a bin module is the path of
+least resistance, and the workspace has repeatedly grown
+files under `bins/*/src/` that any second consumer would
+have to copy-paste. The
+[`HUMANS.md`](HUMANS.md) §"Priority: Audit & refactor" →
+Clean separation of concerns directive calls this out
+explicitly.
+
+**The discipline.**
+
+- Before adding a new module to a `bins/*/src/` tree, ask:
+  could anything else (a future bin variant, an integration
+  test, a downstream embedder) want this? If yes, the
+  module belongs in a library.
+- Clap derive types (`#[derive(Args)]`, `#[derive(Subcommand)]`)
+  stay in the bin. CLI surfaces are intentionally per-bin
+  — flags, env-var names, signal handling differ across
+  deployment shapes.
+- Shared CLI scaffolding that generalizes across bins
+  already lives in [`philharmonic/src/server/`](../philharmonic/src/server/)
+  (`cli`, `config`, `install`, `keygen`, `reload`); new
+  shared CLI pieces belong there or in a sibling module.
+- When extracting a bin module to a library, follow the
+  workspace's submodule + new-crate pattern (see
+  [`./scripts/new-submodule.sh`](../scripts/new-submodule.sh)
+  and the [Codex gate](CLAUDE.md#claude-vs-codex-division-of-labour)).
+  Don't extract speculatively — extract when a second
+  consumer materialises or when the audit sweep visits the
+  module.
+- Some current bin contents (e.g.
+  `bins/philharmonic-api-server/src/lowerer.rs`,
+  `embed_job.rs`, `executor.rs`, `scope.rs`) predate this
+  rule. They are extraction candidates under the Audit &
+  refactor sweep — not a current style violation that
+  blocks landing other work, but a tracked debt.
 
 ---
 

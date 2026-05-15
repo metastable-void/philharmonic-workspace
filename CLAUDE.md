@@ -58,12 +58,19 @@ preserving; route substantive changes through the Codex gate
 even when "small" feels tempting. The umbrella rule lives at
 [`CONTRIBUTING.md §10.0`](CONTRIBUTING.md#100-posture-maintainability-over-fast-coding);
 the current operational application is
-[`HUMANS.md`](HUMANS.md) §"Priority: Maintainability sweep"
-(workspace sweep underway by Yuka's direct Codex dispatch
-while v1 stabilises). When in doubt, slow down. The H3
-stability work in mid-May 2026 was fundamentally diagnosis,
-not coding; every shipping-fast-to-escape-diagnosis detour
-had to be unpicked.
+[`HUMANS.md`](HUMANS.md) §"Priority: Audit & refactor"
+(workspace audit + refactor underway by Yuka's direct Codex
+dispatch while v1 stabilises; two named sub-directives —
+Maintainability sweep and Clean separation of concerns —
+the latter is operationalised at
+[`CONTRIBUTING.md §10.14`](CONTRIBUTING.md#1014-unpublished-bin-crates-minimal-cli-logic-in-libraries)
+and the design principle
+[`docs/design/02-design-principles.md` §Bins are thin](docs/design/02-design-principles.md#bins-are-thin)).
+After the sweep fully completes, Claude Code continues to
+Tier-2 connectors (D7 SMTP, D19 DNS). When in doubt, slow
+down. The H3 stability work in mid-May 2026 was
+fundamentally diagnosis, not coding; every shipping-fast-
+to-escape-diagnosis detour had to be unpicked.
 
 ## Hard stops before doing anything
 

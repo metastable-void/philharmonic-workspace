@@ -194,7 +194,16 @@ pending):
 - **In-tree binaries** (under `bins/`, never published):
   `philharmonic-api-server`, `philharmonic-connector`
   (deployment connector binary), and the workspace-internal
-  `xtask/` crate.
+  `xtask/` crate. Under
+  [`02-design-principles.md` §Bins are thin](02-design-principles.md#bins-are-thin)
+  these own only their Clap CLI types and `main()` glue;
+  substantive implementation lives in libraries. Current
+  contents that predate the principle (e.g.
+  `bins/philharmonic-api-server/src/lowerer.rs`,
+  `embed_job.rs`, `executor.rs`, `scope.rs`) are
+  candidates for extraction into library crates during the
+  Audit & refactor sweep (`HUMANS.md §Priority: Audit &
+  refactor`).
 
 ### Naming history
 
@@ -265,11 +274,11 @@ philharmonic-api                  → philharmonic-types,
 bins/philharmonic-api-server      → philharmonic-api,
                                     philharmonic-connector-router,
                                     mechanics-config
-                                    (lowerer lives here; assembles
-                                    {realm, impl, config} from
-                                    plaintext implementation slot
-                                    and decrypted SCK blob, then
-                                    calls connector-client primitives)
+                                    (lowerer / embed-job /
+                                    executor / scope currently live
+                                    here; Audit & refactor sweep
+                                    extracts them into libraries —
+                                    see "Bins are thin" principle)
 
 bins/philharmonic-connector       → philharmonic-connector-service,
                                     philharmonic-connector-impl-*

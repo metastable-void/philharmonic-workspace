@@ -94,6 +94,41 @@ This is enforced by making the information structurally unavailable:
 the substrate has no vocabulary for "workflow instance"; the
 executor receives jobs with no instance ID in the protocol.
 
+## Bins are thin
+
+Unpublished bin crates under `bins/` own their Clap CLI types and
+the `main()` orchestration glue, but no substantive logic.
+Anything reusable — request lowering, signal handling, config-
+shape transformations, runtime wiring — lives in a library crate;
+the bin reduces to argument parsing, config loading, building the
+library's runtime handle, and handing off to it. New library
+crates are created if the logic doesn't fit an existing one.
+
+**Why.** Bins under `bins/` are deliberately unpublished
+(`publish = false`). Logic that lives there is invisible to
+external consumers, skips the SemVer release discipline the
+library crates enforce, and isn't testable from outside the
+workspace. Putting implementation in a bin is shipping code
+through a side door — undeclarable, unanchored to a versioned
+boundary, and a magnet for the kind of spaghetti the maintainability
+sweep exists to undo.
+
+**Exception.** Clap CLI types (`#[derive(clap::Args)]` etc.) and
+`main()` glue stay in the bin. CLI surfaces are intentionally
+per-deployment-shape — not every consumer of `philharmonic-api`
+wants the same flags, environment-variable layout, or signal map.
+The rule is about implementation logic, not about argument
+parsing. The shared CLI scaffolding that does generalize lives in
+the `philharmonic` meta-crate's `server::cli` module already.
+
+**Consequence.** Some current bin contents (e.g. the lowerer in
+`bins/philharmonic-api-server/src/lowerer.rs`) predate this
+principle and live in the bin. The Audit & refactor sweep
+(`HUMANS.md §Priority: Audit & refactor`) extracts them into
+library crates incrementally as the sweep visits each module.
+`docs/design/03-crates-and-ownership.md` annotates which bin
+contents are anticipated to migrate.
+
 ## Implementation uniformity
 
 All connector implementations are the same kind of thing: Rust code

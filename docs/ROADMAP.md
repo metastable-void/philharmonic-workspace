@@ -40,7 +40,21 @@ active work now lives in the post-v1 dispatch plan (§3 below).
   body-framing + hop-by-hop headers across the mhc-based
   forwarder.
 - **Pending**: D7 / D8 / D9 / D19 (Tier 2/3 connectors —
-  SMTP, Anthropic, Gemini, DNS).
+  SMTP, Anthropic, Gemini, DNS). **Gated** on the Audit &
+  refactor sweep (§3.K below) reaching its done-state;
+  Claude Code resumes Tier-2 dispatches only after Yuka
+  signals the sweep complete.
+- **Priority: Audit & refactor** (in flight via Yuka's
+  direct Codex dispatch, per
+  [`HUMANS.md` §Priority: Audit & refactor](../HUMANS.md)):
+  workspace-wide pass for maintainability issues, dirty /
+  spaghetti code, memory leaks / deadlocks / races, and
+  enforcement of the new "bins are thin" principle
+  ([design/02 §Bins are thin](design/02-design-principles.md#bins-are-thin),
+  operationalised at
+  [CONTRIBUTING.md §10.14](../CONTRIBUTING.md#1014-unpublished-bin-crates-minimal-cli-logic-in-libraries)).
+  Bug-fixes encountered mid-run are landed; no other
+  behaviour change. Tracked under §3.K.
 - **§3.J production-security cleanup arc closed 2026-05-14**:
   D23 + D24 + D25 all done; combined with the
   mechanics-h3-quinn vendor + the `deny.toml` Linux-x86_64
@@ -131,7 +145,8 @@ Done / pending breakdown lives in the
 **Current state** block at the top of this file. Done arcs
 trim to one-line done-pointers below (§3.A, C, D, E, F, G,
 H, I, J); the still-pending §3.B carries the full dispatch
-specs.
+specs. §3.K is the in-flight Audit & refactor priority that
+gates §3.B.
 
 ### A. Embedding datasets (6 dispatches + 1 Gate-1) — DONE
 
@@ -375,10 +390,52 @@ no-wrapper full ban. Per-arc archives at
 and
 [`docs/archive/2026-05-14-roadmap-d24-done.md`](archive/2026-05-14-roadmap-d24-done.md).
 
+### K. Audit & refactor (in flight, Yuka direct Codex dispatch)
+
+Workspace-wide audit + refactor sweep. Per
+[`HUMANS.md` §Priority: Audit & refactor](../HUMANS.md):
+
+- **Maintainability sweep.** Sub-agent / subdirectory pass
+  for spaghetti code, dirty bits, memory leaks, deadlocks,
+  races, and other quality issues. Refactor for structured /
+  small / deduplicated units. Bug-fixes encountered mid-run
+  are landed; no other behaviour change is permitted in the
+  same pass.
+- **Clean separation of concerns.** Unpublished bin crates
+  under `bins/` are reduced to Clap CLI + `main()` glue;
+  substantive logic moves into library crates (existing or
+  new). Discipline rule:
+  [`CONTRIBUTING.md §10.14`](../CONTRIBUTING.md#1014-unpublished-bin-crates-minimal-cli-logic-in-libraries).
+  Design principle:
+  [`docs/design/02-design-principles.md` §Bins are thin](design/02-design-principles.md#bins-are-thin).
+  Current extraction candidates flagged in
+  [`docs/design/03-crates-and-ownership.md`](design/03-crates-and-ownership.md):
+  `bins/philharmonic-api-server/src/lowerer.rs`,
+  `embed_job.rs`, `executor.rs`, `scope.rs`. The Chat UI
+  question (chats are workflow knowledge, not framework
+  knowledge — testing usefulness vs. framework purity) is
+  flagged for later decision; no action this pass.
+
+**Dispatch model.** This arc is not driven by Claude's
+prompt-and-dispatch flow (no `docs/codex-prompts/` archives).
+Yuka spawns Codex directly, scoping each pass herself; Claude
+Code maintains the docs in step (this file, CONTRIBUTING.md,
+design docs, CLAUDE.md / AGENTS.md cross-refs) as scope
+shifts. Done-state is whatever Yuka signals.
+
+**Gate on §3.B.** Tier-2 connectors (D7 SMTP, D8 Anthropic,
+D9 Gemini, D19 DNS) are dispatchable only after Yuka signals
+this sweep complete. Until then, Claude Code's connector
+work is limited to docs / design / prompt-drafting; no
+substantive coding dispatch lands.
+
 ### Suggested sequencing
 
-**Next dispatchable**: D7 / D8 / D9 / D19 (Tier 2/3
-connectors; all four independent + parallel-safe).
+**Currently in flight**: §3.K Audit & refactor (Yuka direct
+Codex dispatch). Gates §3.B.
+
+**Next dispatchable (post-sweep)**: D7 / D8 / D9 / D19
+(Tier 2/3 connectors; all four independent + parallel-safe).
 
 - **D7** (`philharmonic-connector-impl-email-smtp`,
   Tier 2) — `email_send` wire shape locked in
