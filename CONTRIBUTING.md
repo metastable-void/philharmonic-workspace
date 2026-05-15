@@ -1644,12 +1644,21 @@ and commit. Never regenerate.
 
 ## 10. Rust code conventions
 
-### 10.0 Posture: maintainability over speed
+### 10.0 Posture: maintainability over fast coding
 
-**Default to slow, careful, structured code; never trade
-maintainability for keystrokes.** Every §10 subsection below
-is specific guidance; this is the umbrella principle that
-applies even when a specific rule hasn't been written down.
+**Default to slow, careful, structured authorship; never trade
+maintainability for keystrokes.** This is about *coding
+velocity*, not the runtime behaviour of what you write —
+**runtime speed remains a first-class goal** (the workspace
+targets musl + LTO release builds, `[profile.dev.package."*"]
+opt-level = 3` for fast local iteration, opportunistic HTTP/3,
+aws-lc-rs assembly fast paths, etc.). The thing being
+deprioritised here is the *time to commit* — typing fast,
+skipping diagnosis, shipping the first plausible fix, copying
+a pattern instead of reading the existing one. Every §10
+subsection below is specific guidance; this is the umbrella
+principle that applies even when a specific rule hasn't been
+written down.
 
 What this looks like in practice:
 
