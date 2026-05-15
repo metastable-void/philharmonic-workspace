@@ -1332,16 +1332,32 @@ configured to do for normal-process DNS.
 **Resolv.conf fallback.** When `/etc/resolv.conf` is
 absent (`ENOENT`) — a normal situation in minimal-base
 container images, distroless containers, and some scratch
-deployments — the impl falls back to a fixed set of
-Cloudflare public resolvers:
-`2606:4700:4700::1111`, `2606:4700:4700::1001`,
-`1.1.1.1`, `1.0.0.1`. The fallback fires only on ENOENT;
-any other read error (permission denied, malformed file,
-I/O error) surfaces as a startup error rather than
-silently falling back. The fallback list is hardcoded —
-operators who need a different resolver set should
-provide `/etc/resolv.conf` (or use the host's preferred
-mechanism for installing one).
+deployments — the impl falls back to the
+**Cloudflare fallback resolver set** (see below). The
+fallback fires only on ENOENT; any other read error
+(permission denied, malformed file, I/O error) surfaces
+as a startup error rather than silently falling back.
+The fallback list is hardcoded — operators who need a
+different resolver set should provide `/etc/resolv.conf`
+(or use the host's preferred mechanism for installing one).
+
+##### Cloudflare fallback resolver set
+
+A fixed list of Cloudflare public resolvers used when the
+host doesn't provide `/etc/resolv.conf`:
+
+- `2606:4700:4700::1111`
+- `2606:4700:4700::1001`
+- `1.1.1.1`
+- `1.0.0.1`
+
+This set is shared between the `dns_query` connector
+implementation and `mechanics-http-client`'s own resolver
+path (for HTTPS-RR lookups *and* A/AAAA dial-path
+lookups; see ROADMAP §3.L). Both consume it via the
+shared in-tree crate **`mechanics-dns`** so the fallback
+list, ENOENT semantics, and `IN`-class-only restriction
+live in one place.
 
 All queries are `IN`-class only. Other DNS classes
 (`CH`, `HS`) are not exposed.

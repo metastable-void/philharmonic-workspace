@@ -31,10 +31,17 @@ members = [
     "inline-blob",
     "mechanics-http-server",
     "dockerlet",
-    # In-tree (non-submodule) member crates live below. They're
-    # workspace dev tooling — never published, never consumed by
-    # runtime crates. See `xtask/Cargo.toml` for the current home
-    # of such tooling.
+    # In-tree (non-submodule) member crates live below. Two
+    # sub-categories:
+    # (a) workspace dev tooling / deployment bins — never
+    #     published. `xtask` and the three `bins/*` crates.
+    # (b) published runtime crates that live in-tree rather
+    #     than as a git submodule to skip submodule lifecycle
+    #     overhead. Precedent: `mechanics-h3-quinn` (listed
+    #     above among submodule members for grouping; in-tree
+    #     non-submodule + published, maintained via the
+    #     `vendor-upstream` xtask). Planned: `mechanics-dns`
+    #     (ROADMAP §3.L / D26).
     "bins/mechanics-worker",
     "bins/philharmonic-connector",
     "bins/philharmonic-api-server",

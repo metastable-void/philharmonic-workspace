@@ -35,10 +35,13 @@ active work now lives in the post-v1 dispatch plan (§3 below).
   [`docs/codex-reports/2026-05-15-0001-h3-client-stability.md`](codex-reports/2026-05-15-0001-h3-client-stability.md).
 - **Pending**: Tier 2 = D7 (SMTP) + D19 (DNS), dispatched
   as one batch. Tier 3 = D8 (Anthropic) + D9 (Gemini),
-  dispatched separately later. **Gated** on the Audit &
-  refactor sweep (§3.K below) reaching its done-state;
-  Claude Code resumes the Tier-2 batch only after Yuka
-  signals the sweep complete.
+  dispatched separately later. Plus D26 (§3.L below) =
+  new `mechanics-dns` crate + mhc resolver migration;
+  dispatches independently of the Tier-2 batch.
+  **Gated** on the Audit & refactor sweep (§3.K below)
+  reaching its done-state; Claude Code resumes
+  prompt-and-dispatch work only after Yuka signals the
+  sweep complete.
 - **Priority: Audit & refactor** (in flight): tracked under
   §3.K; per [`HUMANS.md`](../HUMANS.md).
 - **§3.J production-security cleanup arc closed 2026-05-14**:
@@ -126,13 +129,14 @@ The single `(Gate 1)` item is **not** a Codex dispatch — Claude
 drafts the proposal, Yuka reviews per the two-gate crypto-review
 protocol (§2).
 
-Total: **26 Codex dispatches plus 1 Gate-1 proposal.**
+Total: **27 Codex dispatches plus 1 Gate-1 proposal.**
 Done / pending breakdown lives in the
 **Current state** block at the top of this file. Done arcs
 trim to one-line done-pointers below (§3.A, C, D, E, F, G,
-H, I, J); the still-pending §3.B carries the full dispatch
-specs. §3.K is the in-flight Audit & refactor priority that
-gates §3.B.
+H, I, J); the still-pending arcs §3.B (Tier-2 + Tier-3
+connectors) and §3.L (`mechanics-dns` extraction + mhc
+resolver migration) carry the full dispatch specs. §3.K is
+the in-flight Audit & refactor priority that gates §3.B.
 
 ### A. Embedding datasets (6 dispatches + 1 Gate-1) — DONE
 
@@ -398,6 +402,48 @@ Slices 1 + 2 landed 2026-05-15 (server-side bin-thinning +
 HTTPS/HTTP-3 listener extraction):
 [archive](archive/2026-05-15-roadmap-audit-refactor-slices-1-2.md).
 
+### L. `mechanics-dns` extraction + mhc resolver migration (1 dispatch)
+
+The current `mechanics-http-client` is fragile on hosts
+without `/etc/resolv.conf` (typical in distroless / scratch
+container images): its HTTPS-RR lookup uses
+`hickory_resolver::TokioResolver` which errors on
+`read_system_conf` ENOENT, and its h1/h2/HTTPS dial path
+uses `tokio::net::lookup_host` (libc `getaddrinfo`) which
+fails the same way. The D19 DNS connector
+([§3.B](#b-phase-7-tier-23-connector-implementations-4-dispatches))
+is spec'd to fall back to Cloudflare resolvers on ENOENT;
+mhc currently isn't. Both need the same behaviour, and the
+list shouldn't live in two places.
+
+- **D26** (`mechanics-dns`, new in-tree non-submodule
+  crate). Scaffold a new workspace member at
+  `./mechanics-dns/` (same shape as
+  `mechanics-h3-quinn`: in-tree, no git submodule, but
+  published to crates.io so external consumers of mhc /
+  the D19 connector resolve it normally). Library API:
+  - HTTPS-RR lookup
+  - A / AAAA lookup
+  - `IN`-class only
+  - On `/etc/resolv.conf` ENOENT, fall back to the
+    [Cloudflare fallback resolver set](design/08-connector-architecture.md#cloudflare-fallback-resolver-set);
+    any other read error surfaces as a startup-level
+    failure rather than silently falling back.
+
+  Migrate `mechanics-http-client`'s HTTPS-RR call site
+  and its `tokio::net::lookup_host` callers (HTTP/3
+  `first_socket_addr`, h1/h2/HTTPS hyper-util connector)
+  to use `mechanics-dns`. Behaviour on hosts with
+  `/etc/resolv.conf` is unchanged; behaviour on ENOENT
+  hosts becomes "use the Cloudflare set" instead of
+  "fail."
+
+  Dispatches independently of the Tier-2 batch. When D19
+  later dispatches it consumes `mechanics-dns` directly
+  rather than re-implementing the fallback. If D26 hasn't
+  landed before the Tier-2 batch is dispatched, D19 takes
+  on the crate-creation work as a sub-task.
+
 ### Suggested sequencing
 
 **Currently in flight**: §3.K Audit & refactor (Yuka direct
@@ -405,6 +451,8 @@ Codex dispatch). Gates §3.B.
 
 **Next dispatchable (post-sweep)**: Tier-2 batch = D7 + D19,
 dispatched together. Tier 3 (D8 + D9) follows separately.
+D26 (§3.L) is independent of the Tier-2 batch and can
+dispatch at any time after the sweep.
 
 - **D7** (`philharmonic-connector-impl-email-smtp`, Tier 2)
   — `email_send` wire shape locked in
@@ -414,7 +462,15 @@ dispatched together. Tier 3 (D8 + D9) follows separately.
   fully spec'd from
   [`docs/design/08-connector-architecture.md` §DNS](design/08-connector-architecture.md#dns),
   setup-unblocked 2026-05-12 (submodule wired, crates.io
-  `0.0.0` placeholder published). Prompt draft ready.
+  `0.0.0` placeholder published). Consumes
+  `mechanics-dns` for the resolver layer if D26 has
+  landed; otherwise creates `mechanics-dns` as a
+  sub-task. Prompt draft ready.
+- **D26** (`mechanics-dns` extraction + mhc resolver
+  migration, §3.L) — new in-tree non-submodule published
+  crate; mhc loses its `tokio::net::lookup_host` + inline
+  hickory call sites in favour of `mechanics-dns`.
+  Independent of the Tier-2 batch; spec'd in §3.L.
 - **D8** (`philharmonic-connector-impl-llm-anthropic`,
   Tier 3) — fully spec'd from
   [`docs/design/08-connector-architecture.md` §llm_anthropic](design/08-connector-architecture.md#llm_anthropic--config);
