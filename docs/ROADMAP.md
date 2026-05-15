@@ -7,28 +7,38 @@ repo.
 V1 is complete through the first working end-to-end deployment;
 active work now lives in the post-v1 dispatch plan (§3 below).
 
-**Current state** (2026-05-14):
+**Current state** (2026-05-15):
 
 - Design: complete. v1 implementation path: **complete
   through Phase 9.** Reference deployment operational since
   2026-05-02.
-- **Dispatches done** (post-v1): D1, D2, D3, D4, D5, D6
-  (embedding-datasets feature), D10, D11, D12, D13, D14, D15,
-  D16 (WebUI + connector enhancements), D17 (mechanics-core
-  tail-promise polling), D18 (mechanics-core module-surface
-  refactor: feature gates + `console` no-op + `html` +
-  `url` WHATWG + `mime` compose/parse + workflow-authoring
-  guide refresh en+jp; setTimeout-removal sub-piece reverted
-  D17's non-ES global), D20 (workspace-wide webpki-roots TLS
-  via `mechanics-http-client`), D21 (`pre-landing.sh`
-  dep-aware test filtering), D22 (HTTP/3 client + server-lib +
-  server-integration + streaming; `mechanics-http-server
-  0.1.3` published), D23 (`dockerlet` replaces testcontainers),
-  D24 (workspace-wide `default-features = false` audit), D25
-  (`mhc` hickory CVE bump). Plus the `mechanics-h3-quinn`
-  in-tree vendored fork + generic `vendor-upstream` xtask +
-  `check-no-registry` workspace-hardening guard + dev-profile
-  incremental-build disable (2026-05-14 batch).
+- **Dispatches done** (post-v1): D1–D6 (embedding-datasets
+  feature), D10–D15 (WebUI infrastructure + guides), D12/D16
+  (connector enhancements), D17 (mechanics-core tail-promise
+  polling), D18 (mechanics-core 0.6 module-surface refactor),
+  D20 (workspace-wide webpki-roots TLS via
+  `mechanics-http-client`), D21 (`pre-landing.sh` dep-aware
+  test filtering), D22 (HTTP/3 client + server-lib +
+  server-integration + streaming), D23 (`dockerlet` replaces
+  testcontainers), D24 (workspace-wide
+  `default-features = false` audit), D25 (mhc hickory CVE
+  bump). Plus the `mechanics-h3-quinn` in-tree vendored fork,
+  generic `vendor-upstream` xtask, `check-no-registry`
+  workspace-hardening guard, and dev-profile
+  incremental-build disable. Per-crate version state and
+  release notes live in each `CHANGELOG.md`.
+- **Post-D22 H3 client stability follow-on**: landed
+  2026-05-15 in mhc + mhs (unpublished locally; api-server
+  picks up via workspace path-overrides). Pre-wire H3 stream
+  failures transparently fall back to HTTP/2 + retry-once on
+  fresh QUIC connection; cached `SendRequest` mutex scoped
+  to `send_request` only (streams multiplex naturally
+  thereafter); 3 s connect/setup timeout; client+server
+  QUIC keep-alive + 120 s max-idle. Detail at
+  [`docs/codex-reports/2026-05-15-0001-h3-client-stability.md`](codex-reports/2026-05-15-0001-h3-client-stability.md).
+  Connector-router 0.1.5 shipped same window to strip
+  body-framing + hop-by-hop headers across the mhc-based
+  forwarder.
 - **Pending**: D7 / D8 / D9 / D19 (Tier 2/3 connectors —
   SMTP, Anthropic, Gemini, DNS).
 - **§3.J production-security cleanup arc closed 2026-05-14**:
@@ -322,20 +332,28 @@ with workspace-wide fallback on `Cargo.toml` / `Cargo.lock` /
 behaviour. Archive at
 [`docs/archive/2026-05-13-roadmap-d21-done.md`](archive/2026-05-13-roadmap-d21-done.md).
 
-### I. HTTP/3 client + server (D22 — 4 rounds across 2 sessions) — DONE
+### I. HTTP/3 client + server (D22) — DONE
 
-DONE 2026-05-13 / 2026-05-14. D22 client (mhc 0.2.0
-opportunistic HTTP/3 via HTTPS RR + Alt-Svc discovery) +
-D22 server-lib (mhs 0.1.0 with Http3Server / AltSvcLayer /
-0-RTT replay-safety) + D22 server-integration round 01
-(three release bins wired with `bind_h3` + Alt-Svc;
-mechanics 0.5.2, mhs 0.1.2) + D22 server-integration round
-02 (mhs 0.1.3 with proper `http_body::Body` streaming via
-the new `H3RequestBody` type; the 16 MiB axum-adapter buffer
-cap from round 01 is gone). mhs 0.1.3 published to
-crates.io 2026-05-14 13:55 JST. Codex prompt archives under
-[`docs/codex-prompts/`](codex-prompts/) (search for
-`d22-`).
+DONE. Client (mhc) speaks opportunistic HTTP/3 via HTTPS RR
++ Alt-Svc discovery; server-lib (mhs) provides
+`Http3Server` + `AltSvcLayer` + 0-RTT replay-safety + the
+`H3RequestBody` streaming body type; all three release bins
+wired with `bind_h3` + Alt-Svc. Codex prompt archives under
+[`docs/codex-prompts/`](codex-prompts/) (`d22-*`).
+
+**2026-05-15 stability follow-on** (Yuka-direct Codex
+dispatch — not a numbered D-dispatch): pre-wire H3 stream
+failures transparently retry once on a fresh QUIC connection
+then fall back to HTTPS; `SendRequest` mutex scoped to
+`send_request` so concurrent H3 streams to the same origin
+multiplex naturally; 3 s connect/setup timeout; client+server
+QUIC keep-alive (15 s) + 120 s max-idle to survive
+NAT / firewall idle eviction. Detail at
+[`docs/codex-reports/2026-05-15-0001-h3-client-stability.md`](codex-reports/2026-05-15-0001-h3-client-stability.md);
+ships in unpublished mhc 0.2.4 / mhs 0.1.4 (workspace
+path-overrides pick up via rebuild). Same window:
+connector-router 0.1.5 strips body-framing + hop-by-hop
+headers across the mhc-based forwarder.
 
 ### J. Production-security dep cleanup (D23 + D24 + D25 — all done; arc closed) — DONE
 

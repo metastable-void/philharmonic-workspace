@@ -154,39 +154,26 @@ in one workflow). Authentication / authorisation / audit-log /
 permission-aware WebUI / transport hardening (HTTP/3 +
 HSTS-on-TLS + aws-lc-rs + webpki-roots) all in place.
 
-**Current state (2026-05-14):** post-v1 dispatches landed
-(D1-D6 embedding-datasets, D10/D11/D13/D14/D15 WebUI,
-D12/D16 connector enhancements, D17 mechanics-core tail-promise
-polling, D18 mechanics-core module-surface refactor
-(`mechanics:html` + `:console` no-op + `:url` WHATWG + `:mime`
-compose/parse + workflow-authoring guide refresh en+jp; the
-setTimeout-removal sub-piece reverted D17's non-ES global),
-D20 webpki-roots TLS, D21 pre-landing dep-aware test
-filtering, D22 HTTP/3 client+server+streaming, D23 dockerlet,
-D24 default-features audit, D25 hickory CVE bump). Plus the
-in-tree vendored `mechanics-h3-quinn` (first non-submodule
-publishable crate), the generic `vendor-upstream` xtask,
-`check-no-registry` workspace-hardening guard, and dev-profile
-incremental-build disable (2026-05-14 batch). On 2026-05-14 a
-full workspace cascade-publish shipped 22 crates to crates.io
-— the four mechanics crates (`mechanics-config 0.1.2`,
-`mechanics-http-client 0.2.2`, `mechanics-core 0.6.0`,
-`mechanics 0.5.3`), the foundational crates
-(`philharmonic-types 0.3.7`, `philharmonic-store 0.1.3`,
-`philharmonic-store-sqlx-mysql 0.1.5`, `philharmonic-policy
-0.2.5`, `philharmonic-workflow 0.1.6`), the connector
-framework (`philharmonic-connector-common 0.2.2`, `-client
-0.1.2`, `-service 0.2.2`, `-router 0.1.3`), the Tier 1
-connector impls (`-impl-api 0.1.3`, `-impl-http-forward 0.2.1`,
-`-impl-llm-openai-compat 0.2.1`, `-impl-sql-postgres 0.1.2`,
-`-impl-sql-mysql 0.1.2`, `-impl-embed 0.1.1`,
-`-impl-vector-search 0.1.1`), `philharmonic-api 0.1.10`, and
-the meta-crate `philharmonic 0.3.2`. `mechanics 0.5.2` shipped
-mid-cascade with a `handle_h3_request` signature that didn't
-compile against `mhs 0.1.3`'s streaming-body API; that
-release was yanked and `mechanics 0.5.3` supersedes it (root
-cause: pre-landing.sh was skipped on the 0.5.2 commit — see
-[CONTRIBUTING.md §12.5](CONTRIBUTING.md#125-publish-checklist)).
+**Current state (2026-05-15):** post-v1 dispatches landed —
+D1-D6 (embedding-datasets), D10-D15 (WebUI), D12/D16
+(connector enhancements), D17 (mechanics-core tail-promise
+polling), D18 (mechanics-core 0.6 module surface:
+`mechanics:html` / `:console` no-op / `:url` WHATWG /
+`:mime`), D20 (workspace-wide webpki-roots TLS via
+`mechanics-http-client`), D21 (pre-landing dep-aware test
+filtering), D22 (HTTP/3 client + server + streaming), D23
+(`dockerlet` replacing testcontainers), D24
+(`default-features = false` audit), D25 (mhc hickory CVE
+bump). Plus the in-tree vendored `mechanics-h3-quinn`, the
+generic `vendor-upstream` xtask, `check-no-registry`
+workspace-hardening guard, and dev-profile incremental-build
+disable. Per-crate version state and release notes live in
+each `CHANGELOG.md`. Post-D22 HTTP/3 client stability
+follow-on landed 2026-05-15 (pre-wire stream fallback to h2,
+3 s connect/setup timeout, smaller `SendRequest` mutex
+scope, QUIC keep-alive + 120 s max-idle on both sides —
+detail at
+[`docs/codex-reports/2026-05-15-0001-h3-client-stability.md`](docs/codex-reports/2026-05-15-0001-h3-client-stability.md)).
 
 **Remaining post-v1**: D7 SMTP, D8 Anthropic, D9 Gemini, D19
 DNS (Tier 2/3 connectors — independent + parallel-safe).
