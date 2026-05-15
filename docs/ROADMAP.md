@@ -391,7 +391,10 @@ Chat UI relocation deferred ([§14](design/14-open-questions.md#crates-and-organ
 Done-state is whatever Yuka signals.
 
 **Pending extraction candidates:**
-`bins/philharmonic-api-server/src/{lowerer,embed_job,executor,scope}.rs`.
+`bins/philharmonic-api-server/src/{lowerer,embed_job,scope}.rs`
+(the SCK-decrypt / endpoint-payload paths in `lowerer` and
+parts of `embed_job` are crypto-review-aware and want a
+slice of their own).
 
 **Gate on §3.B.** The Tier-2 batch (D7 SMTP + D19 DNS) is
 dispatchable only after the sweep is signalled complete.
@@ -401,6 +404,10 @@ after Tier 2.
 Slices 1 + 2 landed 2026-05-15 (server-side bin-thinning +
 HTTPS/HTTP-3 listener extraction):
 [archive](archive/2026-05-15-roadmap-audit-refactor-slices-1-2.md).
+Slice 3 landed 2026-05-15 (mechanics-worker executor moved
+to `philharmonic-api` under the `mechanics-worker-executor`
+feature, surfaced via meta-crate `api-mechanics-worker-executor`):
+[codex-report](codex-reports/2026-05-15-0006-api-worker-executor-extraction.md).
 
 ### L. `mechanics-dns` extraction + mhc resolver migration (1 dispatch) — DONE
 

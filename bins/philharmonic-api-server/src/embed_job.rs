@@ -2,7 +2,9 @@
 
 use std::{collections::BTreeSet, sync::Arc, time::Duration};
 
-use philharmonic::api::{ApiStore, EmbedDatasetCaps, EmbedDatasetDispatcher};
+use philharmonic::api::{
+    ApiStore, EmbedDatasetCaps, EmbedDatasetDispatcher, MechanicsWorkerExecutor,
+};
 use philharmonic::policy::{
     CorpusItem, EmbeddingDataset, EmbeddingDatasetStatus, Sck, SourceItem, Tenant,
     TenantEndpointConfig, decode_source_items, encode_corpus, sck_decrypt,
@@ -16,8 +18,6 @@ use philharmonic::types::{
 };
 use philharmonic::workflow::{ConfigLowerer, SubjectContext, SubjectKind, WorkflowInstance};
 use serde_json::json;
-
-use crate::executor::MechanicsWorkerExecutor;
 
 const EMBED_SCRIPT_SRC: &str = include_str!("embed_script.js");
 const EMBED_JOB_TIMEOUT: Duration = Duration::from_secs(1_800);

@@ -12,6 +12,7 @@ path = "src/main.rs"
 [dependencies]
 philharmonic = { path = "../../philharmonic", default-features = false, features = [
     "api",
+    "api-mechanics-worker-executor",
     "connector-client",
     "connector-common",
     "connector-router",
@@ -31,7 +32,6 @@ coset = { version = "0.4", default-features = false, features = [] }
 hex = { version = "0.4", default-features = false, features = ["std"] }
 http = { version = "1", default-features = false, features = ["std"] }
 rand_core = { version = "0.6", default-features = false, features = ["getrandom"] }
-mechanics-http-client = { version = "0.2", default-features = false, features = ["http3"] } # kept: preserves opportunistic HTTP/3 endpoint transport.
 serde = { version = "1", default-features = false, features = ["derive", "std"] }
 serde_json = { version = "1", default-features = false, features = ["std"] }
 sqlx = { version = "0.8", default-features = false, features = ["mysql", "runtime-tokio"] }

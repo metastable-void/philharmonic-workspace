@@ -11,8 +11,8 @@ use axum::routing::any;
 use axum::{Router, extract::State};
 use clap::Parser;
 use philharmonic::api::{
-    EmbedDatasetCaps, PhilharmonicApiBuilder, RateLimitBucketConfig, RateLimitConfig, StubExecutor,
-    StubLowerer,
+    EmbedDatasetCaps, MechanicsWorkerExecutor, PhilharmonicApiBuilder, RateLimitBucketConfig,
+    RateLimitConfig, StubExecutor, StubLowerer,
 };
 use philharmonic::connector_client::LowererSigningKey;
 use philharmonic::connector_common::{MLKEM768_PUBLIC_KEY_LEN, RealmId, RealmPublicKey};
@@ -46,14 +46,12 @@ use zeroize::Zeroizing;
 
 mod config;
 mod embed_job;
-mod executor;
 mod lowerer;
 mod scope;
 mod security_headers;
 
 use config::ApiConfig;
 use embed_job::EmbedJobDispatcher;
-use executor::MechanicsWorkerExecutor;
 use lowerer::ConnectorConfigLowerer;
 use scope::HeaderBasedScopeResolver;
 

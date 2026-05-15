@@ -213,9 +213,15 @@ pending):
   deployment helpers live at `philharmonic::server`
   (feature-gated by `server` / `server-key-material` /
   `server-https`; the last is separate from the
-  mechanics-runtime `https` feature). Remaining extraction
-  candidates:
-  `bins/philharmonic-api-server/src/{lowerer,embed_job,executor,scope}.rs`.
+  mechanics-runtime `https` feature). The mechanics-worker
+  workflow executor lives at
+  `philharmonic_api::MechanicsWorkerExecutor` behind the
+  `mechanics-worker-executor` feature (forwarded via the
+  meta-crate's `api-mechanics-worker-executor`). Remaining
+  extraction candidates:
+  `bins/philharmonic-api-server/src/{lowerer,embed_job,scope}.rs`
+  (the SCK-touching paths are crypto-review-aware and want
+  their own slice).
   Slice log at [ROADMAP §3.K](../ROADMAP.md#k-audit--refactor-in-flight-yuka-direct-codex-dispatch).
 
 ### Naming history
@@ -290,11 +296,11 @@ philharmonic-api                  → philharmonic-types,
 bins/philharmonic-api-server      → philharmonic-api,
                                     philharmonic-connector-router,
                                     mechanics-config
-                                    (lowerer / embed-job /
-                                    executor / scope currently live
-                                    here; Audit & refactor sweep
-                                    extracts them into libraries —
-                                    see "Bins are thin" principle)
+                                    (lowerer / embed-job / scope
+                                    currently live here; Audit &
+                                    refactor sweep extracts them
+                                    into libraries — see "Bins are
+                                    thin" principle)
 
 bins/philharmonic-connector       → philharmonic-connector-service,
                                     philharmonic-connector-impl-*
