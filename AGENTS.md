@@ -399,6 +399,24 @@ runs match CI. Raw `cargo <subcommand>` drifts.
   normal for large crates — this distinguishes "still compiling"
   from "actually stuck." See
   [`CONTRIBUTING.md §5.1`](CONTRIBUTING.md#51-build-status-monitoring).
+
+  **Known limitation when run from inside the Codex sandbox.**
+  Codex executes commands inside a process namespace that
+  hides processes outside the sandbox from `ps -eo …`. Since
+  `build-status.sh` walks the host's process table, a Codex-
+  initiated `cargo build` is typically running in a separate
+  process group / namespace and **does not appear** in the
+  script's output. **An empty `build-status.sh` result is NOT
+  evidence that the build has stalled or died — it's evidence
+  that you (Codex) cannot see your own builder from where you
+  are.** Do not interpret "no active Rust build processes"
+  as a reason to kill the build, abort the dispatch, or
+  retry. The correct signals are: (a) the cargo invocation
+  you started is still attached and emitting output on its
+  own pipe, or (b) the wall-clock elapsed against a previous
+  baseline for the same target. If you genuinely need
+  `build-status.sh` visibility, ask the user (or Claude
+  Code) to run it from outside the sandbox.
 - `./scripts/cargo-audit.sh`,
   `./scripts/check-api-breakage.sh <crate> [<version>]` —
   pre-release checks.

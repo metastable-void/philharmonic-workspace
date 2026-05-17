@@ -51,3 +51,21 @@ The code fix should be two-sided:
 2. In `philharmonic::server::https::start_tls_axum_server`, do not let H3 listener completion terminate the TCP HTTPS accept loop. If H3 dies, either log and keep HTTPS alive, or supervise/restart only the H3 side.
 
 A regression test should assert that a synthetic or induced H3 accept failure does not finish the HTTP/3 handle and does not stop the TCP HTTPS listener.
+
+## Fixes Landed
+
+The recommended code fixes were applied in the same session after this investigation:
+
+- `mechanics-http-server/src/server.rs` now treats rejected `incoming.accept()` QUIC handshakes as per-connection warnings and continues the H3 accept loop. Incompatible scanners or clients should no longer stop the H3 listener.
+- `philharmonic/src/server/https.rs` now supervises the optional H3 sidecar separately from the TCP HTTPS accept loop. If the H3 sidecar stops, the TCP HTTPS listener keeps serving instead of being dropped with the H3 task.
+- `mechanics/src/lib.rs` received the same sidecar separation for `MechanicsServer::run_tls_with_h3`, so the older mechanics-family TLS/H3 helper has the same resilience property.
+- `mechanics-http-server/src/tests.rs` now has `incompatible_quic_handshake_does_not_stop_listener`, which first triggers an incompatible QUIC/H3 handshake failure and then verifies a valid H3 request still succeeds through the same listener.
+- `mechanics-http-server/CHANGELOG.md`, `philharmonic/CHANGELOG.md`, and `mechanics/CHANGELOG.md` record the fixes under `Unreleased`.
+
+Validation after the fixes:
+
+- `./scripts/rust-test.sh mechanics-http-server` passed.
+- `./scripts/pre-landing.sh` passed, including the ignored H3 fixtures for `mechanics-http-server`.
+- `git diff --check` was clean.
+- `./scripts/check-md-bloat.sh` reported `96202 total` after this report update.
+- `./scripts/tokei.sh` reported `193768 total` after this report update.
