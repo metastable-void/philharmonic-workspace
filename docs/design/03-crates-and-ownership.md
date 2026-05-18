@@ -115,25 +115,34 @@ Substantive (production):
   corpus-per-request.
 - **`philharmonic-connector-impl-embed`** — pure-Rust
   `tract` + `tokenizers` `embed` with a default-bundled
-  bge-m3 ONNX model gated behind the
+  BAAI/bge-m3 ONNX model gated behind the
   `bundled-default-model` Cargo feature.
+- **`philharmonic-connector-impl-email-smtp`** — `email_smtp`
+  over SMTP submission via `lettre` on rustls (aws-lc-rs +
+  webpki-roots; no `native-tls`, no `ring`). Port 25 rejected
+  at config validation; `connection_mode ∈ {starttls, smtps,
+  auto}` with port-driven defaults and 587-then-465
+  auto-discovery in `auto`; four-valued `tls_strictness`
+  (`strict` / `sloppy` / `opportunistic` /
+  `opportunistic_sloppy`); minimal MIME envelope fixing
+  (`MIME-Version` / `Date` / `Message-Id` / `Content-Type` /
+  CRLF normalisation) with no security-relevant header
+  rewriting.
+- **`philharmonic-connector-impl-dns`** — `dns_query` via the
+  host's stub resolver through the in-tree `mechanics-dns`
+  crate (no direct `hickory-*` dep). `IN`-class only;
+  per-endpoint `allowed_types` / `allowlist_zones` /
+  `blocklist_zones` policy gates fire **before** any DNS
+  packet leaves the process (denied queries have no
+  observable network side-effect); per-call timeout clamped
+  to `[100, 60000]` ms with a 5000 ms default; responses
+  return RDATA in DNS presentation form.
 
-Placeholders (deferred Tier 2/3 — names reserved on
-crates.io as `0.0.x` placeholders, no substantive
-implementation yet):
+Placeholders (deferred Tier 3 — names reserved on crates.io
+as `0.0.x` placeholders, no substantive implementation yet):
 
-- **`philharmonic-connector-impl-email-smtp`** (Tier 2).
 - **`philharmonic-connector-impl-llm-anthropic`** (Tier 3).
 - **`philharmonic-connector-impl-llm-gemini`** (Tier 3).
-
-Planned (Tier 2, **not yet reserved on crates.io, no
-submodule wired into the workspace** — one-time setup is
-pending):
-
-- **`philharmonic-connector-impl-dns`** (Tier 2). Surfaced
-  via HUMANS.md on 2026-05-12; spec at
-  [`08-connector-architecture.md` §DNS](08-connector-architecture.md#dns);
-  ROADMAP entry **D19**.
 
 ### Workspace internal
 
@@ -159,7 +168,10 @@ pending):
   insertion also evicts the origin's `Alt-Svc` entry (so a
   server that disabled H3 after previously advertising it
   doesn't get re-tried via the stale Alt-Svc route every
-  time the negative-cache window expires).
+  time the negative-cache window expires). H3 streamed
+  response bodies retain the h3 `SendRequest` owner until
+  body completion/drop so response streaming does not
+  prematurely close the underlying H3 connection.
 - **`mechanics-http-server`** — opt-in HTTP/3 (QUIC)
   listener + Alt-Svc tower middleware that runs alongside
   the existing hyper-driven HTTP/1.1+HTTP/2 listener.

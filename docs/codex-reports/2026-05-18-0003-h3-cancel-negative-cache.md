@@ -1,4 +1,4 @@
-# HTTP/3 Cancel Negative Cache
+# HTTP/3 Response Owner and Cancel Negative Cache
 
 **Date:** 2026-05-18
 **Prompt:** Chat request about mechanics-worker endpoint requests timing out against api-bin's connector router after a forced long-running request, with `H3_NO_ERROR` / `Connection closed by client` when API `bind_h3` is disabled.
@@ -11,6 +11,10 @@ Those two timers race. If the outer endpoint timeout fires first, it drops the i
 
 Blindly falling back to h1/h2 after the `recv_response` failure would risk replaying a POST whose request bytes were already sent. The landed fix keeps the existing no-replay rule.
 
+Follow-up correction from the operator: the outer mechanics jobs were not timing out; the requests themselves were broken after H3 response headers. That pointed at the response-streaming H3 client path rather than only the cancellation path.
+
+The h3 crate closes a connection with `H3_NO_ERROR` and reason `"Connection closed by client"` when the last `h3::client::SendRequest` is dropped. `mechanics-http-client` returned an H3 streaming response body after `recv_response()`, but then dropped the only `SendRequest` as `Http3State::request()` returned. Body reads then continued on a connection the client had just locally closed.
+
 ## Fix Landed
 
 `mechanics-http-client/src/request.rs` now wraps each H3 attempt in an internal cancellation guard. If the H3 attempt future is cancelled or dropped before completion, the guard inserts the usual origin-level H3 negative-cache entry. If the attempt completes normally, the guard is disarmed and existing success / handshake / stream-error handling remains in charge.
@@ -19,16 +23,23 @@ Negative-cache insertion also removes any cached `Alt-Svc` entry for the origin.
 
 This means a forced or outer-timeout-cancelled long-running H3 request still fails for that request, but subsequent requests from the same client skip H3 instead of repeatedly entering the same stale route.
 
+`mechanics-http-client/src/http3.rs` now stores the `SendRequest` owner inside `H3ResponseBody`. The owner stays alive until the caller consumes or drops the response body, so POST-over-H3 remains enabled and streamed H3 bodies are not cut off by a local client close immediately after headers.
+
 `mechanics-http-client/CHANGELOG.md` records the fix under `Unreleased`.
 
 ## Validation
 
-- `./scripts/rust-lint.sh mechanics-http-client` passed.
-- `./scripts/rust-test.sh mechanics-http-client` passed.
-- `./scripts/pre-landing.sh mechanics-http-client` passed. The wrapper ran workspace lint, affected-crate tests, and the ignored `mechanics-http-client` H3 fixture placeholders.
-- After the follow-up Alt-Svc eviction fix, `./scripts/pre-landing.sh mechanics-http-client` passed again.
-- `./scripts/check-md-bloat.sh` reported `97537 total`.
-- `./scripts/tokei.sh` reported `197283 total`.
+- `./scripts/rust-lint.sh mechanics-http-client` passed after the response-owner fix.
+- `./scripts/rust-test.sh mechanics-http-client` passed after the response-owner fix.
+- The added in-process H3 regression pair in `mechanics-http-client/src/http3.rs`
+  pins the response-owner bug directly: one test drops `SendRequest`
+  before reading the delayed body and observes the client-close /
+  `H3_NO_ERROR` error; the fixed path keeps `SendRequest` inside
+  `H3ResponseBody` and reads the same delayed body successfully.
+- `./scripts/pre-landing.sh mechanics-http-client` passed after the response-owner fix. The wrapper ran workspace lint, workspace tests, and the ignored `mechanics-http-client` H3 fixture placeholders.
+- `git diff --check` and `git -C mechanics-http-client diff --check` passed.
+- `./scripts/check-md-bloat.sh` reported `97569 total`.
+- `./scripts/tokei.sh` reported `197503 total`.
 
 ## Notes
 

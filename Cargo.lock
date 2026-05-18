@@ -3116,6 +3116,7 @@ dependencies = [
  "mechanics-dns",
  "mechanics-h3-quinn",
  "quinn",
+ "rcgen",
  "rustls",
  "serde",
  "serde_json",
