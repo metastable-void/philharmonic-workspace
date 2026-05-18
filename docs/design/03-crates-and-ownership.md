@@ -164,11 +164,16 @@ as `0.0.x` placeholders, no substantive implementation yet):
   that inserts a negative-cache entry on Drop if the attempt
   future is cancelled before completing (so an outer
   endpoint timeout that aborts an in-flight H3 request still
-  marks the origin H3-unhealthy), and negative-cache
-  insertion also evicts the origin's `Alt-Svc` entry (so a
-  server that disabled H3 after previously advertising it
+  marks the origin H3-unhealthy); H3 response-timeouts
+  (`Error::Timeout` returned to the caller, e.g. a deadline
+  trip after H3 accepted the request but the peer never
+  emitted body frames) also negative-cache the origin before
+  returning, so the next request from the same client doesn't
+  repeat the stale H3 route; and negative-cache insertion
+  (from either path) evicts the origin's `Alt-Svc` entry, so
+  a server that disabled H3 after previously advertising it
   doesn't get re-tried via the stale Alt-Svc route every
-  time the negative-cache window expires). H3 streamed
+  time the negative-cache window expires. H3 streamed
   response bodies retain the h3 `SendRequest` owner until
   body completion/drop so response streaming does not
   prematurely close the underlying H3 connection. Terminal
@@ -186,18 +191,23 @@ as `0.0.x` placeholders, no substantive implementation yet):
   successfully), the caller's absolute request deadline takes
   over for both response-header and response-body waits — no
   arbitrary short probe timeout, no replay over TCP/TLS once
-  request bytes have been consumed. The cached QUIC client
-  endpoint is family-aware: IPv4 targets bind `0.0.0.0:0` and
-  IPv6 targets bind `[::]:0`, so an IPv4-only H3 deployment is
-  reached over an IPv4 UDP socket rather than relying on
-  platform-specific dual-stack UDP behaviour from an
-  IPv6-unspecified bind. `Client::fresh_transport()` rebuilds
-  only the hyper TCP/TLS transport while preserving request
-  defaults and the shared H3 state (`Alt-Svc`, HTTPS RR,
-  negative cache, QUIC endpoint state), so an embedder can
-  isolate a potentially poisoned TCP connection pool from one
-  long-lived job to the next without disabling H3 or losing
-  accumulated H3 discovery state. `mechanics-core`'s default
+  request bytes have been consumed. **The QUIC client endpoint
+  is created fresh per H3 attempt**, not cached at process
+  scope: each request resolves the target, picks an IPv4 or
+  IPv6 bind to match (`0.0.0.0:0` or `[::]:0`), and creates a
+  new Quinn `Endpoint` whose owner is then retained by the
+  returned `H3ResponseBody` until the response stream is
+  consumed or dropped. This eliminates the prior class of bugs
+  where a cached endpoint's UDP socket or Quinn state could be
+  poisoned by a previous cancelled / timed-out / half-closed
+  request and inherited by later "fresh" H3 connection
+  attempts. `Client::fresh_transport()` rebuilds only the hyper
+  TCP/TLS transport while preserving request defaults and the
+  shared H3 *discovery / cache* state (`Alt-Svc`, HTTPS RR,
+  negative cache — no longer a cached endpoint to preserve),
+  so an embedder can isolate a potentially poisoned TCP
+  connection pool from one long-lived job to the next without
+  disabling H3 or losing accumulated H3 discovery state. `mechanics-core`'s default
   endpoint transport uses this API to give every
   `mechanics:endpoint` execution a fresh TCP/TLS hyper pool,
   so a cancelled or stalled endpoint call cannot poison the
