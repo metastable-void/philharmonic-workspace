@@ -34,6 +34,37 @@ bin_args=""
 archive_comp="gzip"
 with_https=1
 
+# Abort if the workspace has any uncommitted changes — parent
+# file edits, parent untracked files, submodule pointer
+# movement, or submodule content dirtiness (modified / staged /
+# untracked inside any submodule). `git status --porcelain
+# --ignore-submodules=none` summarises all of these from the
+# parent in one pass; non-empty output means dirty.
+#
+# Called at two points: start (so we never build a release off
+# a dirty tree) and archive (so the archive name's embedded
+# `git rev-parse --short HEAD` actually identifies the binary's
+# source — a dirty tree between build and archive would emit a
+# `philharmonic-<sha>.tar.gz` that doesn't correspond to <sha>).
+#
+# No escape hatch: release archives must be reproducible from a
+# named commit. If you want a debug-build off a dirty tree, use
+# `cargo build` directly, not this wrapper.
+check_clean_or_die() {
+    cd_label=$1
+    cd_dirty=$(git -c diff.ignoreSubmodules=none status \
+        --porcelain --ignore-submodules=none 2>/dev/null)
+    if [ -n "$cd_dirty" ]; then
+        printf '\n%s!!! release-build aborted (%s gate): %s%s\n' \
+            "$C_ERR" "$cd_label" "working tree is dirty" "$C_RESET" >&2
+        printf '\n%s\n\n' "$cd_dirty" >&2
+        printf '    Run ./scripts/status.sh for the full picture\n' >&2
+        printf '    across parent + every submodule. Commit or\n' >&2
+        printf '    stash every change, then re-run release-build.\n' >&2
+        exit 1
+    fi
+}
+
 while [ $# -gt 0 ]; do
     case "$1" in
         --bin)
@@ -87,6 +118,19 @@ Options:
 
 Without --bin, all three bins are built.
 
+Dirty-tree gates (no escape hatch):
+  - Start gate aborts the build if the workspace has any
+    uncommitted changes (parent file edits, parent untracked
+    files, submodule pointer movement, or content dirtiness
+    inside any submodule).
+  - Archive gate re-checks after the build completes so the
+    archive name's embedded short HEAD SHA actually
+    identifies the binary's source — a tree that goes dirty
+    mid-build would otherwise emit a misleading
+    philharmonic-<sha>.tar(.gz|.zst).
+  Run ./scripts/status.sh to see what's dirty; commit or
+  stash before re-running.
+
 Prerequisites:
   apt install musl-tools
   rustup target add x86_64-unknown-linux-musl
@@ -99,6 +143,8 @@ EOF
             ;;
     esac
 done
+
+check_clean_or_die "start"
 
 if [ "$with_https" = "1" ]; then
     features_arg="--features https"
@@ -155,6 +201,8 @@ done
 # is selected, which is significantly faster than single-
 # threaded gzip on the 2.2 GB connector binary.
 if [ -n "$bins_found" ]; then
+    check_clean_or_die "archive"
+
     short_hash=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 
     case "$archive_comp" in
