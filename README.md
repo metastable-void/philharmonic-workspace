@@ -93,7 +93,7 @@ generic DNS / HTTPS RR / A / AAAA lookups), `mechanics-http-client`
 feature),
 `mechanics-http-server` (opportunistic HTTP/3 listener +
 Alt-Svc tower middleware that sits alongside the existing
-TCP+TLS HTTP/1.1+HTTP/2 path; added 2026-05-13 for D22).
+TCP+TLS HTTP/1.1+HTTP/2 path).
 
 **Policy and workflow:** `philharmonic-policy`,
 `philharmonic-workflow`.
@@ -117,11 +117,8 @@ sections; used by the embed impl for ONNX model bundling.
 minimal Docker test-container helper. Thin wrapper over
 `bollard` with a deliberately narrow feature set (Unix
 socket only, no `rustls-native-certs`, no `home`); used
-by the SQL connector + e2e integration tests as a
-lightweight alternative to the broader `testcontainers`
-crate (which was evicted from the workspace dep tree
-during the §3.J production-security cleanup pass on
-2026-05-13).
+by the SQL connector + e2e integration tests as the
+workspace's container helper.
 
 **Meta-crate:** `philharmonic`.
 
@@ -155,56 +152,25 @@ Design is substantially settled. v1 implementation path is
 **complete through Phase 9**; reference deployment operational
 since 2026-05-02 (a WebUI-created workflow runs end-to-end
 through API → mechanics worker → connector router → connector
-service → an OpenAI-compatible upstream LLM).
-
-The platform's stated use-case — RAG-grounded chat backed by a
-vector index and a relational DB, served by a
-self-or-partner-hosted LLM — is verified end-to-end against the
-deployment via the 2026-05-11 PoC milestone (embedding-dataset +
-`embed` + `vector_search` + `sql_postgres` + `llm_openai_compat`
-in one workflow). Authentication / authorisation / audit-log /
-permission-aware WebUI / transport hardening (HTTP/3 +
-HSTS-on-TLS + aws-lc-rs + webpki-roots) all in place.
-
-**Current state (2026-05-15):** post-v1 dispatches landed —
-D1-D6 (embedding-datasets), D10-D15 (WebUI), D12/D16
-(connector enhancements), D17 (mechanics-core tail-promise
-polling), D18 (mechanics-core 0.6 module surface:
-`mechanics:html` / `:console` no-op / `:url` WHATWG /
-`:mime`), D20 (workspace-wide webpki-roots TLS via
-`mechanics-http-client`), D21 (pre-landing dep-aware test
-filtering), D22 (HTTP/3 client + server + streaming), D23
-(`dockerlet` replacing testcontainers), D24
-(`default-features = false` audit), D25 (mhc hickory CVE
-bump), D26 (`mechanics-dns` extraction + mhc resolver
-migration). Plus the in-tree vendored `mechanics-h3-quinn`, the
-generic `vendor-upstream` xtask, `check-no-registry`
-workspace-hardening guard, and dev-profile incremental-build
-disable. Per-crate version state and release notes live in
-each `CHANGELOG.md`. Post-D22 HTTP/3 client stability
-follow-on landed 2026-05-15 (pre-wire stream fallback to h2,
-3 s connect/setup timeout, smaller `SendRequest` mutex
-scope, QUIC keep-alive + 120 s max-idle on both sides —
-detail at
-[`docs/codex-reports/2026-05-15-0001-h3-client-stability.md`](docs/codex-reports/2026-05-15-0001-h3-client-stability.md)).
-
-**Remaining post-v1**: D7 SMTP, D8 Anthropic, D9 Gemini, D19
-DNS (Tier 2/3 connectors — independent + parallel-safe; D19
-now consumes `mechanics-dns` for resolver policy).
-
-§3.J production-security cleanup arc closed 2026-05-14. Banned-
-dep posture: `pyo3` / `maturin` / `openssl-sys` / `native-tls` /
-`rustls-platform-verifier` / `rustls-native-certs` / `ring` all
-no-wrapper full bans on the workspace's ship targets
+service → an OpenAI-compatible upstream LLM). The platform's
+stated use-case — RAG-grounded chat backed by a vector index
+and a relational DB, served by a self-or-partner-hosted LLM —
+is verified end-to-end against the deployment.
+Authentication / authorisation / audit-log / permission-aware
+WebUI / transport hardening (HTTP/3 + HSTS-on-TLS + aws-lc-rs
++ webpki-roots) all in place. The banned-dep posture is
+`pyo3` / `maturin` / `openssl-sys` / `native-tls` /
+`rustls-platform-verifier` / `rustls-native-certs` / `ring`
+— all no-wrapper full bans on the workspace's ship targets
 (`x86_64-unknown-linux-{gnu,musl}`).
 
-The authoritative task list lives in
-[`docs/ROADMAP.md` §3](docs/ROADMAP.md#3-post-v1-dispatch-plan).
-Per-arc done-state snapshots + daily-log history in
-[`docs/archive/`](docs/archive/); Codex prompt archives in
-[`docs/codex-prompts/`](docs/codex-prompts/).
+**What's next**: Tier 2/3 connector implementations — D7 SMTP,
+D19 DNS (Tier 2, dispatched as a batch), then D8 Anthropic and
+D9 Gemini (Tier 3). No internal-platform work blocks them. See
+[`docs/ROADMAP.md` §3](docs/ROADMAP.md#3-post-v1-dispatch-plan)
+for the dispatch specs.
 
-The original 29 published-crate names are reserved on crates.io.
+The original published-crate names are reserved on crates.io.
 Foundational, API, connector-triangle, and Phase 6/7 Tier 1
 implementation crates have published substantive releases at
 `0.1.0` or higher. The remaining connector names
@@ -212,11 +178,11 @@ implementation crates have published substantive releases at
 `philharmonic-connector-impl-llm-anthropic`,
 `philharmonic-connector-impl-llm-gemini`,
 `philharmonic-connector-impl-dns`) are published placeholders
-at `0.0.x` until their implementations land.
-`mechanics-h3-quinn 0.0.10` is the workspace's first in-tree
-non-submodule vendored fork; `mechanics-dns 0.1.0` is the first
-in-tree non-submodule shared runtime helper crate. Per-crate
-version history lives in each crate's `CHANGELOG.md`.
+at `0.0.x` until their implementations land. Per-crate version
+history and release notes live in each crate's `CHANGELOG.md`;
+per-arc done-state snapshots and daily-log history in
+[`docs/archive/`](docs/archive/); Codex prompt archives in
+[`docs/codex-prompts/`](docs/codex-prompts/).
 
 ## Working in the repo
 

@@ -55,12 +55,13 @@ reuse over rewrite; small focused units; deduplicate at the
 third occurrence; refactor behavior-preserving; route
 substantive changes through the Codex gate. Umbrella rule:
 [CONTRIBUTING §10.0](CONTRIBUTING.md#100-posture-maintainability-over-fast-coding).
-Current operational priority:
-[HUMANS.md §Priority: Audit & refactor](HUMANS.md) (Yuka
-direct Codex dispatch; gates Tier-2 connectors). When in
-doubt, slow down — the May 2026 H3 stability work was
-fundamentally diagnosis, and every ship-fast-to-escape-
-diagnosis detour had to be unpicked.
+The current operational priority and what's next is tracked
+in [`docs/ROADMAP.md`](docs/ROADMAP.md) (current status +
+what's needed) and [`HUMANS.md`](HUMANS.md) (Yuka's notes);
+consult both at session start before planning substantive
+work. When in doubt, slow down — the May 2026 H3 stability
+work was fundamentally diagnosis, and every
+ship-fast-to-escape-diagnosis detour had to be unpicked.
 
 ## Hard stops before doing anything
 

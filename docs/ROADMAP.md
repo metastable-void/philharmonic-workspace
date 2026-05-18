@@ -4,68 +4,36 @@
 repo.
 
 **Purpose**: The authoritative implementation plan for Philharmonic.
-V1 is complete through the first working end-to-end deployment;
-active work now lives in the post-v1 dispatch plan (§3 below).
+V1 is complete; active work lives in the post-v1 dispatch plan
+(§3 below). This file describes the **current state and what is
+needed next** — past dispatches and closed arcs are no longer
+enumerated here. Per-arc done-state snapshots live under
+[`docs/archive/`](archive/) and per-crate release notes live in
+each crate's `CHANGELOG.md`.
 
-**Current state** (2026-05-15):
+## Current status
 
-- Design: complete. v1 implementation path: **complete
-  through Phase 9.** Reference deployment operational since
-  2026-05-02.
-- **Dispatches done** (post-v1): D1–D6 (embedding-datasets
-  feature), D10–D15 (WebUI infrastructure + guides), D12/D16
-  (connector enhancements), D17 (mechanics-core tail-promise
-  polling), D18 (mechanics-core 0.6 module-surface refactor),
-  D20 (workspace-wide webpki-roots TLS via
-  `mechanics-http-client`), D21 (`pre-landing.sh` dep-aware
-  test filtering), D22 (HTTP/3 client + server-lib +
-  server-integration + streaming), D23 (`dockerlet` replaces
-  testcontainers), D24 (workspace-wide
-  `default-features = false` audit), D25 (mhc hickory CVE
-  bump), D26 (`mechanics-dns` extraction + mhc resolver
-  migration). Plus the `mechanics-h3-quinn` in-tree vendored fork,
-  generic `vendor-upstream` xtask, `check-no-registry`
-  workspace-hardening guard, and dev-profile
-  incremental-build disable. Per-crate version state and
-  release notes live in each `CHANGELOG.md`.
-- **Post-D22 H3 client stability follow-on**: landed
-  2026-05-15 in mhc + mhs (unpublished locally; api-server
-  picks up via workspace path-overrides). Connector-router
-  0.1.5 shipped same window with body-framing + hop-by-hop
-  header stripping. Detail:
-  [`docs/codex-reports/2026-05-15-0001-h3-client-stability.md`](codex-reports/2026-05-15-0001-h3-client-stability.md).
-- **Pending**: Tier 2 = D7 (SMTP) + D19 (DNS), dispatched
-  as one batch. Tier 3 = D8 (Anthropic) + D9 (Gemini),
-  dispatched separately later. D26 (§3.L below) is done;
-  D19 consumes the landed `mechanics-dns` resolver layer.
-  The §3.K Audit & refactor gate cleared 2026-05-18 (see
-  next bullet); Tier 2 is now next-dispatchable.
-- **§3.K Audit & refactor closed 2026-05-18**: per
-  [`HUMANS.md`](../HUMANS.md). Slices 1–4 landed
-  (server-side bin-thinning, HTTPS/HTTP-3 listener
-  extraction, mechanics-worker executor extraction, and
-  the non-crypto `scope.rs` → `philharmonic-api`
-  `HeaderTenantScopeResolver` extraction). The remaining
-  `lowerer.rs` / `embed_job.rs` extraction is
-  crypto-sensitive (SCK encrypt/decrypt + endpoint payload
-  handling) and is **deferred out of K** — it needs its
-  own crypto-review-aware slice under the Gate protocol
-  rather than incidental cleanup, so it is no longer
-  tracked under §3.K.
-- **§3.J production-security cleanup arc closed 2026-05-14**:
-  D23 + D24 + D25 all done; combined with the
-  mechanics-h3-quinn vendor + the `deny.toml` Linux-x86_64
-  target restriction, the workspace's `ring` ban is now a
-  clean no-wrapper full ban.
+- **v1 path: complete through Phase 9.** Reference deployment
+  operational since 2026-05-02; the RAG-grounded chat use-case
+  (embedding-dataset + `embed` + `vector_search` + `sql_postgres`
+  + `llm_openai_compat`) is verified end-to-end against it.
+- **Post-v1 internal work closed.** Embedding-datasets, WebUI
+  infrastructure, connector enhancements, runtime semantics,
+  module-surface refactor, HTTP-client transport + TLS posture,
+  workspace tooling, HTTP/3 client + server, production-security
+  dep cleanup, `mechanics-dns` extraction, and the §3.K Audit
+  & refactor sweep have all landed.
+- **Open**: §3.B Tier 2/3 connector implementations —
+  D7 SMTP, D19 DNS (Tier 2, dispatched as a batch), then
+  D8 Anthropic, D9 Gemini (Tier 3, dispatched separately).
+  No gate blocks dispatch; specs in §3.B below.
+- **Deferred (not yet scoped)**: a crypto-review-aware slice
+  for the `lowerer.rs` / `embed_job.rs` extraction that was
+  originally considered under §3.K but moved out because it
+  touches SCK encrypt/decrypt and endpoint-payload handling.
+  Will be sequenced once its Gate-1 proposal is ready.
 
-Per-dispatch detail, daily-log entries, and per-arc
-done-state snapshots are preserved at
-[`docs/archive/`](archive/) — per-day archives 2026-05-10
-through 2026-05-15. The live ROADMAP carries only the
-current-state summary + the pending plans (§3.B, §3.K).
-
-Authoritative sources for things this file used to restate but
-now cross-references:
+Authoritative sources for things this file cross-references:
 
 - **Conventions / dev environment / git workflow / pre-landing
   / scripts / publishing**: [`CONTRIBUTING.md`](../CONTRIBUTING.md)
@@ -82,32 +50,17 @@ then implement — **do not invent architectural decisions**.
 
 ---
 
-## 1. Completed v1 milestone archive
+## 1. v1 milestone archive (pointer)
 
-Phases 0–9 (workspace setup → reference deployment) all landed.
-The detailed per-phase plans, definition-of-done, completed-
-crate inventory, and pre-Phase-9 cross-cutting notes were
-trimmed from this roadmap on 2026-05-10. The full pre-trim text
-is preserved verbatim at
+The full pre-trim plans, definition-of-done, and completed-
+crate inventory for Phases 0–9 (workspace setup through
+reference deployment) are preserved verbatim at
 [`docs/archive/2026-05-10-readme-roadmap-trim.md`](archive/2026-05-10-readme-roadmap-trim.md)
 (under "Pre-trim `docs/ROADMAP.md`" → §4 "Completed v1 Milestone
-Archive" and §8 "Definition of done for v1").
-
-One-line summary: **Phase 0** workspace setup, **Phase 1**
-`mechanics-config` extraction, **Phase 2** `philharmonic-policy`,
-**Phase 3** `philharmonic-connector-common`, **Phase 4**
-`philharmonic-workflow`, **Phase 5** connector triangle (client +
-service + router) under Yuka's two-gate crypto review, **Phase 6**
-first connector implementations (`http_forward`,
-`llm_openai_compat`), **Phase 7 Tier 1** SQL Postgres / SQL MySQL /
-stateless vector search / local embedding (with `inline-blob`),
-**Phase 8** `philharmonic-api 0.1.0`, **Phase 9** integration +
-reference deployment (2026-05-02).
-
-Historical implementation detail also lives in dated
+Archive" and §8 "Definition of done for v1"). Historical
+implementation detail also lives in dated
 `docs/codex-prompts/`, `docs/codex-reports/`,
-`docs/notes-to-humans/`, and
-`docs/crypto/{proposals,approvals}/` files.
+`docs/notes-to-humans/`, and `docs/crypto/{proposals,approvals}/`.
 
 ---
 
@@ -127,30 +80,13 @@ are committed under `docs/crypto/{proposals,approvals}/`.
 
 ## 3. Post-v1 dispatch plan
 
-Phase 9 is complete (2026-05-02) and the reference deployment is
-operational. The work below is post-v1 / post-GW: it does not
-block deployment and is sequenced for the next development
-cycle. Each numbered item is one Codex dispatch with its own
+Each numbered item below is one Codex dispatch with its own
 archived prompt under `docs/codex-prompts/` (see
 [`.claude/skills/codex-prompt-archive/SKILL.md`](../.claude/skills/codex-prompt-archive/SKILL.md)).
-The single `(Gate 1)` item is **not** a Codex dispatch — Claude
-drafts the proposal, Yuka reviews per the two-gate crypto-review
-protocol (§2).
 
-Total: **27 Codex dispatches plus 1 Gate-1 proposal.**
-Done / pending breakdown lives in the
-**Current state** block at the top of this file. Done arcs
-trim to one-line done-pointers below (§3.A, C, D, E, F, G,
-H, I, J, K, L); the still-pending arc §3.B (Tier-2 + Tier-3
-connectors) carries the full dispatch specs.
-
-### A. Embedding datasets (6 dispatches + 1 Gate-1) — DONE
-
-DONE 2026-05-10. D1 / D2 / D3 / D4 / D5 / D6 + both crypto
-gates. Authoritative design:
-[`docs/design/16-embedding-datasets.md`](design/16-embedding-datasets.md).
-Per-dispatch detail at
-[`docs/archive/2026-05-11-roadmap-completed-arc-trim.md`](archive/2026-05-11-roadmap-completed-arc-trim.md).
+**Closed arcs** (§3.A, C–L): per-arc done-state snapshots live
+under [`docs/archive/`](archive/) — per-day archives span
+2026-05-10 through 2026-05-18. They are not enumerated here.
 
 ### B. Phase 7 Tier 2/3 connector implementations (4 dispatches)
 
@@ -249,195 +185,17 @@ to implement the `Implementation` trait.
     per-type structured objects are a sub-shape
     decision at prompt-drafting time.
 
-  **Pre-D19 setup** (Yuka, one-time):
-  1. Create the
-     `philharmonic-connector-impl-dns` GitHub repo
-     under `metastable-void` (mirror the layout of
-     the existing connector submodules).
-  2. Reserve the crate name on crates.io by publishing a
-     `0.0.1` placeholder.
-  3. Add a submodule entry to `.gitmodules` + the
-     workspace root.
-  4. Add the crate to the workspace `Cargo.toml`
-     `[workspace] members` list.
+  Pre-D19 setup is complete (2026-05-12): submodule wired,
+  crates.io `0.0.x` placeholder published. Claude drafts
+  the D19 prompt; Codex implements + tests inside the
+  submodule. No crypto gate — DNS connector is HTTP-realm
+  style (token + encrypted payload over the connector
+  framework); just one more `Implementation` trait impl.
+  D19 consumes the in-tree `mechanics-dns` resolver layer.
 
-  After setup, Claude drafts the D19 prompt; Codex
-  implements + tests inside the new submodule. No
-  crypto gate — DNS connector is HTTP-realm style
-  (token + encrypted payload over the connector
-  framework); just one more `Implementation` trait
-  impl.
-
-Independent of one another and of section A; safe to run in
-parallel (modulo the D19 setup prerequisite).
-
-### C. Connector enhancements (2 dispatches) — DONE
-
-DONE 2026-05-10 / 2026-05-11. D12 (`llm_openai_compat`
-`custom_headers` knob) + D16 (`tool_call_fallback_auto`
-dialect variant). Per-dispatch detail at
-[`docs/archive/2026-05-11-roadmap-completed-arc-trim.md`](archive/2026-05-11-roadmap-completed-arc-trim.md).
-
-### D. WebUI infrastructure, features, and docs (5 dispatches) — DONE
-
-DONE 2026-05-02 / 2026-05-10 / 2026-05-11. D10 (CodeMirror 6),
-D11 (workflow-authoring guide rewrite en+jp), D13 (chat-style
-testing UI), D14 (markdown rendering with DOMPurify), D15
-(`abstract_config` structured editor). Per-dispatch detail
-at
-[`docs/archive/2026-05-11-roadmap-completed-arc-trim.md`](archive/2026-05-11-roadmap-completed-arc-trim.md).
-
-### E. Execution-substrate runtime semantics (1 dispatch) — DONE
-
-DONE 2026-05-12. D17 — `mechanics-core` response-detached
-background-poll runtime: the worker's run-job response returns
-when the script's top-level settles; unawaited promises and
-endpoint calls continue polling on the worker tokio task until
-quiescence or `max_execution_time`. The D17-added `setTimeout`
-realm global was reverted 2026-05-14 under D18 per HUMANS.md's
-"no non-ES globals" hard rule (see §3.F). Authoritative
-behaviour spec at
-[`docs/design/06-execution-substrate.md` §Tail-promise polling](design/06-execution-substrate.md#tail-promise-polling).
-Per-dispatch detail at
-[`docs/archive/2026-05-12-roadmap-d17-done-d7-spec-d18-added.md`](archive/2026-05-12-roadmap-d17-done-d7-spec-d18-added.md).
-
-### F. Mechanics module surface (1 dispatch) — DONE
-
-DONE 2026-05-14. D18 — `mechanics-core 0.6.0` module-surface
-refactor across four rounds. R01 added `[features]` gating
-(`rand`, `encoding`, `html`, `console`, `url` default-on;
-`mime` opt-in), the `mechanics:console` no-op module, and the
-`mechanics:html` htmlize wrapper. R02 added `mechanics:url`
-(WHATWG `URL` + `URLSearchParams`). R03 added `mechanics:mime`
-(pure format-only `compose` / `parse`; q-p preferred over
-base64 for non-ASCII text). R04 refreshed the workflow-authoring
-guide en+jp under §"Built-in modules" and added a "JavaScript
-runtime notes" subsection covering the setTimeout-removal +
-Promise-based replacement patterns. The setTimeout-removal
-sub-piece (parent `796f83e`, mechanics-core `cf4f9c6`) closed
-the design-06 §"Realm surface (no non-ES globals)" hard-rule
-violation that D17 had inadvertently introduced. Codex prompt
-archives at
-[`docs/codex-prompts/`](codex-prompts/) (search for
-`d18-mechanics-module-surface`); R03 backing-crate trade-off
-notes at
-[`docs/codex-reports/2026-05-14-0001-d18-mechanics-mime.md`](codex-reports/2026-05-14-0001-d18-mechanics-mime.md).
-
-### G. HTTP-client transport + TLS trust posture (1 dispatch) — DONE
-
-DONE 2026-05-13. D20 — built `mechanics-http-client`
-(hyper-rustls + webpki-roots + aws-lc-rs; published 0.1.0)
-and migrated every workspace reqwest call site to it. All
-three release binaries have runtime dep trees free of
-`reqwest`, `rustls-platform-verifier`, `rustls-native-certs`,
-and `ring`. Cascade-bumps documented at
-[`docs/archive/2026-05-13-roadmap-d20-done.md`](archive/2026-05-13-roadmap-d20-done.md).
-
-### H. Workspace tooling (1 dispatch) — DONE
-
-DONE 2026-05-13. D21 — `scripts/pre-landing.sh` dep-aware
-test filtering: default test phase narrows to
-{dirty crates} ∪ {transitive reverse-dep closure of dirty},
-with workspace-wide fallback on `Cargo.toml` / `Cargo.lock` /
-`scripts/` dirty. `--full` flag forces the pre-D21
-behaviour. Archive at
-[`docs/archive/2026-05-13-roadmap-d21-done.md`](archive/2026-05-13-roadmap-d21-done.md).
-
-### I. HTTP/3 client + server (D22) — DONE
-
-DONE. Client (mhc) speaks opportunistic HTTP/3 via HTTPS RR
-+ Alt-Svc discovery; server-lib (mhs) provides
-`Http3Server` + `AltSvcLayer` + 0-RTT replay-safety + the
-`H3RequestBody` streaming body type; all three release bins
-wired with `bind_h3` + Alt-Svc. Codex prompt archives under
-[`docs/codex-prompts/`](codex-prompts/) (`d22-*`).
-
-**2026-05-15 stability follow-on** (Yuka-direct Codex
-dispatch — not a numbered D-dispatch): pre-wire H3 stream
-failures transparently retry once on a fresh QUIC connection
-then fall back to HTTPS; `SendRequest` mutex scoped to
-`send_request` so concurrent H3 streams to the same origin
-multiplex naturally; 3 s connect/setup timeout; client+server
-QUIC keep-alive (15 s) + 120 s max-idle to survive
-NAT / firewall idle eviction. Detail at
-[`docs/codex-reports/2026-05-15-0001-h3-client-stability.md`](codex-reports/2026-05-15-0001-h3-client-stability.md);
-ships in unpublished mhc 0.2.4 / mhs 0.1.4 (workspace
-path-overrides pick up via rebuild). Same window:
-connector-router 0.1.5 strips body-framing + hop-by-hop
-headers across the mhc-based forwarder.
-
-### J. Production-security dep cleanup (D23 + D24 + D25 — all done; arc closed) — DONE
-
-DONE 2026-05-13 / 2026-05-14. D23 (`dockerlet 0.1.0`
-replaces testcontainers; warm-container + atexit cleanup +
-`auto_remove: true`) + D24 (workspace-wide
-`default-features = false` audit; 24 patch-bumps; banned-
-dep posture: `pyo3` / `maturin` / `openssl-sys` /
-`native-tls` / `rustls-platform-verifier` /
-`rustls-native-certs` all no-wrapper full bans) + D25 (`mhc
-0.2.1` clearing hickory-resolver CVEs `RUSTSEC-2026-0118`
-+ `RUSTSEC-2026-0119`). 2026-05-14 follow-on closing the
-last `ring` wrapper exception: `mechanics-h3-quinn 0.0.10`
-in-tree vendored fork (published) + `deny.toml`
-`[graph] targets` restricted to
-`x86_64-unknown-linux-{gnu,musl}` — `ring` is now a clean
-no-wrapper full ban. Per-arc archives at
-[`docs/archive/2026-05-13-roadmap-d23-d25-done.md`](archive/2026-05-13-roadmap-d23-d25-done.md)
-and
-[`docs/archive/2026-05-14-roadmap-d24-done.md`](archive/2026-05-14-roadmap-d24-done.md).
-
-### K. Audit & refactor (Yuka direct Codex dispatch) — DONE
-
-DONE 2026-05-18. Workspace-wide sweep dispatched by Yuka
-directly per [`HUMANS.md` §Priority: Audit & refactor](../HUMANS.md)
-— Maintainability sweep + Clean separation of concerns
-([§10.14](../CONTRIBUTING.md#1014-unpublished-bin-crates-minimal-cli-logic-in-libraries),
-[§Bins are thin](design/02-design-principles.md#bins-are-thin)).
-Chat UI relocation deferred ([§14](design/14-open-questions.md#crates-and-organization)).
-Four slices landed:
-
-- **Slice 1 + 2** (2026-05-15) — server-side bin-thinning
-  + HTTPS / HTTP-3 listener extraction:
-  [archive](archive/2026-05-15-roadmap-audit-refactor-slices-1-2.md).
-- **Slice 3** (2026-05-15) — `mechanics-worker` executor
-  moved to `philharmonic-api` under the
-  `mechanics-worker-executor` feature, surfaced via
-  meta-crate `api-mechanics-worker-executor`:
-  [codex-report](codex-reports/2026-05-15-0006-api-worker-executor-extraction.md).
-- **Slice 4** (2026-05-18) — `HeaderTenantScopeResolver`
-  moved out of `philharmonic-api-server` into
-  `philharmonic-api` as a generic helper over
-  `IdentityStore`; the bin keeps `SqlStore` ownership and
-  only wires the helper. Plan:
-  [`docs/codex-reports/2026-05-15-0007-header-tenant-scope-resolver-plan.md`](codex-reports/2026-05-15-0007-header-tenant-scope-resolver-plan.md);
-  landed report:
-  [`docs/codex-reports/2026-05-18-0001-header-tenant-scope-extraction.md`](codex-reports/2026-05-18-0001-header-tenant-scope-extraction.md).
-
-**Deferred out of K** (no longer tracked here): `lowerer.rs`
-and parts of `embed_job.rs`. Both touch SCK encrypt/decrypt
-and endpoint payload handling, so they need their own
-crypto-review-aware slice under the Gate protocol rather
-than incidental cleanup; they will be sequenced separately
-when their Gate-1 proposal is ready.
-
-The §3.B Tier-2 gate cleared with this close-out — D7 SMTP
-+ D19 DNS are now next-dispatchable; Tier-3 (D8 + D9)
-follows separately.
-
-### L. `mechanics-dns` extraction + mhc resolver migration (1 dispatch) — DONE
-
-DONE 2026-05-15. D26 scaffolded the in-tree
-`mechanics-dns` crate (HTTPS-RR / A / AAAA / combined IP /
-socket-address helpers, IN-class only, Cloudflare fallback
-only on `/etc/resolv.conf` ENOENT) and migrated mhc's
-resolver call sites onto it. Per-dispatch detail at
-[`docs/codex-reports/2026-05-15-0005-mechanics-dns-extraction.md`](codex-reports/2026-05-15-0005-mechanics-dns-extraction.md);
-verbatim pre-trim §3.L preserved at
-[`docs/archive/2026-05-15-roadmap-l-d26-done.md`](archive/2026-05-15-roadmap-l-d26-done.md).
+Independent of one another; safe to run in parallel.
 
 ### Suggested sequencing
-
-**§3.K Audit & refactor closed 2026-05-18** — Tier-2 gate cleared.
 
 **Next dispatchable**: Tier-2 batch = D7 + D19, dispatched
 together. Tier 3 (D8 + D9) follows separately.
@@ -448,10 +206,9 @@ together. Tier 3 (D8 + D9) follows separately.
   prompt draft ready.
 - **D19** (`philharmonic-connector-impl-dns`, Tier 2) —
   fully spec'd from
-  [`docs/design/08-connector-architecture.md` §DNS](design/08-connector-architecture.md#dns),
-  setup-unblocked 2026-05-12 (submodule wired, crates.io
-  `0.0.0` placeholder published). Consumes the landed
-  `mechanics-dns` resolver layer. Prompt draft ready.
+  [`docs/design/08-connector-architecture.md` §DNS](design/08-connector-architecture.md#dns);
+  consumes the in-tree `mechanics-dns` resolver layer.
+  Prompt draft ready.
 - **D8** (`philharmonic-connector-impl-llm-anthropic`,
   Tier 3) — fully spec'd from
   [`docs/design/08-connector-architecture.md` §llm_anthropic](design/08-connector-architecture.md#llm_anthropic--config);

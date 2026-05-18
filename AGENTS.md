@@ -62,12 +62,15 @@ rewrite; small focused units; deduplicate at the third
 occurrence; refactor behavior-preserving — fixing bugs
 encountered mid-task is fine, gold-plating is not. Umbrella
 rule: [CONTRIBUTING §10.0](CONTRIBUTING.md#100-posture-maintainability-over-fast-coding).
-Current operational priority:
-[HUMANS.md §Priority: Audit & refactor](HUMANS.md) — Yuka
-dispatches you directly. Two sub-directives: **Maintainability
-sweep** (no behaviour change beyond fixing mid-run bugs) and
-**Clean separation of concerns** (bins thin, logic in
-libraries — see [§Bins are thin](docs/design/02-design-principles.md#bins-are-thin)
+The current operational priority lives in
+[`docs/ROADMAP.md`](docs/ROADMAP.md) and
+[`HUMANS.md`](HUMANS.md); the prompt Claude hands you
+already reflects it. Two cross-cutting sub-directives apply
+whenever you touch maintainability-sensitive code:
+**Maintainability sweep** (no behaviour change beyond fixing
+mid-run bugs) and **Clean separation of concerns** (bins
+thin, logic in libraries — see
+[§Bins are thin](docs/design/02-design-principles.md#bins-are-thin)
 and [CONTRIBUTING §10.14](CONTRIBUTING.md#1014-unpublished-bin-crates-minimal-cli-logic-in-libraries)).
 When in doubt, slow down.
 
