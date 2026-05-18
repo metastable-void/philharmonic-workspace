@@ -150,7 +150,16 @@ pending):
   Added 2026-05-13 (D20 / D22 client). All runtime
   outbound-HTTP call sites in the three release bins go
   through this crate; `reqwest` is no longer in the
-  workspace dep tree.
+  workspace dep tree. H3 failure-convergence discipline:
+  every H3 attempt is wrapped in an RAII cancellation guard
+  that inserts a negative-cache entry on Drop if the attempt
+  future is cancelled before completing (so an outer
+  endpoint timeout that aborts an in-flight H3 request still
+  marks the origin H3-unhealthy), and negative-cache
+  insertion also evicts the origin's `Alt-Svc` entry (so a
+  server that disabled H3 after previously advertising it
+  doesn't get re-tried via the stale Alt-Svc route every
+  time the negative-cache window expires).
 - **`mechanics-http-server`** — opt-in HTTP/3 (QUIC)
   listener + Alt-Svc tower middleware that runs alongside
   the existing hyper-driven HTTP/1.1+HTTP/2 listener.
