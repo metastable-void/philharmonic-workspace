@@ -230,7 +230,20 @@ through because meta routes carry no `RequiredPermission`.
 
 Current meta endpoints:
 
-- `GET /v1/_meta/version` — returns `{version}`.
+- `GET /v1/_meta/version` — returns
+  `{version, git_commit_sha}`. `version` is the
+  `philharmonic-api` crate's `CARGO_PKG_VERSION` at compile
+  time. `git_commit_sha` is the workspace's `git HEAD` SHA
+  captured by the deployment binary's `build.rs` at build
+  time (rebuild triggers on `HEAD` / current ref /
+  `packed-refs` changes); the binary feeds it into the API
+  via `PhilharmonicApiBuilder::git_commit_sha(...)`. The
+  field is `null` when the binary was built outside a git
+  tree (e.g. from a published crate tarball or a CI runner
+  with no `.git`); a non-`null` value is the full 40-char
+  hex SHA. The WebUI surfaces the first 7 chars as a build
+  identifier in the brand block (falls back to `version`
+  when the SHA is `null`).
 - `GET /v1/_meta/health` — returns `{status: "ok"}`.
 - `GET /v1/_meta/branding` — returns `{name, monogram}`.
   The name is configured via `webui_brand_name` in the
@@ -238,8 +251,8 @@ Current meta endpoints:
   the name (uppercase).
 
 These endpoints are safe to call from unauthenticated
-contexts (e.g. the WebUI login page fetching branding before
-the user has logged in).
+contexts (e.g. the WebUI login page fetching branding and
+the build identifier before the user has logged in).
 
 ## Identity introspection
 

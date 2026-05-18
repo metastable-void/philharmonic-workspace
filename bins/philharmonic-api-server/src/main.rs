@@ -57,6 +57,7 @@ const ED25519_KEY_BYTES: usize = 32;
 const SCK_KEY_BYTES: usize = 32;
 const MLKEM_PUBLIC_KEY_BYTES: usize = MLKEM768_PUBLIC_KEY_LEN;
 const X25519_PUBLIC_KEY_BYTES: usize = 32;
+const GIT_COMMIT_SHA: Option<&'static str> = option_env!("PHILHARMONIC_API_GIT_COMMIT_SHA");
 const DEFAULT_CONFIG: &str = r#"bind = "127.0.0.1:3000"
 database_url = "mysql://philharmonic@localhost/philharmonic"
 issuer = "philharmonic"
@@ -431,7 +432,8 @@ fn build_runtime(config: &ApiConfig, state: &LongLivedState) -> Result<Runtime, 
         .key_version(config.sck_key_version)
         .embed_dataset_caps(embed_dataset_caps)
         .rate_limit_config(rate_limit)
-        .brand_name(config.webui_brand_name.as_str());
+        .brand_name(config.webui_brand_name.as_str())
+        .git_commit_sha(GIT_COMMIT_SHA);
     if let Some(sck_bytes) = &state.sck_bytes {
         builder = builder.sck(Sck::from_bytes(**sck_bytes));
     }
