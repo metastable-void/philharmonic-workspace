@@ -3528,3 +3528,49 @@ agent-writable-forbidden; see §17.4), and
 `docs/POSIX_CHECKLIST.md` is an external-reference checklist of
 non-POSIX constructs to avoid in shell code (§6 references it).
 Any further standalone `.md` files warrant a conversation first.
+
+### 18.8 `CLAUDE.md` / `AGENTS.md` — keep concise
+
+`CLAUDE.md` and `AGENTS.md` are loaded into **every agent
+session** for this workspace, before the user's prompt is
+processed. Every byte in them is paid for on every Claude
+Code and every Codex invocation — they compete with task
+content for the model's attention budget, and bloat
+compounds across thousands of sessions.
+
+The rule for editing either file:
+
+- **One short bullet or one short paragraph per rule.** No
+  multi-paragraph rationales, no "why this is a NEVER not a
+  'prefer'" sub-sections, no inline incident history beyond
+  a single SHA reference, no enumerated lists of examples
+  when the principle is clear from the §pointer.
+- **Depth lives in `CONTRIBUTING.md`.** When a rule needs
+  rationale, edge cases, failure-mode history, or worked
+  examples, write that content in the corresponding
+  `CONTRIBUTING.md §N` (extending an existing § or adding a
+  new one) and leave a one-line `(see §N)` or `([§N](#...))`
+  pointer in the agent doc.
+- **Anything that can be removed without changing the
+  agent's ability to follow the rule, should be removed.**
+  The agent doesn't need the rule's provenance to obey it;
+  it needs the rule's *current statement* and a pointer to
+  the spec when ambiguity arises.
+- **Prefer extending an existing bullet over adding a new
+  top-level section.** Most rules are refinements of an
+  existing rule, not new categories. Only add a new section
+  when no existing section is the natural home.
+- **Whenever you make a non-trivial edit to either file,
+  run `./scripts/check-md-bloat.sh`** and confirm the new
+  size in your final reply / commit message. If the file
+  grew significantly, audit whether the growth could move
+  to `CONTRIBUTING.md` instead.
+
+Both files carry a "Keep this file concise" section near the
+top so the rule is self-reinforcing within the file itself.
+That section is **not** boilerplate — it's load-bearing, and
+deletion of it would itself violate this §18.8.
+
+The 2026-05-18 trim (CLAUDE.md 729 → 410 lines, AGENTS.md
+606 → 431 lines) is the baseline shape; subsequent edits
+should preserve or improve those numbers, not regress them.

@@ -3,716 +3,397 @@
 Personal development project for generic workflow orchestration
 infrastructure. Rust crate family — most member crates are git
 submodules, with an in-tree `xtask/` crate for workspace dev
-tooling (never published).
+tooling (never published). Developer: Yuka MORI.
 
-Developer: Yuka MORI.
+## Keep this file concise
+
+This file is loaded into every Claude Code session for this
+workspace and competes with task content for context budget.
+**One short bullet or one short paragraph per rule** — no
+multi-paragraph rationales, no "why this is a NEVER not a
+'prefer'" sub-sections, no inline incident history beyond a
+single SHA. Depth lives in `CONTRIBUTING.md`; this file is a
+prompt, not a spec. When you edit this file, prefer compressing
+existing bullets over adding new ones. See
+[`CONTRIBUTING.md §18.8`](CONTRIBUTING.md#188-claudemd--agentsmd--keep-concise).
 
 ## Authoritative docs (read these, don't re-derive)
 
-- [`CONTRIBUTING.md`](CONTRIBUTING.md) — **single authoritative home
-  for workspace conventions.** Git workflow, script wrappers, POSIX
-  shell rules, Rust code rules, versioning, licensing, terminology,
-  journal formats, everything. When a rule seems to apply, read the
-  relevant §here rather than restating. **When you change a
-  convention in practice (new rule, changed rule, retired rule,
-  or an ad-hoc rule that deserves to be authoritative), update
-  `CONTRIBUTING.md` in the same commit** — see its §18.2.
-- [`README.md`](README.md) — **whole-project executive summary.**
-  Self-contained, concise, up-to-date. Will be fed to LLM
-  sub-agents as the project's one-page mental model; structurally
-  stale claims there are bugs. **When you change anything
-  structurally visible (add/rename a crate, reshape the dep
-  graph, complete a phase, reorganise `scripts/`), update
-  `README.md` in the same commit** — see
-  [`CONTRIBUTING.md §18.1`](CONTRIBUTING.md#181-readmemd--whole-project-executive-summary).
-- [`ROADMAP.md`](docs/ROADMAP.md) — **single authoritative home for any
-  roadmap or plan.** Current phase, what's next, what's blocked,
-  what was deferred and why. No parallel TODO lists or
-  plans-of-record elsewhere. **When plans change (phase done, new
-  blocker, deferred task, approach changed), update `ROADMAP.md`
-  in the same commit as the work that changes them** — see
-  [`CONTRIBUTING.md §16`](CONTRIBUTING.md#16-roadmap-maintenance)
-  and
-  [`§18.3`](CONTRIBUTING.md#183-roadmapmd--authoritative-home-for-plans).
-- [`docs/design/`](docs/design/) — architectural design docs (what
-  Philharmonic *is*, not how to develop on it).
+- [`CONTRIBUTING.md`](CONTRIBUTING.md) — single authoritative
+  home for workspace conventions. When you change a convention
+  in practice, update it in the same commit
+  ([§18.2](CONTRIBUTING.md#182-contributingmd--single-authoritative-home-for-conventions)).
+- [`README.md`](README.md) — whole-project executive summary,
+  fed to LLM sub-agents. Update in the same commit as any
+  structurally visible change
+  ([§18.1](CONTRIBUTING.md#181-readmemd--whole-project-executive-summary)).
+- [`docs/ROADMAP.md`](docs/ROADMAP.md) — single authoritative
+  home for plans. Update in the same commit as work that
+  changes them
+  ([§16](CONTRIBUTING.md#16-roadmap-maintenance) /
+  [§18.3](CONTRIBUTING.md#183-roadmapmd--authoritative-home-for-plans)).
+- [`docs/design/`](docs/design/) — architectural design docs
+  (what Philharmonic *is*).
 - [`.claude/skills/`](.claude/skills/) — git-workflow,
-  codex-prompt-archive, crypto-review-protocol. Invoke when their
-  triggers fire.
+  codex-prompt-archive, crypto-review-protocol. Invoke when
+  their triggers fire.
 - [`AGENTS.md`](AGENTS.md) — Codex's counterpart to this file.
-- [`HUMANS.md`](HUMANS.md) — Yuka's note-to-self. **Agent-readable,
-  agent-writable is forbidden.** `commit-all.sh` sweeps her pending
-  edits into whatever commit is being made; that's the only way
-  `HUMANS.md` changes reach the repo.
+- [`HUMANS.md`](HUMANS.md) — Yuka's note-to-self.
+  **Agent-readable, agent-writable is forbidden.**
+  `commit-all.sh` sweeps her pending edits into the commit
+  being made; that's the only way changes reach the repo.
 
 ## Posture: maintainability over fast coding
 
-Default to slow, careful, structured authorship; never trade
-maintainability for keystrokes. **Runtime speed is still a
-first-class goal** — what's deprioritised is *coding
-velocity*. Read existing modules before adding new ones;
-reuse over rewrite; small focused units; deduplicate at the
-third occurrence; refactor behavior-preserving; route
-substantive changes through the Codex gate. Umbrella rule:
+Default to slow, careful authorship; never trade maintainability
+for keystrokes. Runtime speed is still a first-class goal — what's
+deprioritised is *coding velocity*. Reuse over rewrite; small
+focused units; deduplicate at the third occurrence; route
+substantive coding through the Codex gate. Operational priority
+lives in [`docs/ROADMAP.md`](docs/ROADMAP.md) and
+[`HUMANS.md`](HUMANS.md); consult both at session start. Umbrella:
 [CONTRIBUTING §10.0](CONTRIBUTING.md#100-posture-maintainability-over-fast-coding).
-The current operational priority and what's next is tracked
-in [`docs/ROADMAP.md`](docs/ROADMAP.md) (current status +
-what's needed) and [`HUMANS.md`](HUMANS.md) (Yuka's notes);
-consult both at session start before planning substantive
-work. When in doubt, slow down — the May 2026 H3 stability
-work was fundamentally diagnosis, and every
-ship-fast-to-escape-diagnosis detour had to be unpicked.
 
 ## Hard stops before doing anything
 
-- **POSIX-ish host required.** Before running any script, spawning
-  Codex, or attempting a Git state change, check the environment
-  block's `Platform:` field. `linux` / `darwin` / `freebsd` /
-  `openbsd` / `netbsd` / etc. → proceed. `win32` (raw Microsoft
-  Windows) → **STOP IMMEDIATELY**, surface the mismatch, instruct
-  the human to switch to WSL2. Do not run scripts, commit, or
-  spawn Codex. The gate lives here because raw Windows can't
-  execute `#!/bin/sh` in the first place. Git Bash / MSYS / Cygwin
-  → proceed with caution, flag any submodule / signing / permission
-  anomaly. See [`CONTRIBUTING.md §2`](CONTRIBUTING.md#2-development-environment).
+- **POSIX-ish host required.** Check env block's `Platform:`
+  field. `linux` / `darwin` / `freebsd` / `openbsd` / `netbsd`:
+  proceed. `win32` (raw Windows): STOP, surface the mismatch,
+  instruct the user to switch to WSL2. Git Bash / MSYS / Cygwin:
+  proceed with caution. ([§2](CONTRIBUTING.md#2-development-environment))
 - **Crypto-sensitive paths are gated.** SCK, COSE_Sign1,
   COSE_Encrypt0, hybrid KEM, payload-hash, `pht_` tokens — all
-  trigger Yuka's two-gate personal review protocol via the
-  `crypto-review-protocol` skill. See
-  [`crypto-review-protocol` skill](.claude/skills/crypto-review-protocol/SKILL.md) (authoritative) and
-  [`docs/ROADMAP.md §2`](docs/ROADMAP.md#2-crypto-review-protocol-pointer)
-  (cross-reference).
+  trigger the two-gate review protocol. See the
+  [`crypto-review-protocol`](.claude/skills/crypto-review-protocol/SKILL.md)
+  skill (authoritative) and
+  [`docs/ROADMAP.md §2`](docs/ROADMAP.md#2-crypto-review-protocol-pointer).
 
 ## Production is not this machine
 
-A production / customer-facing Philharmonic deployment runs on
-a **separate host** from this development box. When the user
-reports a runtime symptom from production — a workflow stalling,
-no loopback packets after one failed endpoint step, a chat
-instance hanging, a long-lived worker behaving differently than
-a fresh test process — **do not treat dev-box observations as
-production state**:
-
-- `tcpdump`, `ss`, `lsof`, `netstat`, `pstree`, `journalctl`,
-  `/proc/<pid>/`, file-on-disk inspection, log scraping — all of
-  it on this machine reflects *this machine's* processes and
-  sockets. It tells you nothing about the production worker's
-  connection pool, process tree, kernel state, or filesystem.
-- A `cargo run` reproduction in this workspace executes a
-  fresh binary against fresh state; it does not carry the
-  production worker's accumulated state — hyper TCP/TLS pool,
-  tail-promise queue, in-process caches, H3 negative-cache and
-  Alt-Svc table, file handles. A clean local run is not
-  evidence that production is fine.
-- A "doesn't reproduce on the dev box" result does not falsify
-  a production-only symptom — it just means the dev box doesn't
-  have the production host's long-lived state.
-
-When a production symptom is reported, default to **reasoning
-about the long-lived production process state** (what could
-accumulate in the shared `mechanics_http_client::Client`, what
-the worker's tail-promise queue could be holding, what an
-endpoint cancellation could leak into hyper's connection pool)
-rather than to local-process experiments. If on-production
-observation is genuinely needed, say so explicitly in your
-reply; don't substitute local equivalents and present them as
-evidence about production. The 2026-05-18 mhc TCP-pool poisoning
-fix is the canonical example — the "no `lo` packets after one
-soft-failed endpoint step" report came from production, not
-from this box, and the right framing was long-lived shared
-hyper pool state in the worker, not anything observable here.
+Production Philharmonic runs on a separate host. When a runtime
+symptom is reported from production, do **not** treat dev-box
+observations as production state — `tcpdump` / `ss` / `lsof` /
+`pstree` / `journalctl` / file-on-disk inspection here reflect
+*this machine's* processes only; a local `cargo run` does not
+carry the production worker's long-lived hyper TCP pool,
+tail-promise queue, H3 negative cache, or accumulated state. A
+"doesn't reproduce on the dev box" result does not falsify a
+production-only symptom. Default to reasoning about long-lived
+production process state; if on-production observation is
+genuinely needed, say so explicitly rather than substituting
+local equivalents as production evidence. Canonical example:
+the 2026-05-18 mhc TCP-pool poisoning fix (no `lo` packets
+after one soft-failed step — production, not the dev box).
 
 ## Working-directory discipline
 
-**`cd` into the workspace root once, then call workspace
-scripts as `./scripts/foo.sh`.** Never hardcode an absolute
-path to the repo in any script invocation, doc edit, or
-note-to-humans — the workspace root's absolute path varies
-across dev boxes (`/home/...`, `/Users/...`, `/workspace/...`,
-WSL2 mounts, etc.). Read the current session's workspace
-root from the environment block's `Primary working
-directory:` field, `cd` into it before the first
-`./scripts/...` invocation, and use the relative form from
-then on. This explicitly **overrides** the Bash tool's
-default "prefer absolute paths, avoid `cd`" guidance for
-this workspace.
-
-Why this is Claude-side discipline (the scripts are fine):
-the workspace wrappers have internal helpers that resolve
-their own root and work correctly from any cwd. The problem
-is on the agent side — Claude has muscle-memory for typing
-`./scripts/foo.sh`, and that relative form only resolves to
-the script when the current shell is actually at the
-workspace root. If Claude's cwd has drifted (or the session
-started in a different directory) the same `./scripts/...`
-string fails with `No such file or directory`, which then
-tempts a reach for the absolute form and bakes a host-
-specific path into the transcript. `cd` once, type relative
-thereafter, and the muscle-memory pattern produces correct,
-portable output.
-
-Codex specifies the working directory of each shell call by
-design; this rule is **Claude-only**.
+`cd` into the workspace root once at session start, then call
+workspace scripts as `./scripts/foo.sh`. **Never hardcode an
+absolute path to the repo** in any script invocation, doc edit,
+or note-to-humans — the workspace root varies across dev boxes.
+Read it from the env block's `Primary working directory:` field.
+This overrides the Bash tool's default "prefer absolute paths,
+avoid `cd`" guidance for this workspace. The scripts themselves
+handle any cwd via internal helpers; the discipline exists
+because `./scripts/foo.sh` only resolves when the shell is
+actually at the workspace root, and a drifted cwd tempts the
+host-specific absolute form. Codex specifies each call's cwd by
+design; this rule is Claude-only.
 
 ## Claude vs. Codex division of labour
 
-Claude Code is the designer, reviewer, and workspace caretaker.
-Codex is the implementation partner for substantive coding.
-
 - **Claude does:** architecture, API shape, design docs, ROADMAP
-  updates, code review, workspace/repo management (scripts,
-  `Cargo.toml` plumbing, submodule wrangling, doc reconciliation,
-  small fixes that are really housekeeping). Maintenance coding
-  stays with Claude — no Codex round-trip.
-- **Codex does:** non-trivial concrete coding — a crate's actual
-  implementation, an algorithm, a connector impl, test suites of
-  real size. For those, Claude writes the prompt (archived first;
-  see `codex-prompt-archive` skill), spawns Codex through the
-  `codex:` plugin, and reviews what comes back.
+  updates, code review, workspace/repo management, small fixes
+  that are really housekeeping.
+- **Codex does:** non-trivial concrete coding — actual crate
+  implementations, algorithms, connector impls, test suites of
+  real size. Claude writes the prompt (archived first via the
+  [`codex-prompt-archive`](.claude/skills/codex-prompt-archive/SKILL.md)
+  skill), spawns Codex through the `codex:` plugin, reviews.
 
 Rule of thumb: "what should this look like?" → Claude. "Now
-write the thing" → Codex, unless it's plumbing/housekeeping.
+write the thing" → Codex unless it's plumbing/housekeeping.
 
-**Human override: if Yuka explicitly says a task should go to
-Codex, Claude MUST archive a prompt and spawn Codex regardless
-of the task's complexity or scope.** No pushback on "this is
-too small for Codex" or "Claude can handle this" — the human
-developer's explicit dispatch decision is final. The archival
-discipline still applies (prompt committed before spawn).
+- **Human override.** If Yuka explicitly says a task goes to
+  Codex, Claude MUST archive a prompt and dispatch regardless
+  of scope. No pushback.
+- **The Codex gate is mandatory for auditability.** Anything
+  beyond mechanical `pub use` / `Cargo.toml` / config / doc
+  changes goes through Codex with a prompt archived first.
+  Borderline (~50–100 lines new logic) defaults to Codex.
+- **Never assume Codex finished.** Subagent return ≠ done.
+  Before touching any file Codex might be working on, verify
+  both: (1) `./scripts/codex-logs.sh --no-tool-output | grep
+  'task_complete'` shows the event, and (2) `pstree <codex-pid>`
+  has no child processes (`bwrap`, `cargo`, `rustfmt`, etc.).
+  If neither confirms, wait. Touching files while Codex runs
+  has caused repeated incidents.
+- **Once Codex is verifiably done, dry-run before committing.**
+  Run `./scripts/commit-all.sh --dry-run` (combine with
+  `--parent-only` to scope) to preview file scope, then run
+  the real commit. If something should stay out, pass
+  `--exclude <workspace-relative-path>` (repeatable). Codex
+  itself never runs `commit-all.sh` (the codex-guard aborts
+  under any Codex ancestor process).
+- **Cargo appears stuck?** Run `./scripts/build-status.sh`
+  (`watch -n 2` for continuous). Reference it in Codex prompts.
+  ([§5.1](CONTRIBUTING.md#51-build-status-monitoring))
+- **Check resource pressure before heavy work.** Run
+  `./scripts/xtask.sh resource-pressure` (one-line CPU / load /
+  memory / swap summary) before pre-landing, before dispatching
+  Codex, before a full workspace test. `system-resources` is
+  the audit-trailer feed, not a status check.
+- **Codex monitoring scripts have a scope.** `codex-status.sh`
+  / `codex-logs.sh` filter on `originator: Claude Code` —
+  standalone `codex` runs (user-launched, VSCode extension)
+  don't appear. If the user dispatched Codex separately, ask
+  for completion confirmation before touching the tree.
 
-**The Codex gate is mandatory for auditability, not optional
-for convenience.** Any new module, feature implementation, or
-file with non-trivial logic (roughly: more than mechanical
-`pub use` / `Cargo.toml` / config / doc changes) goes through
-Codex with a prompt archived beforehand. Borderline cases
-(~50–100 lines of new logic) should default to Codex — the
-archival overhead is low and the audit trail is valuable.
-Claude doing substantial coding directly bypasses the
-design-then-implement split that makes history reviewable.
+## Executive summary of rules you'll trip over most
 
-**Never assume Codex finished.** Codex writes files
-mid-run; seeing modified files in the workspace or
-receiving a subagent return does NOT mean the Codex
-process is done. Before touching any file Codex might be
-working on, **verify completion** via both:
-1. `./scripts/codex-logs.sh --no-tool-output | grep
-   'task_complete'` — the event must be present.
-2. Process tree check (`pstree <codex-pid>`) — no child
-   processes (no `bwrap`, `cargo`, `rustfmt`, etc.).
-If neither confirms, **wait**. Running `cargo build`,
-`commit-all.sh`, or editing workspace files while Codex
-is still running will silently kill it or produce broken
-state from incomplete output. This has caused repeated
-incidents.
+Every item below is the short form of something in
+`CONTRIBUTING.md`. Read the referenced section before acting on
+anything non-trivial — this summary is a prompt, not a spec.
 
-**Once Codex is verifiably done, dry-run before
-committing.** Codex may have touched files outside the
-prompt's stated scope (a stray `Cargo.lock` regen, an
-unintended doc edit, a new untracked report). Run
-`./scripts/commit-all.sh --dry-run` (combine with
-`--parent-only` to scope to the parent repo) to preview
-the exact file list that `git add -A` would sweep into
-each commit. Inspect the output, confirm the scope
-matches what you expected from the dispatch, and only
-then run the real `commit-all.sh`. Dry-run is read-only
-— no staging, no signing, no temp message file, no
-`.claude/settings.json` guard — purely a preview. If the
-dry-run reveals a file you want kept out of the commit,
-pass `--exclude <workspace-relative-path>` (repeatable)
-to `commit-all.sh`; the flag unstages each named path
-after `git add -A`, leaving its working-tree change
-dirty for a follow-up commit. Typical use: hold
-`Cargo.lock` back from a parent-only doc commit so it
-lands with the corresponding submodule version-bump
-commits later. **Codex itself never runs
-`commit-all.sh`** (including `--dry-run` and
-`--exclude`); the codex-guard in the script aborts
-under any Codex ancestor process.
-
-**When cargo appears stuck** (no output for minutes),
-run `./scripts/build-status.sh` — it shows which crates
-are being compiled/linked/tested, with PIDs and elapsed
-times. Use `watch -n 2 ./scripts/build-status.sh` for
-continuous monitoring. Reference it in Codex prompts to
-prevent false "build is stuck" aborts.
-([§5.1](CONTRIBUTING.md#51-build-status-monitoring))
-
-**Check resource pressure before kicking off heavy
-work.** `./scripts/xtask.sh resource-pressure` prints a
-one-line summary: CPU%, `load_avg_1 / num_cpus` ratio,
-available/total memory, used/total swap. Run it before
-`pre-landing.sh`, before dispatching Codex, before a
-`cargo test --workspace` pass, or any time you'd like
-a fast read on whether the box has headroom. If
-`load1/cpus` is well above 1.0 or swap usage is climbing,
-something else is already saturating the host; queue
-heavy work behind it instead of piling on. The companion
-bin `system-resources` is reserved for machine-readable
-audit-trailer generation — don't use it for status
-checks; it doesn't sample CPU activity.
-
-**Codex monitoring scripts have a scope.**
-`./scripts/codex-status.sh` and `./scripts/codex-logs.sh`
-both filter on `originator: Claude Code` — they only see
-Codex sessions spawned via the Claude-Code `codex:` plugin
-shim. **A standalone `codex` run launched independently
-(e.g. by the user in another terminal, or the VSCode
-extension's app-server) does not appear in either tool.**
-A "No Codex process running" report from
-`codex-status.sh` only confirms no Claude-Code-spawned
-Codex is active — an independent session may still be
-live and editing the workspace. When the user has
-separately dispatched Codex, the codex-completion
-verification protocol above does not apply mechanically;
-ask the user to confirm completion before touching the
-working tree.
-
-## Executive summary of the rules you'll trip over most
-
-Every item here is the short form of something documented in
-full in `CONTRIBUTING.md`. Read the full section before acting
-— this summary is a prompt, not a spec.
-
-- **JST is this workspace's authoritative timezone.** Every
-  human-facing wall-clock reading (deadlines, schedules,
-  generated chart labels, status-report timestamps, prose
-  dates, anything visible to a person) defaults to JST
-  (Asia/Tokyo, UTC+09:00). Wire-format / machine-protocol
-  fields (RFC 3339 audit trailers, Git committer time,
-  external-service clocks) stay in whatever zone the spec
-  mandates; format to JST when displaying them. In Rust use
-  `chrono_tz::Asia::Tokyo`; in shell use `TZ=Asia/Tokyo` or
-  `calendar-jp`. ([CONTRIBUTING.md §JST is this workspace's
-  authoritative timezone](CONTRIBUTING.md#jst-is-this-workspaces-authoritative-timezone))
-- **Ground yourself in JST time — regularly, not just once.**
-  Run `./scripts/xtask.sh calendar-jp` — prints a 5-week grid
-  centred on today (JST), marks weekends and Japanese public
-  holidays, lists each 祝日 in the window with its Japanese
-  name, and shows the current JST wall-clock timestamp.
-  **Mandatory triggers — mechanical, not judgment-based.**
-  Run it *before your next user-facing reply* after each of:
-  session start (your first action of the session);
-  `commit-all.sh` returns success; `push-all.sh` returns
-  success; `publish-crate.sh` returns success; a Codex
-  dispatch reaches `task_complete`; or you're about to reason
-  about "today" / a deadline / a release window / an
-  off-hours hand-off. The cost is one cheap subprocess;
-  "this commit was small" / "this is a one-line edit" is
-  **not** a reason to skip — the trigger is mechanical, not
-  a judgment call about significance. **Recovery clause.** If
-  you've already responded to the user one or more times this
-  session without grounding time first, run it *before your
-  next reply* and add a one-line acknowledgement (*"(grounding
-  time now — was overdue.)"*) so the transcript records the
-  drift; late is strictly better than never. **Coupled
-  obligation.** A `calendar-jp` run whose timestamp falls
-  outside the next bullet's regular-hours window
-  (10:00–19:00 JST Mon–Fri, extended to 21:00) makes the
-  off-hours note a hard requirement on the reply that
-  immediately follows — running calendar-jp and then omitting
-  the note is itself a missed obligation. Long sessions drift
-  across the 10:00 / 19:00 / 21:00 thresholds and sometimes
-  midnight; a stale timestamp is the failure mode. The host's
-  timezone and your training-data cutoff are both unreliable;
-  this bin's output is authoritative for deadline reasoning
-  on this project, and it's cheap to re-run. **Never pipe
-  the output through `tail` or `head`** — the full output
-  is short (~15 lines) and every line matters (the grid,
-  the holiday list, the timestamp). Clipping it loses
-  context that agents need for correct deadline reasoning.
-  **Mechanical reinforcement.** A project-level Claude Code
-  PostToolUse hook in [`.claude/settings.json`](.claude/settings.json)
-  pipes [`.claude/hooks/calendar-jp-grounding.sh`](.claude/hooks/calendar-jp-grounding.sh)
-  output back as `additionalContext` after every
-  `./scripts/commit-all.sh*`, `./scripts/push-all.sh*`, and
-  `./scripts/publish-crate.sh*` invocation, so the calendar-jp
-  grid arrives in the next reply's context unprompted. The
-  hook is belt-and-braces — the prose rule above remains the
-  authoritative obligation, and the hook may take one
-  `/hooks` reload or session restart to start firing after
-  edits. Session start, deadline reasoning, and Codex
-  `task_complete` are still on you.
-- **Work rhythm: never refuse on time, but note out-of-hours
-  sessions as commentary.** Regular hours are 10:00–19:00 JST
-  Mon–Fri; extended is fine up to 21:00; nights, weekends
-  (土/日), and 祝日 are **allowed** (Yuka compensates herself
-  separately for off-hours work) but **availability is not
-  assumed** — don't queue work that needs a human hand-off at
-  23:00 on a Sunday. If the current JST time from
-  `calendar-jp` is outside regular hours, add a one-sentence
-  note in your reply so the session transcript carries the
-  context (*"(JST now 21:47 木 — outside regular hours;
-  proceeding.)"*). The note is a log artefact, not a
-  permission request — **never** stall or wait-for-morning
-  because of the clock.
-  ([CONTRIBUTING.md §8 → "Work rhythm and out-of-hours
-  commentary"](CONTRIBUTING.md#work-rhythm-and-out-of-hours-commentary))
-- **All Git state changes go through `scripts/*.sh`** —
-  `status.sh`, `pull-all.sh`, `commit-all.sh`, `push-all.sh`,
-  `heads.sh`. Never raw `git commit` / `git push` / `git add`
-  outside the scripts. Every commit is `-s` sign-off + `-S`
-  signature + `Audit-Info:` trailer; hooks enforce this.
+- **JST is authoritative.** Every human-facing wall-clock
+  reading defaults to JST (Asia/Tokyo, UTC+09:00). Wire-format
+  fields stay in spec-mandated zones, formatted to JST for
+  display. `chrono_tz::Asia::Tokyo` in Rust; `TZ=Asia/Tokyo`
+  or `calendar-jp` in shell.
+  ([§JST](CONTRIBUTING.md#jst-is-this-workspaces-authoritative-timezone))
+- **Ground yourself in JST time — mechanically, not by judgment.**
+  Run `./scripts/xtask.sh calendar-jp` (5-week grid, weekend /
+  holiday markers, current JST timestamp) *before your next
+  reply* after each of: session start; `commit-all.sh` /
+  `push-all.sh` / `publish-crate.sh` success; Codex
+  `task_complete`; or reasoning about a deadline / release
+  window / off-hours hand-off. "Small commit" / "one-line edit"
+  is not a reason to skip. If overdue, run now and add
+  `(grounding time now — was overdue.)`. **Never pipe the
+  output through `head` / `tail`** — every line matters.
+  A PostToolUse hook in [`.claude/settings.json`](.claude/settings.json)
+  pipes calendar-jp back after the three named scripts; the
+  prose rule remains authoritative for session start, deadline
+  reasoning, and Codex `task_complete`.
+- **Work rhythm: never refuse on time; note out-of-hours.**
+  Regular hours 10:00–19:00 JST Mon–Fri, extended to 21:00.
+  Nights / weekends (土/日) / 祝日 allowed (Yuka compensates
+  separately) but availability not assumed — don't queue work
+  needing a 23:00 Sunday hand-off. Outside regular hours, add
+  one-line context to the reply (*"(JST now 21:47 木 — outside
+  regular hours; proceeding.)"*) — log artefact, not a
+  permission request. Never stall on the clock.
+  ([§work-rhythm](CONTRIBUTING.md#work-rhythm-and-out-of-hours-commentary))
+- **All Git state changes via `scripts/*.sh`.** Never raw `git
+  commit` / `git push` / `git add`. Every commit is `-s` +
+  `-S` + `Audit-Info:` trailer (hooks enforce).
   ([§4](CONTRIBUTING.md#4-git-workflow))
-- **Commit messages: subject ≤ 72 chars, blank line, body
-  wrapped at ≈ 72 cols.** Standard git format — first line is
-  a concise executive summary in the imperative, body covers
-  per-file scope / rationale / residual risks. Long
-  subject-as-body single lines waste tokens for every push-
-  time LLM summarizer, the auto-grounding hook, and human
-  reviewers (`./scripts/heads.sh`, `git log --oneline`,
-  GitHub PR titles, Slack digests). Hard-wrap the body by
-  hand; do not let single physical lines exceed ~72 cols.
-  ([§4.10](CONTRIBUTING.md#410-commit-message-format))
-- **Pass commit messages to `commit-all.sh` via
-  `--message-file -` + a single-quoted heredoc, ALWAYS.**
-  Not "when the message is long" — **always**, even for
-  short single-paragraph messages. The canonical form:
-
+- **Commit messages: subject ≤ 72, blank line, body wrapped
+  at ≈ 72 cols.** Imperative subject; body covers per-file
+  scope / rationale / residual risks. Hard-wrap the body by
+  hand. ([§4.10](CONTRIBUTING.md#410-commit-message-format))
+- **ALWAYS pass commit messages via `--message-file -` +
+  single-quoted heredoc**, even for one-line commits:
   ```sh
   ./scripts/commit-all.sh --message-file - <<'EOF'
-  subject line ≤ 72 chars
+  subject ≤ 72 chars
 
-  body paragraph hard-wrapped at ≈ 72 cols, including any
-  backticked `identifier` / `path/like/this` / `command(...)`
-  tokens, `$VAR` references, or `$(cmd)` substitutions that
-  the body legitimately needs to mention.
+  body wrapped at ≈ 72 cols. Backticked `tokens`, `$VAR`
+  references, and `$(cmd)` substitutions land verbatim.
   EOF
   ```
-
-  **Two load-bearing pieces** that together make the form
-  bulletproof:
-
-  1. `--message-file -` reads the message body from stdin
-     verbatim — no command substitution boundary, no
-     double-quoted argument, no `$(cat <<...)` expansion
-     pass between the heredoc and the script. Bash never
-     looks inside the body.
-  2. The single-quoted `<<'EOF'` heredoc delimiter
-     suppresses shell expansion *inside* the heredoc body
-     before stdin is written. A bare `<<EOF` (unquoted)
-     would still expand backticks and `$VAR` inside the
-     heredoc itself; the single quotes are mandatory.
-
-  The **legacy** `commit-all.sh "$(cat <<'EOF' ... EOF\n)"`
-  form (positional argument wrapped in command substitution
-  + double quotes) still works but is fragile: a missing
-  outer quote, a stray `"` inside the body, or a bash
-  version with unusual quote-removal semantics could re-
-  introduce the expansion failure. Use `--message-file -`
-  instead — it removes the entire quoting boundary.
-
-  Why all this care: with the legacy positional form, the
-  shell silently:
-  - executes backticked spans as command substitution
-    (so ``\`build = "build.rs"\``` becomes the empty string
-    at best, or `command not found` stderr at worst);
-  - expands `$VAR` references (`$CARGO_HOME`, `$PATH`
-    mentions in the body become their host values);
-  - runs `$(...)` as command substitution.
-
-  All silent from the committer's POV — `commit-all.sh`
-  exits 0, the commit message just loses the expanded
-  tokens. **And history is append-only**
-  ([§4.4](CONTRIBUTING.md#44-no-history-modification)) —
-  no amend, no rebase, no force-push — so a mangled
-  message is unfixable except via a fix-forward note.
-  `--message-file -` is the easy mechanical guardrail.
-
-  Failure mode incident: commit `a5833d5` (2026-05-18 WebUI
-  build-identifier traceability) lost ≈ 8 backticked tokens
-  in the body when I passed the message as a double-quoted
-  string instead of a heredoc. Don't repeat it.
+  `--message-file -` reads stdin without a command-substitution
+  boundary; `<<'EOF'` (single-quoted) suppresses expansion
+  inside the heredoc body. The legacy `"$(cat <<'EOF' ... EOF
+  )"` form is fragile — bash can still re-expand on a missing
+  outer quote or quirky `"` placement. History is append-only,
+  so a mangled message is unfixable except via a fix-forward
+  note. (Incident: `a5833d5` lost ≈ 8 backticked tokens to the
+  double-quoted-string form.)
   ([§4.10](CONTRIBUTING.md#410-commit-message-format))
-- **Git history is append-only.** No amend, no rebase, no reset,
-  no force-push, and no `git revert` either. Two narrow
-  script-enforced exceptions — the `post-commit`
-  unsigned-rollback and `pull-all.sh`'s `--rebase`. Mistakes
-  ship as new fix-forward commits only.
-  ([§4.4](CONTRIBUTING.md#44-no-history-modification))
-- **Push early, push often — every sensible-sized step.**
-  Mid-work pushes on `main` are not just allowed but expected:
-  after each discrete unit of work (a doc reconciliation, a
-  script fix, one cohesive refactor), `commit-all.sh` then
-  `push-all.sh`, then start the next unit. Do not batch
-  unrelated topics into one commit, do not let pushes queue up
-  locally between steps, and do not save it all for end-of-
-  session — a session that crashes mid-flight should leave a
-  clean origin trail of completed steps, not a pile of
-  unpushed work. Narrow exceptions: a sequence whose
-  intermediate states wouldn't compile / pass `pre-landing.sh`
-  (land the sequence as one commit), and edits the user is
-  actively iterating on (wait for closure before committing).
-  When in doubt, ask. Hooks + GitHub ruleset accept WIP as
-  long as it's signed, signed-off, and not force-pushed.
-  ([§4.4](CONTRIBUTING.md#44-no-history-modification))
-- **Always use `scripts/*.sh` wrappers for cargo operations.**
-  The wrappers set `CARGO_TARGET_DIR=target-main` (via
-  `lib/cargo-target-dir.sh`) so CLI and Codex builds use
-  `target-main/` instead of the default `target/`.
-  `rust-analyzer` uses `target/`, so this avoids lock
-  contention, build-cache corruption, and "Blocking waiting
-  for file lock" stalls. `xtask.sh` uses `target-xtask/`;
-  `publish-crate.sh` uses `target-publish/`. **Never run raw
-  `cargo build/test/check/clippy` without setting
-  `CARGO_TARGET_DIR` first** — if you must go raw, prefix
-  with `CARGO_TARGET_DIR=target-main`. Read-only queries
-  (`cargo tree`, `cargo metadata`) are fine raw. If no
-  wrapper covers your case, extend one.
+- **Git history is append-only.** No amend, no rebase, no
+  reset, no force-push, no `git revert`. Two narrow
+  script-enforced exceptions: `post-commit` unsigned-rollback
+  and `pull-all.sh --rebase`. Mistakes ship as fix-forward
+  commits. ([§4.4](CONTRIBUTING.md#44-no-history-modification))
+- **Push early, push often.** After each discrete unit of work:
+  `commit-all.sh`, then `push-all.sh`, then next unit. Don't
+  batch unrelated topics; don't queue local pushes; don't save
+  for end-of-session. Narrow exceptions: sequences whose
+  intermediate states wouldn't pass pre-landing (land as one
+  commit); edits the user is actively iterating on (wait for
+  closure). ([§4.4](CONTRIBUTING.md#44-no-history-modification))
+- **Always use `scripts/*.sh` wrappers for cargo.** The wrappers
+  set `CARGO_TARGET_DIR=target-main` so CLI/Codex builds don't
+  fight `rust-analyzer`'s `target/` for the lock. `xtask.sh`
+  uses `target-xtask/`; `publish-crate.sh` uses
+  `target-publish/`. Read-only queries (`cargo tree`,
+  `cargo metadata`) are fine raw; everything else must set
+  `CARGO_TARGET_DIR` if you must bypass the wrapper.
   ([§5](CONTRIBUTING.md#5-script-wrappers-over-raw-cargo))
-- **Run `./scripts/pre-landing.sh` before every commit that
-  touches Rust.** cargo-deny bans + fmt + check + clippy
-  (`-D warnings`) + rustdoc + test, auto-detecting modified
-  crates. The default
-  flow runs `--workspace --exclude xtask` throughout — xtask
-  is gated behind `pre-landing.sh --xtask` (uses
-  `target-xtask/` instead of `target-main/`, so xtask checks
-  don't fight Codex or workspace builds for the same build
-  cache). When you've touched both workspace crates and
-  xtask, run pre-landing twice: once default, once `--xtask`.
-  CI runs the same script. Slow-by-design (minutes per run
-  on this workspace's ~25 crates with `aws-lc-rs` C builds
-  and Boa) — **run it once before the commit, not repeatedly
-  within a single turn**. Stage all the turn's edits, then
-  run pre-landing once. For focused mid-iteration debugging
-  use a narrow `cargo test <name>`; save the full pre-landing
-  pass for the commit. A re-run after fixing a real failure
-  is fine; a tight edit/re-run loop in one turn just burns
-  time. ([§11](CONTRIBUTING.md#11-pre-landing-checks))
+- **Run `./scripts/pre-landing.sh` before every Rust-touching
+  commit.** cargo-deny bans + fmt + check + clippy
+  (`-D warnings`) + rustdoc + test, auto-detects modified
+  crates. xtask is gated behind `pre-landing.sh --xtask`
+  (uses `target-xtask/`). When you've touched both, run twice.
+  Slow-by-design — run once before the commit, not in a tight
+  edit/re-run loop within a turn. Pre-landing green is the
+  banned-dep guarantee — no need for separate `cargo tree
+  --invert` sweeps after.
+  ([§11](CONTRIBUTING.md#11-pre-landing-checks) /
+  [§11.0.0](CONTRIBUTING.md#1100-pre-landing-green-is-the-banned-dep-guarantee))
 - **Claude runs `publish-crate.sh` on Yuka's signal.**
-  Publishing is Claude's job, not Yuka's — the crates.io
-  publish-and-owner-read token lives on this machine for
-  exactly this reason. The flow is: Yuka reviews the
-  to-be-published commit (version bump + CHANGELOG + any
-  meta-crate cascade), signals "ready", then Claude runs
-  `./scripts/publish-crate.sh <crate>` (and the cascade, in
-  dep-order). Until Yuka signals, do not publish — having a
-  release-ready commit on `main` is not by itself a signal.
-  Yanks remain Yuka-only (next bullet).
-  ([§12.5](CONTRIBUTING.md#125-publish-checklist))
+  Publishing is Claude's job — the publish-and-owner-read
+  token is on this machine for that reason. Flow: Yuka reviews
+  the commit (version bump + CHANGELOG + cascade), signals
+  "ready", Claude runs `./scripts/publish-crate.sh <crate>` in
+  dep-order. A release-ready commit on `main` is not a signal
+  by itself. ([§12.5](CONTRIBUTING.md#125-publish-checklist))
 - **Pre-landing.sh before every publish is non-negotiable.**
-  The publish flow is the highest-stakes Rust-touching commit
-  the workspace makes. `cargo publish`'s own `--dry-run`
-  only verifies the packaged tarball against
-  currently-published deps; it does NOT catch a type-mismatch
-  against a workspace-internal dep that's still being staged
-  for the same cascade. Skipping pre-landing on a release
-  commit has shipped broken crates and forced a yank
-  (mechanics 0.5.2 → 0.5.3 on 2026-05-14). No "publishing is
-  Claude's work" framing makes this optional. If you're
-  about to call `./scripts/publish-crate.sh` and you haven't
-  run pre-landing in the same session against the
-  about-to-be-published crate, stop and run it first.
+  `cargo publish --dry-run` only verifies the tarball against
+  *currently-published* deps; it misses workspace-internal dep
+  mismatches being staged in the same cascade. Skipping has
+  forced a yank (mechanics 0.5.2 → 0.5.3, 2026-05-14).
   ([§12.5](CONTRIBUTING.md#125-publish-checklist))
-- **Yanks aren't Claude's job.** The crates.io token
-  available on shared machines is publish-and-owner-read
-  scoped only; `cargo yank` from here returns 403. When a
-  broken release ships: fix forward with a new patch, bump
-  consumer-crate dep floors to the fixed version, and ask
-  Yuka to perform the yank from her separately-held
-  yank-scoped token or via the crates.io web UI. Do not
-  attempt to work around the 403 — the scope split is
-  deliberate.
+- **Yanks aren't Claude's job.** The token here is
+  publish-and-owner-read scoped; `cargo yank` returns 403.
+  Fix forward with a new patch + dep-floor bump on consumers,
+  ask Yuka to yank from her separate token / web UI. Don't
+  work around the 403.
   ([§12.5](CONTRIBUTING.md#125-publish-checklist))
-- **Don't re-run a Rust-build-heavy script just because you
-  lost context** — re-read the captured output file instead.
-  Every foreground Bash invocation and every `run_in_background`
-  task writes its full stdout+stderr to
-  `/tmp/claude-*/.../tasks/<id>.output`; read that file rather
-  than spawning the script again. The "Rust-build-heavy" set is
-  anything that drives a full workspace `cargo build` /
-  `cargo check` / `cargo test`: `pre-landing.sh`,
-  `miri-test.sh`, `release-build.sh`, `check-api-breakage.sh`,
-  any bare `cargo test --workspace` / `cargo build --workspace`
-  / `cargo check --workspace`, plus any background task that
-  took more than ~30 s to finish. Each re-run burns minutes and
-  competes for `target-main/` with concurrent work. Lighter
-  scripts (`webui-build.sh` at ~12 s, `cargo-audit.sh`,
-  per-crate `cargo check -p <one>`) are fine to re-run when
-  convenient — they're not in the "painful" bucket. The
-  workspace's biggest cost drivers, in rough order: a full
-  `cargo test --workspace` pass (many tests across many
-  crates), and any compile of `philharmonic-connector-impl-embed`
-  (BGE-M3 ONNX model bundling via inline-blob + tract).
-  `aws-lc-rs` C builds and the Boa engine are heavy but
-  routine; they cost minutes, not the tens-of-minutes the two
-  above can hit.
-- **Never pipe a Rust-build-heavy script through `head` or
-  `tail`.** Those truncate the output before the Bash tool's
-  capture file is written, so the lines you trimmed are gone
-  and the next question you ask the output has no way to
-  answer — forcing a re-run, the exact thing the previous
-  bullet forbids. Redirect to a file
-  (`./scripts/foo.sh > /tmp/foo.log 2>&1`) or run the script
-  bare and let the Bash tool capture everything; then `grep` /
-  `Read` the file with offset+limit to inspect specific
-  sections. `head` / `tail` are fine on cheap commands
-  (`status.sh`, `heads.sh`, `git log`, single `cargo tree`,
-  `webui-build.sh` tail, etc.) where re-running costs nothing.
+- **Don't re-run a Rust-build-heavy script after losing
+  context — re-read its captured output.** Every Bash
+  invocation and `run_in_background` task writes full
+  stdout+stderr to `/tmp/claude-*/.../tasks/<id>.output`. The
+  heavy set: `pre-landing.sh`, `miri-test.sh`,
+  `release-build.sh`, `check-api-breakage.sh`, any bare
+  workspace `cargo build/check/test`, plus any background
+  task that took > ~30 s. Top cost drivers: a full
+  `cargo test --workspace`, and any
+  `philharmonic-connector-impl-embed` compile (BGE-M3 ONNX
+  bundling via inline-blob + tract). Light scripts
+  (`webui-build.sh`, `cargo-audit.sh`, per-crate `cargo check
+  -p <one>`) are fine to re-run.
+- **Never pipe a Rust-build-heavy script through `head` /
+  `tail`** — truncation happens before the Bash capture file
+  is written, so the trimmed lines are gone and the next
+  question forces a re-run. Redirect to a file or let Bash
+  capture everything, then `grep` / `Read` with offsets.
+  Cheap commands (`status.sh`, `heads.sh`, `git log`, single
+  `cargo tree`, `webui-build.sh` tail) are fine through head/tail.
 - **Run `./scripts/miri-test.sh` on the crypto crate set at
   every checkpoint** — before publishing crypto-touching
-  crates, after completing a phase/sub-phase with crypto
-  changes, weekly during active development, and before
-  milestones. The mandatory five:
-  `philharmonic-policy`, `philharmonic-connector-client`,
+  crates, after a phase / sub-phase with crypto changes,
+  weekly during active development, before milestones.
+  Mandatory five: `philharmonic-policy`,
+  `philharmonic-connector-client`,
   `philharmonic-connector-service`,
-  `philharmonic-connector-common`, `philharmonic-types`.
-  Track when the last run happened; flag missed checkpoints.
+  `philharmonic-connector-common`, `philharmonic-types`. Track
+  the last run; flag missed checkpoints.
   ([§10.11](CONTRIBUTING.md#1011-miri))
-- **Track doc/code volume regularly.** Run
-  `./scripts/check-md-bloat.sh` (reports Markdown file sizes
-  and flags bloated docs) and `./scripts/tokei.sh` (lines of
-  code by language/crate) after completing a sub-phase,
-  landing a doc reconciliation, or any session where
-  significant volume was added. The output helps Yuka gauge
-  whether the workspace is growing proportionally or drifting
-  toward doc-heavy / code-light (or vice versa). Not a gate
-  — just a hygiene check. Run both and note any surprises.
-- **Never recall a crate version from memory.** Always look up
-  with `./scripts/xtask.sh crates-io-versions -- <crate>`. Local
-  "what we're about to publish" comes from
-  `./scripts/crate-version.sh`. ([§5.1](CONTRIBUTING.md#51-crate-version-lookup))
+- **Track doc/code volume.** Run `./scripts/check-md-bloat.sh`
+  and `./scripts/tokei.sh` after sub-phases, doc
+  reconciliations, or volume-heavy sessions. Hygiene check, not
+  a gate.
+- **Never recall a crate version from memory.** Use
+  `./scripts/xtask.sh crates-io-versions -- <crate>` for
+  published versions, `./scripts/crate-version.sh` for local.
+  ([§5.1](CONTRIBUTING.md#51-crate-version-lookup))
 - **No panics in library `src/`.** No `.unwrap()` / `.expect()`
   on `Result`/`Option`, no `panic!` / `unreachable!` / `todo!`
   / `unimplemented!` on reachable paths, no unbounded indexing,
-  no unchecked integer arithmetic, no lossy `as` casts on
-  untrusted widths. Narrow exceptions need an inline
-  justification. Tests / dev-deps / `xtask/` bins are exempt.
+  no unchecked arithmetic, no lossy `as` on untrusted widths.
+  Narrow exceptions need an inline justification. Tests /
+  dev-deps / `xtask/` bins exempt.
   ([§10.3](CONTRIBUTING.md#103-panics-and-undefined-behavior))
 - **Library crates take bytes, not file paths.** File I/O,
   env-var lookup, config-file parsing belong in the bin.
-  Crypto-adjacent APIs especially. ([§10.4](CONTRIBUTING.md#104-library-crate-boundaries))
-- **HTTP client split is strict.** Outbound HTTP from any
-  runtime crate (connector impls, realm service binaries,
-  `philharmonic-api`, anything that ships) goes through
-  **`mechanics-http-client`** — the workspace's single
-  `hyper-rustls` + `webpki-roots` + `aws-lc-rs` wrapper, with
-  opportunistic HTTP/3 via the `http3` feature. **`reqwest`
-  is banned** (no-wrapper full ban via `deny.toml`); new code
-  must not add it. If mhc lacks a shape you need, extend mhc
-  rather than reaching for reqwest. Workspace tooling (`xtask/`
-  bins) uses **`ureq` + rustls** via `xtask::http::fetch_text`.
-  `ureq` in a runtime crate is a review block; `tokio` in an
-  xtask bin defeats the tooling-side cheapness. The underlying
-  `hyper` crate is **not** banned — mhc uses it for the client
-  path, and `mechanics-http-server` / `mechanics` use it for
-  the server path; "no `reqwest`" applies to the outbound-
-  client *abstraction layer*, not to `hyper` itself. rustls
-  for everything; no native-tls, no OpenSSL. No third HTTP
-  client without scoping first.
+  Crypto-adjacent especially.
+  ([§10.4](CONTRIBUTING.md#104-library-crate-boundaries))
+- **HTTP client split.** Runtime crates use
+  **`mechanics-http-client`** (hyper-rustls + webpki-roots +
+  aws-lc-rs; opt-in HTTP/3 via `http3`). **`reqwest` is
+  banned** via `deny.toml`; extend mhc rather than reaching
+  back for reqwest. xtask tooling uses **`ureq` + rustls** via
+  `xtask::http::fetch_text`. `hyper` itself is **not** banned
+  (mhc + server crates consume it); the ban scopes the
+  outbound-client abstraction layer only. rustls everywhere;
+  no native-tls, no OpenSSL.
   ([§10.9](CONTRIBUTING.md#109-http-client-runtime-stack-vs-tooling-stack))
 - **Shell scripts are POSIX sh** (`#!/bin/sh`), not bash.
-  Invoke by path (`./scripts/foo.sh`), never `bash foo.sh`.
-  Validate with `./scripts/test-scripts.sh` after any change.
+  Invoke by path (`./scripts/foo.sh`). Validate with
+  `./scripts/test-scripts.sh` after any change.
   ([§6](CONTRIBUTING.md#6-shell-script-rules-posix-sh))
 - **No `python` / `perl` / `ruby` / `node` / `jq` / `curl` /
   `wget` in workspace tooling.** Shell for orchestration; Rust
-  bins under `xtask/` for anything non-baseline. Use the
-  `./scripts/mktemp.sh` and `./scripts/web-fetch.sh` wrappers
-  for temp files and HTTP. **One narrow exception:**
-  `./scripts/webui-build.sh` invokes Node.js (via `npx
-  webpack`) solely to generate committed WebUI artifacts;
-  general Node.js remains forbidden.
-  ([§7](CONTRIBUTING.md#7-external-tool-wrappers),
+  bins under `xtask/` otherwise. Use `./scripts/mktemp.sh` and
+  `./scripts/web-fetch.sh`. One narrow exception:
+  `webui-build.sh` invokes Node.js (via `npx webpack`) to
+  generate committed WebUI artefacts.
+  ([§7](CONTRIBUTING.md#7-external-tool-wrappers) /
   [§8](CONTRIBUTING.md#8-in-tree-workspace-tooling-xtask))
-- **Every stable UUID (`KIND` consts, algorithm IDs) via
-  `./scripts/xtask.sh gen-uuid -- --v4`.** Not `uuidgen`, not
-  online generators, not `python -c "import uuid"`.
+- **Every stable UUID via `./scripts/xtask.sh gen-uuid --
+  --v4`.** Not `uuidgen`, not online, not Python.
   ([§9](CONTRIBUTING.md#9-kind-uuid-generation))
-- **Notes to humans.** When you tell Yuka anything substantial,
-  also write it to
-  `docs/notes-to-humans/YYYY-MM-DD-NNNN-<slug>.md` and commit
-  via `./scripts/commit-all.sh --parent-only`. Session-only
-  output isn't enough. ([§15.1](CONTRIBUTING.md#151-notes-to-humans))
-- **Project status reports at milestones.** At sensible
-  inflection points — phase / sub-phase landed, major
-  refactor or doc reconciliation finished, before a long
-  break (Golden Week etc.), or on explicit user request —
-  run `./scripts/project-status.sh` to generate a
-  point-in-time LLM summary into
-  `docs/project-status-reports/YYYY-MM-DD-hh-mm-ss.md`,
-  read it (model output can hallucinate SHAs / invent
-  roadmap items), add an entry to `docs/SUMMARY.md` under
-  "Project status reports", then commit it parent-only with
-  a one-sentence "what milestone" message. Don't run it
-  after every commit or speculatively — the value is in the
-  milestone shape, not in a dense archive.
+- **Notes to humans.** Substantial things you tell Yuka also
+  go in `docs/notes-to-humans/YYYY-MM-DD-NNNN-<slug>.md`,
+  committed via `./scripts/commit-all.sh --parent-only`.
+  ([§15.1](CONTRIBUTING.md#151-notes-to-humans))
+- **Project status reports at milestones.** At inflection
+  points (phase landed, refactor done, before a long break,
+  user request): `./scripts/project-status.sh` → writes to
+  `docs/project-status-reports/`; read it (model can
+  hallucinate), add a `docs/SUMMARY.md` entry, commit
+  parent-only. Not after every commit.
   ([§15.4](CONTRIBUTING.md#154-project-status-reports))
-- **Update the Japanese executive summary at milestones.**
-  At the same inflection points as project status reports,
-  invoke the `docs-jp` skill to generate/update
-  `docs-jp/YYYY-MM-DD-開発サマリー.md`. This is Claude's task
-  (not Codex). Read `docs-jp/README.md` every time — it is
-  the authoritative spec for content, tone, and constraints.
-  No project names, no technical jargon, no FLOSS framing.
+- **Japanese executive summary at milestones.** Same triggers
+  as above — invoke the `docs-jp` skill to update
+  `docs-jp/YYYY-MM-DD-開発サマリー.md`. Claude's task, not
+  Codex's. Read `docs-jp/README.md` every time (authoritative
+  spec).
 - **Archive every Codex prompt** *before* spawning — write to
   `docs/codex-prompts/YYYY-MM-DD-NNNN-<slug>.md` and commit.
-  See the `codex-prompt-archive` skill. ([§15.2](CONTRIBUTING.md#152-codex-prompt-archive))
-- **Terminology follows §14.** Inclusive / neutral / technically
-  accurate, FSF-preferred for free-software framing. Literal
-  external identifiers (HTTP `Authorization`, `Win32`,
-  `x86_64-pc-windows-msvc`) stay as they ship.
-- **Prose is in English by default** — commit messages, code
+  See the [`codex-prompt-archive`](.claude/skills/codex-prompt-archive/SKILL.md)
+  skill. ([§15.2](CONTRIBUTING.md#152-codex-prompt-archive))
+- **Terminology follows §14.** Inclusive / neutral /
+  technically accurate, FSF-preferred for free-software
+  framing. Literal external identifiers (HTTP `Authorization`,
+  `Win32`, `x86_64-pc-windows-msvc`) stay as they ship.
+- **Prose is English by default.** Commit messages, code
   comments, docs, notes-to-humans, PR/review text. Multilingual
-  contributors' grammar/typo issues are **fixed best-effort in
-  review**, never grounds to reject a contribution. Non-English
-  text is explicitly allowed when it's the artefact (i18n
-  strings, Unicode tests, literal external identifiers); add an
-  English gloss alongside when the meaning isn't self-evident.
+  contributors' grammar/typo issues are fixed best-effort in
+  review, never grounds to reject. Non-English text is
+  allowed when it's the artefact (i18n strings, Unicode
+  tests, external identifiers); add an English gloss when
+  meaning isn't self-evident.
   ([§14.6](CONTRIBUTING.md#146-english-as-the-default))
 
 ## Memory / persistence policy
 
-**NEVER save anything about this workspace to machine-local
-memory.** Workspace knowledge — coding conventions,
-architectural rules, project history, Yuka's stated
-preferences for this project, decisions taken in this repo,
-crate-family boundaries, anything you "learned" during a
-session about how this project works — all of it belongs in
+**NEVER save workspace knowledge to machine-local memory.**
+Workspace knowledge — conventions, architectural rules, project
+history, Yuka's preferences, decisions, crate-family boundaries,
+anything you "learned" about how this project works — belongs in
 the **repo**, never in your per-agent-install memory store.
-This includes feedback memories about corrections,
-project memories about ongoing work, reference memories
-pointing at this project's resources, and anything that
-mentions any file in this workspace.
+Includes feedback / project / reference memories that mention
+any file in this workspace.
 
-**Why this is a NEVER, not a "prefer":**
+Why this is a NEVER: machine-local memory is per-agent-install,
+invisible to other developers / clones / machines / Codex / CI /
+future sessions on different hosts. The repo is the canonical
+source of truth; saving a workspace rule to memory is a stealth
+fork. Multiple Claude installs would drift; the repo never
+drifts from itself.
 
-- Machine-local memory is per-agent-install — it doesn't
-  travel to other developers, other clones, other machines,
-  Codex, GitHub Actions, or future Claude sessions on
-  different hosts. The same convention saved to memory on
-  this machine is invisible on every other machine.
-- The repo is the canonical source of truth. Saving a
-  workspace rule to memory is a stealth fork of that source
-  of truth — the next agent to encounter the situation will
-  reinvent the rule because the repo doesn't carry it.
-- Multiple Claude installs on multiple machines will drift
-  out of sync if they each carry separate "memorised"
-  conventions. The repo never drifts from itself.
+When you would have written a workspace-knowledge memory:
+identify the right living doc (`CONTRIBUTING.md`, `CLAUDE.md`,
+`AGENTS.md`, `docs/ROADMAP.md`, `docs/design/*.md`; never
+`HUMANS.md`), edit it, commit via `scripts/commit-all.sh`. The
+commit is the persistence mechanism.
 
-**When you would have written a workspace-knowledge memory,
-do this instead:**
-
-1. Identify the right living doc: `CONTRIBUTING.md` (most
-   workspace conventions), `CLAUDE.md` (Claude-specific
-   operating rules), `AGENTS.md` (Codex-specific operating
-   rules), `docs/ROADMAP.md` (planning/state),
-   `docs/design/*.md` (architectural decisions), or
-   `HUMANS.md` (Yuka writes this, don't edit it).
-2. Edit that doc with the new rule, propose the change,
-   commit and push (via `scripts/commit-all.sh`).
-3. Do not write to memory at all for this case. The
-   commit itself is the persistence mechanism.
-
-**Machine-local memory is reserved for narrowly machine-
-local facts:** "On this box, rustup/gh were installed on
-<date>." "This box is the Yuka-home WSL." "This machine's
-Codex CLI version is X." Nothing else.
-
-If you catch yourself reaching for the Write tool with a
-path under `~/.claude/projects/-home-ubuntu-philharmonic-workspace/memory/`
-and the content references *anything* in this workspace
-beyond the host-machine facts above — **stop, close the
-draft, and write the rule to the repo instead.**
+Machine-local memory is reserved for narrowly machine-local
+facts: "rustup/gh installed on this box on <date>"; "this is
+the Yuka-home WSL"; "Codex CLI version is X". Nothing else.
 
 ## Fresh clone
 
@@ -722,8 +403,8 @@ cd philharmonic-workspace
 ./scripts/setup.sh
 ```
 
-`setup.sh` is idempotent. It configures submodule init,
+`setup.sh` is idempotent: configures submodule init,
 `push.recurseSubmodules=check`, `core.hooksPath=.githooks`,
 `commit.gpgsign=true` / `tag.gpgsign=true` /
-`rebase.gpgsign=true`, and installs nightly+miri via rustup.
-See [`CONTRIBUTING.md §1`](CONTRIBUTING.md#1-quick-start).
+`rebase.gpgsign=true`, installs nightly+miri via rustup.
+([§1](CONTRIBUTING.md#1-quick-start))

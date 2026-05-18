@@ -1,606 +1,431 @@
 # AGENTS.md — for Codex
 
-> **Who this file is for.** This file is instructions for **Codex**
-> (the OpenAI Codex CLI agent), not for Claude Code.
+> **Who this file is for.** Instructions for **Codex** (the
+> OpenAI Codex CLI agent), not Claude Code. Division of labour:
+> Claude designs / reviews / drives Git and reads `CLAUDE.md`;
+> Codex (you) implements inside the task Claude hands you,
+> doesn't design from scratch, doesn't commit or push.
 >
-> In this workspace the division of labour is:
-> - **Claude Code** = designer, reviewer, orchestrator, workspace
->   caretaker. It writes the prompts you receive, reviews your
->   output, drives Git. Claude reads `CLAUDE.md` (not this file).
-> - **Codex (you)** = implementation partner. You write the real
->   Rust. You work inside the task Claude hands you. You don't
->   design from scratch, and you don't commit or push.
->
-> If a rule below would conflict with a direct system/developer
-> instruction in the prompt you received, the direct instruction
-> wins (per the built-in AGENTS.md spec).
+> If a rule here conflicts with a direct system/developer
+> instruction in your prompt, the prompt wins (per the AGENTS.md
+> spec).
+
+## Keep this file concise
+
+This file is loaded into every Codex session for this workspace
+and competes with task content for context budget. **One short
+bullet or one short paragraph per rule** — no multi-paragraph
+rationales, no inline incident history beyond a single SHA.
+Depth lives in `CONTRIBUTING.md`. When you (or Claude) edit
+this file, prefer compressing existing bullets over adding new
+ones. See [`CONTRIBUTING.md §18.8`](CONTRIBUTING.md#188-claudemd--agentsmd--keep-concise).
 
 ## Authoritative docs
 
-- **[`CONTRIBUTING.md`](CONTRIBUTING.md) is the single authoritative
-  home for workspace conventions** — git workflow, script
-  wrappers, POSIX sh rules, Rust code rules, versioning,
-  licensing, terminology, journals. Every convention mentioned
-  below in summary form is documented in full there; read the
-  referenced section before acting on a non-trivial task.
-  **If you discover an unwritten convention during the task or
-  need to change one, surface it in your final summary so
-  Claude can update `CONTRIBUTING.md`** — conventions belong in
-  the repo, not in your per-install memory. See its §18.2.
-- **[`README.md`](README.md) is the whole-project executive
-  summary** — self-contained, concise, LLM-ingest-ready (yes,
-  also for you). If the prompt you received conflicts with
-  `README.md`'s structural claims, surface that — one of the
-  two is wrong. If your implementation changes something
-  structurally visible (crate added/renamed, dep graph shift,
-  phase completed, scripts reorganised), flag it so Claude can
-  update `README.md` in the same commit. See
-  [`CONTRIBUTING.md §18.1`](CONTRIBUTING.md#181-readmemd--whole-project-executive-summary).
-- **[`ROADMAP.md`](docs/ROADMAP.md) is the single authoritative home
-  for any roadmap or plan** — current phase, what's next,
-  what's blocked, what was deferred and why. No plans live in
-  chat or your working memory. If your implementation moves a
-  phase forward, completes a task, or reveals that a planned
-  approach was wrong, **surface that in your final summary** so
-  Claude can update `docs/ROADMAP.md` in the same commit as the
-  work. See
-  [`CONTRIBUTING.md §16`](CONTRIBUTING.md#16-roadmap-maintenance)
-  and
-  [`§18.3`](CONTRIBUTING.md#183-roadmapmd--authoritative-home-for-plans).
-- [`docs/design/`](docs/design/) — architectural design docs. What
-  Philharmonic *is*.
-- [`CLAUDE.md`](CLAUDE.md) / [`AGENTS.md`](AGENTS.md) —
-  agent-targeted rules (e.g. the `HUMANS.md` read-only rule).
+- [`CONTRIBUTING.md`](CONTRIBUTING.md) — single authoritative
+  home for workspace conventions. Read the referenced § before
+  acting on anything non-trivial. If you discover an unwritten
+  convention or need to change one, surface it in your final
+  summary so Claude can update it ([§18.2](CONTRIBUTING.md#182-contributingmd--single-authoritative-home-for-conventions)).
+- [`README.md`](README.md) — whole-project executive summary,
+  LLM-ingest-ready (yes, for you too). If your implementation
+  changes something structurally visible (crate added/renamed,
+  dep-graph shift, phase complete, scripts reorganised),
+  surface it so Claude updates README in the same commit
+  ([§18.1](CONTRIBUTING.md#181-readmemd--whole-project-executive-summary)).
+- [`docs/ROADMAP.md`](docs/ROADMAP.md) — single authoritative
+  home for plans. If your work moves a phase forward, completes
+  a task, or reveals an approach was wrong, surface it for
+  Claude to update in the same commit
+  ([§16](CONTRIBUTING.md#16-roadmap-maintenance) /
+  [§18.3](CONTRIBUTING.md#183-roadmapmd--authoritative-home-for-plans)).
+- [`docs/design/`](docs/design/) — architectural design docs.
+- [`CLAUDE.md`](CLAUDE.md) — Claude's counterpart to this file.
 
 ## Posture: maintainability over fast coding
 
-Default to slow, careful, structured authorship; never trade
-maintainability for keystrokes. **Runtime speed is still a
-first-class goal** — what's deprioritised is *coding
-velocity*. Read existing modules first; prefer reuse over
-rewrite; small focused units; deduplicate at the third
-occurrence; refactor behavior-preserving — fixing bugs
-encountered mid-task is fine, gold-plating is not. Umbrella
-rule: [CONTRIBUTING §10.0](CONTRIBUTING.md#100-posture-maintainability-over-fast-coding).
-The current operational priority lives in
-[`docs/ROADMAP.md`](docs/ROADMAP.md) and
-[`HUMANS.md`](HUMANS.md); the prompt Claude hands you
-already reflects it. Two cross-cutting sub-directives apply
-whenever you touch maintainability-sensitive code:
-**Maintainability sweep** (no behaviour change beyond fixing
-mid-run bugs) and **Clean separation of concerns** (bins
-thin, logic in libraries — see
-[§Bins are thin](docs/design/02-design-principles.md#bins-are-thin)
-and [CONTRIBUTING §10.14](CONTRIBUTING.md#1014-unpublished-bin-crates-minimal-cli-logic-in-libraries)).
-When in doubt, slow down.
+Default to slow, careful authorship; never trade maintainability
+for keystrokes. Runtime speed is still first-class — what's
+deprioritised is *coding velocity*. Reuse over rewrite; small
+focused units; deduplicate at the third occurrence; refactor
+behaviour-preserving (fixing bugs encountered mid-task is fine,
+gold-plating is not). Cross-cutting sub-directives: **bins are
+thin, logic in libraries**
+([design §02](docs/design/02-design-principles.md#bins-are-thin)
+/ [§10.14](CONTRIBUTING.md#1014-unpublished-bin-crates-minimal-cli-logic-in-libraries)).
+Umbrella: [§10.0](CONTRIBUTING.md#100-posture-maintainability-over-fast-coding).
 
 ## Hard stops
 
 ### POSIX-ish host required
 
-This workspace assumes a POSIX-ish development host: GNU/Linux
-(incl. WSL2 on Windows), macOS (Darwin), BSDs, illumos/Solaris,
-or musl distros (Alpine).
-
-**Before running anything, check your environment.** `uname -s` →
-`Linux` / `Darwin` / `FreeBSD` / `OpenBSD` / `NetBSD` /
-`DragonFly` / `SunOS`: proceed. Raw Microsoft Windows or a native
-Windows runtime: **STOP IMMEDIATELY**, surface the mismatch in
-your final message, do not attempt the task. The gate lives in
-this document because raw Windows can't execute `#!/bin/sh` in
-the first place. Git Bash / MSYS / Cygwin: proceed with caution,
-flag any submodule / signing / permission anomaly. See
-[`CONTRIBUTING.md §2`](CONTRIBUTING.md#2-development-environment).
+`uname -s` → `Linux` / `Darwin` / `FreeBSD` / `OpenBSD` /
+`NetBSD` / `DragonFly` / `SunOS`: proceed. Raw Microsoft
+Windows: STOP, surface the mismatch, don't attempt the task.
+Git Bash / MSYS / Cygwin: proceed with caution.
+([§2](CONTRIBUTING.md#2-development-environment))
 
 ### Crypto-sensitive paths
 
-SCK encrypt/decrypt, COSE_Sign1 signing/verification, COSE_Encrypt0
-encryption/decryption, the ML-KEM-768 + X25519 + HKDF + AES-256-GCM
-hybrid, payload-hash binding, `pht_` API token generation — all
-require Yuka's personal two-gate review. You are allowed to
-implement crypto code when the task asks for it — but **call it
-out clearly in your final summary** so the review gate isn't
-missed. If the task *doesn't* mention these areas and your
-implementation drifts into touching them, stop and surface rather
-than proceeding.
+SCK encrypt/decrypt, COSE_Sign1, COSE_Encrypt0, ML-KEM-768 +
+X25519 + HKDF + AES-256-GCM hybrid, payload-hash binding,
+`pht_` token generation — all require Yuka's two-gate review.
+Implement when the task asks, but **call it out in your final
+summary** so the gate isn't missed. If the task doesn't mention
+these areas and your implementation drifts into them, stop and
+surface rather than proceed.
 
 ### Production is not this sandbox
 
-The dev sandbox you're running in is **not** the production
-Philharmonic host. Production runs on a separate machine.
-When the prompt cites a runtime symptom from production — a
-workflow stalling, no loopback packets after one failed
-endpoint step, a long-lived worker behaving differently than
-a fresh test process, a chat instance hanging — **do not
-assume local observations on this sandbox reflect production
-state**:
-
-- `tcpdump`, `ss`, `lsof`, `netstat`, `pstree`, `journalctl`,
-  `/proc/<pid>/`, log scraping on this sandbox inspect this
-  sandbox's processes only. They tell you nothing about the
-  production worker's connection pool, process tree, kernel
-  state, or filesystem.
-- A `cargo run` here uses a fresh binary against fresh state;
-  it does not carry the production worker's accumulated state
-  — hyper TCP/TLS pool, tail-promise queue, in-process caches,
-  H3 negative-cache and Alt-Svc table, file handles. A clean
-  local run is not evidence that production is fine.
-- A symptom that doesn't reproduce on this sandbox is not
-  falsified — it just means the sandbox doesn't have the
-  production host's long-lived state.
-
-When the prompt describes a production-only symptom, default
-to **reasoning about long-lived production process state**
-(what accumulates in shared client state across jobs, what an
-endpoint cancellation could leak into a connection pool, what
-the worker's tail-promise queue could hold) rather than local
-experiments. If on-production observation is genuinely needed
-to confirm a hypothesis, say so in your final message rather
-than substituting a local equivalent and presenting it as
-evidence about production. The 2026-05-18 mhc TCP-pool poisoning
-fix is the canonical example: a production "no `lo` packets
-after one soft-failed endpoint step" report was correctly
-analysed as long-lived shared `mechanics_http_client::Client`
-state in the worker rather than via any local packet capture.
+The dev sandbox is **not** the production Philharmonic host.
+When the prompt cites a production runtime symptom, do not
+assume local observations reflect production state — `tcpdump`,
+`ss`, `pstree`, `cargo run` reproductions here cannot carry
+the production worker's long-lived hyper TCP pool,
+tail-promise queue, H3 negative cache, or accumulated state.
+A symptom that doesn't reproduce on this sandbox is not
+falsified — the sandbox just lacks the production host's
+long-lived state. Default to reasoning about production
+process state; if on-production observation is genuinely
+needed, say so in your final message rather than substituting
+local equivalents as production evidence. Canonical example:
+2026-05-18 mhc TCP-pool poisoning fix (no `lo` packets after
+one soft-failed step — production, not the sandbox).
 
 ## Your role
 
-- **Implement what the prompt asks.** Don't redesign scope, don't
-  refactor surrounding code, don't polish unrelated files. Claude
-  decided the shape of the task; your job is to land a correct
-  implementation of it.
-- **Claude reviews your output.** If something in the prompt is
-  ambiguous or contradicts the codebase, flag it in your final
-  message rather than guessing.
+- **Implement what the prompt asks.** Don't redesign scope,
+  refactor surrounding code, or polish unrelated files. Claude
+  decided the shape; land a correct implementation of it.
+- **Claude reviews your output.** If the prompt is ambiguous or
+  contradicts the codebase, flag in your final message — don't
+  guess.
 - **Don't commit, don't push, don't branch.** Leave the working
   tree dirty. Claude commits via `scripts/*.sh` after review.
-- **JST is this workspace's authoritative timezone.** Every
-  human-facing wall-clock reading defaults to JST
-  (Asia/Tokyo, UTC+09:00) — deadlines, schedules, generated
-  chart labels, status reports, prose dates. Wire-format
-  fields (RFC 3339 audit trailers, Git committer time) stay
-  in whatever zone the spec mandates and are converted to JST
-  for display. In Rust use `chrono_tz::Asia::Tokyo`; in shell
-  use `TZ=Asia/Tokyo` or `calendar-jp`. See
-  [`CONTRIBUTING.md §JST`](CONTRIBUTING.md#jst-is-this-workspaces-authoritative-timezone).
-- **Ground yourself in JST time — regularly, not just once.**
-  Run `./scripts/xtask.sh calendar-jp` — prints a 5-week grid
-  centred on today (JST) with weekend/holiday markers and the
-  current JST timestamp. Run it when you start, **again after
-  any significant unit of work completes** (a batch of edits
-  finished, a build/test cycle wrapped, a long dispatch
-  returned) so your next decision uses fresh time, and any
-  time the prompt says "by Thursday", "before the deadline",
-  "this week", or mentions another date-relative commitment.
-  Long sessions drift across the 10:00 / 19:00 / 21:00
-  thresholds and sometimes midnight — a stale timestamp is
-  the failure mode. The host's timezone and your training-data
-  cutoff are both unreliable for this; the bin's output is
-  authoritative, and it is cheap to re-run.
-- **Never refuse on time grounds.** Regular hours are
-  10:00–19:00 JST Mon–Fri; extended to 21:00 is normal;
-  nights, weekends (土/日), and 祝日 are **allowed**. Do not
-  stall, defer, or ask "should I wait until Monday" — just
-  do the work. If the current JST time from `calendar-jp` is
-  outside regular hours, add one short note in your final
-  message so the transcript shows the context
+- **JST is authoritative.** Every human-facing wall-clock
+  reading defaults to JST (Asia/Tokyo, UTC+09:00). Wire-format
+  fields stay in spec-mandated zones, formatted to JST for
+  display. `chrono_tz::Asia::Tokyo` in Rust; `TZ=Asia/Tokyo`
+  or `calendar-jp` in shell.
+  ([§JST](CONTRIBUTING.md#jst-is-this-workspaces-authoritative-timezone))
+- **Ground in JST time regularly.** Run `./scripts/xtask.sh
+  calendar-jp` at start, after any significant unit of work,
+  and any time the prompt references a date-relative
+  commitment. Long sessions drift across 10:00 / 19:00 / 21:00
+  / midnight thresholds — a stale timestamp is the failure
+  mode. Host TZ and your training-data cutoff are unreliable
+  here; the bin is authoritative and cheap to re-run.
+- **Never refuse on time grounds.** Regular hours 10:00–19:00
+  JST Mon–Fri (extended to 21:00). Nights, weekends (土/日),
+  and 祝日 are **allowed** — do the work. Outside regular
+  hours, add a short note in your final message
   (*"(JST now 20:14 土 — out-of-hours session; proceeding.)"*).
-  The note is a log artefact, not a permission request.
+  Log artefact, not a permission request.
 
 ## Git (what you must not do)
 
-Read-only git is fine (`git log`, `git diff`, `git show`,
-`git blame`, `git rev-parse`, `git submodule status`). State
-changes are Claude's job:
+Read-only git is fine (`log`, `diff`, `show`, `blame`,
+`rev-parse`, `submodule status`). State changes are Claude's.
 
-- **Do not run** `git commit`, `git push`, `git add`, `git reset`,
-  `git rebase`, `git stash`, `git branch -D`, `git checkout
-  <branch>`, `git commit --amend`, `git push --force`.
-- **Never rewrite history, and never `git revert` either.** This
-  workspace is append-only and the revert form of "undo" is also
-  forbidden. No amend, no rebase, no reset, no force-push, no
-  `git revert`, no history surgery of any kind. Two
-  script-enforced exceptions exist (the `post-commit` /
-  `commit-all.sh` unsigned-commit rollback, and the `--rebase`
-  inside `pull-all.sh`) — both are Claude's concern, not yours.
-  Mistakes ship as new fix-forward commits. If the prompt seems
-  to require history modification or a revert, stop and surface
-  it.
-  ([`CONTRIBUTING.md §4.4`](CONTRIBUTING.md#44-no-history-modification))
+- **Do not run** `git commit`, `push`, `add`, `reset`,
+  `rebase`, `stash`, `branch -D`, `checkout <branch>`,
+  `commit --amend`, `push --force`.
+- **Never rewrite history; never `git revert`.** Append-only.
+  Two script-enforced exceptions (`post-commit` /
+  `commit-all.sh` unsigned rollback; `pull-all.sh --rebase`)
+  are Claude's, not yours. Mistakes ship as fix-forward
+  commits. If the prompt seems to require history modification
+  or revert, stop and surface.
+  ([§4.4](CONTRIBUTING.md#44-no-history-modification))
 - **Do not touch** `.gitmodules` or submodule pointers.
 - **Leave edits in the working tree.** Claude runs
-  `scripts/commit-all.sh` and `scripts/push-all.sh` after review.
-- The repo installs tracked Git hooks via `core.hooksPath`
-  (`.githooks/{pre-commit,commit-msg,post-commit,pre-push}`,
-  wired by `scripts/setup.sh`). Don't disable them; don't
-  `--no-verify` around them.
-  ([`CONTRIBUTING.md §4.5`](CONTRIBUTING.md#45-tracked-git-hooks))
+  `commit-all.sh` / `push-all.sh` after review.
+- Tracked Git hooks via `core.hooksPath` (`.githooks/...`,
+  wired by `setup.sh`). Don't disable; don't `--no-verify`.
+  ([§4.5](CONTRIBUTING.md#45-tracked-git-hooks))
 
-If the prompt genuinely requires a git state change (e.g.
-"create a branch and open a PR"), stop and surface that.
+If the prompt genuinely needs a git state change (branch,
+PR), stop and surface.
 
 ## Rust conventions — short form
 
 Every rule below is summarised from
-[`CONTRIBUTING.md §10`](CONTRIBUTING.md#10-rust-code-conventions).
-Read the full section when in doubt.
+[`§10`](CONTRIBUTING.md#10-rust-code-conventions). Read the
+full section when in doubt.
 
-- **Edition 2024, MSRV 1.88.** Every `Cargo.toml` already carries
-  `edition = "2024"` and `rust-version = "1.88"`. Match.
-- **License.** All crates are `Apache-2.0 OR MPL-2.0` with both
-  license files at the crate root. **Do not add per-file
-  copyright or license headers.**
-- **Errors.** `thiserror` for library crates, partitioned by what
-  the caller does with them. Predicates like `is_retryable()`
-  where useful. **No `anyhow` in library crates** — callers
-  can't match on specific failure modes. `anyhow` is fine in
-  binary crates.
+- **Edition 2024, MSRV 1.88.** Every `Cargo.toml` already
+  carries `edition = "2024"` and `rust-version = "1.88"`.
+- **License.** `Apache-2.0 OR MPL-2.0` with both files at the
+  crate root. **No per-file copyright or license headers.**
+- **Errors.** `thiserror` in libraries, partitioned by what
+  callers do with them. **No `anyhow` in library crates** —
+  callers can't match. `anyhow` is fine in binaries.
 - **No panics in library `src/`.** No `.unwrap()` / `.expect()`
-  on `Result` / `Option`, no `panic!` / `unreachable!` / `todo!`
+  on `Result`/`Option`, no `panic!` / `unreachable!` / `todo!`
   / `unimplemented!` on reachable paths, no unbounded indexing,
-  no unchecked integer arithmetic, no lossy `as` casts on
-  untrusted widths. Narrow exceptions need an inline
-  justification comment. Tests / dev-deps / `xtask/` bins are
-  exempt. ([§10.3](CONTRIBUTING.md#103-panics-and-undefined-behavior))
+  no unchecked arithmetic, no lossy `as` on untrusted widths.
+  Narrow exceptions need an inline justification. Tests /
+  dev-deps / `xtask/` bins exempt.
+  ([§10.3](CONTRIBUTING.md#103-panics-and-undefined-behavior))
 - **Library crates take bytes, not file paths.** File I/O,
-  env-var lookup, config-file parsing belong in the bin. Any
-  `&Path`-taking API in a crypto-adjacent crate is a smell.
+  env-var lookup, config-file parsing belong in the bin.
+  Crypto-adjacent especially.
   ([§10.4](CONTRIBUTING.md#104-library-crate-boundaries))
-- **Async.** `tokio` is the default. `tokio::sync` primitives.
-  `async-trait` on traits that need to be dyn-compatible — see
-  doc 08 §"Why `async_trait` (in 2026)" for the specific compat
-  reasons on the connector `Implementation` trait.
-- **HTTP client split.** Outbound HTTP from any runtime crate
-  (impl crates, service binaries, `philharmonic-api`, anything
-  shipping) goes through **`mechanics-http-client`** — the
-  workspace's single `hyper-rustls` + `webpki-roots` +
-  `aws-lc-rs` wrapper, with opportunistic HTTP/3 via the
-  `http3` feature. **`reqwest` is banned** (no-wrapper full
-  ban via `deny.toml`); never add it to a crate. If mhc lacks
-  a shape the task needs, surface that in your final message
-  rather than reaching for reqwest. `xtask/` tooling bins use
-  **`ureq` + rustls**; `ureq` in any runtime crate is a review
-  block. The underlying `hyper` crate is **not** banned —
-  mhc / `mechanics-http-server` / `mechanics` consume it for
-  client and server paths; the ban is on the outbound-client
-  abstraction layer (`reqwest`), not on `hyper` itself.
-  rustls for everything; no native-tls, no OpenSSL.
+- **Async.** `tokio` default; `tokio::sync` primitives;
+  `async-trait` on dyn-compatible traits (see doc 08 §"Why
+  `async_trait` (in 2026)").
+- **HTTP client split.** Runtime crates use
+  **`mechanics-http-client`** (hyper-rustls + webpki-roots +
+  aws-lc-rs; opt-in HTTP/3 via `http3`). **`reqwest` is
+  banned** via `deny.toml`; if mhc lacks a shape you need,
+  surface that in your final message rather than reach for
+  reqwest. xtask bins use **`ureq` + rustls**. `hyper` itself
+  is **not** banned (mhc + server crates consume it); the ban
+  scopes the outbound-client abstraction layer only. rustls
+  everywhere; no native-tls, no OpenSSL.
   ([§10.9](CONTRIBUTING.md#109-http-client-runtime-stack-vs-tooling-stack))
-- **Re-exports.** Re-export types from direct dependencies that
-  appear in public API. Don't re-export transitive deps. Don't
-  re-export types the crate doesn't itself use.
+- **Re-exports.** Re-export types from direct deps that appear
+  in public API; don't re-export transitive deps or unused
+  types.
 - **Trait vs. impl split.** Multiple implementations → separate
-  crates, not feature-gated. Follow the pattern when adding new
-  impls.
+  crates, not feature-gated.
 - **Crate naming.** `<subsystem>-<concern>[-<implementation>]`.
 - **Version pinning.** Peer workspace crates pin loosely
-  (`"0.1"`). Cornerstone pinned to minor. Pin a specific patch
-  only when relying on a patch-introduced feature — not out of
-  habit.
-- **Testing.** Unit tests colocated. Integration tests in
-  `tests/`. Tests needing real infra (testcontainers, network)
-  **must** be `#[ignore]`-gated or feature-gated so default CI
-  runs without them.
+  (`"0.1"`); cornerstone pinned to minor; pin a patch only
+  when relying on a patch-introduced feature.
+- **Testing.** Unit tests colocated. Integration in `tests/`.
+  Real-infra tests (testcontainers, network) must be
+  `#[ignore]`-gated or feature-gated.
 - **Comments.** Default to *no* comments. Write one when the
   *why* is non-obvious. Don't narrate *what* — names do that.
-- **Always use `scripts/*.sh` for cargo operations.** The
-  wrappers set `CARGO_TARGET_DIR=target-main` so builds don't
-  fight `rust-analyzer`'s `target/` for the build-directory
-  lock. `xtask.sh` uses `target-xtask/`; `publish-crate.sh`
-  uses `target-publish/`. If you must run cargo directly,
-  prefix with `CARGO_TARGET_DIR=target-main`.
-- **Track volume regularly.** After finishing a sub-phase or
-  a significant batch of edits, run
-  `./scripts/check-md-bloat.sh` and `./scripts/tokei.sh`.
-  Note the output in your final summary — it helps Claude
-  and Yuka gauge growth.
-- **Check resource pressure before heavy work.** Run
-  `./scripts/xtask.sh resource-pressure` for a one-line
-  summary of CPU%, `load_avg_1 / num_cpus`, available/total
-  memory, and used/total swap. Use it as a pre-flight
-  before kicking off `pre-landing.sh`, a long
-  `cargo test --workspace`, or anything else that's going
-  to compete for CPU/RAM. If `load1/cpus` is well above
-  1.0 or swap is climbing, the box is already saturated;
-  defer rather than pile on. Don't confuse this with
-  `xtask.sh system-resources`, which is the
-  machine-readable audit-trailer feed and doesn't sample
-  CPU activity.
+- **Always use `scripts/*.sh` for cargo.** Wrappers set
+  `CARGO_TARGET_DIR=target-main` so builds don't fight
+  `rust-analyzer`'s `target/`. `xtask.sh` uses `target-xtask/`;
+  `publish-crate.sh` uses `target-publish/`. Raw cargo
+  (`cargo tree`, `cargo metadata`) is fine read-only; for
+  anything that builds, prefix with `CARGO_TARGET_DIR=target-main`.
+- **Track volume.** After a sub-phase or significant batch,
+  run `./scripts/check-md-bloat.sh` + `./scripts/tokei.sh`,
+  note the output in your final summary.
+- **Check resource pressure before heavy work.**
+  `./scripts/xtask.sh resource-pressure` (one-line CPU / load /
+  memory / swap). Use before pre-landing, long `cargo test
+  --workspace`, etc. If `load1/cpus` is well above 1.0 or swap
+  is climbing, defer. `xtask.sh system-resources` is the
+  audit-trailer feed, not a status check.
 
 ## Shell scripts — short form
 
-Every rule from [`CONTRIBUTING.md §6`](CONTRIBUTING.md#6-shell-script-rules-posix-sh)
-applies if you touch shell scripts:
+If you touch shell scripts, every rule from
+[`§6`](CONTRIBUTING.md#6-shell-script-rules-posix-sh) applies:
 
 - **`#!/bin/sh`, not bash.** No `[[ ]]`, `=~`, arrays, `<<<`,
-  `<(...)`, `mapfile`, `${var:0:N}`, `$'\e[...]'`, `local`,
+  `<(...)`, `mapfile`, `${var:0:N}`, `local`,
   `${BASH_SOURCE[0]}`.
-- **`set -eu`, not `set -euo pipefail`.** Pipefail isn't POSIX.
-- **Invoke by path**: `./scripts/foo.sh`, not `bash foo.sh`.
-- **Validate with `./scripts/test-scripts.sh`** after any
-  change. CI runs the same check.
-- **POSIX checklist**: [`docs/POSIX_CHECKLIST.md`](docs/POSIX_CHECKLIST.md)
-  enumerates non-POSIX constructs to avoid.
+- **`set -eu`**, not `set -euo pipefail` (pipefail isn't POSIX).
+- **Invoke by path** (`./scripts/foo.sh`), not `bash foo.sh`.
+- **Validate** with `./scripts/test-scripts.sh` after any
+  change.
+- POSIX checklist: [`docs/POSIX_CHECKLIST.md`](docs/POSIX_CHECKLIST.md).
 
 ### Rust bins, not Python / Perl / jq / curl
 
-**Never invoke `python`, `perl`, `ruby`, `node`, `jq`, `curl`, or
+**Never invoke `python`, `perl`, `ruby`, `node`, `jq`, `curl`,
 `wget` from workspace tooling.** Shell for orchestration; Rust
-bins under `xtask/` for anything non-baseline. Use the
-`./scripts/mktemp.sh` and `./scripts/web-fetch.sh` wrappers for
-temp files and HTTP. ([§7](CONTRIBUTING.md#7-external-tool-wrappers),
+bins under `xtask/` otherwise. Use `./scripts/mktemp.sh` and
+`./scripts/web-fetch.sh`. If tempted to reach for one, surface
+in your final summary.
+([§7](CONTRIBUTING.md#7-external-tool-wrappers) /
 [§8](CONTRIBUTING.md#8-in-tree-workspace-tooling-xtask))
-
-If you're tempted to reach for one of those, surface it in your
-final summary so Claude can decide whether to extend the Rust
-tooling.
 
 ### KIND UUIDs via xtask
 
-Every stable wire-format UUID is minted via `./scripts/xtask.sh
-gen-uuid -- --v4`. Not `python3 -c "import uuid"`, not `uuidgen`,
-not online generators. ([§9](CONTRIBUTING.md#9-kind-uuid-generation))
+Every stable wire-format UUID via `./scripts/xtask.sh gen-uuid
+-- --v4`. Not `python3 -c "import uuid"`, not `uuidgen`, not
+online generators. ([§9](CONTRIBUTING.md#9-kind-uuid-generation))
 
 ## `HUMANS.md` — do not touch
 
-`HUMANS.md` is a human-authored note-to-self. It's part of your
-context, not your output surface.
-
-- **You MAY read it** for context on Yuka's thinking, preferences,
-  and current focus.
-- **You MUST NOT modify it.** No edits, no appends, no
-  "helpful" reformatting, no auto-generated sections. No
-  exceptions.
-- If something in `HUMANS.md` looks wrong or outdated, flag it
-  in your final summary. Don't edit it.
-
-See [`CLAUDE.md`](CLAUDE.md) for Claude Code rules,
-[`AGENTS.md`](AGENTS.md) for Codex rules.
+Yuka's note-to-self. **You MAY read it** for context. **You
+MUST NOT modify it** — no edits, no appends, no "helpful"
+reformatting, no exceptions. If something looks wrong, flag in
+your final summary.
 
 ## Workspace conventions belong in the repo, NEVER in memory
 
-**NEVER persist any workspace knowledge in machine-local
-storage** — not `$CODEX_HOME`-local state, not cached project
-files, not in-process memory, not any file outside the repo
-checkout. Workspace knowledge means: coding conventions,
-architectural rules, project history, Yuka's stated
-preferences for this project, decisions taken in this repo,
-crate-family boundaries, anything you learned during a session
-about how this project works.
+**NEVER persist workspace knowledge in machine-local storage** —
+not `$CODEX_HOME`-local state, not cached project files, not
+in-process memory, nothing outside the repo checkout. Workspace
+knowledge means: coding conventions, architectural rules,
+project history, Yuka's preferences, decisions, crate-family
+boundaries, anything you learned about how this project works.
 
-**Why NEVER, not "prefer":**
+Machine-local state is per-install, invisible to other
+developers / clones / machines / Claude / future Codex sessions.
+The repo is the canonical source of truth; saving a workspace
+rule to local state is a stealth fork.
 
-- Machine-local state is per-install — it doesn't travel to
-  other developers, other clones, other machines, Claude, or
-  future Codex sessions on different hosts. Saving a
-  workspace rule there is invisible everywhere else.
-- The repo is the canonical source of truth. Saving a
-  workspace rule to local state is a stealth fork — the next
-  agent to encounter the situation will reinvent the rule.
-
-If you discover a rule that applies to *this project* —
-naming, versioning, tooling, anything a future contributor
-would need to honour — surface it in your final structured-
-output report (under residuals or open questions). Claude
-then edits `CONTRIBUTING.md` (or the relevant agent-facing
-doc) and commits the rule to the repo. The commit is the
+If you discover a rule that applies to *this project*, surface
+it in your structured-output final report (under residuals /
+open questions). Claude edits `CONTRIBUTING.md` (or the
+relevant agent-facing doc) and commits — the commit is the
 persistence mechanism.
 
 ## Use the script wrappers, not raw cargo
 
-If a task needs a cargo operation, use the wrapper. The wrappers
-encode the mandated flags (`-D warnings`, `--all-targets`,
-per-crate scoping, auto-install of optional tools) so your local
-runs match CI. Raw `cargo <subcommand>` drifts.
+Wrappers encode the mandated flags (`-D warnings`,
+`--all-targets`, per-crate scoping, auto-install of optional
+tools) so local runs match CI. Raw `cargo <subcommand>` drifts.
 
-- `./scripts/pre-landing.sh` — canonical cargo-deny bans + fmt
-  + check + clippy (`-D warnings`) + rustdoc + test. Run before
-  finishing any Rust-touching task. Default flow runs
-  `--workspace --exclude xtask` throughout; xtask is gated
-  behind `pre-landing.sh --xtask` (uses `target-xtask/` so
-  xtask checks don't share the build cache with workspace
-  builds or Codex). If your task touched both workspace
-  crates and xtask, run pre-landing twice (default + xtask).
-  Slow-by-design (minutes per run on this workspace's ~25
-  crates with `aws-lc-rs` C builds and Boa) — **run it once
-  at the end of the task, not repeatedly between edits in one
-  turn**. For focused mid-iteration debugging use a narrow
-  `cargo test <name>`; save the full pre-landing for the
-  hand-off. A re-run after fixing a real failure is fine.
-  See [`CONTRIBUTING.md §11`](CONTRIBUTING.md#11-pre-landing-checks).
+- **`./scripts/pre-landing.sh`** — canonical cargo-deny bans +
+  fmt + check + clippy (`-D warnings`) + rustdoc + test. Run
+  before finishing any Rust-touching task. Default flow runs
+  `--workspace --exclude xtask`; xtask is gated behind
+  `pre-landing.sh --xtask` (uses `target-xtask/` so xtask
+  doesn't share the build cache with workspace or Codex). If
+  your task touched both, run pre-landing twice. Slow-by-design
+  (minutes per run on ~25 crates with `aws-lc-rs` C builds and
+  Boa) — **run it once at the end, not repeatedly between
+  edits**. For focused mid-iteration debugging use narrow
+  `cargo test <name>`. ([§11](CONTRIBUTING.md#11-pre-landing-checks))
+
   **Pre-landing green is the banned-dep guarantee.** Step 1
   (`cargo deny check bans`) reads `deny.toml` and enforces the
   full ban list (`pyo3` / `maturin` / `openssl-sys` /
   `native-tls` / `rustls-platform-verifier` /
-  `rustls-native-certs` no-wrapper full bans; `ring` wrapper-
-  allowed only via `quinn-proto`). **If pre-landing exits
-  clean, the tree is guaranteed forbidden-dep-free — do not
-  run redundant `cargo tree --invert <banned>` sweeps
-  afterwards.** A targeted single `cargo tree --invert <dep>`
-  is fine *before* pre-landing if you want to verify a
-  specific feature-flag choice in 30 s instead of waiting
-  for the full pre-landing pass; once pre-landing is green
-  on the final tree, you're done. See
-  [`CONTRIBUTING.md §11.0.0`](CONTRIBUTING.md#1100-pre-landing-green-is-the-banned-dep-guarantee).
-  **Don't re-run a Rust-build-heavy script just because you
-  lost context** — re-read the captured output. Every
-  background task and every foreground Bash invocation
-  writes its full stdout+stderr to a
-  `/tmp/.../tasks/<id>.output` file; read that rather than
-  spawning the script again. The Rust-build-heavy set is
-  anything driving a full workspace `cargo build` / `check` /
-  `test`: `pre-landing.sh`, `miri-test.sh`,
-  `release-build.sh`, `check-api-breakage.sh`, bare
-  `cargo {build,check,test} --workspace`, plus any
-  background task that took more than ~30 s on its previous
-  run. Lighter scripts (`webui-build.sh` ~12 s,
-  `cargo-audit.sh`, per-crate `cargo check -p <one>`) are
-  fine to re-run when convenient. The workspace's biggest
-  cost drivers, in rough order: a full
-  `cargo test --workspace` pass (many tests across many
-  crates) and any compile of
-  `philharmonic-connector-impl-embed` (BGE-M3 ONNX model
-  bundling via inline-blob + tract). `aws-lc-rs` C builds
-  and the Boa engine are heavy but routine; they cost
-  minutes, not the tens-of-minutes the two above can hit.
+  `rustls-native-certs` / `reqwest` no-wrapper full bans;
+  `ring` wrapper-allowed only via `quinn-proto`). If pre-landing
+  exits clean, the tree is forbidden-dep-free — do **not** run
+  redundant `cargo tree --invert <banned>` sweeps afterwards.
+  ([§11.0.0](CONTRIBUTING.md#1100-pre-landing-green-is-the-banned-dep-guarantee))
+
+  **Don't re-run a Rust-build-heavy script after losing
+  context — re-read its captured output.** Every Bash
+  invocation and background task writes full stdout+stderr to
+  `/tmp/.../tasks/<id>.output`. Heavy set: `pre-landing.sh`,
+  `miri-test.sh`, `release-build.sh`, `check-api-breakage.sh`,
+  bare `cargo {build,check,test} --workspace`, plus any
+  background task that took > ~30 s. Top cost drivers: a full
+  `cargo test --workspace`, and any
+  `philharmonic-connector-impl-embed` compile (BGE-M3 ONNX
+  bundling). Light scripts (`webui-build.sh` ~12 s,
+  `cargo-audit.sh`, per-crate `cargo check -p <one>`) re-run
+  cheaply.
+
   **Never pipe a Rust-build-heavy script through `head` /
-  `tail`** — those truncate before the capture file is
-  written, so the lines you trimmed are gone and you'll be
-  tempted to re-run. Redirect to a file or let the Bash
-  tool capture everything, then `grep` / `Read` the file
-  with offset+limit to inspect specific sections. `head` /
-  `tail` are fine on cheap commands (`status.sh`,
-  `heads.sh`, `git log`, single `cargo tree`,
-  `webui-build.sh` tail) where re-running costs nothing.
-- `./scripts/rust-lint.sh [<crate>]`,
-  `./scripts/rust-test.sh [--include-ignored|--ignored] [<crate>]`
-  — individual phases.
-- `./scripts/miri-test.sh <crate>` / `--workspace` — routine UB
-  checks. Not in pre-landing (too slow).
-- `./scripts/build-status.sh` — shows what `rustc`/`rust-lld`/
-  `clippy`/`miri` are currently processing. Use when cargo
-  appears stuck (no output for minutes). Long silences are
-  normal for large crates — this distinguishes "still compiling"
-  from "actually stuck." See
-  [`CONTRIBUTING.md §5.1`](CONTRIBUTING.md#51-build-status-monitoring).
+  `tail`** — truncation happens before the capture file is
+  written, so the trimmed lines are gone. Redirect to a file
+  or let Bash capture everything, then `grep` / `Read` with
+  offsets. Cheap commands are fine through head/tail.
 
-  **Known limitation when run from inside the Codex sandbox.**
-  Codex executes commands inside a process namespace that
-  hides processes outside the sandbox from `ps -eo …`. Since
-  `build-status.sh` walks the host's process table, a Codex-
-  initiated `cargo build` is typically running in a separate
-  process group / namespace and **does not appear** in the
-  script's output. **An empty `build-status.sh` result is NOT
-  evidence that the build has stalled or died — it's evidence
-  that you (Codex) cannot see your own builder from where you
-  are.** Do not interpret "no active Rust build processes"
-  as a reason to kill the build, abort the dispatch, or
-  retry. The correct signals are: (a) the cargo invocation
-  you started is still attached and emitting output on its
-  own pipe, or (b) the wall-clock elapsed against a previous
-  baseline for the same target. If you genuinely need
-  `build-status.sh` visibility, ask the user (or Claude
-  Code) to run it from outside the sandbox.
-- `./scripts/cargo-audit.sh`,
-  `./scripts/check-api-breakage.sh <crate> [<version>]` —
+- **`./scripts/rust-lint.sh [<crate>]`,
+  `./scripts/rust-test.sh [--include-ignored|--ignored]
+  [<crate>]`** — individual phases.
+- **`./scripts/miri-test.sh <crate>` / `--workspace`** —
+  routine UB checks. Not in pre-landing (too slow).
+- **`./scripts/build-status.sh`** — shows what `rustc` /
+  `rust-lld` / `clippy` / `miri` is currently processing.
+  Use when cargo appears stuck. Long silences are normal for
+  large crates — this distinguishes "still compiling" from
+  "actually stuck". ([§5.1](CONTRIBUTING.md#51-build-status-monitoring))
+
+  **Known limitation inside the Codex sandbox.** Codex's
+  process namespace hides processes outside the sandbox from
+  `ps -eo …`. A Codex-initiated `cargo build` typically runs
+  in a separate group / namespace and **does not appear**.
+  **An empty `build-status.sh` result is NOT evidence the
+  build stalled — it's evidence you can't see your own builder
+  from inside the sandbox.** Do not kill the build, abort,
+  or retry on that signal. Use either the cargo invocation
+  still emitting on its own pipe, or wall-clock elapsed
+  against a prior baseline. If you need real visibility, ask
+  the user / Claude to run it from outside.
+- **`./scripts/cargo-audit.sh`,
+  `./scripts/check-api-breakage.sh <crate> [<version>]`** —
   pre-release checks.
-- `./scripts/crate-version.sh <crate>` / `--all` — local version.
-- `./scripts/xtask.sh crates-io-versions -- <crate>` — published
-  versions.
+- **`./scripts/crate-version.sh <crate>` / `--all`** — local
+  version.
+- **`./scripts/xtask.sh crates-io-versions -- <crate>`** —
+  published versions.
 
-If your task needs a cargo operation with no wrapper, surface
-that in your final summary rather than silently running raw
-cargo. **Exempt**: read-only queries (`cargo tree`,
-`cargo metadata`, `cargo --version`) — run these raw.
-
-See [`CONTRIBUTING.md §5`](CONTRIBUTING.md#5-script-wrappers-over-raw-cargo).
+If a task needs a cargo operation with no wrapper, surface in
+your final summary. Read-only queries (`cargo tree`,
+`cargo metadata`, `cargo --version`) are exempt — run raw.
 
 ## Before you hand off
 
 Before concluding any task that touched a `.rs` file (including
-transitive effects — e.g. a `Cargo.toml` dep bump), run:
+transitive — e.g. a `Cargo.toml` dep bump), run:
 
 ```sh
 ./scripts/pre-landing.sh
 ```
 
-It auto-detects modified crates and runs the full flow:
-`rust-lint.sh` (fmt + check + clippy `-D warnings`), then
-`rust-test.sh` (`cargo test --workspace`, skips `#[ignore]`),
-then `rust-test.sh --ignored <crate>` for each modified crate.
-If any step fails and you can't get it green within the task,
-say so in your final summary. Don't hand off red code.
-
-Clippy runs with `-D warnings` — warnings are errors. Fix the
-root cause. Only add `#[allow(clippy::<lint>)]` at the
-*narrowest* scope, with a one-line comment, when a lint is
-genuinely wrong for a specific call site.
+It auto-detects modified crates and runs the full flow
+(lint → test → ignored-test for each modified crate). Clippy
+is `-D warnings`. Fix root causes; `#[allow(clippy::<lint>)]`
+only at the narrowest scope with a one-line comment. If any
+step fails and you can't get it green within the task, say so
+in your final summary — don't hand off red code.
 
 Doc-only / config-only / script-only changes can skip
 pre-landing (no `.rs` touched).
-
-See [`CONTRIBUTING.md §11`](CONTRIBUTING.md#11-pre-landing-checks).
+([§11](CONTRIBUTING.md#11-pre-landing-checks))
 
 ## Reports (`docs/codex-reports/`)
 
-You have a dedicated journal at `docs/codex-reports/` for
-writing your findings back to the repo. Parallel to
-`docs/codex-prompts/` (Claude → you) and
-`docs/notes-to-humans/` (Claude → Yuka), this directory is
-**you → the repo**: observations that outlive the
-session-summary you return to Claude.
+Your journal at `docs/codex-reports/` is **you → the repo**:
+findings that outlive the session-summary you return to Claude.
+Parallel to `docs/codex-prompts/` (Claude → you) and
+`docs/notes-to-humans/` (Claude → Yuka).
 
-**Filename:** `docs/codex-reports/YYYY-MM-DD-NNNN-<slug>[-NN].md`.
-`NNNN` is four-digit daily sequence counted within
-`docs/codex-reports/` — list the directory, find the highest
-`NNNN` for today, add one; start at `0001` if the directory has
-nothing for today yet. ([§15](CONTRIBUTING.md#15-journal-like-files))
-
-**Write a report when:**
-
-- The prompt explicitly asks for one.
-- You made a non-obvious design call the prompt didn't spell
-  out.
-- Substantial findings surfaced during implementation that don't
-  fit in the session-summary.
-- You flagged something per a flag-vs-fix policy (crypto-review,
-  zeroization gaps, `unsafe` in neighbouring code) that you saw
-  but didn't fix.
-
-**Skip** for routine, well-specified work with no surprises.
-
-**Cross-reference the prompt in a short header**:
-
-```markdown
-# <title>
-
-**Date:** 2026-04-22
-**Prompt:** docs/codex-prompts/2026-04-22-0001-<slug>.md
-```
-
-Then prose. Audience: future Claude sessions and Yuka. Complete
-sentences, concrete file paths, no in-jokes.
-
-**Don't commit.** Leave the file dirty. Mention the path in
-your final summary so Claude picks it up on review.
+- **Filename**: `YYYY-MM-DD-NNNN-<slug>[-NN].md`. `NNNN` is
+  four-digit daily sequence within `docs/codex-reports/`; list
+  the dir, take highest+1, start at `0001` if empty for today.
+  ([§15](CONTRIBUTING.md#15-journal-like-files))
+- **Write when:** the prompt asks; you made a non-obvious
+  design call the prompt didn't spell out; substantial findings
+  surfaced; you flagged something per flag-vs-fix (crypto,
+  zeroization, `unsafe`) without fixing it.
+- **Skip** for routine, well-specified work with no surprises.
+- **Header**: `# <title>` / `**Date:** YYYY-MM-DD` / **Prompt:**
+  pointer to the codex-prompts file. Then prose. Audience:
+  future Claude sessions and Yuka. Concrete file paths, no
+  in-jokes.
+- **Don't commit.** Leave the file dirty; mention the path in
+  your final summary.
 
 ## Terminology — short form
 
-See [`CONTRIBUTING.md §14`](CONTRIBUTING.md#14-naming-and-terminology)
-for the full rule set. Short form:
+Full set: [`§14`](CONTRIBUTING.md#14-naming-and-terminology).
+Short form:
 
 - No `master`/`slave`; use `primary`/`replica`,
-  `leader`/`follower`, etc. Default branch here is `main`.
+  `leader`/`follower`. Default branch is `main`.
 - No gendered defaults; prefer singular "they".
 - `allowlist`/`denylist`, not `whitelist`/`blacklist`.
 - `stub`/`placeholder`/`fake`, not "dummy".
-- **GNU/Linux** for the OS, **Linux kernel** for the kernel —
-  don't collapse. `uname -s` matching against literal `Linux`
-  is fine (kernel-interface identifier, not prose).
-- **Microsoft Windows** / **Windows** in prose. No `win*`
-  freeform abbreviations; shipped identifiers (`Win32` API,
-  `x86_64-pc-windows-msvc`) stay as-is.
+- **GNU/Linux** for the OS, **Linux kernel** for the kernel.
+  `uname -s` matching against literal `Linux` is fine
+  (kernel-interface identifier).
+- **Microsoft Windows** / **Windows** in prose; shipped
+  identifiers (`Win32`, `x86_64-pc-windows-msvc`) stay as-is.
 - Prefer **"free software"** or **"FLOSS"** over standalone
-  **"open-source"**, except quoting external conventions (OSI
-  proper noun, etc.).
+  **"open-source"**, except quoting external conventions.
 - Technical accuracy overrides aesthetic neutrality — literal
-  external identifiers (HTTP `Authorization`, a DB `MASTER`
-  command, an external repo's `master` branch) ship as they
-  are.
-- **Prose is in English by default** — code comments,
-  rustdoc, error-message text, the summary you return to
-  Claude (which may feed a commit message). Non-English text is
-  fine when it's the artefact (i18n strings, Unicode-handling
-  test fixtures, literal quotation from external sources) and
-  should carry an English gloss in a nearby comment or in the
-  summary to Claude when the meaning isn't self-evident. See
-  [`CONTRIBUTING.md §14.6`](CONTRIBUTING.md#146-english-as-the-default).
-  Grammar / typo issues in the final summary are not worth
-  flagging as blockers — Claude will polish prose during review.
+  external identifiers (HTTP `Authorization`, DB `MASTER`
+  command, an external `master` branch) ship as-is.
+- **Prose is English by default** — code comments, rustdoc,
+  error-message text, the summary you return to Claude.
+  Non-English text is fine when it's the artefact (i18n
+  strings, Unicode tests, external quotation); add an
+  English gloss when meaning isn't self-evident. Grammar /
+  typos aren't blockers — Claude polishes in review.
+  ([§14.6](CONTRIBUTING.md#146-english-as-the-default))
 
 ## When in doubt
 
 If the task seems to fall outside these rules, or the rules
-themselves seem to conflict with what the prompt asks, surface
-the tension in your response instead of guessing. Claude is
-waiting to review and re-prompt if needed.
+seem to conflict with what the prompt asks, surface the
+tension in your response — don't guess. Claude is waiting to
+review and re-prompt if needed.
