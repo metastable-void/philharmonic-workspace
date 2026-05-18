@@ -748,78 +748,49 @@ Do not run raw `cargo fmt` / `cargo clippy` / `cargo test` —
 `pre-landing.sh` covers them and uses the right
 `CARGO_TARGET_DIR`.
 
-## Commit strategy
+## Hand-off shape: Codex does not commit
 
-Use `./scripts/commit-all.sh` (NOT `--parent-only`; the script
-handles submodule-first ordering correctly). Commits land in
-this order — `commit-all.sh` enforces it:
+**Leave the working tree dirty.** Claude commits via
+`./scripts/commit-all.sh` after reviewing the diff. The script
+has a `codex-guard` (`scripts/lib/codex-guard.sh`) that walks
+the ancestor process chain and aborts if any process is named
+`*codex*`; calling `commit-all.sh` from inside a Codex run
+will hard-fail. Do not work around the guard.
 
-1. Submodule commits inside each touched submodule
-   (`philharmonic-connector-impl-email-smtp`,
-   `philharmonic-connector-impl-dns`, optionally
-   `mechanics-dns` if re-exports added).
-2. Parent commit picking up:
-   - New submodule pointers.
-   - Updated `philharmonic/Cargo.toml` + `philharmonic/src/lib.rs`
-     + `philharmonic/CHANGELOG.md`.
-   - Updated `bins/philharmonic-connector/src/main.rs`.
-   - `Cargo.lock` regeneration (let `cargo build` write it).
+Specifically:
 
-Suggested message shape (the parent commit; submodule commits
-use their own crate-scoped messages):
+- Do **not** run `./scripts/commit-all.sh` (any flags,
+  including `--dry-run` and `--parent-only` and `--exclude`).
+- Do **not** run raw `git commit` / `git push` / `git add`.
+  The pre-commit hooks enforce signoff + signature +
+  `Audit-Info:` trailer; the codex-guard fires from those hooks
+  too.
+- Do **not** run `git commit --no-verify` / `--no-gpg-sign`.
+- Do **not** run `git reset` / `git rebase` / `git amend`.
+  History is append-only.
+- Do **not** run `./scripts/push-all.sh`. Claude pushes after
+  reviewing.
+- Do **not** run `./scripts/publish-crate.sh`. Yuka publishes.
+- Do **not** edit `HUMANS.md`. Agent-readable,
+  agent-writable forbidden.
 
-```
-D7 + D19: SMTP (email_smtp) + DNS (dns_query) connector impls
+Edits land in the working tree across the parent repo and the
+touched submodules:
 
-Subject body wrapped at ~72 cols.
+- `philharmonic-connector-impl-email-smtp/` submodule.
+- `philharmonic-connector-impl-dns/` submodule.
+- `mechanics-dns/` (in-tree, not a submodule) iff re-exports
+  added.
+- Parent repo: `philharmonic/` (submodule), `bins/`, `Cargo.lock`
+  (regenerated automatically by `cargo build`).
 
-D7 — philharmonic-connector-impl-email-smtp 0.1.0:
-- lettre over rustls-aws-lc-rs + webpki-roots; no native-tls.
-- Port 25 rejected at config validation.
-- connection_mode {starttls,smtps,auto} with port-driven
-  defaults and auto-discovery.
-- tls_strictness {strict,sloppy,opportunistic,
-  opportunistic_sloppy}.
-- Minimal MIME envelope fixing (MIME-Version, Date,
-  Message-Id, Content-Type, CRLF). No security-header
-  rewriting.
+Claude inspects the per-submodule + parent dirty state, runs
+`./scripts/commit-all.sh --dry-run` to confirm scope, then
+runs the real commit-all that handles submodule-first ordering
+and writes signoff/signature/audit-trailer per commit.
 
-D19 — philharmonic-connector-impl-dns 0.1.0:
-- mechanics-dns backend; no direct hickory deps.
-- IN-class only via system stub resolver; ENOENT fallback to
-  Cloudflare set already lives in mechanics-dns.
-- allowed_types / allowlist_zones / blocklist_zones policy
-  gates fire before any DNS packet leaves the process.
-- Per-call timeout from request.timeout_ms or
-  config.default_timeout_ms (default 5000 ms).
-- v1 sub-shape: presentation-format strings (per-type
-  structured objects deferred).
-
-Wired into philharmonic meta-crate (connector-dns feature
-added; connector-email-smtp moves from off-by-default to
-default-on) and bins/philharmonic-connector registry.
-philharmonic meta-crate patch-bumped.
-
-Pre-landing green. Tier-3 (D8 Anthropic + D9 Gemini) follows
-separately.
-```
-
-(Adjust subject + body to match what actually shipped after
-implementation; the above is a template.)
-
-**Forbidden:**
-
-- Raw `git commit` / `git push` / `git add` outside the
-  scripts. The pre-commit hooks enforce signoff + signature +
-  `Audit-Info:` trailer.
-- `git commit --no-verify` / `--no-gpg-sign`. Hooks are
-  non-negotiable.
-- `git reset` / `git rebase` / `git amend`. History is
-  append-only.
-- `./scripts/push-all.sh`. **Claude pushes** after review.
-- `./scripts/publish-crate.sh`. **Yuka publishes.**
-- Editing `HUMANS.md`. Agent-readable, agent-writable
-  forbidden.
+Codex's session summary should mention which submodules have
+dirty trees so Claude knows where to look.
 
 ## Codex report (encouraged)
 
@@ -975,9 +946,11 @@ needed), **STOP and report**.
     patch-bumped + CHANGELOG entry (if needed).
 11. `./scripts/pre-landing.sh` passes.
 12. Banned-dep tree checks pass per Verification block above.
-13. All commits landed via `commit-all.sh` (NOT
-    `--parent-only`).
-14. NOT pushed (Claude pushes).
+13. Working tree left dirty across parent + touched submodules
+    (per "Hand-off shape" above). **No commits, no pushes** —
+    Claude commits and pushes after reviewing the diff.
+14. Session summary lists which submodules + the parent have
+    dirty trees so Claude can scope the `commit-all.sh` run.
 15. Outcome section of this prompt file updated with: (a)
     list of files touched per crate, (b) version bumps issued,
     (c) lettre feature combination chosen + why, (d) any
@@ -1064,16 +1037,14 @@ Don't reach for `hickory-resolver` directly.
 </missing_context_gating>
 
 <action_safety>
-- All git state changes via `./scripts/commit-all.sh` only. No
-  raw `git commit`, no raw `git push`, no raw `git add` outside
-  the script. The pre-commit hooks enforce signoff + signature
-  + `Audit-Info:` trailer.
-- **Never** `git commit --no-verify`, **never** `git
-  --no-gpg-sign`. The hooks are non-negotiable.
-- **Never** `git reset`, **never** `git rebase`, **never** `git
-  amend`. History is append-only.
-- **Never** invoke `./scripts/push-all.sh`. Claude pushes after
-  reviewing.
+- **You do not commit.** Leave the working tree dirty across
+  parent + touched submodules. `./scripts/commit-all.sh` (any
+  flags) and raw `git commit` / `git push` / `git add` /
+  `git reset` / `git rebase` / `git amend` are all forbidden.
+  The script's `codex-guard` will hard-abort if you try; the
+  same guard fires from the pre-commit hooks. Claude commits +
+  pushes after reviewing the diff.
+- **Never** invoke `./scripts/push-all.sh`. Claude pushes.
 - **Never** invoke `./scripts/publish-crate.sh`. Yuka publishes.
 - **Never** edit `HUMANS.md`. Agent-readable, agent-writable
   forbidden.
@@ -1127,10 +1098,10 @@ At the end of the dispatch, return:
      philharmonic-connector-impl-dns`: via mechanics-dns
      only / FAIL.
    - `cargo deny check bans`: PASS / FAIL.
-8. **Git state**:
-   - Per-submodule + parent SHAs (`./scripts/status.sh` clean
-     at the end).
-   - **NOT pushed.**
+8. **Working-tree state at hand-off**:
+   - List which submodules + the parent have dirty trees.
+   - No commits expected from you. Claude will commit + push
+     after reviewing the diff.
 9. **Codex report**: if you wrote
    `docs/codex-reports/2026-05-18-0002-d7-d19-tier2-smtp-dns.md`,
    note its presence (dirty in working tree; Claude commits
