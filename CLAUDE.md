@@ -292,42 +292,60 @@ full in `CONTRIBUTING.md`. Read the full section before acting
   GitHub PR titles, Slack digests). Hard-wrap the body by
   hand; do not let single physical lines exceed ~72 cols.
   ([§4.10](CONTRIBUTING.md#410-commit-message-format))
-- **Pass commit messages to `commit-all.sh` via a single-
-  quoted heredoc, ALWAYS.** Not "when the message is long" —
-  **always**, even for short single-paragraph messages. The
-  heredoc form is:
+- **Pass commit messages to `commit-all.sh` via
+  `--message-file -` + a single-quoted heredoc, ALWAYS.**
+  Not "when the message is long" — **always**, even for
+  short single-paragraph messages. The canonical form:
 
   ```sh
-  ./scripts/commit-all.sh "$(cat <<'EOF'
+  ./scripts/commit-all.sh --message-file - <<'EOF'
   subject line ≤ 72 chars
 
   body paragraph hard-wrapped at ≈ 72 cols, including any
   backticked `identifier` / `path/like/this` / `command(...)`
-  tokens that the body legitimately needs to mention.
+  tokens, `$VAR` references, or `$(cmd)` substitutions that
+  the body legitimately needs to mention.
   EOF
-  )"
   ```
 
-  **The single-quoted `<<'EOF'` delimiter is load-bearing.**
-  It suppresses shell expansion of backticks, `$(...)`,
-  `$VAR`, and `!`-history-expansion inside the body. A
-  bare double-quoted string passed as the message argument
-  goes through bash's quote-removal pass first, which:
-  - silently executes backticked spans as command
-    substitution (so ``\`build = "build.rs"\``` becomes the
-    empty string at best, or `command not found` stderr at
-    worst);
-  - silently expands `$VAR` references (so `$CARGO_HOME`,
-    `$PATH` mentions in the body become their host values);
-  - silently runs `$(...)` as command substitution.
+  **Two load-bearing pieces** that together make the form
+  bulletproof:
 
-  All of those failure modes are silent from the
-  committer's POV — `commit-all.sh` exits 0, the commit
-  message just loses the expanded tokens. **And history is
-  append-only** ([§4.4](CONTRIBUTING.md#44-no-history-modification))
-  — no amend, no rebase, no force-push — so a mangled
-  message is unfixable except via a fix-forward note. The
-  heredoc rule is the easy mechanical guardrail.
+  1. `--message-file -` reads the message body from stdin
+     verbatim — no command substitution boundary, no
+     double-quoted argument, no `$(cat <<...)` expansion
+     pass between the heredoc and the script. Bash never
+     looks inside the body.
+  2. The single-quoted `<<'EOF'` heredoc delimiter
+     suppresses shell expansion *inside* the heredoc body
+     before stdin is written. A bare `<<EOF` (unquoted)
+     would still expand backticks and `$VAR` inside the
+     heredoc itself; the single quotes are mandatory.
+
+  The **legacy** `commit-all.sh "$(cat <<'EOF' ... EOF\n)"`
+  form (positional argument wrapped in command substitution
+  + double quotes) still works but is fragile: a missing
+  outer quote, a stray `"` inside the body, or a bash
+  version with unusual quote-removal semantics could re-
+  introduce the expansion failure. Use `--message-file -`
+  instead — it removes the entire quoting boundary.
+
+  Why all this care: with the legacy positional form, the
+  shell silently:
+  - executes backticked spans as command substitution
+    (so ``\`build = "build.rs"\``` becomes the empty string
+    at best, or `command not found` stderr at worst);
+  - expands `$VAR` references (`$CARGO_HOME`, `$PATH`
+    mentions in the body become their host values);
+  - runs `$(...)` as command substitution.
+
+  All silent from the committer's POV — `commit-all.sh`
+  exits 0, the commit message just loses the expanded
+  tokens. **And history is append-only**
+  ([§4.4](CONTRIBUTING.md#44-no-history-modification)) —
+  no amend, no rebase, no force-push — so a mangled
+  message is unfixable except via a fix-forward note.
+  `--message-file -` is the easy mechanical guardrail.
 
   Failure mode incident: commit `a5833d5` (2026-05-18 WebUI
   build-identifier traceability) lost ≈ 8 backticked tokens

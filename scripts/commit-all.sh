@@ -29,7 +29,8 @@
 #
 # Usage:
 #   scripts/commit-all.sh [--anonymize] [--parent-only] [--dry-run]
-#                          [--exclude <path>]... [message]
+#                          [--exclude <path>]...
+#                          [--message-file <path> | message]
 #
 # --parent-only: skip the submodule walk. Use this when the parent
 #   has its own pending work (e.g. docs, scripts) that should land
@@ -58,7 +59,32 @@
 #   landing first. Under `--dry-run`, the excluded paths are
 #   listed alongside the would-be-committed status so the
 #   preview matches the planned scope.
-# Message defaults to "updates" and is unused under --dry-run.
+# --message-file <path>: read the commit message body from <path>
+#   (an existing readable file) instead of the positional [message]
+#   argument. Pass `-` as the path to read the message from stdin.
+#   This is the canonical form for any message that contains
+#   backticks, `$(...)` command substitutions, `$VAR` references,
+#   or `!` history-expansion — the stdin / file path bypasses
+#   bash's quote-removal pass entirely, so technical tokens in the
+#   body land in the commit verbatim instead of being silently
+#   expanded by the shell (the incident in commit `a5833d5` lost
+#   ≈ 8 backticked tokens to that failure mode). Mutually
+#   exclusive with the positional [message] argument; if both are
+#   provided the script aborts. An empty file or empty stdin is
+#   treated as an error — a meaningful subject line is required.
+#   Canonical heredoc form:
+#       ./scripts/commit-all.sh --message-file - <<'EOF'
+#       subject line ≤ 72 chars
+#
+#       body wrapped at ≈ 72 cols, with backticked `tokens`
+#       and `$()` substitutions preserved verbatim.
+#       EOF
+#   The single-quoted heredoc delimiter (`<<'EOF'`) is still
+#   load-bearing — it suppresses shell expansion *inside* the
+#   heredoc body before stdin is written. A bare `<<EOF`
+#   (unquoted) would still expand backticks and `$VAR`.
+# Message defaults to "updates" (positional form only) and is
+# unused under --dry-run.
 #
 # Scope: the parent commit uses `git add -A` before `git commit`,
 # so ALL dirty parent files get swept in. Pre-staging a subset
@@ -85,6 +111,10 @@ dry_run=0
 # are validated whitespace-free below so the unquoted-list `for`
 # split is unambiguous.
 parent_excludes=
+# Path supplied via --message-file. Empty means the flag wasn't
+# given. `-` means "read from stdin". Anything else is a regular
+# file path validated below.
+msg_file_arg=
 while [ $# -gt 0 ]; do
     case "$1" in
         --parent-only) parent_only=1; shift ;;
@@ -109,8 +139,21 @@ while [ $# -gt 0 ]; do
             fi
             shift
             ;;
+        --message-file)
+            if [ $# -lt 2 ]; then
+                echo "commit-all.sh: --message-file requires a path argument ('-' for stdin)" >&2
+                exit 2
+            fi
+            shift
+            if [ -n "$msg_file_arg" ]; then
+                echo "commit-all.sh: --message-file given more than once" >&2
+                exit 2
+            fi
+            msg_file_arg=$1
+            shift
+            ;;
         --help)
-            echo "Usage: $0 [--anonymize] [--parent-only] [--dry-run] [--exclude <path>]... [message]"
+            echo "Usage: $0 [--anonymize] [--parent-only] [--dry-run] [--exclude <path>]... [--message-file <path> | message]"
             exit
             ;;
         --)                           shift; break ;;
@@ -119,7 +162,36 @@ while [ $# -gt 0 ]; do
     esac
 done
 
-msg="${1:-updates}"
+# Resolve the commit message. Three sources, mutually exclusive:
+#   1. --message-file <path>   (stdin if <path> = '-')
+#   2. positional [message]    (legacy / interactive shape)
+#   3. fall back to "updates"  (positional default)
+# Reading must finish before any later step that itself touches
+# stdin (the `git submodule foreach` loop below does not, but
+# keeping the read up front is safer for future-proofing). `$()`
+# strips trailing newlines, which is what the existing
+# `printf '%s\n\n' "$msg"` writer expects.
+if [ -n "$msg_file_arg" ]; then
+    if [ "$#" -gt 0 ]; then
+        echo "commit-all.sh: --message-file and positional [message] are mutually exclusive" >&2
+        exit 2
+    fi
+    if [ "$msg_file_arg" = "-" ]; then
+        msg=$(cat)
+    else
+        if [ ! -f "$msg_file_arg" ] || [ ! -r "$msg_file_arg" ]; then
+            printf 'commit-all.sh: --message-file path not readable: %s\n' "$msg_file_arg" >&2
+            exit 2
+        fi
+        msg=$(cat -- "$msg_file_arg")
+    fi
+    if [ -z "$msg" ]; then
+        echo "commit-all.sh: --message-file produced an empty message; a meaningful subject is required" >&2
+        exit 2
+    fi
+else
+    msg="${1:-updates}"
+fi
 
 # Skip the message-file / audit / Code-stats setup under --dry-run:
 # nothing is going to consume it, and computing the audit line hits

@@ -913,12 +913,12 @@ every one of them and burn context tokens unnecessarily.
 
 #### Passing the message to `commit-all.sh`
 
-**Always pass commit messages via a single-quoted heredoc.**
-Not "for long messages" — always, even for one-paragraph
-messages. The canonical form:
+**Always pass commit messages via `--message-file -` plus a
+single-quoted heredoc.** Not "for long messages" — always,
+even for one-paragraph messages. The canonical form:
 
 ```sh
-./scripts/commit-all.sh "$(cat <<'EOF'
+./scripts/commit-all.sh --message-file - <<'EOF'
 subject line ≤ 72 chars
 
 body paragraph hard-wrapped at ≈ 72 cols, freely using
@@ -927,14 +927,38 @@ tokens that the body legitimately needs to mention. Mention
 `$VAR` and `$(cmd)` references too without worrying about
 expansion.
 EOF
+```
+
+**Two load-bearing pieces** that together make the form
+bulletproof:
+
+1. `--message-file -` reads the message body from stdin
+   verbatim — no command substitution boundary, no
+   double-quoted argument boundary between the heredoc and
+   the script. Bash never looks inside the body.
+2. The single-quoted `<<'EOF'` heredoc delimiter
+   suppresses shell expansion *inside* the heredoc body
+   before stdin is written. A bare `<<EOF` (unquoted)
+   would still expand backticks and `$VAR` inside the
+   heredoc itself; the single quotes are mandatory.
+
+**Legacy positional form** (still accepted, but fragile):
+
+```sh
+./scripts/commit-all.sh "$(cat <<'EOF'
+…
+EOF
 )"
 ```
 
-**The single-quoted `<<'EOF'` delimiter is load-bearing.**
-It suppresses shell expansion of backticks, `$(...)`, `$VAR`,
-and `!`-history-expansion inside the body. A bare
-double-quoted message string goes through bash's
-quote-removal pass first, which silently:
+This works in current bash but re-introduces a quoting
+boundary — a missing outer `"`, a stray `"` inside the
+body, or an unusual quote-removal semantics in some shell
+could re-introduce the expansion failure. Prefer
+`--message-file -`; it removes the boundary entirely.
+
+Why all this discipline: with the legacy positional form
+(or any plain `"message"` argument), bash silently:
 
 - runs backticked spans as command substitution (so an
   innocuous \`build = "build.rs"\` in the body becomes the
@@ -947,13 +971,14 @@ All silent from the committer's perspective —
 `commit-all.sh` exits 0 and the commit just loses the
 expanded tokens. **Combined with the append-only history
 rule (§4.4)**, a mangled message is unfixable except via a
-fix-forward errata note. The heredoc rule is the easy
+fix-forward errata note. `--message-file -` is the easy
 mechanical guardrail; use it unconditionally.
 
 Same rule applies to any other script that takes a free-form
 message argument (today only `commit-all.sh`). If a future
-wrapper script grows a message argument, plumb the heredoc
-discipline into its examples.
+wrapper script grows a message argument, give it a
+`--message-file <path>` (with `-` for stdin) sibling and
+recommend that as the canonical form.
 
 ---
 
