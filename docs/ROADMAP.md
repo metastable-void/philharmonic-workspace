@@ -38,12 +38,20 @@ active work now lives in the post-v1 dispatch plan (§3 below).
   as one batch. Tier 3 = D8 (Anthropic) + D9 (Gemini),
   dispatched separately later. D26 (§3.L below) is done;
   D19 consumes the landed `mechanics-dns` resolver layer.
-  **Gated** on the Audit & refactor sweep (§3.K below)
-  reaching its done-state; Claude Code resumes
-  prompt-and-dispatch work only after Yuka signals the
-  sweep complete.
-- **Priority: Audit & refactor** (in flight): tracked under
-  §3.K; per [`HUMANS.md`](../HUMANS.md).
+  The §3.K Audit & refactor gate cleared 2026-05-18 (see
+  next bullet); Tier 2 is now next-dispatchable.
+- **§3.K Audit & refactor closed 2026-05-18**: per
+  [`HUMANS.md`](../HUMANS.md). Slices 1–4 landed
+  (server-side bin-thinning, HTTPS/HTTP-3 listener
+  extraction, mechanics-worker executor extraction, and
+  the non-crypto `scope.rs` → `philharmonic-api`
+  `HeaderTenantScopeResolver` extraction). The remaining
+  `lowerer.rs` / `embed_job.rs` extraction is
+  crypto-sensitive (SCK encrypt/decrypt + endpoint payload
+  handling) and is **deferred out of K** — it needs its
+  own crypto-review-aware slice under the Gate protocol
+  rather than incidental cleanup, so it is no longer
+  tracked under §3.K.
 - **§3.J production-security cleanup arc closed 2026-05-14**:
   D23 + D24 + D25 all done; combined with the
   mechanics-h3-quinn vendor + the `deny.toml` Linux-x86_64
@@ -133,9 +141,8 @@ Total: **27 Codex dispatches plus 1 Gate-1 proposal.**
 Done / pending breakdown lives in the
 **Current state** block at the top of this file. Done arcs
 trim to one-line done-pointers below (§3.A, C, D, E, F, G,
-H, I, J, L); the still-pending arc §3.B (Tier-2 + Tier-3
-connectors) carries the full dispatch specs. §3.K is the
-in-flight Audit & refactor priority that gates §3.B.
+H, I, J, K, L); the still-pending arc §3.B (Tier-2 + Tier-3
+connectors) carries the full dispatch specs.
 
 ### A. Embedding datasets (6 dispatches + 1 Gate-1) — DONE
 
@@ -379,42 +386,43 @@ no-wrapper full ban. Per-arc archives at
 and
 [`docs/archive/2026-05-14-roadmap-d24-done.md`](archive/2026-05-14-roadmap-d24-done.md).
 
-### K. Audit & refactor (in flight, Yuka direct Codex dispatch)
+### K. Audit & refactor (Yuka direct Codex dispatch) — DONE
 
-Workspace-wide sweep dispatched by Yuka directly. Scope:
-[`HUMANS.md` §Priority: Audit & refactor](../HUMANS.md) —
-Maintainability sweep + Clean separation of concerns
+DONE 2026-05-18. Workspace-wide sweep dispatched by Yuka
+directly per [`HUMANS.md` §Priority: Audit & refactor](../HUMANS.md)
+— Maintainability sweep + Clean separation of concerns
 ([§10.14](../CONTRIBUTING.md#1014-unpublished-bin-crates-minimal-cli-logic-in-libraries),
 [§Bins are thin](design/02-design-principles.md#bins-are-thin)).
 Chat UI relocation deferred ([§14](design/14-open-questions.md#crates-and-organization)).
-Done-state is whatever Yuka signals.
+Four slices landed:
 
-**Pending extraction candidates:**
-- `scope.rs` — Codex drafted a plan for this in
-  [`docs/codex-reports/2026-05-15-0007-header-tenant-scope-resolver-plan.md`](codex-reports/2026-05-15-0007-header-tenant-scope-resolver-plan.md):
-  move `HeaderTenantScopeResolver` into `philharmonic-api`
-  as a generic helper over `IdentityStore` (no new deps,
-  no feature flag — the API crate already pulls
-  `http` / `philharmonic-policy` / `philharmonic-store` /
-  `philharmonic-types`). The bin keeps its `SqlStore`
-  ownership; only the resolver moves. Slice 4 candidate.
-- `lowerer.rs` and parts of `embed_job.rs` — touch SCK
-  decrypt/encrypt and endpoint payload handling; want
-  their own crypto-review-aware slice rather than
-  incidental cleanup.
+- **Slice 1 + 2** (2026-05-15) — server-side bin-thinning
+  + HTTPS / HTTP-3 listener extraction:
+  [archive](archive/2026-05-15-roadmap-audit-refactor-slices-1-2.md).
+- **Slice 3** (2026-05-15) — `mechanics-worker` executor
+  moved to `philharmonic-api` under the
+  `mechanics-worker-executor` feature, surfaced via
+  meta-crate `api-mechanics-worker-executor`:
+  [codex-report](codex-reports/2026-05-15-0006-api-worker-executor-extraction.md).
+- **Slice 4** (2026-05-18) — `HeaderTenantScopeResolver`
+  moved out of `philharmonic-api-server` into
+  `philharmonic-api` as a generic helper over
+  `IdentityStore`; the bin keeps `SqlStore` ownership and
+  only wires the helper. Plan:
+  [`docs/codex-reports/2026-05-15-0007-header-tenant-scope-resolver-plan.md`](codex-reports/2026-05-15-0007-header-tenant-scope-resolver-plan.md);
+  landed report:
+  [`docs/codex-reports/2026-05-18-0001-header-tenant-scope-extraction.md`](codex-reports/2026-05-18-0001-header-tenant-scope-extraction.md).
 
-**Gate on §3.B.** The Tier-2 batch (D7 SMTP + D19 DNS) is
-dispatchable only after the sweep is signalled complete.
-Tier-3 (D8 Anthropic + D9 Gemini) is sequenced separately
-after Tier 2.
+**Deferred out of K** (no longer tracked here): `lowerer.rs`
+and parts of `embed_job.rs`. Both touch SCK encrypt/decrypt
+and endpoint payload handling, so they need their own
+crypto-review-aware slice under the Gate protocol rather
+than incidental cleanup; they will be sequenced separately
+when their Gate-1 proposal is ready.
 
-Slices 1 + 2 landed 2026-05-15 (server-side bin-thinning +
-HTTPS/HTTP-3 listener extraction):
-[archive](archive/2026-05-15-roadmap-audit-refactor-slices-1-2.md).
-Slice 3 landed 2026-05-15 (mechanics-worker executor moved
-to `philharmonic-api` under the `mechanics-worker-executor`
-feature, surfaced via meta-crate `api-mechanics-worker-executor`):
-[codex-report](codex-reports/2026-05-15-0006-api-worker-executor-extraction.md).
+The §3.B Tier-2 gate cleared with this close-out — D7 SMTP
++ D19 DNS are now next-dispatchable; Tier-3 (D8 + D9)
+follows separately.
 
 ### L. `mechanics-dns` extraction + mhc resolver migration (1 dispatch) — DONE
 
@@ -429,11 +437,10 @@ verbatim pre-trim §3.L preserved at
 
 ### Suggested sequencing
 
-**Currently in flight**: §3.K Audit & refactor (Yuka direct
-Codex dispatch). Gates §3.B.
+**§3.K Audit & refactor closed 2026-05-18** — Tier-2 gate cleared.
 
-**Next dispatchable (post-sweep)**: Tier-2 batch = D7 + D19,
-dispatched together. Tier 3 (D8 + D9) follows separately.
+**Next dispatchable**: Tier-2 batch = D7 + D19, dispatched
+together. Tier 3 (D8 + D9) follows separately.
 
 - **D7** (`philharmonic-connector-impl-email-smtp`, Tier 2)
   — `email_send` wire shape locked in

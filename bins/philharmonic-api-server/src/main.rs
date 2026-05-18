@@ -11,8 +11,8 @@ use axum::routing::any;
 use axum::{Router, extract::State};
 use clap::Parser;
 use philharmonic::api::{
-    EmbedDatasetCaps, MechanicsWorkerExecutor, PhilharmonicApiBuilder, RateLimitBucketConfig,
-    RateLimitConfig, StubExecutor, StubLowerer,
+    EmbedDatasetCaps, HeaderTenantScopeResolver, MechanicsWorkerExecutor, PhilharmonicApiBuilder,
+    RateLimitBucketConfig, RateLimitConfig, StubExecutor, StubLowerer,
 };
 use philharmonic::connector_client::LowererSigningKey;
 use philharmonic::connector_common::{MLKEM768_PUBLIC_KEY_LEN, RealmId, RealmPublicKey};
@@ -47,13 +47,11 @@ use zeroize::Zeroizing;
 mod config;
 mod embed_job;
 mod lowerer;
-mod scope;
 mod security_headers;
 
 use config::ApiConfig;
 use embed_job::EmbedJobDispatcher;
 use lowerer::ConnectorConfigLowerer;
-use scope::HeaderBasedScopeResolver;
 
 const ED25519_KEY_BYTES: usize = 32;
 const SCK_KEY_BYTES: usize = 32;
@@ -421,8 +419,8 @@ fn build_runtime(config: &ApiConfig, state: &LongLivedState) -> Result<Runtime, 
     let embed_dataset_caps = build_embed_dataset_caps(config);
 
     let mut builder = PhilharmonicApiBuilder::new()
-        .request_scope_resolver(Arc::new(HeaderBasedScopeResolver::new(
-            state.pool.pool().clone(),
+        .request_scope_resolver(Arc::new(HeaderTenantScopeResolver::new(
+            SqlStore::from_pool(state.pool.pool().clone()),
         )))
         .store(store.clone())
         .api_verifying_key_registry(registry)
