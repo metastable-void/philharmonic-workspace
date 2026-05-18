@@ -16,7 +16,18 @@
 # Step 4 exercises the `#[ignore]`-gated integration tests (the
 # testcontainers / live-service ones) for crates you actually
 # changed — the workspace-level run in step 3 skips them for
-# speed.
+# speed. **Step 4 deliberately does NOT widen via the rdep
+# closure**: only the originally-dirty crates (or the user's
+# explicit positional list) get `--ignored` tested. A non-dirty
+# crate that happens to be in the rdep closure of a dirty
+# crate gets its non-ignored tests re-run in step 3 (since the
+# dep change may have broken something on its public surface),
+# but its `#[ignore]`-gated tests stay skipped. The asymmetry
+# is intentional: ignored tests are slow real-infrastructure
+# tests (testcontainers, live services), and the dirty-set
+# author is the one who needs to verify their own touched code
+# end-to-end, not every dep-closure neighbour. See
+# CONTRIBUTING.md §11.
 #
 # Step 1 only runs the `bans` cargo-deny check (banned crates).
 # Licenses and advisories are intentionally not part of the

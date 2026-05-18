@@ -2569,6 +2569,23 @@ split is workspace-level skip-ignored for regression coverage
 and per-touched-crate `--ignored` for your actual changes.
 Don't run `--ignored` against untouched crates; it's waste.
 
+**The `--ignored` phase is dirty-only — it does NOT widen via
+the rdep closure.** Step 3's D21 narrowing (described above)
+runs non-ignored tests on the union of dirty crates + their
+transitive reverse-dep closure: when you change
+`philharmonic-types`, every downstream crate's non-ignored
+tests rerun in step 3 because the dep change could have
+broken something on a public surface. Step 4 stays strictly
+on the dirty set: only the crates you actually edited (or
+the user's explicit positional list) get their `#[ignore]`-
+gated integration tests exercised. A dep-closure neighbour
+that isn't itself dirty gets its non-ignored tests rerun and
+that's it — its slow `testcontainers` / live-service tests
+stay skipped. The asymmetry is intentional: the dirty-set
+author is the one who needs to verify their own touched code
+end-to-end, not every neighbour the dep graph happens to
+pull in.
+
 **Pre-landing is slow-by-design — run it once per commit, not
 repeatedly.** Even on a warm cache, `pre-landing.sh` walks
 fmt-check + workspace check + workspace clippy + workspace
