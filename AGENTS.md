@@ -250,13 +250,21 @@ Read the full section when in doubt.
   `async-trait` on traits that need to be dyn-compatible — see
   doc 08 §"Why `async_trait` (in 2026)" for the specific compat
   reasons on the connector `Implementation` trait.
-- **HTTP client split.** Runtime crates (impl crates, service
-  binaries, `philharmonic-api`, anything shipping) use
-  **`reqwest` + `rustls-tls` + tokio** — or `hyper` + rustls
-  directly when reqwest's abstraction is too thick. `xtask/`
-  tooling bins use **`ureq` + rustls**. `ureq` in any runtime
-  crate is a review block. rustls in both; no native-tls, no
-  OpenSSL.
+- **HTTP client split.** Outbound HTTP from any runtime crate
+  (impl crates, service binaries, `philharmonic-api`, anything
+  shipping) goes through **`mechanics-http-client`** — the
+  workspace's single `hyper-rustls` + `webpki-roots` +
+  `aws-lc-rs` wrapper, with opportunistic HTTP/3 via the
+  `http3` feature. **`reqwest` is banned** (no-wrapper full
+  ban via `deny.toml`); never add it to a crate. If mhc lacks
+  a shape the task needs, surface that in your final message
+  rather than reaching for reqwest. `xtask/` tooling bins use
+  **`ureq` + rustls**; `ureq` in any runtime crate is a review
+  block. The underlying `hyper` crate is **not** banned —
+  mhc / `mechanics-http-server` / `mechanics` consume it for
+  client and server paths; the ban is on the outbound-client
+  abstraction layer (`reqwest`), not on `hyper` itself.
+  rustls for everything; no native-tls, no OpenSSL.
   ([§10.9](CONTRIBUTING.md#109-http-client-runtime-stack-vs-tooling-stack))
 - **Re-exports.** Re-export types from direct dependencies that
   appear in public API. Don't re-export transitive deps. Don't

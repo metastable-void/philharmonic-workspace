@@ -160,9 +160,15 @@ Authentication / authorisation / audit-log / permission-aware
 WebUI / transport hardening (HTTP/3 + HSTS-on-TLS + aws-lc-rs
 + webpki-roots) all in place. The banned-dep posture is
 `pyo3` / `maturin` / `openssl-sys` / `native-tls` /
-`rustls-platform-verifier` / `rustls-native-certs` / `ring`
-— all no-wrapper full bans on the workspace's ship targets
-(`x86_64-unknown-linux-{gnu,musl}`).
+`rustls-platform-verifier` / `rustls-native-certs` / `ring` /
+`reqwest` — all no-wrapper full bans on the workspace's ship
+targets (`x86_64-unknown-linux-{gnu,musl}`). `reqwest` was
+migrated out in D20 / D22-client in favour of
+`mechanics-http-client` as the single outbound-HTTP wrapper;
+the ban prevents re-introduction. `hyper` itself remains
+allowed (mhc and the server crates consume it for client and
+server paths respectively); only the `reqwest` abstraction
+layer is banned.
 
 **What's next (MVP-blocking)**: a **production Chat UI** for
 the first concrete use case — **customer-support chat**. The

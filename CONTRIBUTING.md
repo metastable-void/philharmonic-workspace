@@ -2043,76 +2043,90 @@ by role:
 
 | Role                                   | Client                | Runtime |
 | ---                                    | ---                   | ---     |
-| **Runtime crates** (libraries and bin crates that ship — connector impls, realm service binaries, `philharmonic-api`, etc.) | **`reqwest`** with `rustls-tls` (or **`hyper`** + `rustls` directly when reqwest's abstraction is too thick) | `tokio` |
+| **Runtime crates** (libraries and bin crates that ship — connector impls, realm service binaries, `philharmonic-api`, etc.) | **`mechanics-http-client`** — the workspace's `hyper-rustls` + `webpki-roots` + `aws-lc-rs` wrapper, optional `http3` feature for opportunistic HTTP/3 | `tokio` |
 | **Workspace tooling** (`xtask/` bins — `web-fetch`, `crates-io-versions`, `openai-chat`, anything future) | **`ureq`** with `rustls` via `xtask::http::fetch_text` | synchronous |
 
 Hard rules:
 
+- **`reqwest` is banned.** No-wrapper full ban via
+  [`deny.toml`](../deny.toml) `[bans]`. The whole workspace
+  was migrated off reqwest onto `mechanics-http-client` as part
+  of D20 / D22-client; new code must not re-introduce it. If
+  mhc is missing a shape a new runtime caller needs (a
+  request-builder ergonomic, a streaming-body affordance,
+  TRACE support, multipart, whatever), the answer is to
+  extend mhc — not to reach back for reqwest, not to add a
+  parallel reqwest path "just for this one site." A
+  `reqwest` line in any new `Cargo.toml` is a review block.
 - **`ureq` is tooling-only.** No runtime crate depends on
   `ureq`. A member crate's `Cargo.toml` pulling `ureq` is a
   review block — either the crate is actually dev tooling and
   belongs under `xtask/` (see [§8](#8-in-tree-workspace-tooling-xtask)),
-  or it should depend on `reqwest` instead.
-- **Runtime crates pick `reqwest` first, `hyper` only when
-  reqwest's abstraction genuinely gets in the way.** Custom
-  trailer handling, streaming body mutations, HTTP/2 frame
-  control, and similar lower-level concerns justify hyper.
-  "I prefer hyper's ergonomics" does not.
+  or it should depend on `mechanics-http-client` instead.
+- **Use mhc; reach for direct `hyper` only inside mhc itself.**
+  Runtime crates other than `mechanics-http-client` should
+  not depend on `hyper` directly for *client-side* outbound
+  HTTP — that is mhc's job. Crates that need lower-level
+  control (custom trailer handling, streaming-body mutations,
+  H2 frame control, etc.) should add the affordance to mhc
+  and call it through mhc, so the workspace keeps a single
+  audit point for the outbound client stack. The `hyper` crate
+  itself is **not** banned: mhc consumes it for the client
+  path; `mechanics-http-server` and `mechanics` consume it for
+  the server path. "No `reqwest`" is a ban on the outbound-
+  client abstraction layer, not on `hyper` itself.
 - **No third HTTP client.** `isahc`, `surf`, `curl`-the-crate,
   etc. are not approved. A new runtime HTTP dependency needs
   an explicit scoping discussion before landing.
-- **Single TLS stack, no system crypto headers.** Both reqwest
-  (with the `rustls-tls` feature) and ureq (with the `rustls`
-  feature) use **rustls** — not native-tls, not OpenSSL, not
+- **Single TLS stack, no system crypto headers.** mhc and ureq
+  both use **rustls** — not native-tls, not OpenSSL, not
   system TLS. The underlying cryptographic provider must be
-  vendored / pure-Rust-ish (e.g. `aws-lc-rs`, which vendors
-  AWS-LC's C source and builds it via `cc`; or `ring`, which
-  does the same). **Never depend on system-installed OpenSSL
-  headers or `libssl-dev` / `openssl-devel` packages** — the
-  build must succeed on a clean checkout with only a Rust
-  toolchain (+ a C compiler for the vendored C portions of
-  aws-lc-rs / ring). This keeps statically-linkable musl
-  builds simple, keeps the system-library dep surface at zero,
-  and keeps cross-compilation (including
-  `x86_64-unknown-linux-musl` for the Phase 9 bin targets)
-  clean.
+  vendored / pure-Rust-ish (`aws-lc-rs` workspace-wide
+  post-D20, which vendors AWS-LC's C source and builds it via
+  `cc`). **Never depend on system-installed OpenSSL headers
+  or `libssl-dev` / `openssl-devel` packages** — the build
+  must succeed on a clean checkout with only a Rust toolchain
+  (+ a C compiler for the vendored C portions of aws-lc-rs).
+  This keeps statically-linkable musl builds simple, keeps
+  the system-library dep surface at zero, and keeps cross-
+  compilation (including `x86_64-unknown-linux-musl` for the
+  Phase 9 bin targets) clean.
 - **tokio stays on the runtime side.** `xtask/` bins must
   not pull tokio just to make one HTTP call — `ureq` (sync) is
   the point.
-- **reqwest version is workspace-wide consistent.** Every
-  reqwest-using crate in the workspace pins to the same
-  `major.minor` (e.g., `reqwest = "0.13"`). When a bump is
-  needed — a security advisory, an ecosystem-wide move to a
-  new major, a feature we actually need — every reqwest-using
-  crate moves together in the same PR / release window, not
-  piecemeal. Reason: mismatched reqwest majors balloon the
-  dep graph with two copies of hyper / http / tower, which
-  is both a disk-and-compile-time cost and a latent
-  behavior-drift risk when the two versions disagree on
-  e.g. HTTP/2 framing.
+- **mhc version is workspace-wide consistent.** Every
+  mhc-using crate pins to the same `major.minor`. When a bump
+  is needed, every consumer crate moves together in the same
+  release window, not piecemeal. Reason: mismatched mhc
+  majors would balloon the dep graph with two copies of the
+  same hyper + h3 stack, defeating the single-audit-point
+  rationale.
 
 Reasoning for the split:
 
 - **Async fit.** Every runtime crate in Philharmonic lives in
-  tokio territory (per §10.8). `reqwest`'s async API composes
-  with the rest of the runtime naturally; `ureq` in a tokio
-  context would force `spawn_blocking` wrappers at every call
-  site — strictly worse than just using reqwest.
+  tokio territory (per §10.8). mhc's async API composes with
+  the rest of the runtime naturally; `ureq` in a tokio context
+  would force `spawn_blocking` wrappers at every call site.
 - **Scoping clarity.** Reading a `Cargo.toml` tells you which
   side of the split a crate is on without further context. A
-  `ureq` dep means "dev tooling"; a `reqwest` dep means
-  "service crate doing real network I/O."
-- **Dep surface, reviewed twice.** ureq is the smallest viable
-  sync HTTP client; reqwest carries hyper + tower + tokio
-  transitively. Forcing runtime crates through reqwest
-  concentrates the heavy dep-graph audit in one place rather
-  than spread across every impl crate.
+  `ureq` dep means "dev tooling"; an `mhc` dep means
+  "runtime crate doing real network I/O."
+- **Dep surface, audited once.** mhc owns the workspace's
+  whole outbound-HTTP audit surface (hyper + rustls +
+  aws-lc-rs + webpki-roots + the opportunistic-H3 stack on the
+  `http3` feature). Concentrating it in one wrapper crate
+  means upgrades, CVE responses, and TLS-posture changes
+  happen in one place rather than spread across every impl
+  crate. `reqwest` was the previous concentration point;
+  D20 / D22-client migrated the workspace to mhc as the
+  smaller, post-quantum-ready, H3-aware replacement.
 - **Tooling stays cheap.** xtask bins are short-lived shell
   commands; the build cost of pulling tokio into each of them
   would dominate the actual work they do.
 
 Doc 08 §"http_forward" spells the concrete shape for the
-first runtime consumer of this rule (reqwest + rustls-tls,
+first runtime consumer of this rule (`mechanics-http-client`,
 `Client` reused across calls, per-request timeout from
 `HttpEndpoint.timeout_ms`).
 

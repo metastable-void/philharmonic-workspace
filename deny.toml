@@ -205,6 +205,18 @@ deny = [
     # `ssl_providerless`. No wrapper exception remains.
     "rustls-native-certs",
 
+    # Runtime outbound HTTP is `mechanics-http-client` only
+    # (post-D20 / D22-client). All workspace crates that previously
+    # depended on `reqwest` were migrated to mhc — the workspace's
+    # single `hyper-rustls` + `webpki-roots` + `aws-lc-rs` wrapper
+    # (with opportunistic HTTP/3 via the `http3` feature). New
+    # runtime crates that need outbound HTTP must depend on
+    # `mechanics-http-client`; if mhc lacks a needed shape, extend
+    # mhc rather than reaching back for reqwest. Workspace tooling
+    # (`xtask/` bins) continues to use `ureq` + rustls via
+    # `xtask::http::fetch_text`. No-wrapper full ban.
+    "reqwest",
+
     # Crypto provider — workspace is `aws-lc-rs` only
     # (post-D20 / D22-client / D22-server). All directly-fixable
     # `ring` sources eliminated: `reqwest` dev-dep migrated to

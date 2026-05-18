@@ -217,7 +217,8 @@ into the crates.
   `dockerlet` replacing testcontainers, D24 default-features
   audit (banned: `pyo3` / `maturin` / `openssl-sys` /
   `native-tls` / `rustls-platform-verifier` /
-  `rustls-native-certs` / `ring`), D25 hickory CVE bump.
+  `rustls-native-certs` / `ring` / `reqwest`), D25 hickory
+  CVE bump.
   `mechanics-h3-quinn` in-tree vendored fork + generic
   `vendor-upstream` xtask + `check-no-registry` workspace-
   hardening guard + dev-profile incremental disable round out
