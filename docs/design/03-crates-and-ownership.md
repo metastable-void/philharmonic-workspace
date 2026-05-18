@@ -177,42 +177,45 @@ as `0.0.x` placeholders, no substantive implementation yet):
   replayable byte bodies, so a probe failure can both
   negative-cache the origin and fall through cleanly without
   re-sending bytes the upstream may have already accepted.
-  H3 connect / setup / stream-open / upload phases are
-  bounded independently so a deployment whose DNS HTTPS RR
-  still advertises `h3` against a server with
-  `bind_h3 = None` falls through the H3 probe before the
-  caller's full request timeout is spent; the whole
-  opportunistic H3 probe is in turn bounded by its own
-  small fail-open window, and the response-header wait is
-  bounded by an independent fail-open window after that
-  (so a stale or half-disabled H3 peer that accepts a
-  replayable POST but never emits response headers still
-  falls open to the TCP/TLS path before the caller's full
-  endpoint timeout is spent). The cached QUIC client
-  endpoint is family-aware: IPv4 targets bind `0.0.0.0:0`
-  and IPv6 targets bind `[::]:0`, so an IPv4-only H3
-  deployment is reached over an IPv4 UDP socket rather
-  than relying on platform-specific dual-stack UDP
-  behaviour from an IPv6-unspecified bind.
-  `Client::fresh_transport()` rebuilds only the hyper
-  TCP/TLS transport while preserving request defaults and
-  the shared H3 state (`Alt-Svc`, HTTPS RR, negative
-  cache, QUIC endpoint state), so an embedder can isolate
-  a potentially poisoned TCP connection pool from one
-  long-lived job to the next without disabling H3 or
-  losing accumulated H3 discovery state. `mechanics-core`'s
-  default endpoint transport uses this API to give every
-  `mechanics:endpoint` execution a fresh TCP/TLS hyper
-  pool, so a cancelled or stalled endpoint call cannot
-  poison the long-lived worker's connection pool and
-  starve later jobs from new workflow / chat instances.
-  The endpoint transport also tracks `timeout_ms` as an
-  absolute per-request deadline (request/header phase,
-  then response-body read) instead of wrapping the whole
-  endpoint operation in an outer `tokio::time::timeout`;
-  using cancellation of the entire endpoint future as
-  normal control flow was what previously let stalled
-  hyper transport state survive into subsequent jobs.
+  The H3 pre-request phases (connect, setup, stream-open,
+  upload) are bounded by short local fail-open windows so a
+  deployment whose DNS HTTPS RR still advertises `h3` against
+  a server with `bind_h3 = None` falls through the probe path
+  before the caller's full request timeout is spent. **Once
+  H3 has accepted the request** (headers sent, body uploaded
+  successfully), the caller's absolute request deadline takes
+  over for both response-header and response-body waits — no
+  arbitrary short probe timeout, no replay over TCP/TLS once
+  request bytes have been consumed. The cached QUIC client
+  endpoint is family-aware: IPv4 targets bind `0.0.0.0:0` and
+  IPv6 targets bind `[::]:0`, so an IPv4-only H3 deployment is
+  reached over an IPv4 UDP socket rather than relying on
+  platform-specific dual-stack UDP behaviour from an
+  IPv6-unspecified bind. `Client::fresh_transport()` rebuilds
+  only the hyper TCP/TLS transport while preserving request
+  defaults and the shared H3 state (`Alt-Svc`, HTTPS RR,
+  negative cache, QUIC endpoint state), so an embedder can
+  isolate a potentially poisoned TCP connection pool from one
+  long-lived job to the next without disabling H3 or losing
+  accumulated H3 discovery state. `mechanics-core`'s default
+  endpoint transport uses this API to give every
+  `mechanics:endpoint` execution a fresh TCP/TLS hyper pool,
+  so a cancelled or stalled endpoint call cannot poison the
+  long-lived worker's connection pool and starve later jobs
+  from new workflow / chat instances. **Timeout enforcement
+  is deadline-based, not wrapper-based**: `timeout_ms` is
+  converted to a single absolute `Instant` carried through
+  the request/header phase, into the returned `Response`
+  object, and into the body-collection loop. Both the
+  hyper/TCP/TLS and H3 body paths observe the same deadline,
+  so a stale H3 response that produced headers but never
+  yields body frames cannot keep the worker in tail polling
+  past the configured budget. The previous outer
+  `tokio::time::timeout` wrapper around the whole endpoint
+  operation has been removed; using cancellation of the
+  entire endpoint future as normal control flow was what
+  previously let stalled hyper transport state survive into
+  subsequent jobs.
 - **`mechanics-http-server`** — opt-in HTTP/3 (QUIC)
   listener + Alt-Svc tower middleware that runs alongside
   the existing hyper-driven HTTP/1.1+HTTP/2 listener.

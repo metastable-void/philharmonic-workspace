@@ -222,6 +222,21 @@ Lifetime is bounded by the per-job `max_execution_time`:
   worker-pool slot limits self-regulate backpressure — no new
   cap is introduced.
 
+**Already-started native-async jobs are preserved across the
+early-reply boundary.** Internally, the executor uses *one*
+native-async polling loop spanning both the "wait until the
+main promise settles" phase and the "continue to tail
+quiescence" phase. The early reply is emitted from inside that
+same loop, so an in-flight `mechanics:endpoint(...)` future that
+was scheduled before the main promise settled is **not** dropped
+at the response-fence boundary — it stays in the in-flight set
+and the same loop keeps driving it through to body completion or
+deadline. A previous two-loop shape (separate in-flight future
+sets for main-wait and tail-poll) could cancel a sibling
+endpoint future when the main promise resolved, leaving the
+worker apparently blocked in tail polling but actually unable to
+make progress on the stalled response.
+
 Side effects in tail-poll still complete: real HTTP requests to
 connector services still go out, real Promise chains still
 settle. What changes is that the run-job response is no longer
