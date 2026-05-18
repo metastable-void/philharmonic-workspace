@@ -11,11 +11,17 @@ The runtime failure shape from the prompt is a TCP/TLS API listener with no HTTP
 
 That relies on platform-specific dual-stack UDP behaviour. On hosts where an IPv6 UDP socket cannot send to IPv4 targets, or where the server is re-enabled only on an IPv4 bind, the client can fail the HTTP/3 path even though the H3 server is healthy. The existing disabled-H3 fallback tests did not catch this because they only asserted fallback before a large timeout, not that an enabled IPv4 H3 target would use an IPv4 client socket.
 
+The follow-up production symptom was stronger: after one soft-failed endpoint step, later workflow/chat instances produced no `lo` packets for `tcp port 443 or udp port 443`. Because production is not on the dev box, I treated that as a long-lived mechanics-worker state issue rather than a local packet-capture observation. The code path with that persistence is the shared `mechanics_http_client::Client` held by `DefaultEndpointHttpClient`: a cancelled/stalled endpoint call can leave hyper TCP/TLS pool state alive across jobs and across UI/workflow instances.
+
 ## Fix Landed
 
 `mechanics-http-client/src/request.rs` now bounds the whole opportunistic H3 probe separately from the endpoint/request timeout. If the H3 probe does not complete inside that small fail-open window, the client negative-caches H3 for the origin, removes the stale `Alt-Svc` entry, and continues to the normal TCP/TLS request path. The H3 feature remains enabled; this only prevents an unavailable H3 path from being terminal for replayable endpoint requests.
 
 `mechanics-http-client/src/http3.rs` now keeps separate cached QUIC endpoints for IPv4 and IPv6 targets. The resolved target address is selected before the endpoint is fetched, and IPv4 targets bind `0.0.0.0:0` while IPv6 targets bind `[::]:0`.
+
+`mechanics-http-client::Client::fresh_transport()` now rebuilds only the hyper TCP/TLS transport while preserving request defaults and shared H3 state (`Alt-Svc`, HTTPS RR, negative cache, and QUIC endpoint state). `mechanics-core`'s default endpoint transport uses that fresh TCP/TLS transport for every `mechanics:endpoint` execution, so a poisoned TCP connection pool cannot survive from one endpoint call into the next. This does not remove tail promise polling and does not disable H3.
+
+`mechanics-core/src/internal/http/transport.rs` also removes the outer timeout wrapper around the whole endpoint operation. Endpoint `timeout_ms` is now represented as an absolute deadline: the request/header phase receives the current remaining budget, then the response-body read receives the remaining budget. That keeps timeout coverage for both phases without dropping the whole transport future from outside at an arbitrary await point.
 
 `mechanics-http-client/src/http3.rs` also adds `http3_state_uses_ipv4_udp_endpoint_for_ipv4_targets`, which verifies the IPv4 bind directly under Tokio. `mechanics-http-client/CHANGELOG.md` records the fix under `Unreleased`.
 
@@ -29,18 +35,24 @@ After review of `/tmp/test-script.js` and `/tmp/test-context.json`, I added two 
 
 `mechanics-http-client/src/http3.rs` also bounds the HTTP/3 response-header phase separately. That is not the disabled-listener case, but it closes the neighbouring fail-open gap for replayable endpoint requests once an H3 peer has accepted the QUIC connection.
 
+The later no-packets symptom is addressed by transport isolation rather than by changing the JavaScript scheduler: `mechanics-core/src/internal/http/transport.rs` refreshes only the TCP/TLS hyper pool before executing an endpoint request. The existing D17 tail-promise polling behaviour remains intact.
+
+The endpoint transport lifecycle cleanup keeps that isolation workaround but removes the earlier belt-and-braces outer timeout. Timeout enforcement is now phase-local and deadline-based, which avoids using cancellation of the entire endpoint operation as normal control flow.
+
 ## Validation
 
 - `./scripts/rust-test.sh mechanics-http-client` passed.
 - `./scripts/rust-lint.sh mechanics-http-client` passed.
+- `./scripts/rust-test.sh mechanics-core` passed.
+- `./scripts/rust-lint.sh mechanics-core` passed.
 - `./scripts/pre-landing.sh` passed. The run auto-detected
   `mechanics-http-client`; it printed the existing cargo-doc filename
   collision warning, the known sandbox-limited `rustup` temp-file
   warning, and existing duplicate-lock warnings, then ended with
   `pre-landing: all checks passed`.
-- `./scripts/check-md-bloat.sh` reported `97871 total`.
-- `./scripts/tokei.sh` reported `198735 total`.
+- `./scripts/check-md-bloat.sh` reported `97900 total`.
+- `./scripts/tokei.sh` reported `198844 total`.
 
 ## Notes
 
-This change does not disable HTTP/3 and does not change the H3 discovery policy. It makes unavailable H3 fail open to TCP/TLS for replayable requests, and it makes the cached QUIC client endpoint match the remote address family so H3 remains usable when the API-side H3 listener is re-enabled.
+This change does not disable HTTP/3 and does not change the H3 discovery policy. It makes unavailable H3 fail open to TCP/TLS for replayable requests, makes the cached QUIC client endpoint match the remote address family, and prevents stale TCP/TLS transport state from crossing mechanics endpoint executions.

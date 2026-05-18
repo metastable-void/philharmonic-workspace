@@ -194,6 +194,25 @@ as `0.0.x` placeholders, no substantive implementation yet):
   deployment is reached over an IPv4 UDP socket rather
   than relying on platform-specific dual-stack UDP
   behaviour from an IPv6-unspecified bind.
+  `Client::fresh_transport()` rebuilds only the hyper
+  TCP/TLS transport while preserving request defaults and
+  the shared H3 state (`Alt-Svc`, HTTPS RR, negative
+  cache, QUIC endpoint state), so an embedder can isolate
+  a potentially poisoned TCP connection pool from one
+  long-lived job to the next without disabling H3 or
+  losing accumulated H3 discovery state. `mechanics-core`'s
+  default endpoint transport uses this API to give every
+  `mechanics:endpoint` execution a fresh TCP/TLS hyper
+  pool, so a cancelled or stalled endpoint call cannot
+  poison the long-lived worker's connection pool and
+  starve later jobs from new workflow / chat instances.
+  The endpoint transport also tracks `timeout_ms` as an
+  absolute per-request deadline (request/header phase,
+  then response-body read) instead of wrapping the whole
+  endpoint operation in an outer `tokio::time::timeout`;
+  using cancellation of the entire endpoint future as
+  normal control flow was what previously let stalled
+  hyper transport state survive into subsequent jobs.
 - **`mechanics-http-server`** — opt-in HTTP/3 (QUIC)
   listener + Alt-Svc tower middleware that runs alongside
   the existing hyper-driven HTTP/1.1+HTTP/2 listener.
