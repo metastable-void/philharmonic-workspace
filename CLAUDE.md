@@ -289,10 +289,51 @@ full in `CONTRIBUTING.md`. Read the full section before acting
   subject-as-body single lines waste tokens for every push-
   time LLM summarizer, the auto-grounding hook, and human
   reviewers (`./scripts/heads.sh`, `git log --oneline`,
-  GitHub PR titles, Slack digests). When passing a HEREDOC to
-  `commit-all.sh`, hard-wrap the body by hand inside the
-  heredoc; do not let single physical lines exceed ~72
-  cols. ([§4.10](CONTRIBUTING.md#410-commit-message-format))
+  GitHub PR titles, Slack digests). Hard-wrap the body by
+  hand; do not let single physical lines exceed ~72 cols.
+  ([§4.10](CONTRIBUTING.md#410-commit-message-format))
+- **Pass commit messages to `commit-all.sh` via a single-
+  quoted heredoc, ALWAYS.** Not "when the message is long" —
+  **always**, even for short single-paragraph messages. The
+  heredoc form is:
+
+  ```sh
+  ./scripts/commit-all.sh "$(cat <<'EOF'
+  subject line ≤ 72 chars
+
+  body paragraph hard-wrapped at ≈ 72 cols, including any
+  backticked `identifier` / `path/like/this` / `command(...)`
+  tokens that the body legitimately needs to mention.
+  EOF
+  )"
+  ```
+
+  **The single-quoted `<<'EOF'` delimiter is load-bearing.**
+  It suppresses shell expansion of backticks, `$(...)`,
+  `$VAR`, and `!`-history-expansion inside the body. A
+  bare double-quoted string passed as the message argument
+  goes through bash's quote-removal pass first, which:
+  - silently executes backticked spans as command
+    substitution (so ``\`build = "build.rs"\``` becomes the
+    empty string at best, or `command not found` stderr at
+    worst);
+  - silently expands `$VAR` references (so `$CARGO_HOME`,
+    `$PATH` mentions in the body become their host values);
+  - silently runs `$(...)` as command substitution.
+
+  All of those failure modes are silent from the
+  committer's POV — `commit-all.sh` exits 0, the commit
+  message just loses the expanded tokens. **And history is
+  append-only** ([§4.4](CONTRIBUTING.md#44-no-history-modification))
+  — no amend, no rebase, no force-push — so a mangled
+  message is unfixable except via a fix-forward note. The
+  heredoc rule is the easy mechanical guardrail.
+
+  Failure mode incident: commit `a5833d5` (2026-05-18 WebUI
+  build-identifier traceability) lost ≈ 8 backticked tokens
+  in the body when I passed the message as a double-quoted
+  string instead of a heredoc. Don't repeat it.
+  ([§4.10](CONTRIBUTING.md#410-commit-message-format))
 - **Git history is append-only.** No amend, no rebase, no reset,
   no force-push, and no `git revert` either. Two narrow
   script-enforced exceptions — the `post-commit`

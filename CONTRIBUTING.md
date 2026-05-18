@@ -911,6 +911,50 @@ push-time LLM summarizers, and human reviewers all read
 subjects first; long single-line bodies-as-subjects defeat
 every one of them and burn context tokens unnecessarily.
 
+#### Passing the message to `commit-all.sh`
+
+**Always pass commit messages via a single-quoted heredoc.**
+Not "for long messages" — always, even for one-paragraph
+messages. The canonical form:
+
+```sh
+./scripts/commit-all.sh "$(cat <<'EOF'
+subject line ≤ 72 chars
+
+body paragraph hard-wrapped at ≈ 72 cols, freely using
+backticked `identifier` / `path/like/this` / `command(...)`
+tokens that the body legitimately needs to mention. Mention
+`$VAR` and `$(cmd)` references too without worrying about
+expansion.
+EOF
+)"
+```
+
+**The single-quoted `<<'EOF'` delimiter is load-bearing.**
+It suppresses shell expansion of backticks, `$(...)`, `$VAR`,
+and `!`-history-expansion inside the body. A bare
+double-quoted message string goes through bash's
+quote-removal pass first, which silently:
+
+- runs backticked spans as command substitution (so an
+  innocuous \`build = "build.rs"\` in the body becomes the
+  empty string at best, or `command not found` stderr at
+  worst);
+- expands `$VAR` references to their host values;
+- runs `$(...)` as command substitution.
+
+All silent from the committer's perspective —
+`commit-all.sh` exits 0 and the commit just loses the
+expanded tokens. **Combined with the append-only history
+rule (§4.4)**, a mangled message is unfixable except via a
+fix-forward errata note. The heredoc rule is the easy
+mechanical guardrail; use it unconditionally.
+
+Same rule applies to any other script that takes a free-form
+message argument (today only `commit-all.sh`). If a future
+wrapper script grows a message argument, plumb the heredoc
+discipline into its examples.
+
 ---
 
 ## 5. Script wrappers over raw `cargo`
