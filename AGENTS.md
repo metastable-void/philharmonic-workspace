@@ -104,6 +104,45 @@ missed. If the task *doesn't* mention these areas and your
 implementation drifts into touching them, stop and surface rather
 than proceeding.
 
+### Production is not this sandbox
+
+The dev sandbox you're running in is **not** the production
+Philharmonic host. Production runs on a separate machine.
+When the prompt cites a runtime symptom from production — a
+workflow stalling, no loopback packets after one failed
+endpoint step, a long-lived worker behaving differently than
+a fresh test process, a chat instance hanging — **do not
+assume local observations on this sandbox reflect production
+state**:
+
+- `tcpdump`, `ss`, `lsof`, `netstat`, `pstree`, `journalctl`,
+  `/proc/<pid>/`, log scraping on this sandbox inspect this
+  sandbox's processes only. They tell you nothing about the
+  production worker's connection pool, process tree, kernel
+  state, or filesystem.
+- A `cargo run` here uses a fresh binary against fresh state;
+  it does not carry the production worker's accumulated state
+  — hyper TCP/TLS pool, tail-promise queue, in-process caches,
+  H3 negative-cache and Alt-Svc table, file handles. A clean
+  local run is not evidence that production is fine.
+- A symptom that doesn't reproduce on this sandbox is not
+  falsified — it just means the sandbox doesn't have the
+  production host's long-lived state.
+
+When the prompt describes a production-only symptom, default
+to **reasoning about long-lived production process state**
+(what accumulates in shared client state across jobs, what an
+endpoint cancellation could leak into a connection pool, what
+the worker's tail-promise queue could hold) rather than local
+experiments. If on-production observation is genuinely needed
+to confirm a hypothesis, say so in your final message rather
+than substituting a local equivalent and presenting it as
+evidence about production. The 2026-05-18 mhc TCP-pool poisoning
+fix is the canonical example: a production "no `lo` packets
+after one soft-failed endpoint step" report was correctly
+analysed as long-lived shared `mechanics_http_client::Client`
+state in the worker rather than via any local packet capture.
+
 ## Your role
 
 - **Implement what the prompt asks.** Don't redesign scope, don't

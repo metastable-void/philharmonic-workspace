@@ -83,6 +83,77 @@ ship-fast-to-escape-diagnosis detour had to be unpicked.
   [`docs/ROADMAP.md §2`](docs/ROADMAP.md#2-crypto-review-protocol-pointer)
   (cross-reference).
 
+## Production is not this machine
+
+A production / customer-facing Philharmonic deployment runs on
+a **separate host** from this development box. When the user
+reports a runtime symptom from production — a workflow stalling,
+no loopback packets after one failed endpoint step, a chat
+instance hanging, a long-lived worker behaving differently than
+a fresh test process — **do not treat dev-box observations as
+production state**:
+
+- `tcpdump`, `ss`, `lsof`, `netstat`, `pstree`, `journalctl`,
+  `/proc/<pid>/`, file-on-disk inspection, log scraping — all of
+  it on this machine reflects *this machine's* processes and
+  sockets. It tells you nothing about the production worker's
+  connection pool, process tree, kernel state, or filesystem.
+- A `cargo run` reproduction in this workspace executes a
+  fresh binary against fresh state; it does not carry the
+  production worker's accumulated state — hyper TCP/TLS pool,
+  tail-promise queue, in-process caches, H3 negative-cache and
+  Alt-Svc table, file handles. A clean local run is not
+  evidence that production is fine.
+- A "doesn't reproduce on the dev box" result does not falsify
+  a production-only symptom — it just means the dev box doesn't
+  have the production host's long-lived state.
+
+When a production symptom is reported, default to **reasoning
+about the long-lived production process state** (what could
+accumulate in the shared `mechanics_http_client::Client`, what
+the worker's tail-promise queue could be holding, what an
+endpoint cancellation could leak into hyper's connection pool)
+rather than to local-process experiments. If on-production
+observation is genuinely needed, say so explicitly in your
+reply; don't substitute local equivalents and present them as
+evidence about production. The 2026-05-18 mhc TCP-pool poisoning
+fix is the canonical example — the "no `lo` packets after one
+soft-failed endpoint step" report came from production, not
+from this box, and the right framing was long-lived shared
+hyper pool state in the worker, not anything observable here.
+
+## Working-directory discipline
+
+**`cd` into the workspace root once, then call workspace
+scripts as `./scripts/foo.sh`.** Never hardcode an absolute
+path to the repo in any script invocation, doc edit, or
+note-to-humans — the workspace root's absolute path varies
+across dev boxes (`/home/...`, `/Users/...`, `/workspace/...`,
+WSL2 mounts, etc.). Read the current session's workspace
+root from the environment block's `Primary working
+directory:` field, `cd` into it before the first
+`./scripts/...` invocation, and use the relative form from
+then on. This explicitly **overrides** the Bash tool's
+default "prefer absolute paths, avoid `cd`" guidance for
+this workspace.
+
+Why this is Claude-side discipline (the scripts are fine):
+the workspace wrappers have internal helpers that resolve
+their own root and work correctly from any cwd. The problem
+is on the agent side — Claude has muscle-memory for typing
+`./scripts/foo.sh`, and that relative form only resolves to
+the script when the current shell is actually at the
+workspace root. If Claude's cwd has drifted (or the session
+started in a different directory) the same `./scripts/...`
+string fails with `No such file or directory`, which then
+tempts a reach for the absolute form and bakes a host-
+specific path into the transcript. `cd` once, type relative
+thereafter, and the muscle-memory pattern produces correct,
+portable output.
+
+Codex specifies the working directory of each shell call by
+design; this rule is **Claude-only**.
+
 ## Claude vs. Codex division of labour
 
 Claude Code is the designer, reviewer, and workspace caretaker.
