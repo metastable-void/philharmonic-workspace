@@ -164,22 +164,39 @@ WebUI / transport hardening (HTTP/3 + HSTS-on-TLS + aws-lc-rs
 — all no-wrapper full bans on the workspace's ship targets
 (`x86_64-unknown-linux-{gnu,musl}`).
 
-**What's next**: Tier 2/3 connector implementations — D7 SMTP,
-D19 DNS (Tier 2, dispatched as a batch), then D8 Anthropic and
-D9 Gemini (Tier 3). No internal-platform work blocks them. See
-[`docs/ROADMAP.md` §3](docs/ROADMAP.md#3-post-v1-dispatch-plan)
-for the dispatch specs.
+**What's next (MVP-blocking)**: a **production Chat UI** for
+the first concrete use case — **customer-support chat**. The
+framework itself is not a chat app (chats are workflow
+knowledge), so the production Chat UI lives in a separate
+codebase from the framework's crate family — either an
+in-tree top-level bin (`bins/philharmonic-chat-app/` shape,
+frontend + backend unified, depends on `philharmonic` like
+any other consumer) or an entirely separate project that
+consumes the published `philharmonic-*` crates externally.
+The current `philharmonic/webui/` chat surface stays as the
+workflow-author testing chat; the production Chat UI is its
+own codebase. Tracked as
+[`docs/ROADMAP.md` §3.M](docs/ROADMAP.md#3-post-v1-dispatch-plan).
+
+**Post-MVP (not queued)**: Tier-3 LLM connector implementations
+— D8 Anthropic and D9 Gemini. `llm_openai_compat` already
+covers the OpenAI / vLLM / compatible-gateway shape the MVP
+needs, so neither blocks deployment. Specs preserved at
+[`docs/ROADMAP.md` §3.B](docs/ROADMAP.md#3-post-v1-dispatch-plan)
+for whenever they become MVP+1 priorities.
 
 The original published-crate names are reserved on crates.io.
-Foundational, API, connector-triangle, and Phase 6/7 Tier 1
-implementation crates have published substantive releases at
-`0.1.0` or higher. The remaining connector names
-(`philharmonic-connector-impl-email-smtp`,
-`philharmonic-connector-impl-llm-anthropic`,
-`philharmonic-connector-impl-llm-gemini`,
-`philharmonic-connector-impl-dns`) are published placeholders
-at `0.0.x` until their implementations land. Per-crate version
-history and release notes live in each crate's `CHANGELOG.md`;
+Foundational, API, connector-triangle, Phase 6/7 Tier 1, and
+Tier-2 implementation crates (including the just-landed
+`philharmonic-connector-impl-email-smtp` and
+`philharmonic-connector-impl-dns`, both at `0.1.0` as of
+2026-05-18) have published substantive releases. The remaining
+two connector names (`philharmonic-connector-impl-llm-anthropic`,
+`philharmonic-connector-impl-llm-gemini`) are published
+placeholders at `0.0.x` and stay that way until their D8/D9
+dispatches run — both are post-MVP and not blocked on anything.
+Per-crate version history and release notes live in each
+crate's `CHANGELOG.md`;
 per-arc done-state snapshots and daily-log history in
 [`docs/archive/`](docs/archive/); Codex prompt archives in
 [`docs/codex-prompts/`](docs/codex-prompts/).

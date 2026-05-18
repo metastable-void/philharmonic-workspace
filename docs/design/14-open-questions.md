@@ -189,15 +189,26 @@ settled.
   common`.
 - **Policy crate boundaries**: one `philharmonic-policy` crate,
   not split.
-- **Chat UI relocation** (decided 2026-05-15): the Chat UI
-  at `philharmonic/webui/` doesn't structurally belong in
-  the framework (chats are workflow knowledge; see
+- **Chat UI relocation** (decided 2026-05-15; **elevated to
+  MVP-blocking 2026-05-18**): the Chat UI at
+  `philharmonic/webui/` doesn't structurally belong in the
+  framework (chats are workflow knowledge; see
   [§02 *Layered ignorance*](02-design-principles.md#layered-ignorance)).
-  Retained for end-to-end testing utility. Future home:
-  either an in-tree `philharmonic-chat-app` bin (frontend
-  + backend unified) or a separate project — Yuka picks at
-  relocation time. No removal during the Audit & refactor
-  sweep ([ROADMAP §3.K](../ROADMAP.md#k-audit--refactor-in-flight-yuka-direct-codex-dispatch)).
+  The existing webui-embedded chat surface stays in place
+  indefinitely as the workflow-author **testing** chat —
+  no removal — but the first MVP deployment use case
+  (customer-support chat) needs a **production Chat UI in
+  a separate codebase**: either an in-tree top-level
+  `bins/philharmonic-chat-app/` (frontend + backend
+  unified, depends on `philharmonic` like any other
+  consumer) or an entirely separate project that consumes
+  the published `philharmonic-*` crates externally. Yuka
+  picks the shape at scoping time. Tracked as
+  [ROADMAP §3.M](../ROADMAP.md#m-production-chat-ui-mvp-blocking-customer-support--first-use-case).
+  Framework crates remain forbidden from learning chat-app
+  concepts (sessions, conversation-history UI, agent
+  personas, support-queue routing, etc.) — those live in
+  the chat-app codebase only.
 
 ### Tenancy and principals
 

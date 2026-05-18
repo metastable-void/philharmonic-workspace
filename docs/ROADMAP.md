@@ -21,12 +21,24 @@ each crate's `CHANGELOG.md`.
   infrastructure, connector enhancements, runtime semantics,
   module-surface refactor, HTTP-client transport + TLS posture,
   workspace tooling, HTTP/3 client + server, production-security
-  dep cleanup, `mechanics-dns` extraction, and the §3.K Audit
-  & refactor sweep have all landed.
-- **Open**: §3.B Tier 2/3 connector implementations —
-  D7 SMTP, D19 DNS (Tier 2, dispatched as a batch), then
-  D8 Anthropic, D9 Gemini (Tier 3, dispatched separately).
-  No gate blocks dispatch; specs in §3.B below.
+  dep cleanup, `mechanics-dns` extraction, the §3.K Audit &
+  refactor sweep, and the §3.B Tier-2 connector batch (D7 SMTP
+  + D19 DNS, both at `0.1.0` as of 2026-05-18) have all landed.
+- **Open (MVP-blocking)**: §3.M **Production Chat UI** for
+  the first concrete use case (customer support chat). The
+  framework is not a chat app — chat is a separate concern;
+  the production Chat UI lives in a **separate codebase**
+  (either an in-tree `philharmonic-chat-app` bin or an
+  entirely separate project), not inside the framework's
+  crate family. Specs in §3.M below. This blocks MVP
+  deployment.
+- **Open (post-MVP, deferred)**: §3.B Tier-3 LLM connector
+  implementations — D8 Anthropic and D9 Gemini. **Not
+  required for MVP deployment** (`llm_openai_compat` covers
+  the OpenAI / vLLM / compatible-gateway shape that the MVP
+  needs). Specs in §3.B below are kept for whenever they
+  become MVP+1 priorities; no dispatch is planned in the
+  current cycle.
 - **Deferred (not yet scoped)**: a crypto-review-aware slice
   for the `lowerer.rs` / `embed_job.rs` extraction that was
   originally considered under §3.K but moved out because it
@@ -88,44 +100,25 @@ archived prompt under `docs/codex-prompts/` (see
 under [`docs/archive/`](archive/) — per-day archives span
 2026-05-10 through 2026-05-18. They are not enumerated here.
 
-### B. Phase 7 Tier 2/3 connector implementations (4 dispatches)
+### B. Phase 7 Tier-3 LLM connectors (2 dispatches — deferred out of MVP)
 
-Three of these (D7 / D8 / D9) take an existing `0.0.x`
-placeholder to a `0.1.0` substantive implementation; D19 is
-a **new crate** (no placeholder yet on crates.io, no
-submodule wired into the workspace). None touch the crypto
-path; the connector-service framework already validates
-tokens and decrypts payloads — implementations only need
-to implement the `Implementation` trait.
+Tier-2 batch (D7 SMTP + D19 DNS) shipped 2026-05-18 at
+`0.1.0` and is recorded with the other closed arcs. What
+remains here is **Tier-3 only**: D8 Anthropic + D9 Gemini.
 
-- **D7** `philharmonic-connector-impl-email-smtp` (Tier 2).
-  Implement per
-  [`docs/design/08-connector-architecture.md` §SMTP](design/08-connector-architecture.md#smtp).
-  Hard requirements (locked 2026-05-12 via HUMANS.md):
-  - **Port 25 rejected** unconditionally.
-  - **Username + password required**; anonymous submission
-    refused at config validation.
-  - **Explicit `connection_mode` knob** in the endpoint
-    config: `starttls` / `smtps` / `auto` (default). When
-    set, wins over the port-driven inference. The full
-    SMTP server config — host, port, credentials, mode,
-    strictness — lives in the endpoint config and is
-    never visible to workflow code.
-  - **Port-driven defaults** (when `connection_mode` is
-    `auto`): 587 → STARTTLS, 465 → SMTPS, otherwise
-    STARTTLS. **Auto-discovery** (`auto` + no port):
-    try 587/STARTTLS, then 465/SMTPS.
-  - **Four-valued `tls_strictness` enum**: `strict`
-    (default), `sloppy`, `opportunistic`,
-    `opportunistic_sloppy`. Independent of
-    `connection_mode`.
-  - **Request shape** `{mail_from, recipients[], body}`
-    with minimal MIME envelope fixing (insert
-    `MIME-Version` / `Date` / `Message-Id` / default
-    `Content-Type` only when the submission server would
-    reject otherwise; CRLF-normalise line endings; never
-    inject security-relevant headers).
-  - Transport: `lettre` over `rustls`.
+**MVP status (decided 2026-05-18):** Neither D8 nor D9 is
+required for MVP deployment. `llm_openai_compat` already
+covers the OpenAI / vLLM / compatible-gateway shape that
+the first use case (customer-support chat, §3.M) needs.
+The specs below are preserved verbatim so that whenever
+D8 / D9 become MVP+1 priorities the dispatch can proceed
+without re-deriving the shape — they are **not** queued
+for the current cycle. Neither touches the crypto path;
+both take an existing `0.0.x` placeholder to a `0.1.0`
+substantive impl by implementing the
+`Implementation` trait against an already-decrypted
+`config` + `request`.
+
 - **D8** `philharmonic-connector-impl-llm-anthropic` (Tier 3).
 - **D9** `philharmonic-connector-impl-llm-gemini` (Tier 3) —
   must support **both** Google API surfaces for Gemini:
@@ -151,64 +144,85 @@ to implement the `Implementation` trait.
   OAuth2 access-token caching for Vertex AI) defers to
   D9's prompt-drafting time.
 
-- **D19** `philharmonic-connector-impl-dns` (Tier 2,
-  **new crate**). Implement per
-  [`docs/design/08-connector-architecture.md` §DNS](design/08-connector-architecture.md#dns).
-  Hard requirements (locked 2026-05-12 via HUMANS.md):
-  - Arbitrary DNS querying via the system's stub
-    resolver (consults `/etc/resolv.conf`). No custom
-    recursive resolver, no caching layer beyond the OS.
-  - **Resolv.conf fallback**: when `/etc/resolv.conf` is
-    `ENOENT` (typical in minimal-base / distroless /
-    scratch container images), fall back to a hardcoded
-    Cloudflare resolver set:
-    `2606:4700:4700::1111`,
-    `2606:4700:4700::1001`,
-    `1.1.1.1`,
-    `1.0.0.1`. Any other read error
-    (permission denied, malformed file, I/O) surfaces as
-    a startup error — fallback fires only on ENOENT.
-  - `IN` class only.
-  - Endpoint config carries optional `allowed_types`
-    (RR type allowlist), `allowlist_zones`, and
-    `blocklist_zones` (domain-suffix gates). When both
-    lists exist: query passes if its zone is
-    allowlisted AND not blocklisted. Blocklist is a
-    strict overlay-deny.
-  - Resolver library: `hickory-resolver` (formerly
-    `trust-dns-resolver`) in system-config mode —
-    pure-Rust, async, no `unsafe`.
-  - Capability name `dns_query`; realm `dns`. Request
-    `{name, type, timeout_ms?}`; response
-    `{records: [{type, name, ttl, data}, ...]}`. v1
-    emits rdata as presentation-format strings;
-    per-type structured objects are a sub-shape
-    decision at prompt-drafting time.
+D8 and D9 are independent of one another and of §3.M; safe
+to run in parallel whenever they get queued. They do **not**
+gate §3.M.
 
-  Pre-D19 setup is complete (2026-05-12): submodule wired,
-  crates.io `0.0.x` placeholder published. Claude drafts
-  the D19 prompt; Codex implements + tests inside the
-  submodule. No crypto gate — DNS connector is HTTP-realm
-  style (token + encrypted payload over the connector
-  framework); just one more `Implementation` trait impl.
-  D19 consumes the in-tree `mechanics-dns` resolver layer.
+### M. Production Chat UI (MVP-blocking, customer support — first use case)
 
-Independent of one another; safe to run in parallel.
+First production deployment use case is a **customer-support
+chat** product. That requires a production-grade Chat UI —
+something polished and operable enough to put in front of
+real end users, distinct from the current `philharmonic/webui/`
+chat surface which exists for workflow-author end-to-end
+testing only and is sized accordingly.
+
+**Architectural constraint (decided in HUMANS.md, confirmed
+2026-05-18):** the framework is **not** a chat app. Chats
+are workflow knowledge (per
+[§02 *Layered ignorance*](design/02-design-principles.md#layered-ignorance));
+the framework's crate family must not gain chat-app concepts.
+The production Chat UI therefore lives in a **separate
+codebase** from the framework's crate family:
+
+- **Either** an in-tree top-level bin (e.g.
+  `bins/philharmonic-chat-app/` with both frontend and
+  backend unified — same repo, distinct concern, distinct
+  directory tree; depends on the framework crates via
+  `philharmonic` like any other consumer).
+- **Or** an entirely separate project / repository that
+  consumes published `philharmonic-*` crates as an external
+  client.
+
+Yuka picks between those two shapes at scoping time. Either
+shape preserves the boundary: framework crates know nothing
+about chat-app concepts (sessions, conversation history
+UI, agent personas, customer-tenant mapping, support-queue
+routing, etc.); the chat app consumes the framework's
+existing primitives (workflows, instances, `llm_generate`
+via `llm_openai_compat`, the embedding-dataset path for
+RAG grounding, etc.) and adds its own chat-app concerns on
+top.
+
+**Existing testing-grade Chat UI** at `philharmonic/webui/`
+stays in place for the foreseeable future as the workflow-
+author end-to-end test surface — it does not need to be
+removed when the production Chat UI lands. The two coexist,
+the testing one inside the framework webui, the production
+one in its separate codebase.
+
+**Scope to draft (next steps before dispatch):**
+
+- Codebase shape decision (in-tree bin vs. separate project)
+  — Yuka calls.
+- Product-side requirements for the customer-support use
+  case (conversation persistence model, end-user
+  authentication shape, operator console, queue routing,
+  handoff to human agents if applicable, audit-log
+  exposure to operators, etc.).
+- Which framework crates the Chat UI consumes and at what
+  versions; whether any new framework-side surface is
+  needed (anticipated: probably nothing new — workflows +
+  `llm_openai_compat` + RAG primitives already cover the
+  shape).
+- Operational deployment shape: same deployment binary set
+  as the framework MVP, or its own deployment.
+
+This arc is MVP-blocking. D8/D9 (§3.B above) are
+explicitly **post-MVP** — they don't block §3.M, and §3.M
+doesn't block them.
 
 ### Suggested sequencing
 
-**Next dispatchable**: Tier-2 batch = D7 + D19, dispatched
-together. Tier 3 (D8 + D9) follows separately.
+**Next dispatchable**: §3.M Production Chat UI scoping +
+dispatch. Specifics deferred to scoping time; the codebase-
+shape decision (in-tree `bins/philharmonic-chat-app/` vs.
+separate project) drives subsequent work.
 
-- **D7** (`philharmonic-connector-impl-email-smtp`, Tier 2)
-  — `email_send` wire shape locked in
-  [`docs/design/08-connector-architecture.md` §SMTP](design/08-connector-architecture.md#smtp);
-  prompt draft ready.
-- **D19** (`philharmonic-connector-impl-dns`, Tier 2) —
-  fully spec'd from
-  [`docs/design/08-connector-architecture.md` §DNS](design/08-connector-architecture.md#dns);
-  consumes the in-tree `mechanics-dns` resolver layer.
-  Prompt draft ready.
+**Post-MVP, no dispatch queued**: D8 + D9 (§3.B Tier-3 LLM
+connectors). When queued, both are independent and
+parallel-safe.
+
 - **D8** (`philharmonic-connector-impl-llm-anthropic`,
   Tier 3) — fully spec'd from
   [`docs/design/08-connector-architecture.md` §llm_anthropic](design/08-connector-architecture.md#llm_anthropic--config);
