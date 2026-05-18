@@ -2642,6 +2642,16 @@ reference for release-to-release API-breakage checks.
 
 ### 12.5 Publish checklist
 
+**Who runs `publish-crate.sh`.** Claude Code runs the script
+when Yuka signals a release is ready (typically after she has
+reviewed the to-be-published diff and confirmed the version
+bumps + CHANGELOG entries). Codex never runs it (the
+codex-guard in `commit-all.sh` doesn't apply here, but the
+contract is the same — Codex's hand-off is dirty-tree-only).
+Yuka does not run it herself in the normal flow; she signals,
+Claude executes. The yanks side of the token-scope split
+remains Yuka-only (see "Token-scope split" below).
+
 The correct sequence for a crate release is:
 
 0. **`./scripts/pre-landing.sh` must pass.** This is the most

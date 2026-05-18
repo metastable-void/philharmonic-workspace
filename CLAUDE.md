@@ -348,6 +348,17 @@ full in `CONTRIBUTING.md`. Read the full section before acting
   pass for the commit. A re-run after fixing a real failure
   is fine; a tight edit/re-run loop in one turn just burns
   time. ([§11](CONTRIBUTING.md#11-pre-landing-checks))
+- **Claude runs `publish-crate.sh` on Yuka's signal.**
+  Publishing is Claude's job, not Yuka's — the crates.io
+  publish-and-owner-read token lives on this machine for
+  exactly this reason. The flow is: Yuka reviews the
+  to-be-published commit (version bump + CHANGELOG + any
+  meta-crate cascade), signals "ready", then Claude runs
+  `./scripts/publish-crate.sh <crate>` (and the cascade, in
+  dep-order). Until Yuka signals, do not publish — having a
+  release-ready commit on `main` is not by itself a signal.
+  Yanks remain Yuka-only (next bullet).
+  ([§12.5](CONTRIBUTING.md#125-publish-checklist))
 - **Pre-landing.sh before every publish is non-negotiable.**
   The publish flow is the highest-stakes Rust-touching commit
   the workspace makes. `cargo publish`'s own `--dry-run`
