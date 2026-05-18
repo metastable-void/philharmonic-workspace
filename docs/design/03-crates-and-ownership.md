@@ -171,7 +171,20 @@ as `0.0.x` placeholders, no substantive implementation yet):
   time the negative-cache window expires). H3 streamed
   response bodies retain the h3 `SendRequest` owner until
   body completion/drop so response streaming does not
-  prematurely close the underlying H3 connection.
+  prematurely close the underlying H3 connection. Terminal
+  H3 stream failures fail open to the H2/H1.1 stack on the
+  same request — the client only attempts H3 for empty or
+  replayable byte bodies, so a probe failure can both
+  negative-cache the origin and fall through cleanly without
+  re-sending bytes the upstream may have already accepted.
+  H3 connect / setup / stream-open / upload phases are
+  bounded independently so a deployment whose DNS HTTPS RR
+  still advertises `h3` against a server with
+  `bind_h3 = None` falls through the H3 probe before the
+  caller's full request timeout is spent; the
+  response-header wait is governed by the caller's request
+  timeout (so long-running H3 endpoints whose work happens
+  before headers still complete normally).
 - **`mechanics-http-server`** — opt-in HTTP/3 (QUIC)
   listener + Alt-Svc tower middleware that runs alongside
   the existing hyper-driven HTTP/1.1+HTTP/2 listener.
