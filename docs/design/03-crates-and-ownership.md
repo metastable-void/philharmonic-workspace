@@ -181,10 +181,19 @@ as `0.0.x` placeholders, no substantive implementation yet):
   bounded independently so a deployment whose DNS HTTPS RR
   still advertises `h3` against a server with
   `bind_h3 = None` falls through the H3 probe before the
-  caller's full request timeout is spent; the
-  response-header wait is governed by the caller's request
-  timeout (so long-running H3 endpoints whose work happens
-  before headers still complete normally).
+  caller's full request timeout is spent; the whole
+  opportunistic H3 probe is in turn bounded by its own
+  small fail-open window, and the response-header wait is
+  bounded by an independent fail-open window after that
+  (so a stale or half-disabled H3 peer that accepts a
+  replayable POST but never emits response headers still
+  falls open to the TCP/TLS path before the caller's full
+  endpoint timeout is spent). The cached QUIC client
+  endpoint is family-aware: IPv4 targets bind `0.0.0.0:0`
+  and IPv6 targets bind `[::]:0`, so an IPv4-only H3
+  deployment is reached over an IPv4 UDP socket rather
+  than relying on platform-specific dual-stack UDP
+  behaviour from an IPv6-unspecified bind.
 - **`mechanics-http-server`** — opt-in HTTP/3 (QUIC)
   listener + Alt-Svc tower middleware that runs alongside
   the existing hyper-driven HTTP/1.1+HTTP/2 listener.
