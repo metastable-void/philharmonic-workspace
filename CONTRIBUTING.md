@@ -2414,6 +2414,36 @@ GitHub CI runs the same script on a clean checkout (no dirty
 submodules → step 4 naturally empty) so contributor and CI
 behaviour don't drift.
 
+### 11.0.0 Pre-landing green is the banned-dep guarantee
+
+Step 1 above (`./scripts/cargo-deny.sh check bans`) reads the
+**authoritative** banned-dep list from `deny.toml` and enforces
+every entry: `pyo3` / `maturin` / `openssl-sys` / `native-tls` /
+`rustls-platform-verifier` / `rustls-native-certs` are all
+no-wrapper full bans on the workspace's ship targets
+(`x86_64-unknown-linux-{gnu,musl}`), and `ring` is wrapper-
+allowed only via the `quinn-proto` exception. The check is
+Cargo.lock-only, fast, and fail-fast.
+
+**Therefore: if `pre-landing.sh` exits clean, the workspace is
+guaranteed free of forbidden deps.** No follow-up
+`cargo tree --invert <banned-dep>` sweep is needed to confirm
+it — pre-landing already did. Running redundant tree checks
+afterwards is wasted cycles (and on a sandboxed Codex run, also
+contention for `target-main/`). If you've changed a
+`Cargo.toml` and want to verify a specific dep path
+*before* running the full pre-landing — e.g. you suspect a new
+feature pulls a banned dep and you'd rather find out in 30 s
+than 5 min — a single targeted `CARGO_TARGET_DIR=target-main
+cargo tree --invert <dep> --target all` is reasonable. After
+pre-landing has been green once on the final tree, you're done.
+
+If you need the broader picture (license posture, advisory
+scanning, supply-chain audit), use `./scripts/cargo-audit.sh`
+and `./scripts/cargo-deny.sh check all` separately —
+intentionally not in pre-landing because they're release-time
+concerns, not per-commit gates.
+
 ### 11.0.1 xtask is gated behind `--xtask`
 
 xtask is the in-tree dev-tooling crate (§8.1) and carries its

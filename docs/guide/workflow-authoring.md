@@ -82,7 +82,7 @@ blob is encrypted at rest under the substrate credential key.
 > the full API body. The WebUI's endpoint Create form has
 > separate inputs for **Display name** and **Implementation**;
 > only paste the **inner `config` object** (e.g.
-> `{"model_id": "bge-m3", ...}`, **not** the whole
+> `{"model_id": "BAAI/bge-m3", ...}`, **not** the whole
 > `{"display_name": ..., "implementation": ..., "config":
 > {...}}` envelope) into the **Config JSON** editor.
 > Connectors set `#[serde(deny_unknown_fields)]` on their
@@ -341,7 +341,7 @@ Use `embed` to turn text into embedding vectors.
   "display_name": "BGE embedder",
   "implementation": "embed",
   "config": {
-    "model_id": "bge-m3",
+    "model_id": "BAAI/bge-m3",
     "max_batch_size": 32,
     "timeout_ms": 10000
   }
@@ -371,7 +371,7 @@ Use `embed` to turn text into embedding vectors.
 ```json
 {
   "embeddings": [[0.1, -0.2, 0.3]],
-  "model": "bge-m3",
+  "model": "BAAI/bge-m3",
   "dimensions": 3
 }
 ```
@@ -472,6 +472,166 @@ corpus item had no payload.
 | `results[].score` | Cosine similarity in `[-1.0, 1.0]`. Higher = more similar. |
 | `results[].payload` | Echoed from the matching corpus item; omitted entirely when the matched item had no payload. |
 
+### `email_smtp`
+
+Use `email_smtp` to submit messages to an SMTP submission server
+(port 587 STARTTLS or port 465 SMTPS — port 25 is rejected
+unconditionally). Realm is `email`.
+
+```json
+{
+  "display_name": "Alerts SMTP",
+  "implementation": "email_smtp",
+  "config": {
+    "host": "smtp.example.com",
+    "port": 587,
+    "connection_mode": "auto",
+    "username": "alerts@example.com",
+    "password": "...",
+    "tls_strictness": "strict"
+  }
+}
+```
+
+| Field | Required | Notes |
+|---|---|---|
+| `host` | yes | Submission-server hostname. |
+| `port` | no | Required when `connection_mode` is `starttls` or `smtps`. May be omitted only in `auto` mode (auto-discovery). Port `25` is refused at config validation. |
+| `connection_mode` | no | One of `starttls` / `smtps` / `auto`. Default `auto`. When set explicitly, wins over port-driven inference. |
+| `username` | yes | SMTP AUTH username; non-empty. Anonymous submission is refused. |
+| `password` | yes | SMTP AUTH password; non-empty. |
+| `tls_strictness` | no | One of `strict` (default — full certificate + hostname verification), `sloppy` (TLS required, identity skipped — vulnerable to active MITM), `opportunistic` (TLS attempted on STARTTLS with full verification when negotiated, plaintext fallback), `opportunistic_sloppy` (same with identity skipped). |
+
+Mode selection in `auto`:
+
+- With `port = 587` → STARTTLS. With `port = 465` → SMTPS.
+  Any other configured port → STARTTLS by default.
+- Without `port` → auto-discovery: tries `587/STARTTLS`
+  first, then `465/SMTPS`. First successful handshake wins.
+
+**Request body** (passed as the `body` option to
+`endpoint(...)`):
+
+```json
+{
+  "mail_from": "alerts@example.com",
+  "recipients": ["ops@example.com", "oncall@example.com"],
+  "body": "From: alerts@example.com\r\nTo: ops@example.com\r\nSubject: Test\r\nMIME-Version: 1.0\r\nContent-Type: text/plain; charset=utf-8\r\n\r\nHello."
+}
+```
+
+| Field | Required | Notes |
+|---|---|---|
+| `mail_from` | yes | Envelope sender (`MAIL FROM`); non-empty. |
+| `recipients` | yes | Non-empty array of envelope recipients (`RCPT TO`); each entry non-empty. |
+| `body` | yes | Full MIME message (headers + blank line + body). Non-empty. |
+| any other field | — | Rejected at deserialize time (`deny_unknown_fields`). |
+
+Minimal MIME envelope fixes are applied before submission —
+if `body` is missing any of `MIME-Version`, `Date`,
+`Message-Id`, or `Content-Type`, the connector inserts a
+default; if line endings are LF/mixed, they are normalised to
+CRLF. Headers already present are passed through verbatim —
+no `From:` rewriting and no DKIM/SPF/DMARC-relevant injection.
+If `Message-Id` is generated, it has the form
+`<uuid@philharmonic.local>`.
+
+**Response body** (read as `response.body`):
+
+```json
+{
+  "accepted": true,
+  "message_id": "<a05c…@philharmonic.local>"
+}
+```
+
+| Field | Notes |
+|---|---|
+| `accepted` | Always `true` when the call succeeds. Submission server accepted the message. |
+| `message_id` | The `Message-Id:` header value that was used — either the one already in the body or the one the connector inserted. |
+
+v1 does not pool SMTP connections (each call opens a fresh
+connection) and does not retry SMTP failures.
+`http_forward`-backed configs cover transactional-email
+provider HTTP APIs (SendGrid, Postmark, Mailgun); `email_smtp`
+covers actual SMTP submission only.
+
+### `dns_query`
+
+Use `dns_query` to perform a single DNS lookup via the host's
+system stub resolver (which consults `/etc/resolv.conf` or
+falls back to a built-in resolver set when the file is
+missing). Realm is `dns`.
+
+```json
+{
+  "display_name": "DNS lookups",
+  "implementation": "dns_query",
+  "config": {
+    "allowed_types": ["A", "AAAA", "MX", "TXT"],
+    "allowlist_zones": ["example.com", "example.org"],
+    "blocklist_zones": ["secret.example.com"],
+    "default_timeout_ms": 5000
+  }
+}
+```
+
+| Field | Required | Notes |
+|---|---|---|
+| `allowed_types` | no | RR-type allowlist using canonical IANA names (`A`, `AAAA`, `CNAME`, `MX`, `NS`, `PTR`, `SOA`, `SRV`, `TXT`, `CAA`, `HTTPS`, …). When omitted, all standard RR types are allowed. |
+| `allowlist_zones` | no | Domain-suffix allowlist. Case-insensitive exact-final-label match (`example.com` matches `example.com` and `foo.example.com`, not `notexample.com`). |
+| `blocklist_zones` | no | Domain-suffix blocklist. Strict overlay-deny over `allowlist_zones`: a query passes only if it matches the allowlist AND no blocklist entry. |
+| `default_timeout_ms` | no | Per-query timeout default. Clamped to `[100, 60000]`. Falls back to `5000` ms when both `default_timeout_ms` and request-level `timeout_ms` are omitted. |
+
+**Request body** (passed as the `body` option to
+`endpoint(...)`):
+
+```json
+{
+  "name": "www.example.com",
+  "type": "MX",
+  "timeout_ms": 3000
+}
+```
+
+| Field | Required | Notes |
+|---|---|---|
+| `name` | yes | Domain name to query. The caller is responsible for IDN encoding if non-ASCII. |
+| `type` | yes | RR type as a canonical IANA name. Subject to the `allowed_types` policy gate when configured. |
+| `timeout_ms` | no | Per-call override of `default_timeout_ms`. Clamped to `[100, 60000]`. |
+| any other field | — | Rejected at deserialize time (`deny_unknown_fields`). |
+
+Policy gates (allowlist / blocklist / type allowlist) fire
+**before** any DNS packet leaves the process — a denied query
+has no observable network side-effect.
+
+**Response body** (read as `response.body`):
+
+```json
+{
+  "records": [
+    {"type": "A",  "name": "www.example.com", "ttl": 300,
+     "data": "93.184.216.34"},
+    {"type": "MX", "name": "example.com",     "ttl": 3600,
+     "data": "10 mail.example.com"}
+  ]
+}
+```
+
+| Field | Notes |
+|---|---|
+| `records` | Array of resource records returned by the resolver. Order matches the resolver's order. May be empty. |
+| `records[].type` | RR type as canonical IANA name. |
+| `records[].name` | Owner name in DNS presentation form. |
+| `records[].ttl` | TTL in seconds (`u32`). |
+| `records[].data` | RDATA rendered in DNS presentation form (e.g. `"93.184.216.34"` for A, `"10 mail.example.com"` for MX, raw chunks for TXT). v1 does not emit per-type structured objects. |
+
+v1 is stub-resolver only — no DoH/DoT/DoQ in the connector
+itself (the OS resolver may still use them transparently if
+the host is configured for it). `IN` class only. NXDOMAIN /
+SERVFAIL / NOTIMP / REFUSED surface as upstream errors
+carrying the DNS RCODE.
+
 ### Reserved connector names
 
 These crates are reserved but not implemented in this workspace
@@ -479,7 +639,6 @@ version:
 
 | Implementation | State |
 |---|---|
-| `email_smtp` | Reserved / pending implementation. |
 | `llm_anthropic` | Reserved / pending implementation. |
 | `llm_gemini` | Reserved / pending implementation. |
 
@@ -1173,7 +1332,7 @@ Endpoint setup:
     "display_name": "BGE embedder",
     "implementation": "embed",
     "config": {
-      "model_id": "bge-m3",
+      "model_id": "BAAI/bge-m3",
       "max_batch_size": 32,
       "timeout_ms": 10000
     }
@@ -1367,7 +1526,7 @@ Setup requires three endpoints:
     "display_name": "BGE embedder",
     "implementation": "embed",
     "config": {
-      "model_id": "bge-m3",
+      "model_id": "BAAI/bge-m3",
       "max_batch_size": 32,
       "timeout_ms": 10000
     }

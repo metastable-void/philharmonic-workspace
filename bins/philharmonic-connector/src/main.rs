@@ -347,6 +347,18 @@ fn build_implementation_registry() -> Result<ImplementationRegistry, String> {
         philharmonic::connector_impl_vector_search::VectorSearch::new(),
     )?;
 
+    register_implementation(
+        &mut registry,
+        philharmonic::connector_impl_email_smtp::EmailSmtp::new()
+            .map_err(|error| format!("failed to build email_smtp implementation: {error}"))?,
+    )?;
+
+    register_implementation(
+        &mut registry,
+        philharmonic::connector_impl_dns::DnsQuery::new()
+            .map_err(|error| format!("failed to build dns_query implementation: {error}"))?,
+    )?;
+
     Ok(registry)
 }
 

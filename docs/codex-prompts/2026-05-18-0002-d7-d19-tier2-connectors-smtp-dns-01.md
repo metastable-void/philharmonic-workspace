@@ -810,7 +810,35 @@ If you skip the report, say so in the session summary.
 
 ## Outcome
 
-Pending — will be updated after the Codex run.
+D7 SMTP and D19 DNS landed as Tier-2 connector implementations with
+`philharmonic-connector-impl-email-smtp` and
+`philharmonic-connector-impl-dns` both bumped to `0.1.0`, and the
+`philharmonic` meta-crate bumped to `0.3.5`; `mechanics-dns` did not
+need surface changes or a version bump. Files touched: parent
+`Cargo.lock`, `bins/philharmonic-connector/Cargo.toml`,
+`bins/philharmonic-connector/src/main.rs`, this prompt archive, and
+`docs/codex-reports/2026-05-18-0002-d7-d19-tier2-smtp-dns.md`;
+`philharmonic/{Cargo.toml,CHANGELOG.md,src/lib.rs}`;
+SMTP crate `Cargo.toml`, `CHANGELOG.md`, `README.md`, `src/lib.rs`,
+`src/{config,connect,error,mime,request,response}.rs`, and
+`tests/{config,mime}.rs`; DNS crate `Cargo.toml`, `CHANGELOG.md`,
+`README.md`, `src/lib.rs`, `src/{config,error,policy,request,response}.rs`,
+and `tests/{policy,timeout}.rs`. The SMTP crate uses lettre with
+`features = ["aws-lc-rs", "builder", "smtp-transport", "tokio1",
+"tokio1-rustls", "webpki-roots"]` to keep rustls + aws-lc-rs while
+avoiding `native-tls`; `cargo tree --target all --invert ring` shows
+the existing lockfile `ring` path is still `quinn-proto` only, and
+the GNU/Linux musl/gnu target-specific ring checks print nothing.
+Blockers worked around: the sandbox could not write the default Cargo
+or rustup homes, so verification used `CARGO_HOME=/tmp/codex-cargo-home`
+and carried a non-fatal rustup temp-dir warning; no implementation
+blockers remain. Residual risks: coverage is policy/MIME/config/error
+focused, with no live SMTP server or live DNS server integration in this
+round; that tradeoff is documented in the Codex report. Base SHAs for
+the dirty hand-off are parent `0bc2e1ca0e9c9930fef89f19ddf2a52267e6c86b`,
+`philharmonic` `707c86c4bb31609a5ae1d0e4306c8f522e3ef069`, SMTP
+`2eb62e5ac1ce8546c4645bc3bacae1ba6b8e5eae`, and DNS
+`c7517c96ae9345c6ae4e6f906cda84eac42d68d1`; Codex created no commits.
 
 ---
 

@@ -22,6 +22,8 @@ philharmonic = { path = "../../philharmonic", default-features = false, features
     "server",
     "server-key-material",
     "connector-vector-search",
+    "connector-email-smtp",
+    "connector-dns",
 ] }
 async-trait = { version = "0.1", default-features = false, features = [] }
 axum = { version = "0.8", default-features = false, features = ["http1", "json", "tokio"] }

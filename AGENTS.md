@@ -361,6 +361,20 @@ runs match CI. Raw `cargo <subcommand>` drifts.
   `cargo test <name>`; save the full pre-landing for the
   hand-off. A re-run after fixing a real failure is fine.
   See [`CONTRIBUTING.md §11`](CONTRIBUTING.md#11-pre-landing-checks).
+  **Pre-landing green is the banned-dep guarantee.** Step 1
+  (`cargo deny check bans`) reads `deny.toml` and enforces the
+  full ban list (`pyo3` / `maturin` / `openssl-sys` /
+  `native-tls` / `rustls-platform-verifier` /
+  `rustls-native-certs` no-wrapper full bans; `ring` wrapper-
+  allowed only via `quinn-proto`). **If pre-landing exits
+  clean, the tree is guaranteed forbidden-dep-free — do not
+  run redundant `cargo tree --invert <banned>` sweeps
+  afterwards.** A targeted single `cargo tree --invert <dep>`
+  is fine *before* pre-landing if you want to verify a
+  specific feature-flag choice in 30 s instead of waiting
+  for the full pre-landing pass; once pre-landing is green
+  on the final tree, you're done. See
+  [`CONTRIBUTING.md §11.0.0`](CONTRIBUTING.md#1100-pre-landing-green-is-the-banned-dep-guarantee).
   **Don't re-run a Rust-build-heavy script just because you
   lost context** — re-read the captured output. Every
   background task and every foreground Bash invocation
