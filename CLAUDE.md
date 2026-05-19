@@ -49,9 +49,16 @@ Default to slow, careful authorship; never trade maintainability
 for keystrokes. Runtime speed is still a first-class goal — what's
 deprioritised is *coding velocity*. Reuse over rewrite; small
 focused units; deduplicate at the third occurrence; route
-substantive coding through the Codex gate. Operational priority
-lives in [`docs/ROADMAP.md`](docs/ROADMAP.md) and
-[`HUMANS.md`](HUMANS.md); consult both at session start. Umbrella:
+substantive coding through the Codex gate. **Structural
+correctness over surface fixes**: think in state machines and
+invariants; never ship a workaround in place of a diagnosis; if
+you can't construct the right model, surface the deficit (via a
+codex-report / notes-to-humans entry) rather than ship
+wrong-but-plausible code — see
+[CONTRIBUTING §10.0.1](CONTRIBUTING.md#1001-structural-correctness-over-surface-fixes).
+Operational priority lives in [`docs/ROADMAP.md`](docs/ROADMAP.md)
+and [`HUMANS.md`](HUMANS.md); consult both at session start.
+Umbrella:
 [CONTRIBUTING §10.0](CONTRIBUTING.md#100-posture-maintainability-over-fast-coding).
 
 ## Hard stops before doing anything

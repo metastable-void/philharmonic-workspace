@@ -49,8 +49,14 @@ for keystrokes. Runtime speed is still first-class — what's
 deprioritised is *coding velocity*. Reuse over rewrite; small
 focused units; deduplicate at the third occurrence; refactor
 behaviour-preserving (fixing bugs encountered mid-task is fine,
-gold-plating is not). Cross-cutting sub-directives: **bins are
-thin, logic in libraries**
+gold-plating is not). **Structural correctness over surface
+fixes**: think in state machines and invariants; never ship a
+workaround in place of a diagnosis; if you cannot construct the
+right model, surface the deficit in your codex-report rather
+than ship wrong-but-plausible code
+([§10.0.1](CONTRIBUTING.md#1001-structural-correctness-over-surface-fixes)).
+Cross-cutting sub-directives: **bins are thin, logic in
+libraries**
 ([design §02](docs/design/02-design-principles.md#bins-are-thin)
 / [§10.14](CONTRIBUTING.md#1014-unpublished-bin-crates-minimal-cli-logic-in-libraries)).
 Umbrella: [§10.0](CONTRIBUTING.md#100-posture-maintainability-over-fast-coding).

@@ -1796,6 +1796,90 @@ current operational priority — Maintainability sweep + Clean
 separation of concerns (§10.14). §10.0 is long-term posture;
 the sweep is short-term application.
 
+### 10.0.1 Structural correctness over surface fixes
+
+> Always write structurally verifiably correct code; never
+> work around issues. Don't write code that just looks good;
+> always think about the semantics and the state machines
+> behind the code. Structurally correct code always wins. If
+> you cannot construct the correct state machine behind the
+> code, surface the deficit rather than writing wrong code.
+
+(Yuka, 2026-05-19.) This is §10.0's umbrella sharpened to a
+single point: a change that *looks* correct because it
+compiles, passes the existing tests, and makes the obvious
+symptom go away is not the same thing as a change that *is*
+correct against the system's actual semantics. The workspace
+optimises for the latter.
+
+Concretely:
+
+- **Think in terms of state machines.** Most non-trivial code
+  in this workspace is implicitly a state machine — a workflow
+  instance moves through a five-status lifecycle; an H3
+  request passes through connect / setup / stream-open /
+  upload / response phases; a connector dispatch goes through
+  token-verify / payload-decrypt / impl-call / response-
+  encrypt; SCK at-rest blobs cycle through `key_version`
+  rotations. Before editing a path, identify the state machine
+  it implements: the states, the transitions, the invariants
+  per state, the triggers that move between states, and the
+  error / cancel paths that exit them. Code an edit *against*
+  that model — not against whatever the local variables happen
+  to look like in the file you opened.
+- **A workaround is debt, not a fix.** If the right fix
+  requires diagnosing the actual root cause and you don't yet
+  have the diagnosis, **surface the deficit** rather than
+  patching the symptom. "I added an `if … { return Err(…) }`
+  here to make the panic go away" is a workaround; "the
+  upstream guarantee on `Foo::bar()` doesn't hold under
+  condition X, so the call site needs to be re-shaped to
+  handle the unguaranteed case" is a fix. Workarounds
+  compound — every one creates a new implicit state the next
+  edit has to reason about, and the §10.0 cross-reference to
+  the 2026-05-14/15 H3 stability false-starts is exactly the
+  shape of damage this produces at scale.
+- **Verifiable beats plausible.** Code that "looks like it
+  should work" but rests on a model you haven't actually
+  written down is fragile. If you cannot point at the state
+  machine, invariants, or pre-/post-conditions that justify
+  the change, you don't know whether the change is correct —
+  you're guessing. The dev box passing `pre-landing.sh` is
+  not a substitute for that reasoning; pre-landing checks the
+  floor (types, lints, existing tests pass), not the ceiling
+  (correctness against the model).
+- **Surface deficits explicitly when you can't model the
+  path.** If you can't construct the right state machine —
+  because the design isn't written down, because two crates
+  disagree, because an external protocol's behaviour is
+  ambiguous, because a library doesn't document the
+  invariant you need — **say so**. Don't ship the patch you
+  would have written *if* the model were clear. Codex's
+  codex-report mechanism ([§15.3](#153-codex-reports)) and
+  Claude's notes-to-humans mechanism
+  ([§15.1](#151-notes-to-humans)) both exist for this; use
+  them. A blocked-with-a-clear-explanation result is more
+  valuable to this project than a shipped-but-wrong patch.
+- **No "ship a workaround now, diagnose later."** Every false
+  start called out in §10.0 was a workaround attempted before
+  the diagnosis was complete; every one had to be unpicked.
+  The eventual correct fix was small once the diagnosis was
+  right.
+
+Applies to both Claude and Codex. Claude reviewers must hold
+Codex output to this standard; Codex prompts make the
+state-machine framing explicit (this is one of the §3
+durable wins of the prompt-archive discipline — the prompt
+forces the model up front, before any line of code is
+written). The "diagnosis is the work; coding is the
+consequence" framing in §10.0's closing paragraph is the
+short form.
+
+Cross-references: [§10.0](#100-posture-maintainability-over-fast-coding)
+umbrella; [§15.3](#153-codex-reports) codex-reports;
+[§15.1](#151-notes-to-humans) notes-to-humans;
+[`HUMANS.md` §Priority: Audit & refactor](HUMANS.md).
+
 ### 10.1 Edition and MSRV
 
 - **Edition 2024.**
