@@ -40,7 +40,26 @@ Refactor codes to make the code structured, small, de-duplicated.
 
 ## Chat UI separation
 
-TBD.
+- Chat UI (Web UI + backend) server bin at `bins/philharmonic-chat`
+  bin crate.
+- Chat UI is frontend-only; no backend that maintains states. The API
+  server is the backend.
+
+### Config
+
+Config:
+
+```toml
+[chat]
+bind = "[::]:443"
+bind_h3 = "[::]:443"
+
+api_url = "https://philharmonic-api.tld"
+
+[tls]
+cert_path = "/path/to/fullchain.pem"
+key_path = "/path/to/privkey.pem"
+```
 
 ## WebUI
 
