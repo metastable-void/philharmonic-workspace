@@ -105,7 +105,7 @@ TCP+TLS HTTP/1.1+HTTP/2 path).
 **Connector implementations:** `philharmonic-connector-impl-` ×
 `http-forward`, `llm-openai-compat`, `llm-anthropic`, `llm-gemini`,
 `sql-postgres`, `sql-mysql`, `email-smtp`, `embed`, `vector-search`,
-`dns` (planned — see D19).
+`dns`.
 
 **API:** `philharmonic-api`.
 
@@ -134,11 +134,11 @@ hand-written `Cargo.toml` is preserved across re-vendor;
 
 **In-tree runtime crate (publishable, not a submodule):**
 `mechanics-dns` — reusable DNS resolver layer shared by
-`mechanics-http-client` and the planned DNS connector. It
-centralises the Cloudflare fallback resolver set used only when
-`/etc/resolv.conf` is absent, and exposes IN-class HTTPS RR,
-A, AAAA, generic DNS query, combined IP, and socket-address
-lookup helpers.
+`mechanics-http-client` and the `philharmonic-connector-impl-dns`
+connector. It centralises the Cloudflare fallback resolver set
+used only when `/etc/resolv.conf` is absent, and exposes IN-class
+HTTPS RR, A, AAAA, generic DNS query, combined IP, and socket-
+address lookup helpers.
 
 **In-tree workspace tooling (not published, not a submodule):**
 `xtask` — multi-bin crate for dev tools written in Rust. Bins are

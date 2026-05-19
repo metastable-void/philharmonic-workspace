@@ -10,9 +10,12 @@ infrastructure" and "API + deployment" below are shipped.
 state lives in each `CHANGELOG.md`). Three bin targets with
 key generation, musl static builds, Docker compose, full-
 pipeline e2e tests, opportunistic HTTP/3 on all three bins.
-Remaining v1-adjacent work is the Tier 2/3 connectors —
-D7 SMTP, D8 Anthropic, D9 Gemini, D19 DNS — all independent
-and parallel-safe.
+Tier-2 connectors (D7 SMTP, D19 DNS) shipped at 0.1.0 on
+2026-05-18. Tier-3 LLM connectors (D8 Anthropic, D9 Gemini)
+are deferred post-MVP — `llm_openai_compat` already covers the
+OpenAI / vLLM / compatible-gateway shape the MVP needs. The
+remaining MVP-blocker is a separate-codebase production
+Chat UI (§3.M); see [`docs/ROADMAP.md`](../ROADMAP.md).
 
 ## Core infrastructure
 
@@ -459,12 +462,11 @@ Summary of where v1 stands:
   exercised by the reference deployment.
 - Phase 7 Tier 1 implementations (`sql_postgres`,
   `sql_mysql`, `embed`, `vector_search`) are published.
-- Phase 7 Tier 2/3 (`email_smtp`, `llm_anthropic`,
-  `llm_gemini`, `dns_query`) are the remaining connector
-  work, scheduled as ROADMAP dispatches D7 / D8 / D9 / D19
-  respectively. All four are independent and parallel-safe;
-  their crate names are reserved as `0.0.x` placeholders on
-  crates.io.
+- Phase 7 Tier 2 (`email_smtp` D7, `dns_query` D19) shipped at
+  0.1.0 on 2026-05-18. Phase 7 Tier 3 (`llm_anthropic` D8,
+  `llm_gemini` D9) is deferred post-MVP; both crate names
+  remain `0.0.x` placeholders on crates.io until they become
+  MVP+1.
 - `philharmonic-api` and the three deployment binaries
   (`philharmonic-api-server`, `mechanics-worker`,
   `philharmonic-connector`) are published and operational.

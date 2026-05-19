@@ -271,8 +271,8 @@ as `0.0.x` placeholders, no substantive implementation yet):
   `mechanics-http-client` (replacing its previous
   `tokio::net::lookup_host` and inline
   `hickory_resolver::TokioResolver` calls) and by
-  `philharmonic-connector-impl-dns` (D19) when D19
-  dispatches. Added 2026-05-15 under ROADMAP §3.L / D26.
+  `philharmonic-connector-impl-dns` (D19, shipped at 0.1.0
+  on 2026-05-18). Added 2026-05-15 under ROADMAP §3.L / D26.
 
 ### API and meta
 

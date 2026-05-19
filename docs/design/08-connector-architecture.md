@@ -1441,11 +1441,11 @@ otherwise-permitted allowlisted zone.
 - `data` — rdata in presentation-format string by
   default (e.g. `"10 mail.example.com"` for MX,
   `"93.184.216.34"` for A, raw text for TXT chunks). The
-  D19 impl dispatch may decide to emit per-type
-  structured objects instead (e.g. `{priority, exchange}`
-  for MX) if structured shapes turn out cleaner for
-  workflow authors; that's a sub-shape choice at
-  prompt-drafting time.
+  D19 impl (0.1.0, shipped 2026-05-18) emits presentation-
+  format strings; per-type structured objects (e.g.
+  `{priority, exchange}` for MX) remain a possible future
+  extension if structured shapes turn out cleaner for
+  workflow authors.
 
 #### Error cases
 

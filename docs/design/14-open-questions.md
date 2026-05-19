@@ -48,7 +48,7 @@ valued `tls_strictness` (`strict` / `sloppy` / `opportunistic`
 `{mail_from, recipients[], body}` with minimal MIME envelope
 fixing, transport `lettre` over rustls. See
 [`08-connector-architecture.md` §SMTP](08-connector-architecture.md#smtp).
-Ready for D7 implementation dispatch.
+Shipped as D7 at 0.1.0 on 2026-05-18.
 
 Settled 2026-05-12: **`dns_query`** (new Tier 2 capability) —
 arbitrary DNS query connector for any standard RR, IN class
@@ -59,7 +59,7 @@ Cloudflare fallback (`2606:4700:4700::1111`,
 distroless / scratch containers), optional RR allowlist /
 blocklist + zone allowlist / blocklist. See
 [`08-connector-architecture.md` §DNS](08-connector-architecture.md#dns).
-Ready for D19 implementation dispatch.
+Shipped as D19 at 0.1.0 on 2026-05-18.
 
 Settled since the previous draft:
 

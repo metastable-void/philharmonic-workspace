@@ -194,11 +194,14 @@ into the crates.
   pure-Rust `tract` + `tokenizers` stack with default-bundled
   bge-m3 model. The workspace-internal `inline-blob 0.1.0`
   proc-macro (large-blob ELF embedding helper) also shipped
-  2026-04-27. Tier 2/3 connectors (`email-smtp`,
-  `llm-anthropic`, `llm-gemini`, `dns`) are tracked as
-  ROADMAP dispatches D7 / D8 / D9 / D19; all four are
-  independent and parallel-safe, with `0.0.x` placeholders
-  reserved on crates.io.
+  2026-04-27. **Phase 7 Tier 2 is complete** —
+  `philharmonic-connector-impl-email-smtp` 0.1.0 (D7) and
+  `philharmonic-connector-impl-dns` 0.1.0 (D19) both shipped
+  2026-05-18. Tier 3 connectors (`llm-anthropic` D8, `llm-gemini`
+  D9) remain post-MVP, deferred out of the current cycle —
+  `llm_openai_compat` already covers the OpenAI / vLLM /
+  compatible-gateway shape the MVP needs; D8 / D9 stay as
+  `0.0.x` placeholders on crates.io until they become MVP+1.
 - API layer: implemented. Published as `philharmonic-api` 0.1.0
   (2026-04-28, Phase 8). Real `ConfigLowerer` and `StepExecutor`
   added in Phase 9 (2026-04-30). Three bin targets, WebUI, e2e
@@ -222,5 +225,9 @@ into the crates.
   `mechanics-h3-quinn` in-tree vendored fork + generic
   `vendor-upstream` xtask + `check-no-registry` workspace-
   hardening guard + dev-profile incremental disable round out
-  the 2026-05-14 batch. **Post-v1 remaining**: D7 SMTP, D8
-  Anthropic, D9 Gemini, D19 DNS.
+  the 2026-05-14 batch. D7 SMTP + D19 DNS Tier-2 connectors
+  landed 2026-05-18 at 0.1.0. **Post-v1 remaining (MVP-
+  blocking)**: §3.M production Chat UI in a separate codebase
+  (in-tree `bins/philharmonic-chat-app/` or a wholly separate
+  project — Yuka picks the shape). **Post-MVP, deferred**:
+  D8 Anthropic, D9 Gemini Tier-3 LLM connectors.
