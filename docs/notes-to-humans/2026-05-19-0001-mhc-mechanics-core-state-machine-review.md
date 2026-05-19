@@ -937,6 +937,9 @@ launches a setTimeout(noop, 10_000) will block the worker for
 10 s. Operators should know this when sizing
 `max_execution_time` vs. `worker_count` vs. expected QPS.
 
+**Yuka's note**. there should be no `setTimeout()`. if there is,
+please remove it immediately.
+
 **F. `drain_timeout_jobs` runs all due timers synchronously.**
 A misbehaving script firing many `setTimeout(fn, 0)` in a loop
 creates many TimeoutJobs at near-identical instants. On the
@@ -1000,6 +1003,10 @@ have:
    box cannot reproduce the symptom and I cannot observe
    production. Per CLAUDE.md "Production is not this machine" —
    no resolution possible from this side.
+
+   **Yuka's note**: Containment is not a fix. Your DNS 'fix'
+   is not a fix; please fix the source of the DNS state corruption,
+   if any.
 
 2. **Whether the H3 negative-cache + Alt-Svc eviction
    coordination is sufficient under server-side flips.** The
