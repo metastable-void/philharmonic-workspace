@@ -101,11 +101,13 @@ value and deserializes the return value back to JSON.
 Philharmonic's convention, layered on top, is:
 
 ```javascript
-export default async function main({context, args, input, subject}) {
+export default async function main({context, args, input, subject, data, instance}) {
     // context: threaded state, evolves step by step
     // args:    per-instance value supplied at creation, immutable
     // input:   per-step value, varies per invocation
     // subject: authenticated caller context
+    // data:    workflow-bound data
+    // instance: running instance public V4 UUID and step seq
     return {context: newContext, output: stepOutput, done: true};
 }
 ```
@@ -320,15 +322,17 @@ adding it later is a pure addition.
 
 ## What the executor doesn't know
 
-- What workflow a job belongs to. Jobs arrive with
-  script + arg + config; no instance ID, no correlation with
-  prior jobs.
+- The executor itself remains stateless across calls. Jobs
+  arrive with a script + arg + config triple; `arg.instance`
+  carries the workflow instance UUID and step seq as call-time
+  inputs, not executor-held state or affinity.
 - What the caller does with results.
-- Whether two jobs are related.
+- Whether two jobs are related beyond any fields the caller
+  chooses to put in the argument.
 - What persistence the caller uses.
 - What the fields inside the argument mean (`context`, `args`,
-  `input`, `subject` are philharmonic conventions invisible to
-  the executor).
+  `input`, `subject`, `data`, and `instance` are philharmonic
+  conventions invisible to the executor).
 
 The executor is, structurally, the simplest layer of the system:
 inputs in, computation, outputs out, no memory of either.

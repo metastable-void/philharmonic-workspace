@@ -239,8 +239,10 @@ pub enum StepExecutionError {
 ```
 
 The `arg` parameter is the full script argument:
-`{context, args, input, subject, data}`. The engine assembles
-this before calling the executor.
+`{context, args, input, subject, data, instance}`. The engine
+assembles this before calling the executor. `instance` carries
+`{id, step}` — the running workflow instance's public V4 UUID
+and the step seq currently executing.
 
 Two error variants distinguish retryable-inconclusive
 (`Transport`) from recorded-failure (`ScriptError`).
@@ -279,10 +281,10 @@ handles all capability-specific and policy-specific concerns.
 
 ## Script argument
 
-The workflow script receives a five-field argument:
+The workflow script receives a six-field argument:
 
 ```javascript
-export default async function main({context, args, input, subject, data}) {
+export default async function main({context, args, input, subject, data, instance}) {
     // context: threaded state, evolves step by step (content-
     //          addressed across revisions)
     // args:    per-instance arguments, set at creation,
@@ -290,6 +292,7 @@ export default async function main({context, args, input, subject, data}) {
     // input:   per-step input value, varies per invocation
     // subject: authenticated caller context (see below)
     // data:    workflow-bound data, always present (see below)
+    // instance: running instance public V4 UUID and step seq
     return {context: newContext, output: stepOutput, done: true};
 }
 ```
@@ -313,15 +316,17 @@ authoritative implementation is `build_script_data` in
 lifecycle and [the workflow authoring guide](../guide/workflow-authoring.md)
 for the runtime states scripts encounter.
 
-The `subject` field shape matches `SubjectContext` serialized to
-JSON:
+The `subject` field is the script-facing subject shape:
 
 ```javascript
 {
     kind: "ephemeral",  // or "principal"
     id: "opaque-subject-id",
-    tenant: "tenant_abc",
-    authority: "auth_xyz",  // null for kind="principal"
+    tenant_id: "00000000-0000-4000-8000-000000000000",
+      // tenant's public V4 UUID
+    authority_id: "11111111-1111-4111-8111-111111111111",
+      // minting authority's public V4 UUID;
+      // null for kind="principal"
     claims: {
         // Free-form, tenant-defined for ephemeral subjects;
         // typically empty or minimal for principals.
@@ -350,8 +355,8 @@ application. Philharmonic doesn't validate claim shape.
 3. Fetch script bytes and abstract config bytes from content
    store.
 4. Read latest context and args from content store.
-5. Assemble executor arg: `{context, args, input, subject,
-   data}`. `data` is built from the template's optional
+5. Assemble executor arg: `{context, args, input, subject, data,
+   instance}`. `data` is built from the template's optional
    `data_config` content slot — currently
    `data.embed_datasets.<name>: CorpusItem[]` per binding.
    Bindings that don't have a `Ready` corpus available (or
@@ -491,6 +496,13 @@ from earlier drafts:
 - `SubjectContext` parameter added to mutating engine methods.
 - Script argument expanded from `{context, args, input}` to
   `{context, args, input, subject}`.
+- Then expanded again to add `instance: {id, step}` so scripts
+  can know which workflow instance and step they are executing
+  inside (2026-05-19).
+- Concurrently, `subject.tenant_id` and `subject.authority_id`
+  were flattened from `{internal, public}` objects to bare
+  public V4 UUID strings (2026-05-19) — the internal V7 UUID is
+  not a script-facing identifier.
 - Step records carry subject content for audit attribution.
 - `ConfigLowerer` trait takes subject context (for future
   capability implementations that may consume it).

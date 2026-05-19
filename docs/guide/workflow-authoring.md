@@ -718,11 +718,21 @@ export default async function main(arg) {
 
 ```javascript
 {
-  context: {}, // mutable state from previous successful steps
-  args: {},    // immutable instance creation arguments
-  input: {},   // per-step input
-  subject: {}, // caller identity
-  data: {}     // workflow-bound data, always present
+  context: {},  // mutable state from previous successful steps
+  args: {},     // immutable instance creation arguments
+  input: {},    // per-step input
+  subject: {
+    kind: "ephemeral",
+    id: "opaque-subject-id",
+    tenant_id: "00000000-0000-4000-8000-000000000000",
+    authority_id: "11111111-1111-4111-8111-111111111111",
+    claims: {}
+  },
+  data: {},     // workflow-bound data, always present
+  instance: {
+    id: "22222222-2222-4222-8222-222222222222",
+    step: 1
+  }
 }
 ```
 
@@ -730,6 +740,15 @@ export default async function main(arg) {
 callers and ephemeral-token callers both reach scripts through
 this field; scripts that do not need caller identity can ignore
 it.
+
+`subject.tenant_id` is the tenant's public V4 UUID string.
+`subject.authority_id` is the minting authority's public V4 UUID
+string for ephemeral callers, or `null` for principal callers.
+
+`instance.id` is the `WorkflowInstance`'s public V4 UUID string.
+`instance.step` is the 1-based step seq currently executing.
+These fields are useful for log correlation and idempotency-key
+construction.
 
 ### Return value
 

@@ -579,7 +579,31 @@ If you skip the report, say so in the session summary.
 
 ## Outcome
 
-Pending — will be updated after Codex run.
+Implemented. Files touched: `philharmonic-workflow/src/engine.rs`,
+`philharmonic-workflow/src/subject.rs`,
+`philharmonic-workflow/tests/engine_mock.rs`,
+`philharmonic-workflow/CHANGELOG.md`,
+`docs/design/07-workflow-orchestration.md`,
+`docs/design/06-execution-substrate.md`,
+`docs/guide/workflow-authoring.md`, and this prompt archive.
+The `instance` field was added at
+`philharmonic-workflow/src/engine.rs:249`; `SubjectContext::to_script_value`
+now uses an inline `json!{...}` object that emits only public V4
+UUID strings for script-facing IDs. Tests extend the existing
+`MockExecutor` capture seam in `philharmonic-workflow/tests/engine_mock.rs`
+and cover instance shape, step increment, step-record consistency,
+principal subject null authority, and ephemeral subject public-ID
+flattening. Consumer grep found no in-tree JS reads of
+`arg.subject.tenant_id.public`, `arg.subject.tenant_id.internal`,
+`arg.subject.authority_id.public`, or
+`arg.subject.authority_id.internal`; the only broader stale-looking
+doc-text hit is the lowerer proposal sketch at
+`docs/crypto/proposals/2026-04-30-phase-9-config-lowerer.md:85`,
+which is outside this dispatch's script-argument scope and was left
+unchanged. Blockers: none; residual risk is downstream workflow
+scripts outside this checkout that still read the old nested subject
+shape. Hand-off heads: parent `3f71fc4`, `philharmonic-workflow`
+`1324edd`.
 
 ---
 
