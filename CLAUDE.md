@@ -241,14 +241,22 @@ anything non-trivial — this summary is a prompt, not a spec.
 - **Run `./scripts/pre-landing.sh` before every Rust-touching
   commit.** cargo-deny bans + fmt + check + clippy
   (`-D warnings`) + rustdoc + test, auto-detects modified
-  crates. xtask is gated behind `pre-landing.sh --xtask`
-  (uses `target-xtask/`). When you've touched both, run twice.
-  Slow-by-design — run once before the commit, not in a tight
-  edit/re-run loop within a turn. Pre-landing green is the
-  banned-dep guarantee — no need for separate `cargo tree
-  --invert` sweeps after.
+  crates. **Lint phase auto-applies fmt + clippy autofixes
+  on a dirty tree** (`--allow-dirty --allow-staged`), so don't
+  burn a round trip running `cargo fmt` manually — re-running
+  pre-landing after a fmt failure used to be the right move;
+  now the script does it for you. Non-fixable warnings still
+  fail via `-D warnings`. Pass `--dry-run` for legacy check-
+  only behaviour (no source rewrites; useful before publish
+  or when verifying a clean tree). xtask is gated behind
+  `pre-landing.sh --xtask` (uses `target-xtask/`). When you've
+  touched both, run twice. Slow-by-design — run once before
+  the commit, not in a tight edit/re-run loop within a turn.
+  Pre-landing green is the banned-dep guarantee — no need for
+  separate `cargo tree --invert` sweeps after.
   ([§11](CONTRIBUTING.md#11-pre-landing-checks) /
-  [§11.0.0](CONTRIBUTING.md#1100-pre-landing-green-is-the-banned-dep-guarantee))
+  [§11.0.0](CONTRIBUTING.md#1100-pre-landing-green-is-the-banned-dep-guarantee) /
+  [§11.0.2](CONTRIBUTING.md#1102-autofix-on-default---dry-run-opts-out))
 - **Claude runs `publish-crate.sh` on Yuka's signal.**
   Publishing is Claude's job — the publish-and-owner-read
   token is on this machine for that reason. Flow: Yuka reviews

@@ -295,6 +295,20 @@ tools) so local runs match CI. Raw `cargo <subcommand>` drifts.
   edits**. For focused mid-iteration debugging use narrow
   `cargo test <name>`. ([§11](CONTRIBUTING.md#11-pre-landing-checks))
 
+  **Lint phase autofixes by default (dirty trees OK).** Step 2
+  invokes `rust-lint.sh --fix`, which runs `cargo fmt`
+  (rewriting in place) and `cargo clippy --fix --allow-dirty
+  --allow-staged --all-targets -- -D warnings`. Trivially-
+  autofixable fmt / clippy findings are resolved without an
+  extra "cargo fmt then re-run" round trip — important for
+  agent contexts where the round trip costs tokens. Non-
+  fixable warnings still fail the run via `-D warnings`, so
+  the gate is unchanged. Pass `--dry-run` to opt out and run
+  the lint phase in legacy check-only mode (no source
+  rewrites; useful when verifying a tree is already clean,
+  e.g. before publish).
+  ([§11.0.2](CONTRIBUTING.md#1102-autofix-on-default---dry-run-opts-out))
+
   **Pre-landing green is the banned-dep guarantee.** Step 1
   (`cargo deny check bans`) reads `deny.toml` and enforces the
   full ban list (`pyo3` / `maturin` / `openssl-sys` /

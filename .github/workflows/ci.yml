@@ -60,5 +60,5 @@ jobs:
       # per-crate --ignored phase — contributor behavior matches
       # exactly, ensuring no CI/local drift.
       - name: Pre-landing checks (lint + workspace test)
-        run: ./scripts/pre-landing.sh
+        run: ./scripts/pre-landing.sh --dry-run
 

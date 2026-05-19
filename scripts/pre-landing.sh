@@ -78,6 +78,18 @@
 #   ./scripts/pre-landing.sh --no-ignored <crate>...
 #   ./scripts/pre-landing.sh --full             # force workspace-wide step 3 (disable D21 narrowing)
 #   ./scripts/pre-landing.sh --xtask            # ONLY xtask, target-xtask, no --ignored phase
+#   ./scripts/pre-landing.sh --dry-run          # check-only mode (no fmt / clippy autofixes)
+#
+# Fix-on-default: by default the lint step (step 2) applies
+# `cargo fmt` and `cargo clippy --fix --allow-dirty --allow-staged`
+# in place so trivially-autofixable issues are resolved without
+# the caller (Yuka, Claude, Codex) burning an extra round trip on
+# "fmt failed, run cargo fmt, re-run pre-landing". The clippy
+# `-D warnings` gate is preserved, so non-fixable warnings still
+# fail the run — autofix never silently weakens the gate. Pass
+# `--dry-run` to keep the legacy check-only behaviour (useful for
+# CI, for verifying the tree is already clean, or when you don't
+# want source rewritten).
 #
 # Run before every commit that touches Rust code. GitHub CI runs
 # this same script (with a clean checkout → no dirty crates → no
@@ -95,12 +107,14 @@ no_ignored=0
 xtask_only=0
 full_test=0
 verbose=0
+dry_run=0
 
 while [ $# -gt 0 ]; do
     case "$1" in
         --no-ignored) no_ignored=1; shift ;;
         --xtask)      xtask_only=1; shift ;;
         --full)       full_test=1; shift ;;
+        --dry-run)    dry_run=1; shift ;;
 	-v)           verbose=1; shift ;;
 	--verbose)    verbose=1; shift ;;
         --)                           shift; break ;;
@@ -114,6 +128,20 @@ if [ "$verbose" -eq 1 ] ; then
     denyflags="check bans"
 fi
 
+# Default: pass `--fix` to rust-lint.sh so fmt + clippy autofix
+# run in place. `--dry-run` opts out and keeps the legacy check-
+# only behaviour (no source rewrites). `cargo clippy --fix` is
+# invoked with `--allow-dirty --allow-staged` inside rust-lint.sh
+# so the fix pass works against the typical pre-landing state
+# (uncommitted Rust edits the author is about to land); the
+# `-D warnings` gate still fails the run on non-fixable warnings.
+lint_fix_flag=--fix
+dry_run_label=
+if [ "$dry_run" -eq 1 ]; then
+    lint_fix_flag=
+    dry_run_label=' (dry-run)'
+fi
+
 if [ "$xtask_only" -eq 1 ]; then
     if [ $# -gt 0 ]; then
         echo "pre-landing.sh: --xtask is mutually exclusive with positional crate names" >&2
@@ -123,12 +151,13 @@ if [ "$xtask_only" -eq 1 ]; then
         echo "pre-landing.sh: --xtask implies no --ignored phase; --no-ignored is redundant" >&2
         exit 2
     fi
-    printf '%s=== pre-landing (--xtask): scope = xtask only, CARGO_TARGET_DIR=target-xtask ===%s\n' \
-        "$C_HEADER" "$C_RESET"
+    printf '%s=== pre-landing (--xtask): scope = xtask only, CARGO_TARGET_DIR=target-xtask%s ===%s\n' \
+        "$C_HEADER" "$dry_run_label" "$C_RESET"
     ./scripts/check-toolchain.sh
     # shellcheck disable=SC2086
     ./scripts/cargo-deny.sh $denyflags
-    ./scripts/rust-lint.sh --xtask
+    # shellcheck disable=SC2086
+    ./scripts/rust-lint.sh --xtask $lint_fix_flag
     ./scripts/rust-test.sh --xtask
     printf '%s=== pre-landing: xtask checks passed ===%s\n' "$C_OK" "$C_RESET"
     exit 0
@@ -172,7 +201,8 @@ fi
 ./scripts/check-no-registry.sh
 # shellcheck disable=SC2086
 ./scripts/cargo-deny.sh $denyflags
-./scripts/rust-lint.sh
+# shellcheck disable=SC2086
+./scripts/rust-lint.sh $lint_fix_flag
 
 # Step 2: dep-aware test phase (ROADMAP D21).
 #

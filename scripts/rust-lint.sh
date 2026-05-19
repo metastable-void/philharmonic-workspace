@@ -8,12 +8,26 @@
 #   ./scripts/rust-lint.sh <crate-name>  # single crate (target-main, or
 #                                        # target-xtask if crate is xtask)
 #   ./scripts/rust-lint.sh --xtask       # ONLY xtask, target-xtask
+#   ./scripts/rust-lint.sh --fix [...]   # apply fmt + clippy autofixes
+#                                        # in place (dirty tree OK); still
+#                                        # fails on non-fixable warnings
+#                                        # via clippy `-D warnings`
 #
 # Runs in order:
-#   cargo fmt   <scope> --check
+#   cargo fmt   <scope> [--check]                                check mode
+#   cargo fmt   <scope>                                          fix mode
 #   cargo check <scope>
-#   cargo clippy <scope> --all-targets -- -D warnings
+#   cargo clippy <scope> --all-targets -- -D warnings            check mode
+#   cargo clippy --fix --allow-dirty --allow-staged <scope> \    fix mode
+#                --all-targets -- -D warnings
 #   RUSTDOCFLAGS="-D missing_docs" cargo doc --no-deps <scope>
+#
+# Fix mode (`--fix`) rewrites source files in place. `cargo clippy
+# --fix` normally refuses to run against a dirty working tree;
+# `--allow-dirty --allow-staged` is passed so the fix pass works
+# against pre-landing's typical state (uncommitted Rust edits the
+# author is about to land). Non-fixable warnings still fail the
+# run via `-D warnings`, so this never silently weakens the gate.
 #
 # Scope mode:
 #   workspace (default) — `cargo check/clippy/doc/test --workspace
@@ -40,9 +54,10 @@
 # toggled), but the canonical pre-landing lint run goes through
 # this script.
 #
-# If the fmt-check step fails, run `cargo fmt --all` (or
-# `cargo fmt -p <crate>`) to apply the missing formatting, then
-# re-run the script.
+# If the fmt-check step fails in check mode, either re-run with
+# `--fix` to apply formatting and autofixable clippy lints in
+# place, or run `cargo fmt --all` (or `cargo fmt -p <crate>`)
+# manually and re-run the script.
 #
 # See docs/design/13-conventions.md §Pre-landing checks.
 #
@@ -53,24 +68,34 @@ set -eu
 . "$(dirname -- "$0")/lib/workspace-cd.sh"
 . "$(dirname -- "$0")/lib/cargo-noise-filter.sh"
 
-# Parse --xtask early so we can pin CARGO_TARGET_DIR=target-xtask
-# *before* sourcing cargo-target-dir.sh (which only sets the
-# default when CARGO_TARGET_DIR is unset, preserving any explicit
-# value we set here).
+# Parse flags in any order. We need to know `--xtask` *before*
+# sourcing cargo-target-dir.sh (which only sets the default when
+# CARGO_TARGET_DIR is unset, preserving any explicit value we set
+# here), and we need to know `--fix` before composing the fmt /
+# clippy commands.
 xtask_only=0
-if [ "${1:-}" = "--xtask" ]; then
-    xtask_only=1
-    shift
-fi
+fix_mode=0
+crate=
 
-if [ "$xtask_only" -eq 1 ] && [ $# -gt 0 ]; then
-    echo "Usage: $0 [--xtask | <crate-name>]" >&2
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --xtask) xtask_only=1; shift ;;
+        --fix)   fix_mode=1; shift ;;
+        --)      shift; break ;;
+        -*) echo "unknown flag: $1" >&2; exit 2 ;;
+        *)
+            if [ -n "$crate" ]; then
+                echo "Usage: $0 [--xtask | <crate-name>] [--fix]" >&2
+                exit 2
+            fi
+            crate=$1
+            shift ;;
+    esac
+done
+
+if [ "$xtask_only" -eq 1 ] && [ -n "$crate" ]; then
+    echo "Usage: $0 [--xtask | <crate-name>] [--fix]" >&2
     echo "       --xtask is mutually exclusive with a positional crate arg." >&2
-    exit 2
-fi
-
-if [ $# -gt 1 ]; then
-    echo "Usage: $0 [--xtask | <crate-name>]" >&2
     exit 2
 fi
 
@@ -78,34 +103,56 @@ fi
 # the build cache stays isolated from `target-main` (used by
 # workspace builds, CLI cargo invocations, and Codex). This
 # applies to both `--xtask` and `<crate-name>=xtask`.
-if [ "$xtask_only" -eq 1 ] || [ "${1:-}" = "xtask" ]; then
+if [ "$xtask_only" -eq 1 ] || [ "$crate" = "xtask" ]; then
     CARGO_TARGET_DIR=target-xtask
     export CARGO_TARGET_DIR
 fi
 
 . "$(dirname -- "$0")/lib/cargo-target-dir.sh"
 
-if [ "$xtask_only" -eq 1 ] || [ "${1:-}" = "xtask" ]; then
+# fmt_check_flag: `--check` in check mode, empty in fix mode (so
+#                 cargo fmt rewrites in place).
+# clippy_fix_args: empty in check mode; `--fix --allow-dirty
+#                  --allow-staged` in fix mode. `--allow-dirty
+#                  --allow-staged` lets clippy rewrite source even
+#                  when the working tree has uncommitted edits,
+#                  which is the normal pre-landing state.
+if [ "$fix_mode" -eq 1 ]; then
+    fmt_check_flag=
+    clippy_fix_args='--fix --allow-dirty --allow-staged'
+    fix_label=' (fix mode)'
+else
+    fmt_check_flag=--check
+    clippy_fix_args=
+    fix_label=
+fi
+
+if [ "$xtask_only" -eq 1 ] || [ "$crate" = "xtask" ]; then
     crate=xtask
-    printf '%s=== rust-lint scope: xtask only (CARGO_TARGET_DIR=%s) ===%s\n' \
-        "$C_HEADER" "$CARGO_TARGET_DIR" "$C_RESET"
-    printf '%s--- cargo fmt -p xtask --check ---%s\n' "$C_DIM" "$C_RESET"
-    run_with_cargo_noise_filter cargo fmt -p "$crate" --check
+    printf '%s=== rust-lint scope: xtask only%s (CARGO_TARGET_DIR=%s) ===%s\n' \
+        "$C_HEADER" "$fix_label" "$CARGO_TARGET_DIR" "$C_RESET"
+    printf '%s--- cargo fmt -p xtask %s ---%s\n' "$C_DIM" "$fmt_check_flag" "$C_RESET"
+    # shellcheck disable=SC2086
+    run_with_cargo_noise_filter cargo fmt -p "$crate" $fmt_check_flag
     printf '%s--- cargo check -p xtask ---%s\n' "$C_DIM" "$C_RESET"
     run_with_cargo_noise_filter cargo check -p "$crate"
-    printf '%s--- cargo clippy -p xtask --all-targets -- -D warnings ---%s\n' "$C_DIM" "$C_RESET"
-    run_with_cargo_noise_filter cargo clippy -p "$crate" --all-targets -- -D warnings
+    printf '%s--- cargo clippy %s-p xtask --all-targets -- -D warnings ---%s\n' \
+        "$C_DIM" "${clippy_fix_args:+$clippy_fix_args }" "$C_RESET"
+    # shellcheck disable=SC2086
+    run_with_cargo_noise_filter cargo clippy $clippy_fix_args -p "$crate" --all-targets -- -D warnings
     printf '%s--- cargo doc -p xtask (missing_docs) ---%s\n' "$C_DIM" "$C_RESET"
     RUSTDOCFLAGS="-D missing_docs" run_with_cargo_noise_filter cargo doc --no-deps -p "$crate"
-elif [ $# -eq 1 ]; then
-    crate=$1
-    printf '%s=== rust-lint scope: crate %s ===%s\n' "$C_HEADER" "$crate" "$C_RESET"
-    printf '%s--- cargo fmt -p %s --check ---%s\n' "$C_DIM" "$crate" "$C_RESET"
-    run_with_cargo_noise_filter cargo fmt -p "$crate" --check
+elif [ -n "$crate" ]; then
+    printf '%s=== rust-lint scope: crate %s%s ===%s\n' "$C_HEADER" "$crate" "$fix_label" "$C_RESET"
+    printf '%s--- cargo fmt -p %s %s ---%s\n' "$C_DIM" "$crate" "$fmt_check_flag" "$C_RESET"
+    # shellcheck disable=SC2086
+    run_with_cargo_noise_filter cargo fmt -p "$crate" $fmt_check_flag
     printf '%s--- cargo check -p %s ---%s\n' "$C_DIM" "$crate" "$C_RESET"
     run_with_cargo_noise_filter cargo check -p "$crate"
-    printf '%s--- cargo clippy -p %s --all-targets -- -D warnings ---%s\n' "$C_DIM" "$crate" "$C_RESET"
-    run_with_cargo_noise_filter cargo clippy -p "$crate" --all-targets -- -D warnings
+    printf '%s--- cargo clippy %s-p %s --all-targets -- -D warnings ---%s\n' \
+        "$C_DIM" "${clippy_fix_args:+$clippy_fix_args }" "$crate" "$C_RESET"
+    # shellcheck disable=SC2086
+    run_with_cargo_noise_filter cargo clippy $clippy_fix_args -p "$crate" --all-targets -- -D warnings
     printf '%s--- cargo doc -p %s (missing_docs) ---%s\n' "$C_DIM" "$crate" "$C_RESET"
     RUSTDOCFLAGS="-D missing_docs" run_with_cargo_noise_filter cargo doc --no-deps -p "$crate"
 else
@@ -125,15 +172,17 @@ else
         fi
     done
 
-    printf '%s=== rust-lint scope: workspace (excluding xtask) ===%s\n' "$C_HEADER" "$C_RESET"
-    printf '%s--- cargo fmt%s --check ---%s\n' "$C_DIM" "$fmt_pkgs" "$C_RESET"
+    printf '%s=== rust-lint scope: workspace (excluding xtask)%s ===%s\n' \
+        "$C_HEADER" "$fix_label" "$C_RESET"
+    printf '%s--- cargo fmt%s %s ---%s\n' "$C_DIM" "$fmt_pkgs" "$fmt_check_flag" "$C_RESET"
     # shellcheck disable=SC2086
-    run_with_cargo_noise_filter cargo fmt $fmt_pkgs --check
+    run_with_cargo_noise_filter cargo fmt $fmt_pkgs $fmt_check_flag
     printf '%s--- cargo check --workspace --exclude xtask ---%s\n' "$C_DIM" "$C_RESET"
     run_with_cargo_noise_filter cargo check --workspace --exclude xtask
-    printf '%s--- cargo clippy --workspace --exclude xtask --all-targets -- -D warnings ---%s\n' \
-        "$C_DIM" "$C_RESET"
-    run_with_cargo_noise_filter cargo clippy --workspace --exclude xtask --all-targets -- -D warnings
+    printf '%s--- cargo clippy %s--workspace --exclude xtask --all-targets -- -D warnings ---%s\n' \
+        "$C_DIM" "${clippy_fix_args:+$clippy_fix_args }" "$C_RESET"
+    # shellcheck disable=SC2086
+    run_with_cargo_noise_filter cargo clippy $clippy_fix_args --workspace --exclude xtask --all-targets -- -D warnings
     printf '%s--- cargo doc --workspace --exclude xtask (missing_docs) ---%s\n' "$C_DIM" "$C_RESET"
     RUSTDOCFLAGS="-D missing_docs" run_with_cargo_noise_filter cargo doc --no-deps --workspace --exclude xtask
 fi

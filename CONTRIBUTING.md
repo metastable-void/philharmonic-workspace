@@ -999,7 +999,7 @@ The inventory:
 
 | Wrapper | Wraps | Notes |
 |---|---|---|
-| `./scripts/pre-landing.sh [<crate>...] [--no-ignored] [-v\|--verbose]` | `cargo deny check bans` + `cargo fmt --check` + `cargo check` + `cargo clippy --all-targets -- -D warnings` + `cargo test --workspace` + `cargo test --ignored -p <crate>` per modified crate | The canonical pre-commit flow. Auto-detects modified crates via `show-dirty.sh`. Default `cargo-deny` invocation hides the inclusion graph for less noise; pass `-v` / `--verbose` to print it. CI runs the same script. See §11. |
+| `./scripts/pre-landing.sh [<crate>...] [--no-ignored] [--dry-run] [-v\|--verbose]` | `cargo deny check bans` + `cargo fmt` + `cargo check` + `cargo clippy --fix --allow-dirty --allow-staged --all-targets -- -D warnings` + `cargo test --workspace` + `cargo test --ignored -p <crate>` per modified crate | The canonical pre-commit flow. Auto-detects modified crates via `show-dirty.sh`. Default lint step is fix mode (autofixes fmt + clippy in place against a dirty tree, see §11.0.2); pass `--dry-run` for legacy check-only behaviour. Default `cargo-deny` invocation hides the inclusion graph for less noise; pass `-v` / `--verbose` to print it. CI runs the same script. See §11. |
 | `./scripts/rust-lint.sh [<crate>]` | `cargo fmt --check` + `cargo check` + `cargo clippy --all-targets -- -D warnings` | Workspace (no arg) or per-crate. |
 | `./scripts/rust-test.sh [--include-ignored\|--ignored] [<crate>]` | `cargo test` with ignored-test control | `--ignored` runs *only* `#[ignore]`-gated; `--include-ignored` runs everything. |
 | `./scripts/miri-test.sh --workspace \| <crate>...` | `cargo +nightly miri test` | Slow; not in `pre-landing.sh`. See §10.7. |
@@ -2562,9 +2562,18 @@ tree) and runs, in order:
    `openssl-sys`, …). Licenses and advisories are intentionally
    not part of pre-landing — licenses are a release-time concern,
    advisory scanning lives in `cargo-audit.sh`.
-2. `./scripts/rust-lint.sh` — fmt-check + check + clippy
+2. `./scripts/rust-lint.sh` — fmt + check + clippy
    (`-D warnings`) + rustdoc (`-D missing_docs`),
-   `--workspace --exclude xtask` throughout.
+   `--workspace --exclude xtask` throughout. By default
+   pre-landing invokes this in **fix mode**: `cargo fmt`
+   rewrites and `cargo clippy --fix --allow-dirty
+   --allow-staged` apply autofixable lints in place against the
+   typical dirty working tree, so trivial formatting / lint
+   findings never burn a round trip for the caller (Yuka,
+   Claude, Codex). The `-D warnings` clippy gate still fails
+   the run on anything not auto-fixable. Pass `--dry-run` to
+   `pre-landing.sh` to keep the older check-only behaviour
+   (no source rewrites) — see §11.0.2.
 3. `./scripts/rust-test.sh` — `cargo test --workspace
    --exclude xtask` (skips `#[ignore]`-gated tests).
 4. `./scripts/rust-test.sh --ignored <crate>` for every modified
@@ -2574,8 +2583,10 @@ tree) and runs, in order:
 Pass crate names to `pre-landing.sh` to override auto-detection;
 pass `--no-ignored` to skip step 4 (rare, for fast iteration
 when you're certain the slow tests aren't affected); pass
-`-v` / `--verbose` to print the `cargo-deny` inclusion graph
-(default is the quieter `--hide-inclusion-graph` form).
+`--dry-run` to disable the §11.0.2 autofix-on-default and run
+the lint phase in legacy check-only mode; pass `-v` /
+`--verbose` to print the `cargo-deny` inclusion graph (default
+is the quieter `--hide-inclusion-graph` form).
 
 GitHub CI runs the same script on a clean checkout (no dirty
 submodules → step 4 naturally empty) so contributor and CI
@@ -2644,6 +2655,53 @@ The two flows are mutually exclusive on purpose — landing a
 change that touches both workspace members and xtask requires
 two pre-landing runs (one default, one `--xtask`), which is
 the intended cost of keeping the build caches isolated.
+
+### 11.0.2 Autofix on default; `--dry-run` opts out
+
+The lint phase (step 2 above) runs in **fix mode** by default
+since 2026-05-19: `cargo fmt` rewrites in place and `cargo
+clippy --fix --allow-dirty --allow-staged --all-targets --
+-D warnings` applies autofixable clippy suggestions, in
+addition to the `cargo check` / `cargo doc` gates. `--allow-
+dirty --allow-staged` are passed because the pre-landing
+working state *is* dirty by construction (the author is
+about to commit). The clippy `-D warnings` gate is preserved,
+so non-fixable warnings still fail the run — autofix-on-
+default reduces wasted round trips for autofixable issues
+without ever weakening the gate.
+
+**Why.** Before this change, a caller (Yuka in iterative
+work, Claude landing a small fix, Codex driving a large
+implementation) hitting a trivially-autofixable fmt or clippy
+finding would: (a) read the pre-landing failure, (b) issue a
+`cargo fmt` / `cargo clippy --fix` manually, (c) re-run pre-
+landing. For coding agents that round trip is pure overhead —
+agent context, model tokens, and wall-clock time spent on a
+mechanical fix the script could have applied itself. Fix-on-
+default eliminates the round trip; the `-D warnings` post-
+check still catches anything the autofixer can't resolve, so
+the gate's correctness is unchanged.
+
+**`--dry-run`** keeps the legacy check-only behaviour
+(`cargo fmt --check`; clippy without `--fix`). Use it when:
+
+- You're verifying a tree is already clean without rewriting
+  anything (e.g. before a publish, where the working state
+  must match the about-to-publish snapshot exactly).
+- You're running pre-landing as a *check* (CI-ish posture)
+  on someone else's checkout and don't want to modify their
+  tree.
+- You're isolating "did pre-landing pass purely by virtue of
+  autofix masking lints?" from "did pre-landing pass because
+  the code was clean?".
+
+GitHub CI runs `pre-landing.sh` without `--dry-run` for now —
+fix-mode against a clean CI checkout is a no-op (nothing to
+fix) and the `-D warnings` gate still applies, so the
+contributor / CI behaviour stays aligned. If a future need
+arises (e.g. CI noticing that *agents* are committing
+unformatted code that would silently get fixed locally),
+flipping CI to `--dry-run` makes the gate strict again.
 
 **Why split the test run.** Integration tests that need real
 infrastructure carry `#[ignore]` so the default workspace run

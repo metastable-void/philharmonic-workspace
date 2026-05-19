@@ -37,7 +37,9 @@
       "Bash(./scripts/pre-landing.sh --xtask)",
       "Bash(./scripts/heads.sh)",
       "Skill(codex-prompt-archive)",
-      "Skill(codex-prompt-archive:*)"
+      "Skill(codex-prompt-archive:*)",
+      "Skill(git-workflow)",
+      "Skill(git-workflow:*)"
     ],
     "additionalDirectories": [
       "/tmp"
