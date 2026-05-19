@@ -77,7 +77,7 @@ on any surface changes.
 Nested `.body` required.
 
 ```
-await endpoint("cs_track", {
+await endpoint("my_http", {
   body: {
     body: {
       ...
