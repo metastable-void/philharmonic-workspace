@@ -220,19 +220,49 @@ the shared `mechanics-config` `HttpEndpoint` JSON shape.
 `{slot}` in `url_template` must have a matching
 `url_param_specs` entry.
 
-**Request body**: the script's `body` option becomes the
-**upstream** HTTP request body, encoded per the endpoint
-config's `request_body_type`:
+**Request shape — important:** `http_forward` is a **typed
+connector that nests the upstream HTTP request inside the
+endpoint-call `body` option**. The connector receives an
+`HttpForwardRequest { body, urlParams?, queries?, headers? }`
+envelope; everything addressed to the upstream HTTP service
+(its URL slots, its query parameters, its request headers,
+its request body) goes **inside** the endpoint-call `body`,
+not at the top level of the `endpoint(...)` call:
 
-- `json` (default): serialised as JSON.
-- `utf8`: passed as a UTF-8 string.
-- `bytes`: passed as raw bytes (`Uint8Array`).
+```js
+await endpoint("my_http", {
+  body: {                                    // <-- HttpForwardRequest envelope
+    body: { event: "created", id: "abc" },   // <-- actual upstream HTTP body
+    urlParams: { resource: "users" },        // <-- {resource} in url_template
+    queries:   { trace: "req-123" },         // <-- slotted query values
+    headers:   { "Idempotency-Key": "k_1" }, // <-- overridable request headers
+  },
+});
+```
 
-URL slot values come from `urlParams`, query parameters from
-`queries`, request headers from `headers` (subject to
-`overridable_request_headers`). `http_forward` is the only
-connector for which `headers`, `urlParams`, and `queries`
-are meaningful — the other connectors ignore them.
+Field-by-field inside the envelope:
+
+- **`body`** (inner): the **upstream** HTTP request body,
+  encoded per the endpoint config's `request_body_type` —
+  `json` (default; serialised as JSON), `utf8` (passed as a
+  UTF-8 string body), or `bytes` (base64-encoded string;
+  sent as raw `application/octet-stream`). Missing or
+  `null` → no body sent.
+- **`urlParams`**: values for `{slot}`s in `url_template`,
+  resolved through `url_param_specs`. Unknown slot keys
+  rejected; percent-encoded during URL construction.
+- **`queries`**: values for `slotted` query rules.
+- **`headers`**: per-call header overrides, subject to the
+  endpoint config's `overridable_request_headers` allowlist.
+  Case-insensitive match; duplicates / unknown names
+  rejected.
+
+The top-level `urlParams` / `queries` / `headers` keys on
+the `endpoint(...)` call are **not** the same — they apply
+to the mechanics-core → connector-router call (the inner
+connector path), which has no slots and no query rules, so
+they're functionally a no-op for `http_forward`. Use the
+nested form above for anything the upstream service needs.
 
 **Response body** (`response.body`): for `http_forward`,
 this is the `HttpForwardResponse` envelope wrapping the
@@ -1025,10 +1055,10 @@ Endpoint options:
 
 | Option | Meaning |
 |---|---|
-| `body` | The connector's typed request body for typed connectors (LLM, embed, vector_search, SQL); the upstream HTTP request body for `http_forward`. |
-| `headers` | Extra request headers; `http_forward` only — typed connectors ignore this. Restricted to the endpoint's `overridable_request_headers` allowlist. Header matching is case-insensitive. |
-| `urlParams` | URL template slot values; `http_forward` only — typed connectors ignore this. |
-| `queries` | Query string slot values; `http_forward` only — typed connectors ignore this. |
+| `body` | The connector's typed request body. For typed connectors (LLM, embed, vector_search, SQL) this is the typed request struct directly. For `http_forward` this is the `HttpForwardRequest` envelope (`{ body, urlParams?, queries?, headers? }`) — the upstream URL slots, query values, headers, and request body all nest **inside** `body`, not at the top level. See [`http_forward` notes](#http_forward) above. |
+| `headers` | Extra HTTP headers on the **mechanics-core → connector-router** call (not the upstream call). Restricted to the endpoint's `overridable_request_headers` allowlist; case-insensitive match. Functionally a no-op for typed connectors and for `http_forward` (which receives its upstream headers from `body.headers`). |
+| `urlParams` | URL template slot values on the **mechanics-core → connector-router** call. The connector-router URL has no slots; functionally a no-op. For `http_forward`, upstream URL slots go in `body.urlParams`. |
+| `queries` | Query string slot values on the **mechanics-core → connector-router** call. The connector-router URL has no slotted queries; functionally a no-op. For `http_forward`, upstream queries go in `body.queries`. |
 
 Endpoint response (mechanics-core transport envelope, identical
 shape for every connector):

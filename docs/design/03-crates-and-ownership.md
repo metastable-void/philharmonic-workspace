@@ -173,7 +173,20 @@ as `0.0.x` placeholders, no substantive implementation yet):
   (from either path) evicts the origin's `Alt-Svc` entry, so
   a server that disabled H3 after previously advertising it
   doesn't get re-tried via the stale Alt-Svc route every
-  time the negative-cache window expires. H3 streamed
+  time the negative-cache window expires. The negative cache
+  tracks consecutive-failure streaks and **doubles the TTL
+  per repeated failure** (`base * 2^(failures-1)`, clamped at
+  the 1 h hard cap), so a long-wedged origin's retry cadence
+  backs off geometrically; a successful H3 response evicts
+  the entry, so the next failure starts fresh at the base
+  TTL. Alt-Svc updates also fire on H3 responses (not only
+  on TCP/TLS), so an upstream flipping `Alt-Svc: clear` on
+  its H3 endpoint mid-deployment is observed promptly.
+  HTTPS RR lookup outcomes — both positive entries and
+  negative outcomes (timeout / `Ok(None)` / DNS error) —
+  are cached, so the 150 ms lookup-timeout penalty doesn't
+  repeat on every request to an origin without an HTTPS
+  RR. H3 streamed
   response bodies retain the h3 `SendRequest` owner until
   body completion/drop so response streaming does not
   prematurely close the underlying H3 connection. Terminal
@@ -186,7 +199,14 @@ as `0.0.x` placeholders, no substantive implementation yet):
   upload) are bounded by short local fail-open windows so a
   deployment whose DNS HTTPS RR still advertises `h3` against
   a server with `bind_h3 = None` falls through the probe path
-  before the caller's full request timeout is spent. **Once
+  before the caller's full request timeout is spent. **Each
+  phase budget is `min(phase_default, remaining(deadline))`**:
+  a caller passing `timeout(100ms)` never sees mhc block for
+  more than ~100 ms on the H3 chain, even though the sum of
+  per-phase defaults exceeds that. When the deadline-derived
+  budget binds, the phase surfaces `Error::Timeout` (terminal
+  — deadline exhausted) rather than the phase's fail-fast
+  variant (which would permit TCP/TLS fallback). **Once
   H3 has accepted the request** (headers sent, body uploaded
   successfully), the caller's absolute request deadline takes
   over for both response-header and response-body waits — no

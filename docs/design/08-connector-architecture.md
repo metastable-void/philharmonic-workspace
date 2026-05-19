@@ -799,9 +799,21 @@ Mapped to `ImplementationError` variants:
   `status`, the exposed response headers, and the decoded body
   so the script can still inspect what came back.
 - **`upstream_unreachable`** — transport error; all retries
-  exhausted. Carries the underlying error kind.
-- **`upstream_timeout`** — request exceeded `timeout_ms`
-  (including retries, subject to `max_retry_delay_ms`).
+  exhausted. Carries the underlying error kind. Retryability
+  is decided from the typed transport-error class
+  (`Network` / `Timeout` retryable per
+  `retry_on_io_errors` / `retry_on_timeout`;
+  `BodyTooLarge` / `InvalidRequest` / `Decode` / `Other`
+  terminal at the type level), so deterministic local
+  conditions (body-cap violations, malformed requests,
+  decode failures) are not re-attempted against the same
+  upstream.
+- **`upstream_timeout`** — total endpoint call exceeded
+  `timeout_ms`. `timeout_ms` is the **aggregate**
+  wall-clock budget across the whole endpoint call
+  (all attempts + retry sleeps), not a per-attempt bound;
+  the script-side shape is "call this endpoint and tell
+  me within Tms whether it worked".
 - **`response_too_large`** — response body exceeded
   `response_max_bytes`.
 - **`invalid_request`** — the script's request didn't match
