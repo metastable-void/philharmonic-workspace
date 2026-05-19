@@ -1,4 +1,4 @@
-# Add `instance: { id, step }` to the workflow script argument
+# Script-argument shape changes: add `instance: { id, step }`; flatten `subject.tenant_id` and `subject.authority_id` to public V4 strings
 
 **Date:** 2026-05-19 (JST)
 **Slug:** `script-arg-instance-field`
@@ -8,26 +8,54 @@ plus three doc files; no other submodules touched.
 
 ## Motivation
 
-Workflow JS scripts currently receive
-`{context, args, input, subject, data}`
-([`philharmonic-workflow/src/engine.rs:243-249`](../../philharmonic-workflow/src/engine.rs#L243-L249)).
-The workflow `context` field is the caller-mutable state slot — **not**
-the instance UUID — so there is no way for a script to know which
-`WorkflowInstance` it is running inside, nor which step seq it
-occupies. Yuka has decided to surface this as a new top-level field
-with shape `instance: { id, step }`.
+Two coupled changes to the JSON value workflow JS scripts receive,
+both surfaced from
+[`philharmonic-workflow::WorkflowEngine::execute_step`](../../philharmonic-workflow/src/engine.rs#L243-L249):
 
-This is a small, well-scoped feature that touches one engine site,
-the script-arg JSON contract (JS-observable but additive, so
-non-breaking from a script-author perspective), three design / guide
-docs, and the `philharmonic-workflow` CHANGELOG `[Unreleased]`
-section. Non-crypto, non-breaking from a JS author's perspective
-(new field, ignorable; the JSON canonicalisation used to hash inputs
-applies to the `input` slot only, not the assembled `script_arg`, so
-no stored hashes shift). **No publish, no version bump** — the
-crate's `Cargo.toml` stays at `0.1.6`; the change lands in the
-`[Unreleased]` section of `CHANGELOG.md` and ships with whatever
+**(1) Add `instance: { id, step }`.** Scripts currently receive
+`{context, args, input, subject, data}`. The workflow `context`
+field is the caller-mutable state slot — **not** the instance UUID
+— so there is no way for a script to know which `WorkflowInstance`
+it is running inside, nor which step seq it occupies. Yuka has
+decided to surface this as a new top-level field with shape
+`instance: { id, step }`.
+
+**(2) Flatten `subject.tenant_id` and `subject.authority_id` to the
+public V4 UUID string.** The current
+[`SubjectContext::to_script_value`](../../philharmonic-workflow/src/subject.rs#L33-L35)
+implementation delegates to `serde_json::to_value(self)`, which
+serialises each `EntityId<T>` field through the type's default
+`Serialize` impl
+([`philharmonic-types/src/entity.rs:259-263`](../../philharmonic-types/src/entity.rs#L259-L263))
+— that produces
+`{"internal": "<v7-uuid>", "public": "<v4-uuid>"}`. The script
+therefore sees the internal V7 UUID, which is a design leak: scripts
+are out-of-trust JS and should only see the public V4. Per Yuka
+2026-05-19, "no internal ID exposure to scripts". Both `tenant_id`
+and `authority_id` (`Option<EntityId<MintingAuthority>>`) are
+reshaped to the bare public-V4 string (the latter remains
+nullable for the principal-caller case). The `kind`, `id`, and
+`claims` fields are unchanged.
+
+**Scope of both changes:** one engine site plus
+`philharmonic-workflow/src/subject.rs::to_script_value`, tests, the
+`philharmonic-workflow` CHANGELOG `[Unreleased]` section, and three
+doc files. Non-crypto. Non-breaking from a JS-author perspective for
+(1) — purely additive. **Breaking** for (2) from any JS code that
+currently reads `arg.subject.tenant_id.public` or
+`arg.subject.authority_id.public`; those callers would now find
+`arg.subject.tenant_id` itself a string. Yuka has accepted that
+breakage explicitly — the pre-existing `{internal, public}` shape
+was a design leak, not a contract. **No publish, no version bump**
+— the crate's `Cargo.toml` stays at `0.1.6`; the change lands in
+the `[Unreleased]` section of `CHANGELOG.md` and ships with whatever
 version Yuka cuts later.
+
+The persisted `StepRecordSubject`
+([`subject.rs:51-58`](../../philharmonic-workflow/src/subject.rs#L51-L58))
+is **not** changed — audit records keep the full `EntityId`
+serialisation for forensic accuracy. Only the in-flight
+`script_arg.subject` JSON value is reshaped.
 
 ## References (authoritative if anything in this prompt contradicts them)
 
@@ -63,13 +91,47 @@ version Yuka cuts later.
 
 ## Context files pointed at
 
-**Engine site (the only `src/` edit):**
+**Engine site (the `instance` field edit):**
 
 - [`philharmonic-workflow/src/engine.rs`](../../philharmonic-workflow/src/engine.rs)
   — `execute_step` builds `script_arg` at line 243. Add the new
-  `instance` field there. The instance UUID is available via
-  `instance_id.internal().as_uuid()`; the step is the
-  locally-computed `step_seq` (line 150-153).
+  `instance` field there. For the UUID *in the script arg*, use the
+  **public** ID: `instance_id.public().as_uuid()` — consistent with
+  the "no internal ID exposure to scripts" rule applied to
+  `subject.tenant_id` below. The `step` is the locally-computed
+  `step_seq` (line 150-153). (`instance_id.internal().as_uuid()`
+  remains correct for the other engine-internal sites that already
+  use it — engine.rs:145, 196, 266, 283, 311, 323, 370, etc. —
+  those are not script-facing.)
+
+**Subject site (the flattening edit):**
+
+- [`philharmonic-workflow/src/subject.rs`](../../philharmonic-workflow/src/subject.rs)
+  — `SubjectContext::to_script_value` (lines 33-35) currently
+  delegates to `serde_json::to_value(self)`. Replace with a manual
+  build that emits:
+  - `kind` — unchanged (`"principal"` or `"ephemeral"` via the
+    existing serde rename_all snake_case).
+  - `id` — unchanged (the opaque caller-identifier string).
+  - `tenant_id` — `self.tenant_id.public().as_uuid().to_string()`
+    (hyphenated lowercase V4).
+  - `authority_id` — `Option::map` over `self.authority_id`,
+    producing `Some(public-v4-string)` or `None`. Serialise the
+    `Option<String>` so that `None` lands as JSON `null` (matches
+    the previous shape's behaviour for principal callers).
+  - `claims` — unchanged (opaque pass-through).
+
+  The cleanest implementation is an inline `json!{...}` in
+  `to_script_value`, or a private `#[derive(Serialize)]` wire
+  struct (e.g. `ScriptSubject<'a> { kind, id: &'a str, tenant_id:
+  String, authority_id: Option<String>, claims: &'a JsonValue }`)
+  built from `&self` and then `serde_json::to_value`-d. Either is
+  acceptable; pick what reads cleaner. Do **not** mutate the
+  `SubjectContext` struct itself or its top-level `Serialize`
+  impl — the type is also used for non-script purposes via the
+  default Serialize (e.g. potentially logged at debug level), and
+  changing the default impl would have action-at-a-distance
+  consequences. Custom shape strictly inside `to_script_value`.
 
 **Trait that stays put (do not change its signature):**
 
@@ -77,6 +139,15 @@ version Yuka cuts later.
   — `StepExecutor::execute(script, arg: &JsonValue, config)` keeps
   its current shape. The new field travels inside the existing
   `arg` parameter; no trait-level change.
+
+**Audit shape that stays put (do not change):**
+
+- `StepRecordSubject`
+  ([`subject.rs:51-58`](../../philharmonic-workflow/src/subject.rs#L51-L58))
+  — the persisted-audit shape stays as `EntityId<MintingAuthority>`
+  (full `{internal, public}` serialisation) for `authority_id`.
+  Forensic audit keeps the V7 reference. Only the in-flight script
+  arg is flattened.
 
 **Tests:**
 
@@ -114,84 +185,180 @@ version Yuka cuts later.
   "context":  { ... },
   "args":     { ... },
   "input":    { ... },
-  "subject":  { ... },
+  "subject":  {
+    "kind":         "principal" | "ephemeral",
+    "id":           "<opaque caller string>",
+    "tenant_id":    "<V4 UUID string, lowercased hyphenated>",
+    "authority_id": "<V4 UUID string>" | null,
+    "claims":       { ... }
+  },
   "data":     { ... },
-  "instance": { "id": "<uuid string, lowercased, hyphenated>",
-                "step": <unsigned integer, the step_seq for the
-                         step currently executing> }
+  "instance": {
+    "id":   "<V4 UUID string, lowercased hyphenated>",
+    "step": <unsigned integer, the step_seq for the step
+             currently executing>
+  }
 }
 ```
 
-- `id`: the `WorkflowInstance` entity UUID, serialised via the
-  default `Uuid::to_string()` (lowercased, hyphenated 8-4-4-4-12).
-- `step`: the `step_seq` value the engine computes at the top of
-  `execute_step` (1-based; `latest.revision_seq.checked_add(1)`).
-  Semantic: "the seq the engine is about to assign to the step
-  record being created" — matches what the audit log records for
-  this same step.
+### `instance`
 
-No other fields. Yuka explicitly approved `{ id, step }`; do NOT
-add `status`, `template_id`, `tenant_id`, `correlation_id`, or
-anything else — those can be added later if a use case appears.
+- `instance.id`: the `WorkflowInstance`'s **public** V4 UUID,
+  serialised via the default `Uuid::to_string()` (lowercased,
+  hyphenated 8-4-4-4-12). Use `instance_id.public().as_uuid()`,
+  not `.internal()`.
+- `instance.step`: the `step_seq` value the engine computes at the
+  top of `execute_step` (1-based;
+  `latest.revision_seq.checked_add(1)`). Semantic: "the seq the
+  engine is about to assign to the step record being created" —
+  matches what the audit log records for this same step.
+
+No other fields on `instance`. Yuka explicitly approved
+`{ id, step }`; do NOT add `status`, `template_id`, `tenant_id`,
+`correlation_id`, or anything else — those can be added later if a
+use case appears.
+
+### `subject` (flattened)
+
+The five fields above are the complete set. Compared to the
+previous shape produced by `serde_json::to_value(self)`:
+
+- `kind` — unchanged (`"principal"` | `"ephemeral"`).
+- `id` — unchanged (opaque caller identifier string).
+- `tenant_id` — was `{"internal": "<v7>", "public": "<v4>"}`; now
+  the bare V4 string.
+- `authority_id` — was either `null` or
+  `{"internal": "<v7>", "public": "<v4>"}`; now either `null` or
+  the bare V4 string.
+- `claims` — unchanged (opaque pass-through).
+
+No other fields. The persisted `StepRecordSubject` shape is
+untouched (`authority_id` stays full `EntityId` there).
 
 ## Hard requirements
 
-- Place the `instance` key after `data` in the JSON object source
-  ordering, for readability when humans skim engine code or
-  log dumps. (The wire format goes through `serde_json` which
-  preserves insertion order in `json!{...}`; canonical JSON is
-  only applied at hash sites and is not relevant to `script_arg`
-  itself.)
-- The `id` field must serialise as a JSON **string**, not a
-  nested `{uuid: ...}` object, not a byte array. JS authors will
-  write `arg.instance.id` and expect `typeof === 'string'`.
-- The `step` field must serialise as a JSON **number**, not a
-  string. Use `step_seq`'s native unsigned-integer type; do not
-  stringify.
+### Shared
+
+- **No internal-V7-UUID exposure to scripts.** Anywhere a UUID
+  ends up inside `script_arg`, it is the **public V4** form. This
+  rule covers `instance.id`, `subject.tenant_id`, and
+  `subject.authority_id`. Use `EntityId::public().as_uuid()`
+  consistently.
+- **No version bump.** `philharmonic-workflow/Cargo.toml` stays
+  `version = "0.1.6"`. Add the entry to the existing
+  `## [Unreleased]` section in `CHANGELOG.md`.
+- **No panics in library `src/`** per CONTRIBUTING.md §10.3.
+  Tests exempt.
 - **Do not change `StepExecutor`'s trait signature.** Adding a
   field inside `arg: &JsonValue` is sufficient.
 - **Do not change `StepRecordSubject` or the step-record subject
   persistence shape.** The audit confinement at
   [`engine.rs:233`](../../philharmonic-workflow/src/engine.rs#L233)
-  must stay limited to `kind` + `id` + `authority_id`. The
-  instance identity is already implicit at the step-record level
-  (the step record's parent entity is the instance) and leaking
-  it into the subject would muddle the design.
-- **No panics in library `src/`** per CONTRIBUTING.md §10.3.
-  `step_seq` is already produced via `checked_add(1)?` and the
-  UUID is infallible to format — no new fallibility expected,
-  but if you find yourself reaching for `unwrap()`, stop and
-  rethink.
-- **No version bump.** `philharmonic-workflow/Cargo.toml` stays
-  `version = "0.1.6"`. Add the entry to the existing
-  `## [Unreleased]` section in `CHANGELOG.md`.
+  stays limited to `kind` + `id` + `authority_id` (with
+  `authority_id` retaining the full `EntityId` shape for forensic
+  V7 reference). The instance identity is already implicit at the
+  step-record level (the step record's parent entity is the
+  instance).
+
+### `instance` field
+
+- Place the `instance` key after `data` in the JSON object source
+  ordering, for readability when humans skim engine code or log
+  dumps. (`json!{...}` preserves insertion order in source;
+  canonical JSON is only applied at hash sites and is not
+  relevant to `script_arg` itself.)
+- `instance.id` serialises as a JSON **string** (default `Uuid`
+  formatting; lowercased hyphenated 8-4-4-4-12). Not a nested
+  object, not a byte array.
+- `instance.step` serialises as a JSON **number**. Use
+  `step_seq`'s native unsigned-integer type; do not stringify.
+
+### `subject` flattening
+
+- `to_script_value` no longer delegates to
+  `serde_json::to_value(self)`. Build the JSON shape explicitly
+  (inline `json!{...}` or a private wire struct — see Context
+  files above).
+- `tenant_id` is the public V4 UUID **string**, never an object,
+  never `null`. The `Tenant` entity must exist for any valid
+  request, so `tenant_id` is non-optional in the source struct
+  and stays non-optional in the wire shape.
+- `authority_id` is `Option<String>`. `None` → JSON `null`
+  (matches the previous shape's `null` for principal callers);
+  `Some(EntityId)` → its public V4 as a string.
+- Do **not** modify the public `Serialize` impl on
+  `SubjectContext` — the change is local to `to_script_value`.
+- Do **not** change the `claims` field's shape — it passes
+  through as-is.
+
+### Compatibility note for callers
+
+The `subject` reshape is a **breaking change** for any JS that
+reads `arg.subject.tenant_id.public` or
+`arg.subject.authority_id.public`. Yuka has accepted this — the
+`{internal, public}` shape was a design leak from default serde,
+not an intended contract. The CHANGELOG `[Unreleased]` entry must
+call out the breaking shape change explicitly so the next publish
+notes it; the `philharmonic/webui/` chat surface and any other
+in-tree consumer must be grep'd for `subject.tenant_id` /
+`subject.authority_id` usage during this round and either updated
+or flagged. (Surface findings in the session summary; don't fix
+silently — Yuka decides scope.)
 
 ## Tests
 
 Add to `philharmonic-workflow/tests/` (or extend an existing test
 file if one already exercises `execute_step` and admits a small
-addition). Cover at minimum:
+addition). The two changes share the same capture-mock harness;
+cover both in the same test file.
 
-1. **Field presence & shape.** `arg.instance` exists; `arg.instance.id`
-   is a string matching `latest_instance_revision`'s UUID;
-   `arg.instance.step` is a number equal to `step_seq`.
+**`instance` field:**
+
+1. **Field presence & shape.** `arg.instance` exists;
+   `arg.instance.id` is a JSON string equal to
+   `instance_id.public().as_uuid().to_string()`;
+   `arg.instance.step` is a JSON number equal to `step_seq`.
 2. **Step increments across calls.** Two consecutive
-   `execute_step` calls on the same instance produce `step = 1`
-   then `step = 2`. (Adjust starting seq depending on how the
-   existing test harness creates the instance — the contract is
-   "the step seq the engine is about to assign", whatever that
-   number is for the harness's first call.)
+   `execute_step` calls on the same instance produce
+   `step = N` then `step = N+1` (where N is whatever the
+   harness produces on the first call given its instance-
+   creation shape).
 3. **Consistency with the step record.** The `step_seq` value
-   the engine assigns to the new `StepRecord` equals the
-   `arg.instance.step` value the script sees in the same call.
-   (If the harness already exposes the StepRecord that lands,
-   compare against its `step_seq` field. Otherwise this is
-   implicit in (1).)
-4. **Other fields unchanged.** The five existing fields
-   (`context`, `args`, `input`, `subject`, `data`) remain
-   present and unchanged in shape. A quick assertion that
-   `arg.get("context")` etc. are all `Some(_)` is enough — this
-   guards against accidental removal during the edit.
+   the engine assigns to the new `StepRecord` equals
+   `arg.instance.step` for the same call. (Compare against the
+   landed StepRecord's `step_seq` if the harness exposes it;
+   otherwise this is implicit in (1).)
+4. **`instance.id` is the public V4, not the internal V7.**
+   Construct a `SubjectContext` whose `tenant_id`'s
+   `EntityId::internal()` and `EntityId::public()` are
+   distinct (the normal case — V7 and V4 differ by
+   construction). Assert `arg.instance.id` matches `public()`,
+   NOT `internal()`.
+
+**`subject` flattening:**
+
+5. **`subject.tenant_id` is a string equal to the public V4.**
+   Not an object; not the internal V7.
+6. **`subject.authority_id` for principal callers is JSON
+   `null`.** Build a principal `SubjectContext`
+   (`authority_id: None`); assert the field is present and
+   `is_null()`.
+7. **`subject.authority_id` for ephemeral callers is a string
+   equal to the authority's public V4.** Build an ephemeral
+   `SubjectContext` with an authority entity-id; assert the
+   field is a string and equals
+   `authority.public().as_uuid().to_string()`.
+8. **`subject.kind`, `subject.id`, `subject.claims` pass
+   through unchanged.** A small round-trip check that the
+   three pass-through fields keep their shape and content.
+
+**Other-fields-unchanged guard:**
+
+9. The four other existing fields (`context`, `args`, `input`,
+   `data`) remain present in `script_arg` with their shapes
+   unchanged. A quick `arg.get("context")` etc. existence
+   check is enough — guards against accidental removal during
+   the edit.
 
 If the cleanest test seam is a tiny capture-mock `StepExecutor`,
 implement it inline in the test file:
@@ -210,10 +377,6 @@ impl StepExecutor for CaptureExecutor {
         _config: &JsonValue,
     ) -> Result<JsonValue, StepExecutionError> {
         *self.captured.lock().unwrap() = Some(arg.clone());
-        // Return a minimal valid result so execute_step succeeds
-        // and the step record lands. Match whatever shape the
-        // engine's `parse_executor_result` expects (see
-        // engine.rs::execute_step).
         Ok(json!({ "output": {}, "context": {}, "done": false }))
     }
 }
@@ -229,18 +392,50 @@ no-panics rule scopes to library `src/`, not tests.)
 - Lines 241-242: `{context, args, input, subject, data}` →
   `{context, args, input, subject, data, instance}` and a short
   parenthetical "`instance` carries `{id, step}` — the running
-  workflow instance's UUID and the step seq currently
+  workflow instance's public V4 UUID and the step seq currently
   executing."
 - Line 282: "five-field argument" → "six-field argument".
 - Line 285: the destructured signature example —
   `function main({context, args, input, subject, data, instance})`.
+- Lines 316-332: the existing `subject` shape example uses
+  stale field names (`tenant` / `authority` as plain strings —
+  doesn't match the actual code, which uses `tenant_id` /
+  `authority_id`). Rewrite the example to the **new** flattened
+  shape:
+
+  ```javascript
+  {
+      kind: "ephemeral",  // or "principal"
+      id: "opaque-subject-id",
+      tenant_id: "00000000-0000-4000-8000-000000000000",
+        // tenant's public V4 UUID
+      authority_id: "11111111-1111-4111-8111-111111111111",
+        // minting authority's public V4 UUID;
+        // null for kind="principal"
+      claims: {
+          // Free-form, tenant-defined for ephemeral subjects;
+          // typically empty or minimal for principals.
+          user_id: "u_12345",
+          locale: "ja-JP"
+      }
+  }
+  ```
+
+  Preserve the prose around the block (the "Scripts that don't
+  care…" sentence at line 334 onwards stays).
+
 - Line 353: "Assemble executor arg: `{context, args, input,
   subject, data, instance}`."
 - Lines 492-493: the historical-expansion bullet ends at
-  "`subject`". Append a new bullet to the same list:
-  "Then expanded again to add `instance: {id, step}` so scripts
-  can know which workflow instance and step they are executing
-  inside (2026-05-19)."
+  "`subject`". Append two new bullets to the same list:
+  - "Then expanded again to add `instance: {id, step}` so
+    scripts can know which workflow instance and step they
+    are executing inside (2026-05-19)."
+  - "Concurrently, `subject.tenant_id` and
+    `subject.authority_id` were flattened from
+    `{internal, public}` objects to bare public V4 UUID
+    strings (2026-05-19) — the internal V7 UUID is not a
+    script-facing identifier."
 
 ### `docs/design/06-execution-substrate.md`
 
@@ -260,16 +455,25 @@ no-panics rule scopes to library `src/`, not tests.)
 ### `docs/guide/workflow-authoring.md`
 
 - §"Script argument" block (around lines 717-727): extend the
-  code block to include the `instance` field, and add a short
-  prose line below the block:
+  code block to include the `instance` field, and add prose:
 
-  > `instance.id` is the `WorkflowInstance` UUID (string);
-  > `instance.step` is the step seq (number, 1-based) currently
-  > executing. Useful for log correlation and idempotency-key
-  > construction.
+  > `subject.tenant_id` is the tenant's public V4 UUID
+  > (string). `subject.authority_id` is the minting authority's
+  > public V4 UUID (string) for ephemeral callers, or `null`
+  > for principal callers.
+  >
+  > `instance.id` is the `WorkflowInstance`'s public V4 UUID
+  > (string); `instance.step` is the step seq (number, 1-based)
+  > currently executing. Useful for log correlation and
+  > idempotency-key construction.
 
   Match the file's existing voice (declarative, short
   sentences).
+
+- Grep the file for `subject.tenant_id` / `tenant_id.public` /
+  `subject.authority_id` / `authority_id.public` in the script-
+  example snippets — if any example reads either field as an
+  object, update it to the bare-string form.
 
 ## Version policy
 
@@ -283,9 +487,21 @@ section in `philharmonic-workflow/CHANGELOG.md`:
 
 ### Added
 - `script_arg.instance: { id, step }` — workflow scripts now
-  receive the running `WorkflowInstance` UUID (string) and the
-  step seq (number, 1-based) currently executing. Non-breaking:
-  scripts that don't read `arg.instance` are unaffected.
+  receive the running `WorkflowInstance`'s public V4 UUID
+  (string) and the step seq (number, 1-based) currently
+  executing. Non-breaking: scripts that don't read
+  `arg.instance` are unaffected.
+
+### Changed
+- **Breaking (script-arg shape):** `subject.tenant_id` and
+  `subject.authority_id` are now bare public V4 UUID strings
+  (or `null` for `authority_id` on principal callers), not
+  `{internal, public}` objects. The previous nested shape was
+  a serde default leak of the internal V7 UUID into JS
+  scripts; the public V4 is the only identity scripts should
+  observe. Scripts that read `arg.subject.tenant_id.public`
+  must now read `arg.subject.tenant_id` directly. The
+  persisted `StepRecordSubject` (audit shape) is unchanged.
 ```
 
 **Do NOT bump** any other crate; **do NOT publish**. Yuka
@@ -368,17 +584,34 @@ Pending — will be updated after Codex run.
 ---
 
 <task>
-Add a sixth field, `instance: { id, step }`, to the
-`script_arg` JSON value assembled in
+Two coupled edits to the JSON value assembled in
 `philharmonic-workflow::WorkflowEngine::execute_step`
-([`philharmonic-workflow/src/engine.rs:243-249`](philharmonic-workflow/src/engine.rs#L243-L249)).
-`id` is the running `WorkflowInstance`'s UUID as a hyphenated
-lowercase string (default `Uuid::to_string()` form); `step` is
-the `step_seq` value the engine computes at the top of
+([`philharmonic-workflow/src/engine.rs:243-249`](philharmonic-workflow/src/engine.rs#L243-L249)),
+the shape JS workflow scripts receive as their default-export
+function argument.
+
+**(1) Add a sixth top-level field `instance: { id, step }`.**
+`id` is the running `WorkflowInstance`'s **public V4** UUID
+formatted as a hyphenated lowercase string
+(`instance_id.public().as_uuid().to_string()`); `step` is the
+`step_seq` value the engine computes at the top of
 `execute_step` (1-based, the seq the engine will assign to the
-step record being created). The trait signature of
-`StepExecutor::execute` does **not** change — the new field
-travels inside the existing `arg: &JsonValue` parameter.
+step record being created).
+
+**(2) Flatten `subject.tenant_id` and `subject.authority_id` to
+bare public V4 UUID strings** by rewriting
+`SubjectContext::to_script_value`
+([`philharmonic-workflow/src/subject.rs:33-35`](philharmonic-workflow/src/subject.rs#L33-L35))
+so it stops delegating to `serde_json::to_value(self)` and
+instead builds the JSON shape explicitly. `tenant_id` becomes a
+string; `authority_id` becomes `Option<String>` → JSON
+`null | "<v4>"`. The other three fields (`kind`, `id`,
+`claims`) pass through unchanged. Per Yuka 2026-05-19 — "no
+internal ID exposure to scripts". The persisted
+`StepRecordSubject` audit shape is **not** changed.
+
+The `StepExecutor` trait signature does **not** change. Both
+edits travel inside the existing `arg: &JsonValue` parameter.
 
 **Reference docs (authoritative if they contradict this prompt):**
 
@@ -395,41 +628,72 @@ travels inside the existing `arg: &JsonValue` parameter.
 
 **Hard constraints (locked):**
 
-- `instance.id` serialises as a JSON string (default Uuid
+- **No internal V7 UUID exposure to scripts.** Every UUID
+  reachable from `script_arg` is the public V4 form
+  (`EntityId::public().as_uuid()`). This covers `instance.id`,
+  `subject.tenant_id`, and `subject.authority_id`.
+- `instance.id` serialises as a JSON string (default `Uuid`
   formatting); `instance.step` serialises as a JSON number.
-- `instance` is the sixth and only new field; do not add
-  `status` / `template_id` / `tenant_id` / `correlation_id`.
+- `instance` is the sixth and only new top-level field; do not
+  add `status` / `template_id` / `tenant_id` / `correlation_id`
+  on `instance`.
+- `subject.tenant_id` is a bare JSON string (never an object,
+  never `null`). `subject.authority_id` is a JSON string or
+  `null`. Do **not** modify `SubjectContext`'s public
+  `Serialize` impl — the wire-shape change is local to
+  `to_script_value`.
 - `StepExecutor` trait signature unchanged.
 - `StepRecordSubject` persistence shape unchanged — audit
-  confinement stays at `kind` + `id` + `authority_id` only.
+  confinement stays at `kind` + `id` + `authority_id` only,
+  and `authority_id` keeps its full `EntityId` serialisation
+  there.
 - No panics in `philharmonic-workflow/src/` per
   CONTRIBUTING.md §10.3. Tests exempt.
 - **No version bump.** `philharmonic-workflow/Cargo.toml` stays
   at `0.1.6`. CHANGELOG entry goes under the existing
-  `## [Unreleased]` section, NOT a new dated heading.
+  `## [Unreleased]` section, NOT a new dated heading. Note both
+  the additive `instance` change AND the breaking `subject`
+  flattening in that entry.
 - **No publish.** Yuka publishes after review.
+- During this round, grep the workspace for existing
+  `subject.tenant_id.public` / `.internal` / `authority_id.public`
+  / `.internal` usage in JS examples, doc text, and any in-tree
+  script samples. Surface findings in the session summary; do
+  not silently rewrite consumer code outside this prompt's
+  scope (the framework's `philharmonic/webui/` is owned
+  elsewhere — flag and stop).
 
 **Per-file scope (the full set of edits):**
 
 - `philharmonic-workflow/src/engine.rs` — add `"instance":
-  json!({ "id": <uuid string>, "step": <step_seq number> })`
-  to the `script_arg` `json!{...}` at line 243.
+  json!({ "id": <public-v4 string>, "step": <step_seq number> })`
+  to the `script_arg` `json!{...}` at line 243. Use
+  `instance_id.public().as_uuid()`, NOT `.internal()`.
+- `philharmonic-workflow/src/subject.rs` — rewrite
+  `SubjectContext::to_script_value` to build the JSON shape
+  explicitly (inline `json!{...}` or a private wire struct).
+  Flatten `tenant_id` and `authority_id` to bare public V4
+  strings per the preamble.
 - `philharmonic-workflow/tests/<file>` — add shape coverage
-  (field presence, step increment across two calls,
-  consistency with the step record's `step_seq`, other five
-  fields still present). Use a capture-mock `StepExecutor` if
-  no existing harness fits.
-- `philharmonic-workflow/CHANGELOG.md` — add a bullet under
-  `## [Unreleased]`.
+  for both edits per the Tests block in the preamble (use a
+  capture-mock `StepExecutor` if no existing harness fits).
+- `philharmonic-workflow/CHANGELOG.md` — add an `### Added`
+  bullet and a `### Changed` bullet under the existing
+  `## [Unreleased]` section; mark the subject flattening as
+  breaking.
 - `docs/design/07-workflow-orchestration.md` — update the four
   script-arg references (lines 241-242, 282-285, 353,
-  492-493) per the preamble.
+  492-493) per the preamble. Mention the subject reshape if
+  the file describes the `subject` field's wire shape.
 - `docs/design/06-execution-substrate.md` — update the
   signature example (line 104) and rework the statelessness
   paragraph (line 324) per the preamble.
 - `docs/guide/workflow-authoring.md` — extend the §"Script
-  argument" code block and add a one-paragraph description of
-  the new field.
+  argument" code block (both `instance` and the new flat
+  `subject` shape) and add prose describing both. Sweep the
+  file's example snippets for `tenant_id.public` /
+  `tenant_id.internal` / `authority_id.public` /
+  `authority_id.internal` and rewrite to the new shape.
 
 **Verification (must run + pass before declaring done):**
 
@@ -462,36 +726,60 @@ only if the fix is mechanical and local. If it's structural,
 
 1. `philharmonic-workflow/src/engine.rs::execute_step` builds
    `script_arg` with the new `instance` field present, shaped
-   `{ id: <string>, step: <number> }`.
-2. `philharmonic-workflow/tests/` covers field presence,
-   step-seq increment across two calls, consistency with the
-   step record's `step_seq`, and other-fields-still-present.
-3. `philharmonic-workflow/CHANGELOG.md` has a new bullet under
-   the existing `## [Unreleased]` section. **No new dated
-   heading; no version bump.**
-4. `philharmonic-workflow/Cargo.toml` is unchanged (`version =
+   `{ id: <public-v4 string>, step: <number> }`, using
+   `instance_id.public().as_uuid()`.
+2. `philharmonic-workflow/src/subject.rs::to_script_value` is
+   rewritten to flatten `tenant_id` and `authority_id` to bare
+   public V4 strings (or `null` for `authority_id` on principal
+   callers). The public `Serialize` impl on `SubjectContext` is
+   NOT modified.
+3. `philharmonic-workflow/tests/` covers the full Tests matrix
+   from the preamble:
+   - `instance` field: presence/shape, step increment,
+     consistency with the step record, and public-V4-not-V7
+     assertion.
+   - `subject` flattening: `tenant_id` as V4 string,
+     `authority_id` JSON `null` for principal callers,
+     `authority_id` as V4 string for ephemeral callers,
+     pass-through for `kind`/`id`/`claims`.
+   - Other fields (`context`/`args`/`input`/`data`) remain
+     present.
+4. `philharmonic-workflow/CHANGELOG.md` has both new bullets
+   (`### Added` for `instance`, `### Changed` for the
+   breaking `subject` reshape) under the existing
+   `## [Unreleased]` section. **No new dated heading; no
+   version bump.**
+5. `philharmonic-workflow/Cargo.toml` is unchanged (`version =
    "0.1.6"` stays).
-5. `docs/design/07-workflow-orchestration.md` has the four
-   script-arg references updated.
-6. `docs/design/06-execution-substrate.md` has the signature
+6. `docs/design/07-workflow-orchestration.md` has the four
+   script-arg references updated; subject reshape noted if the
+   file describes the `subject` wire shape.
+7. `docs/design/06-execution-substrate.md` has the signature
    example + statelessness paragraph updated.
-7. `docs/guide/workflow-authoring.md` §"Script argument" has
-   the code block extended and a description added.
-8. `./scripts/pre-landing.sh` passes.
-9. Working tree left dirty across `philharmonic-workflow/` +
-   parent (per "Hand-off shape" above). **No commits, no
-   pushes** — Claude commits and pushes after reviewing the
-   diff.
-10. Session summary lists which submodule + the parent have
+8. `docs/guide/workflow-authoring.md` §"Script argument" has
+   the code block extended (both `instance` and flat
+   `subject`), descriptions added, and any `tenant_id.public`
+   / `authority_id.public` example snippets rewritten to the
+   new shape.
+9. `./scripts/pre-landing.sh` passes.
+10. Working tree left dirty across `philharmonic-workflow/` +
+    parent. **No commits, no pushes** — Claude commits and
+    pushes after reviewing the diff.
+11. Session summary lists which submodule + the parent have
     dirty trees so Claude can scope the `commit-all.sh` run.
-11. Outcome section of this prompt file updated with: (a)
+    The summary also lists any external consumers of
+    `arg.subject.tenant_id` / `arg.subject.authority_id` found
+    via repo-wide grep, flagged for Yuka.
+12. Outcome section of this prompt file updated with: (a)
     list of files touched, (b) the line in `engine.rs` where
-    the field was added, (c) the test seam chosen
-    (capture-mock vs existing-harness), (d) any blockers
-    encountered, (e) residual risks, (f) submodule + parent
-    head SHAs at hand-off.
+    the `instance` field was added, (c) the
+    `to_script_value` implementation approach taken
+    (`json!{...}` vs private wire struct), (d) test seam
+    chosen, (e) consumer-grep findings, (f) any blockers,
+    (g) residual risks, (h) submodule + parent head SHAs at
+    hand-off.
 
-If any of (1)–(10) is incomplete, the dispatch is INCOMPLETE.
+If any of (1)–(11) is incomplete, the dispatch is INCOMPLETE.
 Report INCOMPLETE clearly with what's done and what's left,
 and STOP — don't synthesise a half-result.
 </completeness_contract>
@@ -584,35 +872,52 @@ of this dispatch — propose a follow-up shape instead.
 <structured_output_contract>
 At the end of the dispatch, return:
 
-1. **Summary** (2-3 sentences): the engine site touched, the
-   test seam chosen, total new/changed lines split engine vs
-   tests vs docs.
+1. **Summary** (2-3 sentences): the engine + subject sites
+   touched, the test seam chosen, total new/changed lines
+   split engine vs subject vs tests vs docs.
 2. **Touched files**: full list, grouped by submodule + parent.
 3. **`script_arg` diff**: paste the before/after of the
    `json!{...}` call at `engine.rs:243` so the reviewer can
-   eyeball the field placement.
-4. **Test coverage**: number of new test cases, what each one
+   eyeball the new `instance` field's placement.
+4. **`to_script_value` diff**: paste the before/after of
+   `subject.rs::to_script_value` so the reviewer can confirm
+   the flattening shape and that no other field's behaviour
+   shifted.
+5. **Test coverage**: number of new test cases, what each one
    asserts. Note whether you used a capture-mock or extended
-   an existing harness.
-5. **Doc updates**: list each of the three doc files with the
-   specific anchors / line ranges touched.
-6. **CHANGELOG entry**: paste the new bullet verbatim so the
-   reviewer can confirm placement under `[Unreleased]`.
-7. **Verification results**:
+   an existing harness. Confirm both the `instance` matrix
+   and the `subject` matrix are covered.
+6. **Doc updates**: list each of the three doc files with the
+   specific anchors / line ranges touched. Call out any
+   example-snippet rewrites in `workflow-authoring.md` that
+   touched `subject.tenant_id` / `subject.authority_id`
+   reads.
+7. **CHANGELOG entry**: paste both bullets (the `### Added`
+   `instance` bullet and the `### Changed` breaking-`subject`
+   bullet) verbatim so the reviewer can confirm placement
+   under `[Unreleased]`.
+8. **Consumer-grep findings**: list any occurrences of
+   `arg.subject.tenant_id.public` / `.internal` /
+   `arg.subject.authority_id.public` / `.internal` found in
+   the workspace (parent + submodules) — file path + line +
+   one-line context. If none, say "no consumer reads found".
+9. **Verification results**:
    - `pre-landing.sh`: PASS / FAIL (with one-line summary if
      FAIL).
-8. **Working-tree state at hand-off**:
-   - List which submodule + parent have dirty trees.
-   - No commits expected from you. Claude will commit + push
-     after reviewing the diff.
-9. **Codex report**: if you wrote
-   `docs/codex-reports/2026-05-19-0001-script-arg-instance-field.md`,
-   note its presence (dirty in working tree; Claude commits
-   it). If you skipped, say so.
-10. **Residual risks**: anything you'd flag for Claude or
+10. **Working-tree state at hand-off**:
+    - List which submodule + parent have dirty trees.
+    - No commits expected from you. Claude will commit + push
+      after reviewing the diff.
+11. **Codex report**: if you wrote
+    `docs/codex-reports/2026-05-19-0001-script-arg-instance-field.md`,
+    note its presence (dirty in working tree; Claude commits
+    it). If you skipped, say so.
+12. **Residual risks**: anything you'd flag for Claude or
     Yuka before publish (e.g. a downstream consumer that
-    might want to start reading `arg.instance` immediately).
-11. **Outcome paragraph** for the prompt-archive file: 4-6
+    will break on the `subject` flattening; an example in
+    `workflow-authoring.md` that you weren't sure how to
+    rewrite).
+13. **Outcome paragraph** for the prompt-archive file: 4-6
     sentences summarising the round for posterity, ready to
     drop into `## Outcome` of this file.
 </structured_output_contract>
