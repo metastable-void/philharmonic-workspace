@@ -71,3 +71,18 @@ in the future.
 Re-read the docs/codex of everything related, and re-write
 workflow authoring guides in en/jp to reflect the facts
 on any surface changes.
+
+### Clarify http_forward docs
+
+Nested `.body` required.
+
+```
+await endpoint("cs_track", {
+  body: {
+    body: {
+      ...
+    },
+    ...
+  },
+})
+```
