@@ -4,8 +4,7 @@ This guide explains how to create workflow templates, bind them
 to endpoints and embedding datasets, run instances, and author
 scripts that work with the WebUI chat testing flow.
 
-Implementation files are authoritative for runtime behavior. The
-main script argument is currently:
+The current main-script argument is:
 
 ```javascript
 {
@@ -76,7 +75,7 @@ Content-Type: application/json
 ```
 
 The `implementation` field is plaintext metadata. The `config`
-blob is encrypted at rest under the substrate credential key.
+blob is encrypted at rest.
 
 > **WebUI users**: the per-implementation snippets below show
 > the full API body. The WebUI's endpoint Create form has
@@ -85,9 +84,8 @@ blob is encrypted at rest under the substrate credential key.
 > `{"model_id": "BAAI/bge-m3", ...}`, **not** the whole
 > `{"display_name": ..., "implementation": ..., "config":
 > {...}}` envelope) into the **Config JSON** editor.
-> Connectors set `#[serde(deny_unknown_fields)]` on their
-> config structs, so a doubled envelope produces an
-> `unknown field 'config'` error.
+> Connector configs reject unknown fields, so a doubled
+> envelope produces an `unknown field 'config'` error.
 
 ### `llm_openai_compat`
 
@@ -118,19 +116,6 @@ providers that require extra fixed headers.
 | `dialect` | yes | `openai_native`, `vllm_native`, `tool_call_fallback`, or `tool_call_fallback_auto`. The two `tool_call_fallback*` variants both ship the same `emit_output` function-tool fallback for providers without native structured-output support; the `_auto` variant sends `tool_choice: "auto"` instead of the forced `{type: "function", function: {name: ...}}` literal, for upstreams that reject the forced form. |
 | `timeout_ms` | no | Defaults to `60000`. |
 | `custom_headers` | no | Extra fixed upstream headers. Reserved headers such as `Authorization`, `Content-Type`, `Content-Length`, `Host`, `Transfer-Encoding`, and `Connection` are rejected. |
-
-The connector normalizes successful `llm_generate` responses to:
-
-```json
-{
-  "output": {},
-  "stop_reason": "end_turn",
-  "usage": {
-    "input_tokens": 0,
-    "output_tokens": 0
-  }
-}
-```
 
 Every LLM request must include `output_schema`. Scripts read the
 structured result through `response.body.output`.
@@ -163,7 +148,7 @@ structured result through `response.body.output`.
 | `temperature` | no | Sampling temperature. |
 | `top_p` | no | Nucleus-sampling parameter. |
 | `stop` | no | Stop sequences. |
-| any other field | — | Rejected at deserialize time (`deny_unknown_fields`). |
+| any other field | — | Rejected; unknown fields are not allowed. |
 
 **Response body** (read as `response.body`):
 
@@ -184,8 +169,7 @@ structured result through `response.body.output`.
 
 ### `http_forward`
 
-Use `http_forward` for generic HTTP services. Its config wraps
-the shared `mechanics-config` `HttpEndpoint` JSON shape.
+Use `http_forward` for generic HTTP services. The config block:
 
 ```json
 {
@@ -258,17 +242,15 @@ Field-by-field inside the envelope:
   rejected.
 
 The top-level `urlParams` / `queries` / `headers` keys on
-the `endpoint(...)` call are **not** the same — they apply
-to the mechanics-core → connector-router call (the inner
-connector path), which has no slots and no query rules, so
-they're functionally a no-op for `http_forward`. Use the
-nested form above for anything the upstream service needs.
+the `endpoint(...)` call have **no effect** for
+`http_forward`. Use the nested form above for anything the
+upstream service needs.
 
 **Response body** (`response.body`): for `http_forward`,
 this is the `HttpForwardResponse` envelope wrapping the
 upstream response — i.e. **double-nested** relative to the
-mechanics-core transport envelope. Access the upstream's
-body via `response.body.body`, not `response.body`.
+transport envelope. Access the upstream's body via
+`response.body.body`, not `response.body`.
 
 ```json
 {
@@ -394,7 +376,7 @@ Use `embed` to turn text into embedding vectors.
 | Field | Required | Notes |
 |---|---|---|
 | `texts` | yes | Non-empty array of UTF-8 strings. Validation: length must be `1..=max_batch_size` (config-side cap). |
-| any other field | — | Rejected at deserialize time (`deny_unknown_fields`). |
+| any other field | — | Rejected; unknown fields are not allowed. |
 
 **Response body** (read as `response.body`):
 
@@ -555,7 +537,7 @@ Mode selection in `auto`:
 | `mail_from` | yes | Envelope sender (`MAIL FROM`); non-empty. |
 | `recipients` | yes | Non-empty array of envelope recipients (`RCPT TO`); each entry non-empty. |
 | `body` | yes | Full MIME message (headers + blank line + body). Non-empty. |
-| any other field | — | Rejected at deserialize time (`deny_unknown_fields`). |
+| any other field | — | Rejected; unknown fields are not allowed. |
 
 Minimal MIME envelope fixes are applied before submission —
 if `body` is missing any of `MIME-Version`, `Date`,
@@ -629,7 +611,7 @@ missing). Realm is `dns`.
 | `name` | yes | Domain name to query. The caller is responsible for IDN encoding if non-ASCII. |
 | `type` | yes | RR type as a canonical IANA name. Subject to the `allowed_types` policy gate when configured. |
 | `timeout_ms` | no | Per-call override of `default_timeout_ms`. Clamped to `[100, 60000]`. |
-| any other field | — | Rejected at deserialize time (`deny_unknown_fields`). |
+| any other field | — | Rejected; unknown fields are not allowed. |
 
 Policy gates (allowlist / blocklist / type allowlist) fire
 **before** any DNS packet leaves the process — a denied query
@@ -730,9 +712,9 @@ template revision; new instances use the latest revision.
 
 ## Writing scripts
 
-Scripts are ECMAScript modules executed by the Boa JavaScript
-engine. The module default export must be a function, and may
-be `async`.
+Scripts are ECMAScript modules executed in a sandboxed
+JavaScript engine. The module default export must be a
+function, and may be `async`.
 
 ```javascript
 export default async function main(arg) {
@@ -801,11 +783,9 @@ their final output. Chat workflows usually keep `done: false`.
 
 ### Built-in modules
 
-Scripts can import only built-in modules exposed by
-`mechanics-core`. Type declarations for the stable subset live
-under `mechanics-core/ts-types/`; modules added in
-mechanics-core 0.6.0 (`html`, `console`, `url`, `mime`) ship
-without `.d.ts` files yet.
+Scripts can import only the built-in modules listed below.
+TypeScript declarations for each module are available under
+`mechanics-core/ts-types/` in the runtime source.
 
 | Module | Exports |
 |---|---|
@@ -821,18 +801,13 @@ without `.d.ts` files yet.
 | `mechanics:url` | Default `URL` class; named `URLSearchParams`. WHATWG-style. |
 | `mechanics:mime` | `compose(message)`, `parse(raw)` for structured MIME messages. |
 
-The defaults-on subset is `rand`, `encoding` (base64 / base32 /
-hex / form-urlencoded), `html`, `console`, `url`. The `mime`
-module is opt-in at the Rust feature level; Philharmonic's
-`mechanics` Cargo feature enables it transitively, so scripts
-running under `mechanics-worker` and the api-server have it
-available. Embedders that depend on `mechanics-core` directly
-can opt out per-module with `default-features = false`.
+All modules listed above are available to scripts running on
+the standard worker and api-server deployments.
 
 #### `mechanics:html`
 
-HTML-entity escape / unescape, backed by `htmlize`. Pure
-text-in / text-out; no DOM, no parser.
+HTML-entity escape / unescape. Pure text-in / text-out; no
+DOM, no parser.
 
 ```javascript
 import {
@@ -858,9 +833,8 @@ escaped fragments.
 `debug` methods. **Currently all methods are no-ops** — the
 realm performs no host-side I/O for any console call. The
 module exists so existing JS idioms compile and run; future
-versions may capture pre-return `console` writes into the
-`RunJobResponse` (a possibly-breaking change called out in the
-0.6.0 release notes), but today's behaviour is silence.
+versions may capture pre-return `console` writes into the job
+response, but today's behaviour is silence.
 
 ```javascript
 import console from "mechanics:console";
@@ -874,7 +848,7 @@ are the only observable signals from a job.
 
 #### `mechanics:url`
 
-WHATWG `URL` and `URLSearchParams`, backed by the `url` crate.
+WHATWG `URL` and `URLSearchParams`.
 
 ```javascript
 import URL, { URLSearchParams } from "mechanics:url";
@@ -976,32 +950,27 @@ The realm is intentionally minimal:
   `globalThis` DOM, no Web APIs unless imported as a
   `mechanics:*` module.
 - **No timers.** `setTimeout` and `setInterval` are not
-  available as globals. (mechanics-core 0.5.1 removed a
-  short-lived `setTimeout` shim from 0.4.1.) Use Promise-based
-  patterns:
+  available as globals. Use Promise-based patterns:
   - `Promise.resolve().then(() => { ... })` — microtask
     deferral.
   - `(async () => { ... })()` — fire-and-forget async block
     whose tail polling keeps running after `main` returns.
   - Endpoint promises with `.then(...)` — async side effects
     scheduled from a synchronous `main`.
-  The tail-poll behaviour (mechanics-core 0.4.1) keeps
-  unawaited promises and endpoint calls running on the worker
-  thread until quiescence or `max_execution_time`, so
-  unawaited work still completes; it's just not blocked on a
-  timer.
+  The tail-poll behaviour keeps unawaited promises and
+  endpoint calls running on the worker thread until
+  quiescence or `max_execution_time`, so unawaited work
+  still completes; it's just not blocked on a timer.
 - **No `console` global.** Import `mechanics:console` if you
   want the no-op stubs; see above.
 - **ES modules only.** `script_source` is parsed as an ES
   module — `import`, `export`, and a `default` export are
   required. CommonJS (`require`, `module.exports`) is not
   recognised.
-- **Stage-3+ proposals enabled.** Boa's `temporal`, `float16`,
-  and `xsum` features are on, so `Temporal`, `Float16Array`,
-  and `Math.sumPrecise` are available to scripts. ECMA-402
-  (`Intl`) is currently disabled because of a transient
-  upstream dependency conflict; re-attempt when Boa relaxes
-  its `icu_provider` pin.
+- **Stage-3+ proposals available.** `Temporal`,
+  `Float16Array`, and `Math.sumPrecise` are accessible from
+  scripts. ECMA-402 (`Intl`) is currently unavailable in
+  this version.
 
 ### Sandbox limits
 
@@ -1012,10 +981,10 @@ Scripts run in an isolated JavaScript realm:
 | Filesystem access | None. |
 | Network access | Only through `mechanics:endpoint`. |
 | Cross-step JavaScript globals | None; persist state in `context`. |
-| Wall-clock timeout | Worker-pool or per-job configured. `mechanics-core` pool default is 30 seconds; the mechanics-worker binary can set deployment defaults. |
-| Loop iteration limit | `mechanics-core` default is `1_000_000`. |
-| Recursion depth limit | `mechanics-core` default is `512`. |
-| Stack size limit | `mechanics-core` default is `10 * 1024` bytes. |
+| Wall-clock timeout | Deployment-configured; default is 30 seconds. |
+| Loop iteration limit | Default is `1_000_000`. |
+| Recursion depth limit | Default is `512`. |
+| Stack size limit | Default is `10 * 1024` bytes. |
 
 ## Calling endpoints
 
@@ -1055,28 +1024,26 @@ Endpoint options:
 
 | Option | Meaning |
 |---|---|
-| `body` | The connector's typed request body. For typed connectors (LLM, embed, vector_search, SQL) this is the typed request struct directly. For `http_forward` this is the `HttpForwardRequest` envelope (`{ body, urlParams?, queries?, headers? }`) — the upstream URL slots, query values, headers, and request body all nest **inside** `body`, not at the top level. See [`http_forward` notes](#http_forward) above. |
-| `headers` | Extra HTTP headers on the **mechanics-core → connector-router** call (not the upstream call). Restricted to the endpoint's `overridable_request_headers` allowlist; case-insensitive match. Functionally a no-op for typed connectors and for `http_forward` (which receives its upstream headers from `body.headers`). |
-| `urlParams` | URL template slot values on the **mechanics-core → connector-router** call. The connector-router URL has no slots; functionally a no-op. For `http_forward`, upstream URL slots go in `body.urlParams`. |
-| `queries` | Query string slot values on the **mechanics-core → connector-router** call. The connector-router URL has no slotted queries; functionally a no-op. For `http_forward`, upstream queries go in `body.queries`. |
+| `body` | The connector's typed request body. For typed connectors (LLM, embed, vector_search, SQL) this is the typed request struct directly. For `http_forward` this is the `HttpForwardRequest` envelope (`{ body, urlParams?, queries?, headers? }`) — the upstream URL slots, query values, headers, and request body all nest **inside** `body`, not at the top level. See the `http_forward` section above. |
+| `headers` | Reserved; no effect at the top level. For `http_forward`, upstream headers go in `body.headers`. |
+| `urlParams` | Reserved; no effect at the top level. For `http_forward`, upstream URL slots go in `body.urlParams`. |
+| `queries` | Reserved; no effect at the top level. For `http_forward`, upstream queries go in `body.queries`. |
 
-Endpoint response (mechanics-core transport envelope, identical
-shape for every connector):
+Endpoint response (transport envelope; identical shape for
+every connector):
 
 | Field | Meaning |
 |---|---|
-| `body` | The JSON value the connector implementation returned. **Shape is connector-specific** — see each connector's "Response body" subsection above for the contents. For typed connectors this is the typed response struct; for `http_forward` it is the `HttpForwardResponse` envelope (double-nested — see that connector's notes). |
-| `headers` | Connector-path response headers exposed by mechanics-core (lowercased names). For typed connectors, normally empty; for `http_forward`, the connector populates `response.body.headers` instead with upstream headers. |
-| `status` | HTTP status code from the **connector path** call (mechanics-worker → connector-router → connector-service). `200` on a successful call. For `http_forward`, the upstream's status is `response.body.status`, not `response.status`. |
+| `body` | The JSON value the connector returned. **Shape is connector-specific** — see each connector's "Response body" subsection above. For typed connectors this is the typed response struct; for `http_forward` it is the `HttpForwardResponse` envelope (double-nested — see that connector's notes). |
+| `headers` | Transport response headers, lowercased. For typed connectors, normally empty. For `http_forward`, upstream headers are at `response.body.headers` instead. |
+| `status` | HTTP status code of the transport call. `200` on a successful call. For `http_forward`, the upstream's status is `response.body.status`, not `response.status`. |
 | `ok` | `true` if `status` is in `200..=299`. |
 
-Connector-side errors (HTTP 4xx/5xx from the connector path,
-e.g. an upstream LLM returning 400, an invalid SQL query) reach
-the script as a **rejected promise**. Use `try { await
-endpoint(...) } catch (e) { ... }` to handle them — the engine
-trusts the script's outcome once `main()` fulfills, so a
-caught rejection is genuinely caught (see `mechanics-core`
-0.4.0 release notes).
+Connector-side errors (HTTP 4xx/5xx from the transport — e.g.
+an upstream LLM returning 400, an invalid SQL query) reach the
+script as a **rejected promise**. Use
+`try { await endpoint(...) } catch (e) { ... }` to handle them;
+caught rejections are genuinely caught.
 
 ## Reading embedding datasets
 
