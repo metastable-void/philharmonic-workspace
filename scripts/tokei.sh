@@ -28,5 +28,5 @@ if [ ! -w "$cargo_home" ] 2>/dev/null; then
     exit 1
 fi
 
-cargo install -q tokei --features=all
+./scripts/cargo-install.sh tokei >/dev/null 2>&1
 exec tokei

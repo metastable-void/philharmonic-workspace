@@ -309,7 +309,11 @@ else
             "$C_HEADER" "$(printf '%s ' $affected)" "$C_RESET"
         # shellcheck disable=SC2086
         for c in $affected; do
-            pl_step "rust-test $c" ./scripts/rust-test.sh "$c" $quiet_flag
+            # rust-test.sh rejects anything after the positional
+            # crate arg, so $quiet_flag (and other flags) must
+            # come BEFORE "$c". Same applies to the --ignored
+            # phase loop below.
+            pl_step "rust-test $c" ./scripts/rust-test.sh $quiet_flag "$c"
         done
     fi
 fi
@@ -319,7 +323,10 @@ if [ "$no_ignored" -eq 1 ]; then
 elif [ -n "$crates" ]; then
     # shellcheck disable=SC2086
     for c in $crates; do
-        pl_step "rust-test --ignored $c" ./scripts/rust-test.sh --ignored "$c" $quiet_flag
+        # `--ignored` and `$quiet_flag` come BEFORE the crate
+        # positional — rust-test.sh rejects extra args after it.
+        pl_step "rust-test --ignored $c" \
+            ./scripts/rust-test.sh --ignored $quiet_flag "$c"
     done
 else
     printf '%s== no --ignored phase needed (no modified crates) ==%s\n' "$C_HEADER" "$C_RESET"

@@ -38,7 +38,55 @@ and report**.
 
 ## Outcome
 
-Pending — will be updated after the Codex run.
+Implemented the optional `sort=modified_desc` entity-list mode while
+leaving API defaults at `created_desc`. Touched
+`philharmonic-api/src/{pagination.rs,store.rs,lib.rs,routes/{audit,authorities,embed_datasets,endpoints,identity,memberships,principals,roles,workflows}.rs}`
+plus `philharmonic-api/tests/{common/mod.rs,endpoint_config.rs,workflow_endpoints.rs}`;
+`philharmonic-store/src/entity.rs`;
+`philharmonic-store-sqlx-mysql/src/{entity.rs,schema.rs}` and
+`philharmonic-store-sqlx-mysql/tests/integration.rs`; and
+`philharmonic/webui/src/api/client.ts`,
+`philharmonic/webui/src/pages/{Authorities,AuthorityDetail,EmbedDatasets,Endpoints,Instances,Memberships,Principals,RoleDetail,Roles,Templates}.tsx`,
+with `philharmonic/webui/dist/{main.js,main.js.map}` regenerated.
+`CursorKey` uses the preferred `sort_key_value` rename plus
+`sort_mode`; `CursorWire` keeps the JSON `created_at` field and adds
+defaulted `sort`. The three route-local `paginate_items` copies were
+consolidated into the canonical helper in
+`philharmonic-api/src/pagination.rs`; audit remains event-time sorted
+and pins `SortMode::CreatedDesc`. The sqlx-mysql store now implements
+one-round-trip `latest_revision_timestamps` via an
+`INNER JOIN (SELECT entity_id, MAX(revision_seq) ...)` query, and
+`INDEX_MIGRATIONS` now includes
+`ALTER TABLE entity_revision ADD INDEX ix_entity_revision_entity_created (entity_id, created_at)`.
+Verification passed: `./scripts/pre-landing.sh --verbose` ended with
+`=== pre-landing: all checks passed ===` after the default quiet run
+hit an existing wrapper argument-order issue in the ignored-test phase;
+`./scripts/webui-build.sh --production` exited 0 with the pre-existing
+webpack size warnings. Hand-off SHAs: parent `abde64b`,
+`philharmonic` `5329489`, `philharmonic-api` `243932b`,
+`philharmonic-store` `d426627`,
+`philharmonic-store-sqlx-mysql` `e05f0b2`. Residual: parent status
+also shows `.github/workflows/ci.yml` and several `scripts/*.sh`
+changes plus `scripts/cargo-install.sh` that were not part of the
+requested implementation; Claude should review/attribute those before
+committing.
+
+**Post-Codex follow-ups bundled into the same batch commit:**
+
+- `scripts/pre-landing.sh` — Claude-side fix for the wrapper
+  argument-order issue Codex's outcome calls out. The default
+  quiet mode was appending `$quiet_flag` *after* the crate
+  positional in the narrowed `rust-test` and `--ignored`
+  loops, which `rust-test.sh` rejects (it parses one
+  positional and errors on extra args). Moved `$quiet_flag`
+  to before the crate name in both spots; the default quiet
+  path now works end-to-end without the `--verbose` workaround
+  Codex used.
+- `.github/workflows/ci.yml`, `scripts/{cargo-audit,cargo-deny,
+  check-api-breakage,setup,tokei}.sh`, and the new
+  `scripts/cargo-install.sh` — Yuka's parallel work enabling
+  `cargo-binstall` workspace-wide. Attributed and bundled
+  into the same commit per Yuka's direction.
 
 ---
 

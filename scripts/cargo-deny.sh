@@ -29,7 +29,7 @@ set -eu
 
 if ! command -v cargo-deny >/dev/null 2>&1; then
     echo '=== installing cargo-deny ==='
-    cargo install --locked cargo-deny
+    ./scripts/cargo-install.sh cargo-deny
 fi
 
 if [ $# -eq 0 ]; then

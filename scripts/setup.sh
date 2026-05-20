@@ -117,12 +117,16 @@ if command -v cargo >/dev/null 2>&1 && command -v rustc >/dev/null 2>&1; then
     printf '  rustc: %s\n' "$rustc_version"
     printf '  cargo: %s\n' "$cargo_version"
 
+    ok "Setting up cargo-binstall"
+    ./scripts/cargo-install.sh --setup
     ok "Installing cargo-audit"
-    cargo install cargo-audit
+    ./scripts/cargo-install.sh cargo-audit
     ok "Installing mdbook (for docs/)"
-    cargo install mdbook
+    ./scripts/cargo-install.sh mdbook
     ok "Installing cargo-deny"
-    cargo install cargo-deny
+    ./scripts/cargo-install.sh cargo-deny
+    ok "Installing cargo-semver-checks"
+    ./scripts/cargo-install.sh cargo-semver-checks
 else
     warn "Rust toolchain not found on PATH."
     warn "Install rustup from https://rustup.rs/ and ensure"

@@ -32,6 +32,9 @@ jobs:
       - name: Cache cargo + target
         uses: Swatinem/rust-cache@v2
 
+      - name: Set up cargo-binstall
+        uses: cargo-bins/cargo-binstall@main
+
       # Parity with contributor flow: every Git/shell interaction in
       # this workspace goes through scripts/*.sh. CI uses the same
       # scripts so drift between contributor and CI behavior is

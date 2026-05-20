@@ -21,7 +21,7 @@ set -eu
 
 if ! command -v cargo-audit >/dev/null 2>&1; then
     echo '=== installing cargo-audit ==='
-    cargo install --locked cargo-audit
+    ./scripts/cargo-install.sh cargo-audit
 fi
 
 printf '=== cargo audit %s ===\n' "$*"

@@ -64,7 +64,7 @@ baseline_version=${2:-}
 # environment; `cargo install --locked` avoids resolver drift.
 if ! command -v cargo-semver-checks >/dev/null 2>&1; then
     echo "=== installing cargo-semver-checks ==="
-    cargo install --locked cargo-semver-checks
+    ./scripts/cargo-install.sh cargo-semver-checks
 fi
 
 if [ -n "$baseline_version" ]; then

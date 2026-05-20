@@ -239,9 +239,9 @@ build because the blocks exist.
 `scripts/lib/cargo-noise-filter.sh` strips this noise from
 the build / test / lint / publish scripts that invoke cargo
 against the workspace (`rust-lint.sh`, `rust-test.sh`,
-`miri-test.sh`, `release-build.sh`, `musl-build.sh`,
-`publish-crate.sh`, `check-api-breakage.sh`, and the
-stderr-only variant in `xtask.sh`). New scripts that invoke
+`miri-test.sh`, `release-build.sh`, `publish-crate.sh`,
+`check-api-breakage.sh`, and the stderr-only variant in
+`xtask.sh`). New scripts that invoke
 cargo against the workspace should source the filter and
 route cargo through `run_with_cargo_noise_filter` (or
 `run_with_cargo_noise_filter_stderr` for tool wrappers whose
@@ -1030,6 +1030,10 @@ The inventory:
 | `./scripts/xtask.sh crates-io-versions -- <crate>` | crates.io sparse-index query | Lists non-yanked published versions. Rust bin in `xtask/`. |
 | `./scripts/xtask.sh <tool> -- <args>` | wrapper for in-tree Rust bins | Canonical invocation for any `xtask/` bin; mandatory `--` separates wrapper-level flags from bin args. |
 | `./scripts/check-toolchain.sh [--update]` | `rustup check` / `rustup update` + version print | Step 0 of `pre-landing.sh`. |
+| `./scripts/check-no-registry.sh` | Refuse `registry = "..."` directives in any tracked `Cargo.toml` | Pre-publish guard: registry-routing belongs in `.cargo/config.toml`, never in published manifests. Run in workspace-level `pre-landing.sh` flow. Exits 0 clean / 1 with offending lines. |
+| `./scripts/cargo-install.sh <crate>[@<ver>]... \| --setup \| -h\|--help` | `cargo binstall` for workspace tooling | Workspace-wide front door for installing cargo binaries. Bootstraps `cargo-binstall` itself via `cargo install --locked cargo-binstall` on first use, then forwards subsequent calls to `cargo binstall`. `--setup` does the bootstrap only (used by `setup.sh`). `--help` prints the inline usage block. Read-only `CARGO_HOME` exits 0 with a warning rather than failing — CI legs that only sanity-check scripts can call it harmlessly. Callers: `cargo-audit.sh`, `cargo-deny.sh`, `check-api-breakage.sh`, `setup.sh`, `tokei.sh`, and `.github/workflows/ci.yml`. |
+| `./scripts/mdbook-build.sh [--clean] [--check]` | `mdbook build` (or `mdbook test`) | Wraps mdbook against the workspace's `book.toml`. `--clean` removes `book/` first; `--check` runs `mdbook test` for link/anchor checks. mdbook is installed via `setup.sh`; the `book/` directory is committed so consumers can browse the rendered docs without an mdbook install. |
+| `./scripts/find-cargo-registry.sh <crate-substr> [<glob>] \| --list \| --root` | `find ~/.cargo/registry/src` with the workspace's canonical depth + glob | Locates vendored crate source files for upstream-behaviour investigations (e.g. how `sqlx-postgres` parses a connection URL, whether `ring`'s error implements `Debug`). `--list` enumerates every vendored crate directory; `--root` prints the resolved `registry/src/<index>/` root. Output paths are `~`-prefixed for readability. |
 
 **Target-dir split**: every cargo-touching wrapper sources
 `scripts/lib/cargo-target-dir.sh`, which sets
@@ -1057,6 +1061,23 @@ exactly like the bare directory it replaces. The `xtask`
 and `publish` target dirs are not redirected; they're
 typically small enough that the tmpfs win isn't worth the
 extra symlink mechanism.
+
+**Internal-only scripts** (not in the inventory above; brief
+mentions for completeness — they exist for operator / report
+purposes and aren't part of the day-to-day contributor flow):
+
+- `./scripts/hf-fetch-embed-model.sh` — deployment-build-time
+  fetch of an embedding-model ONNX + tokenizer bundle from
+  HuggingFace, pinned by revision SHA. Thin wrapper around the
+  `hf-fetch-embed-model` xtask bin (see
+  `xtask/src/bin/hf-fetch-embed-model.rs` for full
+  documentation). Not invoked at runtime; the connector that
+  consumes the bytes (`philharmonic-connector-impl-embed`) has
+  no network code.
+- `./scripts/slack-webhook.sh` — posts a project-summary Slack
+  message generated from `README.md` + `ROADMAP.md` + recent
+  `git log` for the workspace-internal Slack channel.
+  Operator-facing.
 
 **Exempt**: read-only cargo queries have no wrapper and don't
 need one — `cargo tree`, `cargo metadata`, `cargo --version`,
