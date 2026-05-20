@@ -79,6 +79,19 @@
 #   ./scripts/pre-landing.sh --full             # force workspace-wide step 3 (disable D21 narrowing)
 #   ./scripts/pre-landing.sh --xtask            # ONLY xtask, target-xtask, no --ignored phase
 #   ./scripts/pre-landing.sh --dry-run          # check-only mode (no fmt / clippy autofixes)
+#   ./scripts/pre-landing.sh -v | --verbose     # full cargo chatter (no `--quiet` to sub-scripts;
+#                                               # also expands cargo-deny inclusion graph)
+#
+# Output style: each step prints `== <label> ==` before
+# running and `✓ <label> — Xs` after, with elapsed time. By
+# default the sub-scripts run cargo with `--quiet`, suppressing
+# the per-crate "Compiling X v0.1.0" / "Checking X" / "Finished"
+# / "Documenting" progress lines — errors, warnings, and lint
+# findings still surface, but the noise is dropped. Pass
+# `-v` / `--verbose` for the full cargo chatter (useful when
+# debugging a non-failing slow step or chasing a warning that
+# normally hides under a noise line). The same `-v` flag expands
+# the cargo-deny inclusion graph (already pre-existing).
 #
 # Fix-on-default: by default the lint step (step 2) applies
 # `cargo fmt` and `cargo clippy --fix --allow-dirty --allow-staged`
@@ -142,6 +155,40 @@ if [ "$dry_run" -eq 1 ]; then
     dry_run_label=' (dry-run)'
 fi
 
+# Default: quiet sub-scripts (suppress cargo's per-crate
+# "Compiling X v0.1.0" / "Checking" / "Finished" / "Documenting"
+# chatter). pre-landing's own step headers and per-step elapsed
+# time are the progress signal. Pass `-v` / `--verbose` for the
+# full cargo chatter.
+quiet_flag=--quiet
+if [ "$verbose" -eq 1 ]; then
+    quiet_flag=
+fi
+
+# Per-step progress wrapper: prints "== <label> ==" before the
+# given command, runs it, then prints "✓ <label> Xs" with
+# elapsed time. The step count varies across pre-landing paths
+# (xtask, narrowed workspace, wide workspace, with/without
+# --ignored loop) so the header is keyed by label, not by index.
+# POSIX-only timing via `date +%s`; resolution is one second,
+# which is plenty for cargo-scale steps.
+pl_step() {
+    _pl_label=$1
+    shift
+    _pl_start=$(date +%s)
+    printf '%s== %s ==%s\n' "$C_HEADER" "$_pl_label" "$C_RESET"
+    "$@"
+    _pl_end=$(date +%s)
+    _pl_elapsed=$((_pl_end - _pl_start))
+    if [ "$_pl_elapsed" -ge 60 ]; then
+        _pl_human=$((_pl_elapsed / 60))m$((_pl_elapsed % 60))s
+    else
+        _pl_human=${_pl_elapsed}s
+    fi
+    printf '%s✓ %s — %s%s\n' \
+        "$C_OK" "$_pl_label" "$_pl_human" "$C_RESET"
+}
+
 if [ "$xtask_only" -eq 1 ]; then
     if [ $# -gt 0 ]; then
         echo "pre-landing.sh: --xtask is mutually exclusive with positional crate names" >&2
@@ -153,12 +200,13 @@ if [ "$xtask_only" -eq 1 ]; then
     fi
     printf '%s=== pre-landing (--xtask): scope = xtask only, CARGO_TARGET_DIR=target-xtask%s ===%s\n' \
         "$C_HEADER" "$dry_run_label" "$C_RESET"
-    ./scripts/check-toolchain.sh
+    pl_step 'check-toolchain' ./scripts/check-toolchain.sh
     # shellcheck disable=SC2086
-    ./scripts/cargo-deny.sh $denyflags
+    pl_step 'cargo-deny bans' ./scripts/cargo-deny.sh $denyflags
     # shellcheck disable=SC2086
-    ./scripts/rust-lint.sh --xtask $lint_fix_flag
-    ./scripts/rust-test.sh --xtask
+    pl_step 'rust-lint (xtask)' ./scripts/rust-lint.sh --xtask $lint_fix_flag $quiet_flag
+    # shellcheck disable=SC2086
+    pl_step 'rust-test (xtask)' ./scripts/rust-test.sh --xtask $quiet_flag
     printf '%s=== pre-landing: xtask checks passed ===%s\n' "$C_OK" "$C_RESET"
     exit 0
 fi
@@ -197,12 +245,12 @@ else
     fi
 fi
 
-./scripts/check-toolchain.sh
-./scripts/check-no-registry.sh
+pl_step 'check-toolchain' ./scripts/check-toolchain.sh
+pl_step 'check-no-registry' ./scripts/check-no-registry.sh
 # shellcheck disable=SC2086
-./scripts/cargo-deny.sh $denyflags
+pl_step 'cargo-deny bans' ./scripts/cargo-deny.sh $denyflags
 # shellcheck disable=SC2086
-./scripts/rust-lint.sh $lint_fix_flag
+pl_step 'rust-lint (workspace)' ./scripts/rust-lint.sh $lint_fix_flag $quiet_flag
 
 # Step 2: dep-aware test phase (ROADMAP D21).
 #
@@ -236,9 +284,9 @@ else
 fi
 
 if [ "$narrow" -eq 0 ]; then
-    printf '%s=== pre-landing: step 3 workspace-wide (%s) ===%s\n' \
-        "$C_HEADER" "$narrow_reason" "$C_RESET"
-    ./scripts/rust-test.sh
+    # shellcheck disable=SC2086
+    pl_step "rust-test workspace ($narrow_reason)" \
+        ./scripts/rust-test.sh $quiet_flag
 else
     # Affected = dirty ∪ transitive reverse-dep closure of dirty.
     # The xtask bin reads dirty crate names from stdin, walks
@@ -252,30 +300,29 @@ else
         # Defensive: the dirty crates are not workspace members
         # `cargo metadata` recognises (e.g. recently-removed). Fall
         # back to workspace-wide rather than skip silently.
-        printf '%s=== pre-landing: step 3 workspace-wide (affected-crates returned empty for non-empty dirty set) ===%s\n' \
-            "$C_HEADER" "$C_RESET"
-        ./scripts/rust-test.sh
+        # shellcheck disable=SC2086
+        pl_step 'rust-test workspace (affected-crates empty)' \
+            ./scripts/rust-test.sh $quiet_flag
     else
         # shellcheck disable=SC2086
-        printf '%s=== pre-landing: step 3 narrowed to affected crates: %s ===%s\n' \
+        printf '%s=== rust-test narrowed to affected crates: %s ===%s\n' \
             "$C_HEADER" "$(printf '%s ' $affected)" "$C_RESET"
         # shellcheck disable=SC2086
         for c in $affected; do
-            ./scripts/rust-test.sh "$c"
+            pl_step "rust-test $c" ./scripts/rust-test.sh "$c" $quiet_flag
         done
     fi
 fi
 
 if [ "$no_ignored" -eq 1 ]; then
-    printf '%s=== pre-landing: --no-ignored; skipping step 4 ===%s\n' "$C_HEADER" "$C_RESET"
+    printf '%s== --no-ignored; skipping --ignored phase ==%s\n' "$C_HEADER" "$C_RESET"
 elif [ -n "$crates" ]; then
     # shellcheck disable=SC2086
     for c in $crates; do
-        printf '%s=== pre-landing: --ignored phase for %s ===%s\n' "$C_HEADER" "$c" "$C_RESET"
-        ./scripts/rust-test.sh --ignored "$c"
+        pl_step "rust-test --ignored $c" ./scripts/rust-test.sh --ignored "$c" $quiet_flag
     done
 else
-    printf '%s=== pre-landing: no --ignored phase needed (no modified crates) ===%s\n' "$C_HEADER" "$C_RESET"
+    printf '%s== no --ignored phase needed (no modified crates) ==%s\n' "$C_HEADER" "$C_RESET"
 fi
 
 printf '%s=== pre-landing: all checks passed ===%s\n' "$C_OK" "$C_RESET"

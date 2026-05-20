@@ -277,10 +277,24 @@ anything non-trivial — this summary is a prompt, not a spec.
   set `CARGO_TARGET_DIR=target-main` so CLI/Codex builds don't
   fight `rust-analyzer`'s `target/` for the lock. `xtask.sh`
   uses `target-xtask/`; `publish-crate.sh` uses
-  `target-publish/`. Read-only queries (`cargo tree`,
-  `cargo metadata`) are fine raw; everything else must set
-  `CARGO_TARGET_DIR` if you must bypass the wrapper.
+  `target-publish/`. Raw `cargo check` / `cargo test` /
+  `cargo fmt` / `cargo clippy` / `cargo doc` are
+  soft-banned — use `./scripts/rust-lint.sh` (with
+  `--phase check`/`clippy`/`fmt`/`doc` to scope to one
+  phase) and `./scripts/rust-test.sh` (with `--filter`,
+  `--features`, `--release` for the common bespoke cases).
+  Read-only queries (`cargo tree`, `cargo metadata`) remain
+  fine raw. Anything else not covered by an existing wrapper:
+  extend the wrapper rather than bypassing.
   ([§5](CONTRIBUTING.md#5-script-wrappers-over-raw-cargo))
+- **[Soft] Raw `git status` / `git log` / `git diff` are
+  banned.** Use `./scripts/status.sh` (workspace-wide working
+  tree, ahead/behind, detached HEAD, unpushed tags;
+  `--diff` for the per-repo diff view), `./scripts/heads.sh`
+  (HEAD-per-repo with signature char), or `./scripts/log.sh`
+  (history / audit / stats modes; replaces raw `git log`).
+  Wrappers know about submodules; raw forms only see the
+  current repo and miss the workspace picture.
 - **[Hard, any green run satisfies] Run `./scripts/pre-landing.sh` before every Rust-touching
   commit.** cargo-deny bans + fmt + check + clippy
   (`-D warnings`) + rustdoc + test, auto-detects modified
@@ -332,13 +346,20 @@ anything non-trivial — this summary is a prompt, not a spec.
   bundling via inline-blob + tract). Light scripts
   (`webui-build.sh`, `cargo-audit.sh`, per-crate `cargo check
   -p <one>`) are fine to re-run.
-- **[Soft] Never pipe a Rust-build-heavy script through `head` /
-  `tail`** — truncation happens before the Bash capture file
-  is written, so the trimmed lines are gone and the next
-  question forces a re-run. Redirect to a file or let Bash
-  capture everything, then `grep` / `Read` with offsets.
-  Cheap commands (`status.sh`, `heads.sh`, `git log`, single
-  `cargo tree`, `webui-build.sh` tail) are fine through head/tail.
+- **[Soft] Never pipe `scripts/*.sh` output through `head` /
+  `tail`** — applies to *every* workspace script, not just
+  the Rust-build-heavy ones. Truncation happens before the
+  Bash capture file is written, so the trimmed lines are gone
+  and the next question forces a re-run. Redirect to a file
+  or let Bash capture everything, then `grep` / `Read` with
+  offsets. The previous carve-out for "cheap" scripts
+  (`status.sh`, `heads.sh`, etc.) is removed — cheap scripts
+  must produce output concise enough to read whole, and the
+  Rust-build-heavy ones (`pre-landing.sh`, `miri-test.sh`,
+  `release-build.sh`, `check-api-breakage.sh`) make the head/
+  tail trap worst. Raw Unix tool output (`grep`, `find`,
+  `git` direct from a script consuming it) is still fine
+  through head/tail; the ban targets workspace scripts.
 - **[Soft] Run `./scripts/miri-test.sh` on the crypto crate set at
   every checkpoint** — before publishing crypto-touching
   crates, after a phase / sub-phase with crypto changes,

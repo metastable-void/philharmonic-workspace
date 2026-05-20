@@ -4,6 +4,18 @@
 # Standalone `codex` invocations (e.g. the VSCode extension's app-server)
 # are intentionally ignored.
 #
+# Flags:
+#   --busy   One-line yes/no with PID, elapsed time, and child count
+#            instead of the full tree. Useful for "is Codex still
+#            running?" checks before touching files Codex might be
+#            writing — replaces the ad-hoc
+#            `ps -ef | grep -E 'codex|cargo|rustfmt'` pattern with
+#            a script-shaped probe. Honours the same Claude-spawned
+#            scope (standalone codex CLIs / VSCode app-server stay
+#            out of scope). Exit status: 0 with output regardless of
+#            busy/idle; consumers grep for the leading "BUSY" /
+#            "IDLE" token.
+#
 # POSIX sh + POSIX utilities — works on Linux (glibc + procps, busybox /
 # Alpine), FreeBSD, macOS. A single `ps -A -o` snapshot drives
 # everything; no pgrep, no /proc, no `column`.
@@ -27,6 +39,19 @@ BOLD="$C_BOLD"
 DIM="$C_DIM"
 RESET="$C_RESET"
 
+busy_mode=0
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --busy) busy_mode=1; shift ;;
+        -h|--help)
+            printf 'Usage: codex-status.sh [--busy] [-h|--help]\n'
+            exit 0 ;;
+        *)
+            printf 'codex-status.sh: unknown flag: %s\n' "$1" >&2
+            exit 2 ;;
+    esac
+done
+
 # Snapshot all processes once. Columns in order: pid ppid time rss etime
 # args. `args` must be last because it can contain whitespace. No `-w`
 # because busybox ps rejects it; on macOS/BSD ps may truncate args to
@@ -43,7 +68,11 @@ ROOTS=$(printf '%s\n' "$SNAPSHOT" | awk '
 ' | sort -u)
 
 if [ -z "$ROOTS" ]; then
-    echo "No Codex process running."
+    if [ "$busy_mode" -eq 1 ]; then
+        printf '%sIDLE%s — no Codex process running.\n' "$C_OK" "$C_RESET"
+    else
+        echo "No Codex process running."
+    fi
     exit 0
 fi
 
@@ -139,6 +168,24 @@ fmt_tree() {
             "$_ft_p" "$ROW_TIME" "$_ft_rss_mb" "$ROW_ETIME" "$_ft_cmd"
     done
 }
+
+if [ "$busy_mode" -eq 1 ]; then
+    # Compact one-line summary per root: BUSY, root pid, elapsed,
+    # descendant count. A single Codex root with child processes
+    # alive means cargo / rustfmt / bwrap are still working.
+    for root in $ROOTS; do
+        if row_for "$root"; then
+            _etime_root=$ROW_ETIME
+        else
+            _etime_root='?'
+        fi
+        _ct_all=$(collect_tree "$root" | wc -l | tr -d ' ')
+        _ct_children=$((_ct_all - 1))
+        printf '%sBUSY%s — Codex pid %s elapsed %s, %s descendant process(es).\n' \
+            "$C_WARN" "$C_RESET" "$root" "$_etime_root" "$_ct_children"
+    done
+    exit 0
+fi
 
 printf '%s=== Codex status ===%s\n' "$BOLD" "$RESET"
 for root in $ROOTS; do

@@ -12,6 +12,15 @@
 # work runs in parallel and outputs collect through a temp
 # dir for deterministic printing.
 #
+# With `--diff`, after the per-repo status blocks the script
+# also emits a colored diff for every dirty file across the
+# parent and every submodule. The diff covers both unstaged
+# (`git diff`) and staged (`git diff --cached`) changes; raw
+# `git diff` should not be invoked outside this wrapper (the
+# workspace soft-bans it in CLAUDE.md / AGENTS.md). Untracked
+# files are surfaced by status only — git won't diff them
+# until they're staged.
+#
 # Colors: ANSI sequences are emitted only when stdout is a TTY
 # and NO_COLOR is unset. Pass `--no-color` to force plain
 # output. Git's own status coloring follows the same gate.
@@ -21,11 +30,13 @@
 set -eu
 
 no_color=0
+show_diff=0
 while [ $# -gt 0 ]; do
     case "$1" in
         --no-color) no_color=1; shift ;;
+        --diff)     show_diff=1; shift ;;
         -h|--help)
-            printf 'Usage: status.sh [--no-color] [-h|--help]\n'
+            printf 'Usage: status.sh [--no-color] [--diff] [-h|--help]\n'
             exit 0 ;;
         *)
             printf 'status.sh: unknown flag: %s\n' "$1" >&2
@@ -154,5 +165,39 @@ wait || true
 for f in "$tmpdir"/[0-9]*.out; do
     [ -s "$f" ] && cat "$f"
 done
+
+# --diff: after the status blocks, emit a colored diff for the
+# parent and every submodule with dirty working tree changes.
+# Combines `git diff` (unstaged) and `git diff --cached` (staged)
+# under one header per repo. Submodules with no dirty changes are
+# skipped silently. Untracked files don't appear in git diff
+# output by design — status already lists them as `??`.
+if [ "$show_diff" -eq 1 ]; then
+    print_diff_for_cwd() {
+        _pdfc_name=$1
+        _pdfc_unstaged=$(git -c color.diff="$git_color" diff)
+        _pdfc_staged=$(git -c color.diff="$git_color" diff --cached)
+        if [ -z "$_pdfc_unstaged" ] && [ -z "$_pdfc_staged" ]; then
+            return 0
+        fi
+        printf '%s=== diff: %s ===%s\n' "$C_HEADER" "$_pdfc_name" "$C_RESET"
+        if [ -n "$_pdfc_unstaged" ]; then
+            printf '%s--- unstaged ---%s\n' "$C_DIM" "$C_RESET"
+            printf '%s\n' "$_pdfc_unstaged"
+        fi
+        if [ -n "$_pdfc_staged" ]; then
+            printf '%s--- staged ---%s\n' "$C_DIM" "$C_RESET"
+            printf '%s\n' "$_pdfc_staged"
+        fi
+        echo
+    }
+
+    print_diff_for_cwd 'parent'
+    while IFS= read -r path; do
+        [ -n "$path" ] || continue
+        name=$(basename "$path")
+        ( cd "$path" && print_diff_for_cwd "$name" )
+    done < "$tmpdir/.paths"
+fi
 
 exit 0

@@ -348,9 +348,24 @@ adoption commit lands.
 not raw `git`.** The scripts encode submodule-first ordering,
 mandatory `-s` sign-off, mandatory `-S` signature, detached-HEAD
 guards, and the audit-trailer workflow. Ad-hoc commands drift
-from those defaults. Read-only git (`git log`, `git diff`,
-`git show`, `git status`, `git blame`, `git rev-parse`) is fine
-for history browsing; the prohibition is on state changes.
+from those defaults.
+
+**Read-only git is also soft-banned for the workspace-wide
+queries** — raw `git status` / `git log` / `git diff` see only
+the current repo and miss the workspace's submodule layout.
+Use the wrappers instead:
+
+- `./scripts/status.sh` for `git status` (parent + every
+  submodule; `--diff` adds the per-repo diff for dirty files).
+- `./scripts/heads.sh` for `git log -n 1` (HEAD per repo, with
+  signature char).
+- `./scripts/log.sh` for general `git log` (three modes:
+  history / audit / stats — see §4.1 below).
+
+Bespoke `git show`, `git blame`, `git rev-parse` (and other
+narrow queries that don't have a workspace-wide
+counterpart) remain fine raw; the soft-ban targets the three
+queries with workspace-aware wrappers.
 
 ### 4.1 The scripts
 
@@ -369,8 +384,11 @@ for history browsing; the prohibition is on state changes.
   and `commit-all.sh` on first contributor edit. Off-branch pins
   and unsafe attaches (would require dropping local commits) are
   warned and left detached. Warns if Rust isn't on PATH.
-- `status.sh` — working-tree status of the parent + every
-  submodule (clean submodules are hidden).
+- `status.sh [--diff]` — working-tree status of the parent +
+  every submodule (clean submodules are hidden). `--diff`
+  appends a colored diff (unstaged + staged) per repo for
+  every dirty file; replaces raw `git diff` for workspace-wide
+  inspection.
 - `pull-all.sh` — rebase-pull the parent and update each
   submodule to the tip of its tracked remote branch, then re-run
   the same `attach-submodule-branch` pass `setup.sh` uses
@@ -1000,8 +1018,8 @@ The inventory:
 | Wrapper | Wraps | Notes |
 |---|---|---|
 | `./scripts/pre-landing.sh [<crate>...] [--no-ignored] [--dry-run] [-v\|--verbose]` | `cargo deny check bans` + `cargo fmt` + `cargo check` + `cargo clippy --fix --allow-dirty --allow-staged --all-targets -- -D warnings` + `cargo test --workspace` + `cargo test --ignored -p <crate>` per modified crate | The canonical pre-commit flow. Auto-detects modified crates via `show-dirty.sh`. Default lint step is fix mode (autofixes fmt + clippy in place against a dirty tree, see §11.0.2); pass `--dry-run` for legacy check-only behaviour. Default `cargo-deny` invocation hides the inclusion graph for less noise; pass `-v` / `--verbose` to print it. CI runs the same script. See §11. |
-| `./scripts/rust-lint.sh [<crate>]` | `cargo fmt --check` + `cargo check` + `cargo clippy --all-targets -- -D warnings` | Workspace (no arg) or per-crate. |
-| `./scripts/rust-test.sh [--include-ignored\|--ignored] [<crate>]` | `cargo test` with ignored-test control | `--ignored` runs *only* `#[ignore]`-gated; `--include-ignored` runs everything. |
+| `./scripts/rust-lint.sh [<crate>] [--fix] [--phase <p>] [--quiet]` | `cargo fmt [--check]` + `cargo check` + `cargo clippy --all-targets -- -D warnings` + `cargo doc --no-deps` (rustdoc with `RUSTDOCFLAGS=-D missing_docs`) | Workspace (no arg) or per-crate. `--phase fmt\|check\|clippy\|doc` runs one of the four phases instead of all. `--quiet` propagates `--quiet` to cargo check/clippy/doc (suppresses "Compiling X v0.1.0" chatter; errors still surface). |
+| `./scripts/rust-test.sh [--include-ignored\|--ignored] [<crate>] [--filter <pat>] [--features <list>] [--no-default-features\|--all-features] [--release] [--quiet]` | `cargo test` with ignored-test control, name filter, feature selection, and release-mode toggle | `--ignored` runs *only* `#[ignore]`-gated; `--include-ignored` runs everything. `--filter <pat>` is cargo's positional substring test-name filter. `--features` / `--no-default-features` require a positional crate or `--xtask`. |
 | `./scripts/miri-test.sh --workspace \| <crate>...` | `cargo +nightly miri test` | Slow; not in `pre-landing.sh`. See §10.7. |
 | `./scripts/cargo-audit.sh [...]` | `cargo audit` | Auto-installs `cargo-audit` on first run. |
 | `./scripts/cargo-deny.sh [...]` | `cargo deny check bans` by default; pass through to other subcommands (`check all`, `check licenses`, …). Auto-installs `cargo-deny` on first run. Step 1 of `pre-landing.sh`. |
@@ -1043,6 +1061,15 @@ extra symlink mechanism.
 **Exempt**: read-only cargo queries have no wrapper and don't
 need one — `cargo tree`, `cargo metadata`, `cargo --version`,
 `cargo search` are fine to run raw.
+
+**Specifically soft-banned (raw forms)**: `cargo check`,
+`cargo test`, `cargo fmt`, `cargo clippy`, `cargo doc`. All
+five are covered by `rust-lint.sh` (with `--phase` to scope
+to one) and `rust-test.sh` (with `--filter` / `--features` /
+`--release` for common bespoke cases). The previous
+"bespoke invocations remain fine" carve-out is removed —
+when the script doesn't cover your case, surface the gap as
+a prompt-override and extend the script.
 
 **If no wrapper fits**: extend one, or add a new `scripts/*.sh`
 (see §6). Validate with `./scripts/test-scripts.sh`. Then use

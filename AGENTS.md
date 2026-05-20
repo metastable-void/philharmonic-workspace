@@ -149,8 +149,17 @@ authorship norms) are not included.
 **Soft** (overrides must be surfaced in your codex-report):
 
 - Claude/Codex split of labour (§Your role)
-- No raw Cargo, no read-only raw Git outside wrappers
-  (§"Use the script wrappers")
+- No raw Cargo outside wrappers. Specifically: raw `cargo
+  check` / `cargo test` / `cargo fmt` / `cargo clippy` /
+  `cargo doc` are soft-banned — use `./scripts/rust-lint.sh`
+  (`--phase` for one phase) and `./scripts/rust-test.sh`
+  (`--filter`, `--features`, `--release`). `cargo tree` and
+  `cargo metadata` (read-only queries) are fine raw.
+- No read-only raw Git outside wrappers. Specifically: raw
+  `git status` / `git log` / `git diff` are soft-banned — use
+  `./scripts/status.sh` (with `--diff` for diffs),
+  `./scripts/heads.sh`, or `./scripts/log.sh`. Wrappers see
+  the workspace's submodule layout; raw forms don't.
 - No `python` / `perl` / `ruby` / `node` / `jq` / `curl` /
   `wget` in workspace tooling (one narrow exception:
   `webui-build.sh` uses Node via `npx webpack`)
@@ -158,7 +167,9 @@ authorship norms) are not included.
   changing either side — adding new features to docs is fine
 - Don't re-run a Rust-build-heavy script after losing
   context; re-read its captured output
-- Never pipe a Rust-build-heavy script through `head` / `tail`
+- Never pipe `scripts/*.sh` output through `head` / `tail`
+  (any workspace script, not just the Rust-build-heavy ones).
+  Raw Unix tools (`grep`, `find`) remain fine through head/tail.
 - Miri at every checkpoint on the crypto crate set
   (`philharmonic-policy`,
   `philharmonic-connector-{client,service,common}`,
@@ -398,11 +409,16 @@ tools) so local runs match CI. Raw `cargo <subcommand>` drifts.
   `cargo-audit.sh`, per-crate `cargo check -p <one>`) re-run
   cheaply.
 
-  **Never pipe a Rust-build-heavy script through `head` /
-  `tail`** — truncation happens before the capture file is
-  written, so the trimmed lines are gone. Redirect to a file
-  or let Bash capture everything, then `grep` / `Read` with
-  offsets. Cheap commands are fine through head/tail.
+  **Never pipe `scripts/*.sh` output through `head` /
+  `tail`** — applies to *every* workspace script, not just
+  the Rust-build-heavy ones. Truncation happens before the
+  capture file is written, so the trimmed lines are gone.
+  Redirect to a file or let Bash capture everything, then
+  `grep` / `Read` with offsets. The previous "cheap commands
+  fine" carve-out is removed: cheap scripts must produce
+  output concise enough to read whole. Raw Unix tool output
+  (`grep`, `find`) is still fine through head/tail; the ban
+  targets workspace scripts.
 
 - **`./scripts/rust-lint.sh [<crate>]`,
   `./scripts/rust-test.sh [--include-ignored|--ignored]
