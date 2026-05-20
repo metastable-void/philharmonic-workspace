@@ -12,14 +12,17 @@ The current main-script argument is:
   args,
   input,
   subject,
-  data
+  data,
+  instance
 }
 ```
 
 `data` is always present. It is `{}` when the template has no
 `data_config`, and it contains workflow-bound data such as
 `data.embed_datasets.<name>` when the template declares data
-bindings.
+bindings. `instance` carries `{ id, step }` for log correlation
+and idempotency-key construction; see the script-argument
+section below for the full shape.
 
 ## What workflows are
 
@@ -318,7 +321,7 @@ Use these implementations for SQL query endpoints.
 |---|---|---|
 | `sql` | yes | SQL text. PostgreSQL uses `$1`, `$2`, ... positional placeholders; MySQL uses `?` positional placeholders. |
 | `params` | no | Positional parameter values (JSON array). Defaults to `[]`. |
-| `max_rows` | no | Per-request row cap; the effective cap is the lower of this and the endpoint's `default_max_rows` (PostgreSQL) / `max_rows` config (MySQL). |
+| `max_rows` | no | Per-request row cap; the effective cap is the lower of this and the endpoint config's `default_max_rows`. |
 | `timeout_ms` | no | Per-request timeout in milliseconds; clamped to the endpoint's `default_timeout_ms`. |
 
 **Response body** (read as `response.body`):

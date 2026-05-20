@@ -63,12 +63,12 @@ Umbrella:
 
 ## Hard stops before doing anything
 
-- **POSIX-ish host required.** Check env block's `Platform:`
+- **[Hard] POSIX-ish host required.** Check env block's `Platform:`
   field. `linux` / `darwin` / `freebsd` / `openbsd` / `netbsd`:
   proceed. `win32` (raw Windows): STOP, surface the mismatch,
   instruct the user to switch to WSL2. Git Bash / MSYS / Cygwin:
   proceed with caution. ([§2](CONTRIBUTING.md#2-development-environment))
-- **Crypto-sensitive paths are gated.** SCK, COSE_Sign1,
+- **[Hard] Crypto-sensitive paths are gated.** SCK, COSE_Sign1,
   COSE_Encrypt0, hybrid KEM, payload-hash, `pht_` tokens — all
   trigger the two-gate review protocol. See the
   [`crypto-review-protocol`](.claude/skills/crypto-review-protocol/SKILL.md)
@@ -156,19 +156,44 @@ write the thing" → Codex unless it's plumbing/housekeeping.
   don't appear. If the user dispatched Codex separately, ask
   for completion confirmation before touching the tree.
 
+## Hard rules vs. soft rules
+
+Source: [`HUMANS.md`](HUMANS.md) §"Hard rules and soft rules"
+plus per-rule classifications recorded with Yuka on 2026-05-20.
+
+Each operational rule in this file carries a tag:
+
+- **[Hard]** — cannot be overridden by any prompt. Refuse and
+  surface the mismatch.
+- **[Soft]** — can be overridden by an explicit prompt, but
+  the override must be **surfaced** in the same turn (via
+  `AskUserQuestion`, a notes-to-humans entry, or an inline
+  call-out) so it's auditable.
+
+Special caveat: pre-landing is **[Hard]** but the rule is
+satisfied by *any* green pre-landing run — Codex's, Claude's,
+or Yuka's — so the gate is the green pass, not which agent
+ran it.
+
+Rules without a tag are descriptive guidance (e.g., who does
+what, monitoring tips) rather than rules per se. Codex's
+counterpart classification lives in [`AGENTS.md`](AGENTS.md);
+some Claude-only rules (commit / push / publish / Claude-side
+authorship norms) do not appear there.
+
 ## Executive summary of rules you'll trip over most
 
 Every item below is the short form of something in
 `CONTRIBUTING.md`. Read the referenced section before acting on
 anything non-trivial — this summary is a prompt, not a spec.
 
-- **JST is authoritative.** Every human-facing wall-clock
+- **[Soft] JST is authoritative.** Every human-facing wall-clock
   reading defaults to JST (Asia/Tokyo, UTC+09:00). Wire-format
   fields stay in spec-mandated zones, formatted to JST for
   display. `chrono_tz::Asia::Tokyo` in Rust; `TZ=Asia/Tokyo`
   or `calendar-jp` in shell.
   ([§JST](CONTRIBUTING.md#jst-is-this-workspaces-authoritative-timezone))
-- **Ground yourself in JST time — mechanically, not by judgment.**
+- **[Soft] Ground yourself in JST time — mechanically, not by judgment.**
   Run `./scripts/xtask.sh calendar-jp` (5-week grid, weekend /
   holiday markers, current JST timestamp) *before your next
   reply* after each of: session start; `commit-all.sh` /
@@ -191,15 +216,15 @@ anything non-trivial — this summary is a prompt, not a spec.
   regular hours; proceeding.)"*) — log artefact, not a
   permission request. Never stall on the clock.
   ([§work-rhythm](CONTRIBUTING.md#work-rhythm-and-out-of-hours-commentary))
-- **All Git state changes via `scripts/*.sh`.** Never raw `git
+- **[Hard] All Git state changes via `scripts/*.sh`.** Never raw `git
   commit` / `git push` / `git add`. Every commit is `-s` +
   `-S` + `Audit-Info:` trailer (hooks enforce).
   ([§4](CONTRIBUTING.md#4-git-workflow))
-- **Commit messages: subject ≤ 72, blank line, body wrapped
+- **[Hard] Commit messages: subject ≤ 72, blank line, body wrapped
   at ≈ 72 cols.** Imperative subject; body covers per-file
   scope / rationale / residual risks. Hard-wrap the body by
   hand. ([§4.10](CONTRIBUTING.md#410-commit-message-format))
-- **ALWAYS pass commit messages via `--message-file -` +
+- **[Soft] ALWAYS pass commit messages via `--message-file -` +
   single-quoted heredoc**, even for one-line commits:
   ```sh
   ./scripts/commit-all.sh --message-file - <<'EOF'
@@ -218,19 +243,36 @@ anything non-trivial — this summary is a prompt, not a spec.
   note. (Incident: `a5833d5` lost ≈ 8 backticked tokens to the
   double-quoted-string form.)
   ([§4.10](CONTRIBUTING.md#410-commit-message-format))
-- **Git history is append-only.** No amend, no rebase, no
+- **[Hard] Git history is append-only.** No amend, no rebase, no
   reset, no force-push, no `git revert`. Two narrow
   script-enforced exceptions: `post-commit` unsigned-rollback
   and `pull-all.sh --rebase`. Mistakes ship as fix-forward
   commits. ([§4.4](CONTRIBUTING.md#44-no-history-modification))
-- **Push early, push often.** After each discrete unit of work:
+- **[Hard] Read `HUMANS.md` before every commit.** Yuka's
+  note-to-self may have grown pending guidance — a new
+  workflow rule, a pause on something you were about to do,
+  a question for you to surface. Re-read the file before
+  invoking `commit-all.sh`; new content there can change
+  whether the commit should land at all, what its message
+  should say, or whether you need to revert work-in-progress
+  first. Codex never commits, so this rule is Claude-only.
+- **[Soft] Doc-first: don't paper over code/doc contradictions.**
+  When code contradicts the docs, consider correcting the
+  *code* before rushing to "fix" the *docs*. Surface the
+  question to Yuka (e.g., via `AskUserQuestion` or a
+  notes-to-humans entry) before either side is silently
+  changed. Adding *new* features to the docs is fine — this
+  rule is specifically about handling pre-existing
+  contradictions. Pairs with the posture's *structural
+  correctness over surface fixes* umbrella.
+- **[Soft] Push early, push often.** After each discrete unit of work:
   `commit-all.sh`, then `push-all.sh`, then next unit. Don't
   batch unrelated topics; don't queue local pushes; don't save
   for end-of-session. Narrow exceptions: sequences whose
   intermediate states wouldn't pass pre-landing (land as one
   commit); edits the user is actively iterating on (wait for
   closure). ([§4.4](CONTRIBUTING.md#44-no-history-modification))
-- **Always use `scripts/*.sh` wrappers for cargo.** The wrappers
+- **[Soft] Always use `scripts/*.sh` wrappers for cargo.** The wrappers
   set `CARGO_TARGET_DIR=target-main` so CLI/Codex builds don't
   fight `rust-analyzer`'s `target/` for the lock. `xtask.sh`
   uses `target-xtask/`; `publish-crate.sh` uses
@@ -238,7 +280,7 @@ anything non-trivial — this summary is a prompt, not a spec.
   `cargo metadata`) are fine raw; everything else must set
   `CARGO_TARGET_DIR` if you must bypass the wrapper.
   ([§5](CONTRIBUTING.md#5-script-wrappers-over-raw-cargo))
-- **Run `./scripts/pre-landing.sh` before every Rust-touching
+- **[Hard, any green run satisfies] Run `./scripts/pre-landing.sh` before every Rust-touching
   commit.** cargo-deny bans + fmt + check + clippy
   (`-D warnings`) + rustdoc + test, auto-detects modified
   crates. **Lint phase auto-applies fmt + clippy autofixes
@@ -257,26 +299,26 @@ anything non-trivial — this summary is a prompt, not a spec.
   ([§11](CONTRIBUTING.md#11-pre-landing-checks) /
   [§11.0.0](CONTRIBUTING.md#1100-pre-landing-green-is-the-banned-dep-guarantee) /
   [§11.0.2](CONTRIBUTING.md#1102-autofix-on-default---dry-run-opts-out))
-- **Claude runs `publish-crate.sh` on Yuka's signal.**
+- **[Soft] Claude runs `publish-crate.sh` on Yuka's signal.**
   Publishing is Claude's job — the publish-and-owner-read
   token is on this machine for that reason. Flow: Yuka reviews
   the commit (version bump + CHANGELOG + cascade), signals
   "ready", Claude runs `./scripts/publish-crate.sh <crate>` in
   dep-order. A release-ready commit on `main` is not a signal
   by itself. ([§12.5](CONTRIBUTING.md#125-publish-checklist))
-- **Pre-landing.sh before every publish is non-negotiable.**
+- **[Hard] Pre-landing.sh before every publish is non-negotiable.**
   `cargo publish --dry-run` only verifies the tarball against
   *currently-published* deps; it misses workspace-internal dep
   mismatches being staged in the same cascade. Skipping has
   forced a yank (mechanics 0.5.2 → 0.5.3, 2026-05-14).
   ([§12.5](CONTRIBUTING.md#125-publish-checklist))
-- **Yanks aren't Claude's job.** The token here is
+- **[Hard] Yanks aren't Claude's job.** The token here is
   publish-and-owner-read scoped; `cargo yank` returns 403.
   Fix forward with a new patch + dep-floor bump on consumers,
   ask Yuka to yank from her separate token / web UI. Don't
   work around the 403.
   ([§12.5](CONTRIBUTING.md#125-publish-checklist))
-- **Don't re-run a Rust-build-heavy script after losing
+- **[Soft] Don't re-run a Rust-build-heavy script after losing
   context — re-read its captured output.** Every Bash
   invocation and `run_in_background` task writes full
   stdout+stderr to `/tmp/claude-*/.../tasks/<id>.output`. The
@@ -289,14 +331,14 @@ anything non-trivial — this summary is a prompt, not a spec.
   bundling via inline-blob + tract). Light scripts
   (`webui-build.sh`, `cargo-audit.sh`, per-crate `cargo check
   -p <one>`) are fine to re-run.
-- **Never pipe a Rust-build-heavy script through `head` /
+- **[Soft] Never pipe a Rust-build-heavy script through `head` /
   `tail`** — truncation happens before the Bash capture file
   is written, so the trimmed lines are gone and the next
   question forces a re-run. Redirect to a file or let Bash
   capture everything, then `grep` / `Read` with offsets.
   Cheap commands (`status.sh`, `heads.sh`, `git log`, single
   `cargo tree`, `webui-build.sh` tail) are fine through head/tail.
-- **Run `./scripts/miri-test.sh` on the crypto crate set at
+- **[Soft] Run `./scripts/miri-test.sh` on the crypto crate set at
   every checkpoint** — before publishing crypto-touching
   crates, after a phase / sub-phase with crypto changes,
   weekly during active development, before milestones.
@@ -306,26 +348,26 @@ anything non-trivial — this summary is a prompt, not a spec.
   `philharmonic-connector-common`, `philharmonic-types`. Track
   the last run; flag missed checkpoints.
   ([§10.11](CONTRIBUTING.md#1011-miri))
-- **Track doc/code volume.** Run `./scripts/check-md-bloat.sh`
+- **[Soft] Track doc/code volume.** Run `./scripts/check-md-bloat.sh`
   and `./scripts/tokei.sh` after sub-phases, doc
   reconciliations, or volume-heavy sessions. Hygiene check, not
   a gate.
-- **Never recall a crate version from memory.** Use
+- **[Hard] Never recall a crate version from memory.** Use
   `./scripts/xtask.sh crates-io-versions -- <crate>` for
   published versions, `./scripts/crate-version.sh` for local.
   ([§5.1](CONTRIBUTING.md#51-crate-version-lookup))
-- **No panics in library `src/`.** No `.unwrap()` / `.expect()`
+- **[Hard] No panics in library `src/`.** No `.unwrap()` / `.expect()`
   on `Result`/`Option`, no `panic!` / `unreachable!` / `todo!`
   / `unimplemented!` on reachable paths, no unbounded indexing,
   no unchecked arithmetic, no lossy `as` on untrusted widths.
   Narrow exceptions need an inline justification. Tests /
   dev-deps / `xtask/` bins exempt.
   ([§10.3](CONTRIBUTING.md#103-panics-and-undefined-behavior))
-- **Library crates take bytes, not file paths.** File I/O,
+- **[Hard] Library crates take bytes, not file paths.** File I/O,
   env-var lookup, config-file parsing belong in the bin.
   Crypto-adjacent especially.
   ([§10.4](CONTRIBUTING.md#104-library-crate-boundaries))
-- **HTTP client split.** Runtime crates use
+- **[Hard] HTTP client split.** Runtime crates use
   **`mechanics-http-client`** (hyper-rustls + webpki-roots +
   aws-lc-rs; opt-in HTTP/3 via `http3`). **`reqwest` is
   banned** via `deny.toml`; extend mhc rather than reaching
@@ -335,11 +377,11 @@ anything non-trivial — this summary is a prompt, not a spec.
   outbound-client abstraction layer only. rustls everywhere;
   no native-tls, no OpenSSL.
   ([§10.9](CONTRIBUTING.md#109-http-client-runtime-stack-vs-tooling-stack))
-- **Shell scripts are POSIX sh** (`#!/bin/sh`), not bash.
+- **[Hard] Shell scripts are POSIX sh** (`#!/bin/sh`), not bash.
   Invoke by path (`./scripts/foo.sh`). Validate with
   `./scripts/test-scripts.sh` after any change.
   ([§6](CONTRIBUTING.md#6-shell-script-rules-posix-sh))
-- **No `python` / `perl` / `ruby` / `node` / `jq` / `curl` /
+- **[Soft] No `python` / `perl` / `ruby` / `node` / `jq` / `curl` /
   `wget` in workspace tooling.** Shell for orchestration; Rust
   bins under `xtask/` otherwise. Use `./scripts/mktemp.sh` and
   `./scripts/web-fetch.sh`. One narrow exception:
@@ -347,26 +389,26 @@ anything non-trivial — this summary is a prompt, not a spec.
   generate committed WebUI artefacts.
   ([§7](CONTRIBUTING.md#7-external-tool-wrappers) /
   [§8](CONTRIBUTING.md#8-in-tree-workspace-tooling-xtask))
-- **Every stable UUID via `./scripts/xtask.sh gen-uuid --
+- **[Hard] Every stable UUID via `./scripts/xtask.sh gen-uuid --
   --v4`.** Not `uuidgen`, not online, not Python.
   ([§9](CONTRIBUTING.md#9-kind-uuid-generation))
-- **Notes to humans.** Substantial things you tell Yuka also
+- **[Hard] Notes to humans.** Substantial things you tell Yuka also
   go in `docs/notes-to-humans/YYYY-MM-DD-NNNN-<slug>.md`,
   committed via `./scripts/commit-all.sh --parent-only`.
   ([§15.1](CONTRIBUTING.md#151-notes-to-humans))
-- **Project status reports at milestones.** At inflection
+- **[Soft] Project status reports at milestones.** At inflection
   points (phase landed, refactor done, before a long break,
   user request): `./scripts/project-status.sh` → writes to
   `docs/project-status-reports/`; read it (model can
   hallucinate), add a `docs/SUMMARY.md` entry, commit
   parent-only. Not after every commit.
   ([§15.4](CONTRIBUTING.md#154-project-status-reports))
-- **Japanese executive summary at milestones.** Same triggers
+- **[Soft] Japanese executive summary at milestones.** Same triggers
   as above — invoke the `docs-jp` skill to update
   `docs-jp/YYYY-MM-DD-開発サマリー.md`. Claude's task, not
   Codex's. Read `docs-jp/README.md` every time (authoritative
   spec).
-- **Archive every Codex prompt** *before* spawning — write to
+- **[Soft] Archive every Codex prompt** *before* spawning — write to
   `docs/codex-prompts/YYYY-MM-DD-NNNN-<slug>.md` and commit.
   See the [`codex-prompt-archive`](.claude/skills/codex-prompt-archive/SKILL.md)
   skill. ([§15.2](CONTRIBUTING.md#152-codex-prompt-archive))
@@ -374,7 +416,7 @@ anything non-trivial — this summary is a prompt, not a spec.
   technically accurate, FSF-preferred for free-software
   framing. Literal external identifiers (HTTP `Authorization`,
   `Win32`, `x86_64-pc-windows-msvc`) stay as they ship.
-- **Prose is English by default.** Commit messages, code
+- **[Soft] Prose is English by default.** Commit messages, code
   comments, docs, notes-to-humans, PR/review text. Multilingual
   contributors' grammar/typo issues are fixed best-effort in
   review, never grounds to reject. Non-English text is

@@ -61,6 +61,15 @@ libraries**
 / [§10.14](CONTRIBUTING.md#1014-unpublished-bin-crates-minimal-cli-logic-in-libraries)).
 Umbrella: [§10.0](CONTRIBUTING.md#100-posture-maintainability-over-fast-coding).
 
+**Doc-first: don't paper over code/doc contradictions.** When
+code contradicts the docs, consider correcting the *code*
+before rushing to "fix" the *docs*. Surface the question in
+your codex-report rather than silently changing either side.
+Adding *new* features to the docs is fine — this rule is
+specifically about handling pre-existing contradictions. Pairs
+with the *structural correctness over surface fixes* directive
+above.
+
 ## Hard stops
 
 ### POSIX-ish host required
@@ -97,6 +106,63 @@ needed, say so in your final message rather than substituting
 local equivalents as production evidence. Canonical example:
 2026-05-18 mhc TCP-pool poisoning fix (no `lo` packets after
 one soft-failed step — production, not the sandbox).
+
+## Hard rules vs. soft rules
+
+Source: [`HUMANS.md`](HUMANS.md) §"Hard rules and soft rules"
+plus per-rule classifications recorded with Yuka on 2026-05-20.
+Full rule text lives in the topical sections below; this is a
+classification index for the rules **you (Codex) see and act
+on**. Claude-only rules (commit / push / publish / Claude-side
+authorship norms) are not included.
+
+- **[Hard]** — cannot be overridden by any prompt. Refuse and
+  surface the mismatch in your codex-report.
+- **[Soft]** — can be overridden by an explicit prompt from
+  Yuka or Claude, but the override must be **surfaced** in
+  your codex-report so it's auditable.
+
+**Hard:**
+
+- Codex no-commit / non-read Git (§Git below)
+- Git history append-only (§Git)
+- No raw Git writes outside wrappers (§Git, §"Use the script wrappers")
+- `docs/codex-reports/` is your write space (§Reports)
+- Pre-landing green required on your output — any agent's
+  green run (yours / Claude's / Yuka's) satisfies the rule
+- Commit-message-format constraints on the message you propose
+  in your codex-report (subject ≤ 72, body ≈ 72 cols)
+- Crypto two-gate review (§Hard stops § "Crypto-sensitive paths")
+- POSIX-ish host required (§Hard stops § "POSIX-ish host")
+- No panics in library `src/` (§Rust conventions)
+- Library crates take bytes, not paths (§Rust conventions)
+- HTTP stack split — reqwest banned (§Rust conventions)
+- POSIX sh shells (§Shell scripts)
+- UUIDs via `xtask gen-uuid`
+- No version recall from memory
+- Working-directory discipline — no absolute repo paths
+- No workspace knowledge in machine-local memory
+  (§Workspace conventions)
+- `HUMANS.md` is read-only for agents (§`HUMANS.md` — do not
+  touch)
+
+**Soft** (overrides must be surfaced in your codex-report):
+
+- Claude/Codex split of labour (§Your role)
+- No raw Cargo, no read-only raw Git outside wrappers
+  (§"Use the script wrappers")
+- No `python` / `perl` / `ruby` / `node` / `jq` / `curl` /
+  `wget` in workspace tooling (one narrow exception:
+  `webui-build.sh` uses Node via `npx webpack`)
+- Doc-first: when code contradicts docs, surface before
+  changing either side — adding new features to docs is fine
+- Don't re-run a Rust-build-heavy script after losing
+  context; re-read its captured output
+- Never pipe a Rust-build-heavy script through `head` / `tail`
+- Miri at every checkpoint on the crypto crate set
+  (`philharmonic-policy`,
+  `philharmonic-connector-{client,service,common}`,
+  `philharmonic-types`) when the prompt touches it
 
 ## Your role
 

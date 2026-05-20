@@ -72,17 +72,44 @@ Re-read the docs/codex of everything related, and re-write
 workflow authoring guides in en/jp to reflect the facts
 on any surface changes.
 
-### Clarify http_forward docs
+## Doc-first rule
 
-Nested `.body` required.
+A new rule to add to AGENTS.md / CLAUDE.md:
 
-```
-await endpoint("my_http", {
-  body: {
-    body: {
-      ...
-    },
-    ...
-  },
-})
-```
+> When the code contradicts the docs, please consider
+> correcting the code before rushing into 'fix'ing the
+> docs. Surface any questions before going on. Adding
+> new features to the docs is fine.
+
+## Read HUMANS.md before committing
+
+Codex never commits to Git. This rule is for Claude Code.
+
+Claude Code must read the contents of HUMANS.md before
+committing its changes.
+
+## Hard rules and soft rules
+
+Hard rules cannot be broken at any circumstances. When prompted
+to break soft rules, surface the violation and confirm it with
+the caller.
+
+**Hard rules** (contradicting prompts cannot override them):
+
+- Codex MUST NOT commit to Git or do any other non-read Git
+  operations.
+- Git history is append only. Yuka's manual action **before push**
+  is the only exception. Claude Code MUST NOT do that.
+- Reports at codex-reports are reserved for Codex. Claude Code
+  must not create documents there.
+- No raw Git write operations bypassing the wrapper scripts. Yuka's
+  manual action documented above is the only exception.
+
+**Soft rules** (prompts can override, but violations surfaced):
+
+- Split of labor between Codex and Claude Code.
+- notes-to-humans reports are normally written by Claude Code.
+- no raw Cargo, no read-only raw Git. Should invent scripts instead
+  of ad-hoc command invocations.
+
+Rules given here are not comprehensive. Other documented rules exist.
