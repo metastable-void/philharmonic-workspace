@@ -561,7 +561,13 @@ If you skip the report, say so in the session summary.
 
 ## Outcome
 
-Pending — will be updated after the Codex run.
+Round 01 died without producing any code. The codex-rescue
+dispatch returned but the Codex runtime did not perform any
+edits — working tree stayed clean across all submodules and
+parent post-dispatch. No diagnosable cause from this side
+(no `task_complete` event in the rollout). Re-dispatched as
+round 02; see
+[`2026-05-20-0001-entity-list-sort-modified-opt-in-02.md`](2026-05-20-0001-entity-list-sort-modified-opt-in-02.md).
 
 ---
 
