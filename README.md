@@ -64,6 +64,7 @@ philharmonic-workspace/
 ├── philharmonic-api/                          # submodule
 ├── philharmonic/                              # submodule
 ├── inline-blob/                               # submodule
+├── philharmonic-virt-detect/                  # in-tree runtime crate
 ├── bins/                                      # in-tree bin crates
 │   ├── mechanics-worker/                      #   JS executor server
 │   ├── philharmonic-connector/                #   per-realm connector service
@@ -132,13 +133,22 @@ workspace's TLS posture. Maintained via the
 hand-written `Cargo.toml` is preserved across re-vendor;
 `src/` is overwritten from upstream tarballs.
 
-**In-tree runtime crate (publishable, not a submodule):**
-`mechanics-dns` — reusable DNS resolver layer shared by
-`mechanics-http-client` and the `philharmonic-connector-impl-dns`
-connector. It centralises the Cloudflare fallback resolver set
-used only when `/etc/resolv.conf` is absent, and exposes IN-class
-HTTPS RR, A, AAAA, generic DNS query, combined IP, and socket-
-address lookup helpers.
+**In-tree runtime crates (publishable, not submodules):**
+
+- `mechanics-dns` — reusable DNS resolver layer shared by
+  `mechanics-http-client` and the
+  `philharmonic-connector-impl-dns` connector. It centralises
+  the Cloudflare fallback resolver set used only when
+  `/etc/resolv.conf` is absent, and exposes IN-class HTTPS RR,
+  A, AAAA, generic DNS query, combined IP, and socket-address
+  lookup helpers.
+- `philharmonic-virt-detect` — portable
+  `systemd-detect-virt(1)`-style virtualization / container
+  probe. Single never-failing public function
+  (`detect_virtualization()` → `"kvm"` / `"docker"` / `"wsl"`
+  / … / `"none"`). Shared between the `xtask` CLI and the
+  API server's `/v1/_meta/version` payload (rendered on the
+  WebUI Dashboard).
 
 **In-tree workspace tooling (not published, not a submodule):**
 `xtask` — multi-bin crate for dev tools written in Rust. Bins are

@@ -251,6 +251,15 @@ hang waiting for keystrokes — pass `--no-pager` (e.g. `git
 --no-pager diff`) or pipe through `cat`. Prefer the workspace
 `scripts/*.sh` wrappers; they already handle this.
 
+**ANSI colour is stripped automatically.** `rexec` removes
+ANSI escape sequences from the inner command's stdout / stderr
+before handing the text back, so workspace scripts that
+colourise output (e.g. `heads.sh`, `status.sh`, `log.sh`)
+render as plain text in your transcript. No need to pass
+`--no-color`; what you see is the cleaned stream. Colour
+escapes survive only when the inner command writes to a file
+you then read, since that bypasses rexec's filter.
+
 ## Git (what you must not do)
 
 Read-only git is fine (`log`, `diff`, `show`, `blame`,

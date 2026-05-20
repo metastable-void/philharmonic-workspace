@@ -153,6 +153,17 @@ when stdout is a TTY (`git diff`, `git log`, `git show`,
 `cat`. Prefer the workspace `scripts/*.sh` wrappers; they
 already handle this.
 
+**ANSI colour is stripped automatically.** `rexec` removes
+ANSI escape sequences from the inner command's stdout / stderr
+before handing the text back to the agent — so `heads.sh`,
+`status.sh`, `log.sh`, and any other workspace script that
+colourises output renders as plain text in the agent
+transcript. No need to pass `--no-color` (though it remains
+safe to do so), and no need to post-process; what you see is
+the cleaned stream. Colour escapes survive only when the inner
+command writes to a file the agent then `Read`s, since that
+bypasses rexec's filter.
+
 ## Claude vs. Codex division of labour
 
 - **Claude does:** architecture, API shape, design docs, ROADMAP
