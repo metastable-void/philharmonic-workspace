@@ -1,9 +1,10 @@
 # Philharmonic Workspace — Claude Code briefing
 
-Personal development project for generic workflow orchestration
-infrastructure. Rust crate family — most member crates are git
-submodules, with an in-tree `xtask/` crate for workspace dev
-tooling (never published). Developer: Yuka MORI.
+Generic workflow orchestration infrastructure — a company
+project with Yuka MORI as the sole developer. Rust crate
+family; most member crates are git submodules, with an
+in-tree `xtask/` crate for workspace dev tooling (never
+published).
 
 ## Keep this file concise
 

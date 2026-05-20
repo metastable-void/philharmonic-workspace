@@ -261,7 +261,8 @@ files under each submodule.
 
 ---
 
-**Funding note**: The maintainer of this project (Yuka MORI,
-`metastable-void` on GitHub) is paid for the work inside it by a
-company, which is not Menhera.org. **This is not a Menhera.org
-project.**
+**Ownership and funding**: This is a company project (the
+owning company is not named publicly). Yuka MORI
+(`metastable-void` on GitHub) is the sole developer and is
+paid for the work by the owning company. **This is not a
+Menhera.org project.**

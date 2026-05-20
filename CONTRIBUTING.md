@@ -3682,7 +3682,7 @@ top-level doc requires justification and must be added to this
 authoritative map. `HUMANS.md` and `docs/POSIX_CHECKLIST.md` are
 the two existing standalone docs that have their own roles and
 aren't covered by the six homes above — `HUMANS.md` is the
-human developer's personal note-to-self (agent-readable but
+human developer's note-to-self (agent-readable but
 agent-writable-forbidden; see §17.4), and
 `docs/POSIX_CHECKLIST.md` is an external-reference checklist of
 non-POSIX constructs to avoid in shell code (§6 references it).

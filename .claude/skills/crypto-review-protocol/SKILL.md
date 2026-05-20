@@ -1,12 +1,12 @@
 ---
 name: crypto-review-protocol
-description: Use whenever work touches a crypto-sensitive path in this workspace — SCK encrypt/decrypt, COSE_Sign1 signing/verification, COSE_Encrypt0 encryption/decryption, the ML-KEM-768 + X25519 + HKDF + AES-256-GCM hybrid construction, payload-hash binding, or `pht_` API token generation. These paths require Yuka's personal review at BOTH the approach-design stage (before any code is written) and the code-review stage (before any publish). Neither gate is waivable. Trigger on intent ("implement SCK", "add the COSE_Sign1 token", "mint a pht_ token") — don't wait to be told it's crypto.
+description: Use whenever work touches a crypto-sensitive path in this workspace — SCK encrypt/decrypt, COSE_Sign1 signing/verification, COSE_Encrypt0 encryption/decryption, the ML-KEM-768 + X25519 + HKDF + AES-256-GCM hybrid construction, payload-hash binding, or `pht_` API token generation. These paths require Yuka's review at BOTH the approach-design stage (before any code is written) and the code-review stage (before any publish). Neither gate is waivable. Trigger on intent ("implement SCK", "add the COSE_Sign1 token", "mint a pht_ token") — don't wait to be told it's crypto.
 ---
 
 # Crypto review protocol
 
 Philharmonic's security rests on a small number of cryptographic
-constructions. Yuka reviews them personally. Not because Claude (or
+constructions. Yuka reviews them herself. Not because Claude (or
 Codex) can't write the code, but because crypto bugs are almost
 never caught by tests that aren't *specifically* designed for
 correctness-vs-a-reference, and the pre-approval gate is the

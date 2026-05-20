@@ -748,7 +748,7 @@ Approaches A and B both touch crypto-bound semantics:
   semantics.
 
 Per `CLAUDE.md` and `crypto-review-protocol`, this is on
-Yuka's personal review path. The Gate 1 proposal must state:
+Yuka's review path. The Gate 1 proposal must state:
 which approach (A or B), what `inst`/`step` mean for ephemeral
 jobs, whether a discriminator is added to distinguish ephemeral
 vs step tokens, and how connector-service verification handles
