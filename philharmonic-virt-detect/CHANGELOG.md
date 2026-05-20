@@ -10,9 +10,7 @@ this crate adheres to
 ## [Unreleased]
 
 ### Added
-- Initial crate scaffold with a stub `detect_virtualization()`
-  public function returning `"none"`. The never-fail contract
-  is fixed at the API surface; substantive probe logic is
-  being moved over from the in-tree
-  `xtask/src/bin/detect-virt.rs` xtask binary in a follow-up
-  round.
+- Moved the substantive `detect-virt` probe into this crate.
+  `detect_virtualization()` now catches panics and I/O failures
+  at the crate boundary and returns `"none"` for every failure
+  path.

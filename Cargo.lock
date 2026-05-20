@@ -3844,6 +3844,7 @@ dependencies = [
  "philharmonic-store",
  "philharmonic-store-sqlx-mysql",
  "philharmonic-types",
+ "philharmonic-virt-detect",
  "philharmonic-workflow",
  "rand_core 0.6.4",
  "serde",
@@ -4193,6 +4194,9 @@ dependencies = [
 [[package]]
 name = "philharmonic-virt-detect"
 version = "0.1.0"
+dependencies = [
+ "raw-cpuid",
+]
 
 [[package]]
 name = "philharmonic-workflow"
@@ -7225,8 +7229,8 @@ dependencies = [
  "chrono-tz 0.10.4",
  "clap",
  "flate2",
+ "philharmonic-virt-detect",
  "poloto",
- "raw-cpuid",
  "rustls",
  "serde",
  "serde_json",

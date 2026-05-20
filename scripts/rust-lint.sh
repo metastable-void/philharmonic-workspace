@@ -15,6 +15,13 @@
 #   ./scripts/rust-lint.sh --phase <p>   # run only one phase
 #                                        # p ∈ {fmt, check, clippy, doc}
 #                                        # default: all four phases
+#   ./scripts/rust-lint.sh --target <triple>
+#                                        # cross-compile via cargo check
+#                                        # / clippy / doc. fmt has no
+#                                        # --target and is skipped under
+#                                        # this flag's effects. Requires
+#                                        # `rustup target add <triple>`
+#                                        # for the target's stdlib.
 #
 # Runs in order (the "lint quartet" — gate by `--phase` if you
 # only want one):
@@ -90,6 +97,7 @@ xtask_only=0
 fix_mode=0
 quiet=0
 phase=all
+target=
 crate=
 
 while [ $# -gt 0 ]; do
@@ -109,11 +117,18 @@ while [ $# -gt 0 ]; do
                     echo "--phase value must be one of: fmt, check, clippy, doc, all" >&2
                     exit 2 ;;
             esac ;;
+        --target)
+            shift
+            if [ -z "${1:-}" ]; then
+                echo "--target requires a Rust target triple (e.g. x86_64-unknown-freebsd)" >&2
+                exit 2
+            fi
+            target=$1; shift ;;
         --)      shift; break ;;
         -*) echo "unknown flag: $1" >&2; exit 2 ;;
         *)
             if [ -n "$crate" ]; then
-                echo "Usage: $0 [--xtask | <crate-name>] [--fix] [--phase <name>] [--quiet]" >&2
+                echo "Usage: $0 [--xtask | <crate-name>] [--fix] [--phase <name>] [--quiet] [--target <triple>]" >&2
                 exit 2
             fi
             crate=$1
@@ -130,6 +145,17 @@ done
 quiet_arg=
 if [ "$quiet" -eq 1 ]; then
     quiet_arg=--quiet
+fi
+
+# `--target <triple>` cross-compiles via cargo check / clippy /
+# doc. fmt has no `--target` (it's source-level) and is skipped.
+# Use this for cfg-gated platforms — e.g. surfacing dead-code
+# warnings on `x86_64-unknown-freebsd` when most probes are
+# `cfg(target_os = "linux")`-gated. Requires the target's
+# stdlib to be installed via `rustup target add <triple>`.
+target_arg=
+if [ -n "$target" ]; then
+    target_arg="--target $target"
 fi
 
 if [ "$xtask_only" -eq 1 ] && [ -n "$crate" ]; then
@@ -185,18 +211,18 @@ if [ "$xtask_only" -eq 1 ] || [ "$crate" = "xtask" ]; then
     if phase_runs check; then
         printf '%s--- cargo check -p xtask ---%s\n' "$C_DIM" "$C_RESET"
         # shellcheck disable=SC2086
-        run_with_cargo_noise_filter cargo check $quiet_arg -p "$crate"
+        run_with_cargo_noise_filter cargo check $quiet_arg $target_arg -p "$crate"
     fi
     if phase_runs clippy; then
         printf '%s--- cargo clippy %s-p xtask --all-targets -- -D warnings ---%s\n' \
             "$C_DIM" "${clippy_fix_args:+$clippy_fix_args }" "$C_RESET"
         # shellcheck disable=SC2086
-        run_with_cargo_noise_filter cargo clippy $quiet_arg $clippy_fix_args -p "$crate" --all-targets -- -D warnings
+        run_with_cargo_noise_filter cargo clippy $quiet_arg $target_arg $clippy_fix_args -p "$crate" --all-targets -- -D warnings
     fi
     if phase_runs doc; then
         printf '%s--- cargo doc -p xtask (missing_docs) ---%s\n' "$C_DIM" "$C_RESET"
         # shellcheck disable=SC2086
-        RUSTDOCFLAGS="-D missing_docs" run_with_cargo_noise_filter cargo doc $quiet_arg --no-deps -p "$crate"
+        RUSTDOCFLAGS="-D missing_docs" run_with_cargo_noise_filter cargo doc $quiet_arg $target_arg --no-deps -p "$crate"
     fi
 elif [ -n "$crate" ]; then
     printf '%s=== rust-lint scope: crate %s%s phase=%s ===%s\n' \
@@ -209,18 +235,18 @@ elif [ -n "$crate" ]; then
     if phase_runs check; then
         printf '%s--- cargo check -p %s ---%s\n' "$C_DIM" "$crate" "$C_RESET"
         # shellcheck disable=SC2086
-        run_with_cargo_noise_filter cargo check $quiet_arg -p "$crate"
+        run_with_cargo_noise_filter cargo check $quiet_arg $target_arg -p "$crate"
     fi
     if phase_runs clippy; then
         printf '%s--- cargo clippy %s-p %s --all-targets -- -D warnings ---%s\n' \
             "$C_DIM" "${clippy_fix_args:+$clippy_fix_args }" "$crate" "$C_RESET"
         # shellcheck disable=SC2086
-        run_with_cargo_noise_filter cargo clippy $quiet_arg $clippy_fix_args -p "$crate" --all-targets -- -D warnings
+        run_with_cargo_noise_filter cargo clippy $quiet_arg $target_arg $clippy_fix_args -p "$crate" --all-targets -- -D warnings
     fi
     if phase_runs doc; then
         printf '%s--- cargo doc -p %s (missing_docs) ---%s\n' "$C_DIM" "$crate" "$C_RESET"
         # shellcheck disable=SC2086
-        RUSTDOCFLAGS="-D missing_docs" run_with_cargo_noise_filter cargo doc $quiet_arg --no-deps -p "$crate"
+        RUSTDOCFLAGS="-D missing_docs" run_with_cargo_noise_filter cargo doc $quiet_arg $target_arg --no-deps -p "$crate"
     fi
 else
     # Workspace mode — exclude xtask. fmt has no `--exclude` flag,
@@ -251,18 +277,18 @@ else
     if phase_runs check; then
         printf '%s--- cargo check --workspace --exclude xtask ---%s\n' "$C_DIM" "$C_RESET"
         # shellcheck disable=SC2086
-        run_with_cargo_noise_filter cargo check $quiet_arg --workspace --exclude xtask
+        run_with_cargo_noise_filter cargo check $quiet_arg $target_arg --workspace --exclude xtask
     fi
     if phase_runs clippy; then
         printf '%s--- cargo clippy %s--workspace --exclude xtask --all-targets -- -D warnings ---%s\n' \
             "$C_DIM" "${clippy_fix_args:+$clippy_fix_args }" "$C_RESET"
         # shellcheck disable=SC2086
-        run_with_cargo_noise_filter cargo clippy $quiet_arg $clippy_fix_args --workspace --exclude xtask --all-targets -- -D warnings
+        run_with_cargo_noise_filter cargo clippy $quiet_arg $target_arg $clippy_fix_args --workspace --exclude xtask --all-targets -- -D warnings
     fi
     if phase_runs doc; then
         printf '%s--- cargo doc --workspace --exclude xtask (missing_docs) ---%s\n' "$C_DIM" "$C_RESET"
         # shellcheck disable=SC2086
-        RUSTDOCFLAGS="-D missing_docs" run_with_cargo_noise_filter cargo doc $quiet_arg --no-deps --workspace --exclude xtask
+        RUSTDOCFLAGS="-D missing_docs" run_with_cargo_noise_filter cargo doc $quiet_arg $target_arg --no-deps --workspace --exclude xtask
     fi
 fi
 

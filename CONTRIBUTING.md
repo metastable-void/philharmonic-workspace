@@ -1018,7 +1018,7 @@ The inventory:
 | Wrapper | Wraps | Notes |
 |---|---|---|
 | `./scripts/pre-landing.sh [<crate>...] [--no-ignored] [--dry-run] [-v\|--verbose]` | `cargo deny check bans` + `cargo fmt` + `cargo check` + `cargo clippy --fix --allow-dirty --allow-staged --all-targets -- -D warnings` + `cargo test --workspace` + `cargo test --ignored -p <crate>` per modified crate | The canonical pre-commit flow. Auto-detects modified crates via `show-dirty.sh`. Default lint step is fix mode (autofixes fmt + clippy in place against a dirty tree, see §11.0.2); pass `--dry-run` for legacy check-only behaviour. Default `cargo-deny` invocation hides the inclusion graph for less noise; pass `-v` / `--verbose` to print it. CI runs the same script. See §11. |
-| `./scripts/rust-lint.sh [<crate>] [--fix] [--phase <p>] [--quiet]` | `cargo fmt [--check]` + `cargo check` + `cargo clippy --all-targets -- -D warnings` + `cargo doc --no-deps` (rustdoc with `RUSTDOCFLAGS=-D missing_docs`) | Workspace (no arg) or per-crate. `--phase fmt\|check\|clippy\|doc` runs one of the four phases instead of all. `--quiet` propagates `--quiet` to cargo check/clippy/doc (suppresses "Compiling X v0.1.0" chatter; errors still surface). |
+| `./scripts/rust-lint.sh [<crate>] [--fix] [--phase <p>] [--quiet] [--target <triple>]` | `cargo fmt [--check]` + `cargo check` + `cargo clippy --all-targets -- -D warnings` + `cargo doc --no-deps` (rustdoc with `RUSTDOCFLAGS=-D missing_docs`) | Workspace (no arg) or per-crate. `--phase fmt\|check\|clippy\|doc` runs one of the four phases instead of all. `--quiet` propagates `--quiet` to cargo check/clippy/doc (suppresses "Compiling X v0.1.0" chatter; errors still surface). `--target <triple>` cross-compiles via cargo check / clippy / doc (fmt is source-level and skipped); requires `rustup target add <triple>` first. Useful for surfacing cfg-gated dead-code warnings on alternate platforms (e.g. `x86_64-unknown-freebsd` when most probe paths are `cfg(target_os = "linux")`-gated). |
 | `./scripts/rust-test.sh [--include-ignored\|--ignored] [<crate>] [--filter <pat>] [--features <list>] [--no-default-features\|--all-features] [--release] [--quiet]` | `cargo test` with ignored-test control, name filter, feature selection, and release-mode toggle | `--ignored` runs *only* `#[ignore]`-gated; `--include-ignored` runs everything. `--filter <pat>` is cargo's positional substring test-name filter. `--features` / `--no-default-features` require a positional crate or `--xtask`. |
 | `./scripts/miri-test.sh --workspace \| <crate>...` | `cargo +nightly miri test` | Slow; not in `pre-landing.sh`. See §10.7. |
 | `./scripts/cargo-audit.sh [...]` | `cargo audit` | Auto-installs `cargo-audit` on first run. |
@@ -2589,6 +2589,36 @@ files at all (per the 2026-05-15 libc-file-expectations
 audit summarised in `docs/notes-to-humans/` if recorded).
 New runtime code introduced after D26 that breaks this
 rule should be pushed back at code-review time.
+
+### 10.16 `catch_unwind` is diagnostic, not load-bearing
+
+Production builds compile with `panic = "abort"` (see the
+`[profile.release]` settings on `bins/*` crates and the
+workspace-wide default for published members). Under
+`panic = "abort"`, `std::panic::catch_unwind` is a no-op —
+a panic on the wrapped call aborts the process before
+the `Result` is constructed; the `Ok(...)` and `Err(...)` arms
+of `match catch_unwind(...) { ... }` never execute in
+production.
+
+Therefore: **the correctness of any code path MUST NOT
+depend on `catch_unwind` doing anything.** Use it for
+diagnostic / defense-in-depth value in unwinding (test /
+debug) builds, but design the wrapped code to be panic-free
+on reachable paths — see §10.3. Never-fail contracts must be
+enforced *inside* the wrapped function, not by the wrapper.
+
+When you write a `catch_unwind` call, add an inline comment
+naming this section so the next reader knows the wrapper is
+not load-bearing. Existing usages in
+`philharmonic-api/src/lib.rs` (virtualization-probe startup
+wrapper), `philharmonic-virt-detect/src/lib.rs` (internal
+panic guard), and `mechanics-core/src/internal/pool/shared.rs`
+(worker-thread panic guard) follow this convention.
+
+Don't remove existing `catch_unwind` wrappers — they cost
+nothing in release and they're useful for test-time panic
+isolation. Just don't rely on them.
 
 ---
 

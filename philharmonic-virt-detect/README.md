@@ -24,13 +24,6 @@ via `/v1/_meta/version` and rendered on the Dashboard's API
 status panel), so the logic now lives in this shared library
 and the xtask CLI becomes a thin wrapper.
 
-## Current state
-
-The substantive probe implementation is being moved over from
-`xtask/src/bin/detect-virt.rs`. This first release ships a
-stub that always returns `"none"`, satisfying the never-fail
-contract while the move-in is in progress.
-
 ## License
 
 Dual-licensed under Apache-2.0 OR MPL-2.0.

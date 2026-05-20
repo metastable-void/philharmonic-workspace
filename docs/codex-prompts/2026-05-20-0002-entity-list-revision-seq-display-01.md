@@ -572,7 +572,20 @@ Routine specified-and-shipped work doesn't need one.
 
 ## Outcome
 
-Pending — will be updated after the Codex run.
+Implemented all four topics. Entity list summaries now carry `revision_seq`
+from the renamed `latest_revisions` store API, pagination fetches latest
+revision metadata unconditionally, and the WebUI renders localized `rev N`
+badges with missing revision metadata falling back to `rev 0`. Role detail now
+has a `tenant:role_manage`-gated controlled edit form that patches display name
+and permissions using the existing role update API, while membership creation
+uses a reusable `EntityCombobox` that filters loaded principals/roles and still
+passes through pasted UUIDs outside the first 200 results. Virtualization
+detection moved into `philharmonic-virt-detect`, `xtask detect-virt` became a
+thin printer, the API caches the startup probe result in `VersionState`, and
+the Dashboard displays it as a third metric card. Verification passed with
+`./scripts/pre-landing.sh` ending in `=== pre-landing: all checks passed ===`
+and `./scripts/webui-build.sh --production` exiting 0 with only pre-existing
+webpack size warnings.
 
 ---
 

@@ -12,5 +12,8 @@ homepage = "https://github.com/metastable-void/philharmonic-workspace"
 keywords = ["virtualization", "container", "detect-virt", "systemd", "philharmonic"]
 categories = ["os", "no-std"]
 
+[target.'cfg(any(target_arch = "x86", target_arch = "x86_64"))'.dependencies]
+raw-cpuid = { version = "11", default-features = false, features = ["std"] }
+
 [profile.release]
 opt-level = 3
