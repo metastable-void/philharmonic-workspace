@@ -46,6 +46,7 @@ members = [
     "bins/mechanics-worker",
     "bins/philharmonic-connector",
     "bins/philharmonic-api-server",
+    "philharmonic-virt-detect",
     "xtask",
 ]
 
@@ -81,6 +82,7 @@ mechanics-dns = { path = "mechanics-dns" }
 mechanics-h3-quinn = { path = "mechanics-h3-quinn" }
 mechanics-http-server = { path = "mechanics-http-server" }
 dockerlet = { path = "dockerlet" }
+philharmonic-virt-detect = { path = "philharmonic-virt-detect" }
 
 [profile.dev]
 # Disable incremental compilation in debug builds. Incremental

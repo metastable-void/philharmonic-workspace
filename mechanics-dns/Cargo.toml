@@ -7,8 +7,8 @@ authors = ["metastable-void"]
 description = "Reusable DNS resolver helpers for Mechanics runtime crates, including HTTPS RR and Cloudflare fallback-on-ENOENT support."
 license = "Apache-2.0 OR MPL-2.0"
 readme = "README.md"
-repository = "https://github.com/metastable-void/mechanics-dns"
-homepage = "https://github.com/metastable-void/mechanics-dns"
+repository = "https://github.com/metastable-void/philharmonic-workspace"
+homepage = "https://github.com/metastable-void/philharmonic-workspace"
 keywords = ["dns", "resolver", "https-rr", "mechanics"]
 categories = ["network-programming"]
 
