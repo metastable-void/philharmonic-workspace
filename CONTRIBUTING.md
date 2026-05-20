@@ -1393,6 +1393,48 @@ introduced:
   truncate `args` without it, but `codex-status.sh` already
   truncates to 80 chars downstream.
 
+### 6.5 `--help` via `scripts/lib/script-help.sh`
+
+Every `scripts/*.sh` that can be called in isolation supports
+`-h` / `--help` as its first positional arg, printing the
+script's top-of-file comment block and exiting 0. The mechanism
+is a sourced helper to keep the convention uniform:
+
+```sh
+#!/bin/sh
+# scripts/<name>.sh — one-line summary.
+#
+# Usage:
+#   ./scripts/<name>.sh [flags] [args]
+#
+# …extended description…
+
+set -eu
+
+. "$(dirname -- "$0")/lib/script-help.sh"
+script_help_handle "$@"
+```
+
+`script_help_handle` is defined in
+[`scripts/lib/script-help.sh`](scripts/lib/script-help.sh). It
+inspects `$1`; if it's `-h` or `--help` it dumps lines 2 through
+the first blank line of the calling script (with leading `# `
+stripped) and exits 0, otherwise it returns and the caller's
+own arg parsing proceeds.
+
+**Convention:** new scripts source the helper immediately after
+`set -eu` and structure their header as a contiguous `#`-prefixed
+block terminating in a blank line (the blank line bounds the
+`sed -n '2,/^$/p'` slice the helper uses). Scripts that need
+richer help — listing dynamic subcommands, for example — keep
+their bespoke `usage` function as a secondary handler inside the
+arg-parse loop; the helper still wins for the common
+`./scripts/foo.sh --help` invocation.
+
+Validate the help text by running the script with `--help` and
+making sure the output is the header block, not a sliver of
+code.
+
 ---
 
 ## 7. External tool wrappers

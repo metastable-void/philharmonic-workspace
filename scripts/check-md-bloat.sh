@@ -22,6 +22,10 @@
 
 set -eu
 
+. "$(dirname -- "$0")/lib/script-help.sh"
+script_help_handle "$@"
+
+
 . "$(dirname -- "$0")/lib/workspace-cd.sh"
 
 find . -type d \( -name target -o -name node_modules \) -prune -o -type f -name '*.[mM][dD]' -exec wc -l {} + | sort -nr

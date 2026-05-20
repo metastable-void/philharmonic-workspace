@@ -33,6 +33,10 @@
 
 set -eu
 
+. "$(dirname -- "$0")/lib/script-help.sh"
+script_help_handle "$@"
+
+
 dir=${TMPDIR:-/tmp}
 slug=${1:-tmp}
 

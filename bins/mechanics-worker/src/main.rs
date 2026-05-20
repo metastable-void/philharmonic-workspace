@@ -1,11 +1,13 @@
 //! Mechanics worker — JavaScript execution HTTP service.
 
 use std::collections::HashSet;
+use std::net::SocketAddr;
 use std::path::Path;
 use std::process;
 use std::time::Duration;
 
 use clap::Parser;
+use philharmonic::mechanics::metrics::install_prometheus_exporter;
 use philharmonic::mechanics::{MechanicsPoolConfig, MechanicsServer};
 use philharmonic::mechanics_core::job::MechanicsExecutionLimits;
 use philharmonic::server::cli::{
@@ -19,6 +21,9 @@ mod config;
 use config::MechanicsWorkerConfig;
 
 const DEFAULT_CONFIG: &str = r#"bind = "127.0.0.1:3001"
+# Optional: serve Prometheus-compatible runtime metrics at
+# GET /metrics on this plain-HTTP bind. Omit to disable.
+# bind_metrics = "127.0.0.1:9100"
 # Empty list = every request returns 401 (fail-closed).
 # Add at least one token to accept traffic.
 tokens = []
@@ -81,6 +86,13 @@ async fn serve(args: BaseArgs) -> Result<(), String> {
         config.bind_h3 = Some(bind_h3);
     }
 
+    let bind_metrics = config.bind_metrics;
+    if let Some(bind) = bind_metrics {
+        install_prometheus_exporter(bind)
+            .map_err(|error| format!("failed to install metrics exporter at {bind}: {error}"))?;
+        eprintln!("mechanics-worker metrics listening on {bind}");
+    }
+
     let pool_config = build_pool_config(&config)?;
     let server = MechanicsServer::new(pool_config)
         .map_err(|error| format!("failed to create mechanics server: {error}"))?;
@@ -114,6 +126,7 @@ async fn serve(args: BaseArgs) -> Result<(), String> {
                 }
                 let new_token_count = normalized_token_count(&reloaded.tokens);
                 log_tls_reload_note(&reloaded);
+                log_metrics_reload_note(bind_metrics, reloaded.bind_metrics);
                 server.replace_tokens(reloaded.tokens);
                 log_token_reload(token_count, new_token_count);
                 token_count = new_token_count;
@@ -230,6 +243,14 @@ fn log_token_reload(old_count: usize, new_count: usize) {
     } else {
         eprintln!(
             "mechanics-worker reloaded config; bearer tokens changed: {old_count} -> {new_count}"
+        );
+    }
+}
+
+fn log_metrics_reload_note(current: Option<SocketAddr>, reloaded: Option<SocketAddr>) {
+    if current != reloaded {
+        eprintln!(
+            "mechanics-worker metrics bind changed in config ({current:?} -> {reloaded:?}); restart required to apply metrics listener changes"
         );
     }
 }

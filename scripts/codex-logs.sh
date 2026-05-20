@@ -44,6 +44,10 @@
 
 set -eu
 
+. "$(dirname -- "$0")/lib/script-help.sh"
+script_help_handle "$@"
+
+
 script_dir="$(cd -- "$(dirname -- "$0")" && pwd)"
 
 follow=0

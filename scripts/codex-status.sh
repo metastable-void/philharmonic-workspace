@@ -34,6 +34,10 @@
 
 set -eu
 
+. "$(dirname -- "$0")/lib/script-help.sh"
+script_help_handle "$@"
+
+
 . "$(dirname -- "$0")/lib/colors.sh"
 BOLD="$C_BOLD"
 DIM="$C_DIM"

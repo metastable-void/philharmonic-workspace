@@ -10,6 +10,10 @@
 
 set -eu
 
+. "$(dirname -- "$0")/lib/script-help.sh"
+script_help_handle "$@"
+
+
 . "$(dirname -- "$0")/lib/workspace-cd.sh"
 
 if command -v tokei >/dev/null 2>&1; then

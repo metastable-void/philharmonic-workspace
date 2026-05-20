@@ -124,6 +124,8 @@ authorship norms) are not included.
 
 **Hard:**
 
+- Every command invocation goes through `rexec`
+  (§"Command execution via `rexec`")
 - Codex no-commit / non-read Git (§Git below)
 - Git history append-only (§Git)
 - No raw Git writes outside wrappers (§Git, §"Use the script wrappers")
@@ -204,6 +206,50 @@ authorship norms) are not included.
   hours, add a short note in your final message
   (*"(JST now 20:14 土 — out-of-hours session; proceeding.)"*).
   Log artefact, not a permission request.
+
+## Command execution via `rexec`
+
+**[Hard] Every command invocation goes through `rexec`. No
+exceptions.** `rexec` is the command-execution aggregator for
+AI agents; running raw commands bypasses its transcript and
+host infrastructure. If the binary is missing, run
+`cargo install rexec` first, then proceed. This wraps the
+existing execution rules (`scripts/*.sh` cargo / read-only Git
+wrappers, `xtask.sh`, raw read-only tools) rather than
+replacing them: `rexec` is the outer envelope; the inner
+wrapper is unchanged.
+
+Usage shapes (from `rexec --help`, v0.1.0):
+
+- **Run a command** (the common case; `--whoami` and `--dir`
+  are mandatory, repeat `--env` per override, `--` separates
+  the inner command from `rexec`'s flags):
+  ```sh
+  rexec --whoami <agent-id> --dir <workdir> \
+      [--env VAR=VAL]... -- <command> [args...]
+  ```
+- **Host status:** `rexec -c` / `--check-host` checks whether
+  a host is running for this user. A host must be up before
+  run-mode invocations. **Starting the host is a human's job,
+  not an agent's** — `rexec -s` / `--start-host` runs a
+  foreground process the operator owns (^C to stop). If
+  `--check-host` reports no host running, stop and surface in
+  your final summary; never run `--start-host` yourself.
+- **Transcripts:** `rexec --list <N>` lists the N most recent;
+  `rexec -p <name>` / `--print <name>` shows one by its name
+  (`YYYY-MM-DD-hh:mm:ss`); add `-f` / `--follow` to stream
+  new entries as they arrive.
+
+**Caveat — run mode is interactive; no stdin, beware pagers.**
+`rexec` runs the inner command attached to its own TTY context,
+not yours. Two consequences: (1) stdin from your tool harness
+isn't piped through, so heredoc / piped input (`--message-file
+-`, `cat | foo`) hangs — write the input to a tempfile first
+and pass the path. (2) Commands that auto-page when stdout is a
+TTY (`git diff`, `git log`, `git show`, `less`-using tools)
+hang waiting for keystrokes — pass `--no-pager` (e.g. `git
+--no-pager diff`) or pipe through `cat`. Prefer the workspace
+`scripts/*.sh` wrappers; they already handle this.
 
 ## Git (what you must not do)
 

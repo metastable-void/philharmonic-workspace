@@ -29,6 +29,10 @@
 
 set -eu
 
+. "$(dirname -- "$0")/lib/script-help.sh"
+script_help_handle "$@"
+
+
 no_color=0
 show_diff=0
 while [ $# -gt 0 ]; do

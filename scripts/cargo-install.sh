@@ -43,12 +43,8 @@
 
 set -eu
 
-case "${1:-}" in
-    -h|--help)
-        sed -n '2,/^$/p' "$0" | sed 's/^# \{0,1\}//'
-        exit 0
-        ;;
-esac
+. "$(dirname -- "$0")/lib/script-help.sh"
+script_help_handle "$@"
 
 cargo_home="${CARGO_HOME:-$HOME/.cargo}"
 if [ ! -w "$cargo_home" ] 2>/dev/null; then

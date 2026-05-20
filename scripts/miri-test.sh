@@ -51,6 +51,10 @@
 # POSIX sh only — see docs/design/13-conventions.md §Shell scripts.
 
 set -eu
+
+. "$(dirname -- "$0")/lib/script-help.sh"
+script_help_handle "$@"
+
 . "$(dirname -- "$0")/lib/workspace-cd.sh"
 . "$(dirname -- "$0")/lib/cargo-target-dir.sh"
 . "$(dirname -- "$0")/lib/cargo-noise-filter.sh"

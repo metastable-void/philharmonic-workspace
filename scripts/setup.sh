@@ -14,6 +14,10 @@
 
 set -eu
 
+. "$(dirname -- "$0")/lib/script-help.sh"
+script_help_handle "$@"
+
+
 script_dir="$(cd -- "$(dirname -- "$0")" && pwd)"
 workspace_root="$(cd -- "$script_dir/.." && pwd)"
 . "$script_dir/lib/cargo-target-dir.sh"
@@ -127,6 +131,10 @@ if command -v cargo >/dev/null 2>&1 && command -v rustc >/dev/null 2>&1; then
     ./scripts/cargo-install.sh cargo-deny
     ok "Installing cargo-semver-checks"
     ./scripts/cargo-install.sh cargo-semver-checks
+    if ! command -v rexec >/dev/null 2>&1 ; then
+        ok "Installing rexec"
+        ./scripts/cargo-install.sh rexec
+    fi
 else
     warn "Rust toolchain not found on PATH."
     warn "Install rustup from https://rustup.rs/ and ensure"

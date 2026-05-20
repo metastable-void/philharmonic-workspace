@@ -27,6 +27,10 @@
 
 set -eu
 
+. "$(dirname -- "$0")/lib/script-help.sh"
+script_help_handle "$@"
+
+
 WORKSPACE_ROOT=$(cd "$(dirname "$0")/.." && pwd -P)
 cd "$WORKSPACE_ROOT"
 

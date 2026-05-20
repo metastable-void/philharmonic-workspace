@@ -44,4 +44,8 @@
 # POSIX sh only — see CONTRIBUTING.md §6.
 
 set -eu
+
+. "$(dirname -- "$0")/lib/script-help.sh"
+script_help_handle "$@"
+
 exec "$(dirname -- "$0")/xtask.sh" new-submodule -- "$@"

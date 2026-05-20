@@ -37,6 +37,10 @@
 
 set -eu
 
+. "$(dirname -- "$0")/lib/script-help.sh"
+script_help_handle "$@"
+
+
 . "$(dirname -- "$0")/lib/workspace-cd.sh"
 
 log_lines=100

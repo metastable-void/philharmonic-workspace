@@ -13,6 +13,10 @@
 
 set -eu
 
+. "$(dirname -- "$0")/lib/script-help.sh"
+script_help_handle "$@"
+
+
 . "$(dirname -- "$0")/lib/colors.sh"
 
 printf '%s=== build status ===%s\n' "$C_HEADER" "$C_RESET"

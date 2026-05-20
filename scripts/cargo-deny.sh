@@ -25,6 +25,10 @@
 # POSIX sh only — see docs/design/13-conventions.md §Shell scripts.
 
 set -eu
+
+. "$(dirname -- "$0")/lib/script-help.sh"
+script_help_handle "$@"
+
 . "$(dirname -- "$0")/lib/workspace-cd.sh"
 
 if ! command -v cargo-deny >/dev/null 2>&1; then

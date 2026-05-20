@@ -67,6 +67,10 @@
 
 set -eu
 
+. "$(dirname -- "$0")/lib/script-help.sh"
+script_help_handle "$@"
+
+
 usage() {
     cat <<'EOF'
 Usage: log.sh [--history | --audit | --stats]

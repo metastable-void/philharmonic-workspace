@@ -29,8 +29,9 @@
 #   cargo fmt   <scope>                                          fix mode
 #   cargo check <scope>
 #   cargo clippy <scope> --all-targets -- -D warnings            check mode
-#   cargo clippy --fix --allow-dirty --allow-staged <scope> \    fix mode
+#   cargo clippy --fix --allow-dirty --allow-staged <scope> \    fix mode (pass 1: apply)
 #                --all-targets -- -D warnings
+#   cargo clippy <scope> --all-targets -- -D warnings            fix mode (pass 2: verify)
 #   RUSTDOCFLAGS="-D missing_docs" cargo doc --no-deps <scope>
 #
 # Fix mode (`--fix`) rewrites source files in place. `cargo clippy
@@ -38,7 +39,15 @@
 # `--allow-dirty --allow-staged` is passed so the fix pass works
 # against pre-landing's typical state (uncommitted Rust edits the
 # author is about to land). Non-fixable warnings still fail the
-# run via `-D warnings`, so this never silently weakens the gate.
+# run via `-D warnings`, so this never silently weakens the gate
+# — but `cargo clippy --fix` has been observed to exit 0 even when
+# non-machine-applicable warnings remain (the `--fix` mode skips
+# the suggestion, prints the warning, and finishes with success).
+# To make `-D warnings` enforcement reliable, fix mode follows the
+# `--fix` pass with a plain `cargo clippy … -- -D warnings` verify
+# pass; the second pass is incremental (no source changes between
+# passes mean almost no work) and turns any remaining warning into
+# the failure it would have been in check mode.
 #
 # Phase mode (`--phase <name>`) runs only the named phase. Useful
 # when you want a fast "does it compile?" feedback loop
@@ -84,6 +93,10 @@
 # POSIX sh only — see docs/design/13-conventions.md §Shell scripts.
 
 set -eu
+
+. "$(dirname -- "$0")/lib/script-help.sh"
+script_help_handle "$@"
+
 . "$(dirname -- "$0")/lib/colors.sh"
 . "$(dirname -- "$0")/lib/workspace-cd.sh"
 . "$(dirname -- "$0")/lib/cargo-noise-filter.sh"
@@ -218,6 +231,12 @@ if [ "$xtask_only" -eq 1 ] || [ "$crate" = "xtask" ]; then
             "$C_DIM" "${clippy_fix_args:+$clippy_fix_args }" "$C_RESET"
         # shellcheck disable=SC2086
         run_with_cargo_noise_filter cargo clippy $quiet_arg $target_arg $clippy_fix_args -p "$crate" --all-targets -- -D warnings
+        if [ "$fix_mode" -eq 1 ]; then
+            printf '%s--- cargo clippy -p xtask --all-targets -- -D warnings (verify) ---%s\n' \
+                "$C_DIM" "$C_RESET"
+            # shellcheck disable=SC2086
+            run_with_cargo_noise_filter cargo clippy $quiet_arg $target_arg -p "$crate" --all-targets -- -D warnings
+        fi
     fi
     if phase_runs doc; then
         printf '%s--- cargo doc -p xtask (missing_docs) ---%s\n' "$C_DIM" "$C_RESET"
@@ -242,6 +261,12 @@ elif [ -n "$crate" ]; then
             "$C_DIM" "${clippy_fix_args:+$clippy_fix_args }" "$crate" "$C_RESET"
         # shellcheck disable=SC2086
         run_with_cargo_noise_filter cargo clippy $quiet_arg $target_arg $clippy_fix_args -p "$crate" --all-targets -- -D warnings
+        if [ "$fix_mode" -eq 1 ]; then
+            printf '%s--- cargo clippy -p %s --all-targets -- -D warnings (verify) ---%s\n' \
+                "$C_DIM" "$crate" "$C_RESET"
+            # shellcheck disable=SC2086
+            run_with_cargo_noise_filter cargo clippy $quiet_arg $target_arg -p "$crate" --all-targets -- -D warnings
+        fi
     fi
     if phase_runs doc; then
         printf '%s--- cargo doc -p %s (missing_docs) ---%s\n' "$C_DIM" "$crate" "$C_RESET"
@@ -284,6 +309,12 @@ else
             "$C_DIM" "${clippy_fix_args:+$clippy_fix_args }" "$C_RESET"
         # shellcheck disable=SC2086
         run_with_cargo_noise_filter cargo clippy $quiet_arg $target_arg $clippy_fix_args --workspace --exclude xtask --all-targets -- -D warnings
+        if [ "$fix_mode" -eq 1 ]; then
+            printf '%s--- cargo clippy --workspace --exclude xtask --all-targets -- -D warnings (verify) ---%s\n' \
+                "$C_DIM" "$C_RESET"
+            # shellcheck disable=SC2086
+            run_with_cargo_noise_filter cargo clippy $quiet_arg $target_arg --workspace --exclude xtask --all-targets -- -D warnings
+        fi
     fi
     if phase_runs doc; then
         printf '%s--- cargo doc --workspace --exclude xtask (missing_docs) ---%s\n' "$C_DIM" "$C_RESET"

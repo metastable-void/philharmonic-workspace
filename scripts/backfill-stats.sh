@@ -59,6 +59,10 @@
 # POSIX sh — see CONTRIBUTING.md §6.
 
 set -eu
+
+. "$(dirname -- "$0")/lib/script-help.sh"
+script_help_handle "$@"
+
 . "$(dirname -- "$0")/lib/workspace-cd.sh"
 
 cache_file="docs/stats-cache.tsv"

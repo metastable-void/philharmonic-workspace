@@ -12,6 +12,10 @@ serde = { version = "1", default-features = false, features = ["derive", "std"] 
 tokio = { version = "1", default-features = false, features = ["macros", "rt-multi-thread"] }
 toml = { version = "0.8", default-features = false, features = ["display", "parse"] }
 
+[dev-dependencies]
+mechanics-http-client = { path = "../../mechanics-http-client", default-features = false }
+tokio = { version = "1", default-features = false, features = ["macros", "rt-multi-thread", "time"] }
+
 [features]
 # Default-on so `cargo check --workspace` (and pre-landing.sh)
 # compiles the `#[cfg(feature = "https")]` HTTPS / HTTP/3 code

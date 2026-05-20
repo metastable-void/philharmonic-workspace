@@ -8,6 +8,10 @@
 
 set -eu
 
+. "$(dirname -- "$0")/lib/script-help.sh"
+script_help_handle "$@"
+
+
 . "$(dirname -- "$0")/lib/workspace-cd.sh"
 
 # Integrate remote changes into the parent. Rebase keeps history

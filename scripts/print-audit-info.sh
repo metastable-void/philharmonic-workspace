@@ -1,6 +1,31 @@
 #!/bin/sh
+# scripts/print-audit-info.sh — emit the one-line Audit-Info
+# trailer used by every workspace commit.
+#
+# Usage:
+#   ./scripts/print-audit-info.sh              # full audit line
+#   ./scripts/print-audit-info.sh --anonymize  # redact IP / geo
+#
+# Fields (whitespace-separated `key=value` pairs):
+#   t=<unix-time> d=<workspace-path> h=<hostname>
+#   u=<user/uid> g=<group/gid> 4=<ipv4/cc> 6=<ipv6/cc>
+#   k=<kernel/release> a=<arch> o=<os-id_version>
+#   v=<virt-id> r=<rustc-version> c=<cpu-threads> m=<mem>
+#
+# `--anonymize` redacts the IP / geo fields to `hidden/ZZ` so
+# commits made from sensitive networks can omit those bits while
+# keeping every other field.
+#
+# This script is primarily a helper for `commit-all.sh`'s
+# trailer-generation step, but it stands alone for ad-hoc
+# verification of the trailer shape.
+#
+# POSIX sh only — see docs/design/13-conventions.md §Shell scripts.
 
 set -eu
+
+. "$(dirname -- "$0")/lib/script-help.sh"
+script_help_handle "$@"
 
 uid=$(id -u)
 user=$(id -un)

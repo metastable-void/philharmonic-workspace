@@ -108,6 +108,51 @@ actually at the workspace root, and a drifted cwd tempts the
 host-specific absolute form. Codex specifies each call's cwd by
 design; this rule is Claude-only.
 
+## Command execution via `rexec`
+
+**[Hard] Every command invocation goes through `rexec`. No
+exceptions.** `rexec` is the command-execution aggregator for
+AI agents; running raw commands bypasses its transcript and
+host infrastructure. If the binary is missing, install with
+`cargo install rexec` first, then proceed. This wraps the
+other execution rules (`scripts/*.sh` Git / cargo wrappers,
+`xtask.sh`, raw read-only tools) rather than replacing them:
+`rexec` is the outer envelope; the existing wrapper is the
+inner command.
+
+Usage shapes (from `rexec --help`, v0.1.0):
+
+- **Run a command** (the common case; `--whoami` and `--dir`
+  are mandatory, repeat `--env` per override, `--` separates
+  the inner command from `rexec`'s flags):
+  ```sh
+  rexec --whoami <agent-id> --dir <workdir> \
+      [--env VAR=VAL]... -- <command> [args...]
+  ```
+- **Host status:** `rexec -c` / `--check-host` checks whether
+  a host is running for this user. A host must be up before
+  run-mode invocations. **Starting the host is a human's job,
+  not an agent's** — `rexec -s` / `--start-host` runs a
+  foreground process the operator owns (^C to stop). If
+  `--check-host` reports no host running, stop and ask Yuka
+  to start one; never run `--start-host` yourself.
+- **Transcripts:** `rexec --list <N>` lists the N most recent;
+  `rexec -p <name>` / `--print <name>` shows one by its name
+  (`YYYY-MM-DD-hh:mm:ss`); add `-f` / `--follow` to stream
+  new entries as they arrive.
+
+**Caveat — run mode is interactive; no stdin, beware pagers.**
+`rexec` runs the inner command attached to its own TTY context,
+not the agent's. Two consequences: (1) stdin from the agent's
+Bash tool isn't piped through, so heredoc / piped input
+(`--message-file -`, `cat | foo`) hangs — write input to a
+tempfile first and pass the path. (2) Commands that auto-page
+when stdout is a TTY (`git diff`, `git log`, `git show`,
+`less`-using tools) hang waiting for keystrokes — pass
+`--no-pager` (e.g. `git --no-pager diff`) or pipe through
+`cat`. Prefer the workspace `scripts/*.sh` wrappers; they
+already handle this.
+
 ## Claude vs. Codex division of labour
 
 - **Claude does:** architecture, API shape, design docs, ROADMAP
