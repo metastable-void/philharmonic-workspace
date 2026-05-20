@@ -13,9 +13,11 @@
 #   ./scripts/cargo-install.sh <crate>[@<version>] [<crate>...]
 #       # Install one or more crates via `cargo binstall`.
 #       # Anything after the script name is forwarded verbatim
-#       # to `cargo binstall`, so `--locked`, `--no-confirm`,
-#       # `--force`, version pins, etc. work as documented by
-#       # cargo-binstall.
+#       # to `cargo binstall`, so `--locked`, `--force`, version
+#       # pins, etc. work as documented by cargo-binstall. The
+#       # wrapper always prepends `--no-confirm` so unattended /
+#       # CI runs don't block on the interactive prompt
+#       # `cargo binstall` shows by default.
 #   ./scripts/cargo-install.sh --setup
 #       # Bootstrap-only mode: ensure `cargo-binstall` itself
 #       # is installed, then exit. Does not install any other
@@ -68,4 +70,4 @@ if [ "$skip_install" -eq 1 ] ; then
     exit 0
 fi
 
-exec cargo binstall "$@"
+exec cargo binstall --no-confirm "$@"
