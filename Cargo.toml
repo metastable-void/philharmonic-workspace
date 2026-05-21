@@ -46,6 +46,7 @@ members = [
     "bins/mechanics-worker",
     "bins/philharmonic-connector",
     "bins/philharmonic-api-server",
+    "bins/philharmonic-chat",
     "philharmonic-virt-detect",
     "xtask",
 ]
