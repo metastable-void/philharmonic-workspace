@@ -120,33 +120,57 @@ other execution rules (`scripts/*.sh` Git / cargo wrappers,
 `rexec` is the outer envelope; the existing wrapper is the
 inner command.
 
-**Prefer the MCP tools over the Bash form (v0.2.0+).** The
-workspace exposes `rexec` as an MCP server in both
-[`.mcp.json`](.mcp.json) (the standardised Anthropic MCP
-config; loaded by Claude Code workspace-wide) and
-[`.codex/config.toml`](.codex/config.toml) (the
-`[mcp_servers.rexec]` table for Codex). The server is
-started with the agent's identity baked in via
-`-m --whoami Claude` / `-m --whoami Codex`, so per-call MCP
-tool invocations don't need to re-specify `--whoami`; they
-only need the working directory and the inner command. Use
-the MCP tools by default — they avoid the shell-quoting /
-heredoc traps the Bash form is vulnerable to, they
-integrate with the agent's permission model directly (see
-the `mcp__rexec__*` allow entries in
-[`.claude/settings.json`](.claude/settings.json)), and
-they're the supported run-mode surface going forward.
+**[Hard] When the rexec MCP server is loaded, do NOT use the
+`Bash` tool.** All command execution — including read-only
+checks, transcript inspection, host status, anything — goes
+through `mcp__rexec__exec` (or `mcp__rexec__check_host` for
+the dedicated host-status call). The `Bash` tool is the
+fallback surface only, reserved for sessions where the MCP
+rexec server isn't loaded (a fresh session that predates the
+workspace config, a host where MCP isn't available, etc.).
+Verify presence at session start by looking for
+`mcp__rexec__*` in your tool list; if they're there, use
+them exclusively and treat the `Bash` tool as unavailable
+for this session.
 
-The Bash form (`rexec --whoami ... --dir ... -- <cmd>`) stays
-valid and is the fallback when the MCP server isn't loaded
-for some reason (e.g. a session that predates the config).
-Host status has a dedicated MCP tool (`check_host`);
-transcript inspection (`rexec --list N`, `rexec --print
-<name>`) rides on `exec` with `argv = ["rexec", "--list",
-"N"]` / `argv = ["rexec", "--print", "<name>"]` — the MCP
-tool runs the binary inside the host's environment, so the
-read-only transcript commands hit the same surface as
-run-mode invocations and produce the same output.
+Rationale: the Bash tool adds a redundant layer (Bash shell
+→ `rexec` binary → rexec host) where MCP goes directly
+(MCP client → rexec MCP server → rexec host). The shell
+layer is where the workspace's quoting / heredoc / pager
+traps live; eliminating the shell altogether for the
+common path eliminates those traps entirely. The MCP
+server also integrates with the agent's permission model
+natively (see the `mcp__rexec__*` allow entries in
+[`.claude/settings.json`](.claude/settings.json)) instead
+of routing through `Bash` permissions. The Bash form
+remains a documented fallback so the rule degrades
+gracefully when MCP isn't available — it doesn't go
+away, it just isn't the primary surface.
+
+**Workspace config:** the rexec MCP server is declared in
+[`.mcp.json`](.mcp.json) (Anthropic's standard MCP config
+location; loaded by Claude Code workspace-wide) and
+[`.codex/config.toml`](.codex/config.toml)
+(`[mcp_servers.rexec]` for Codex). Both bake the agent's
+identity into startup args (`-m --whoami Claude` /
+`-m --whoami Codex`), so per-call MCP tool invocations
+only need to supply the working directory and the inner
+command.
+
+**Bash form (`rexec --whoami ... --dir ... -- <cmd>`) is
+the documented fallback** when the MCP server isn't
+loaded. It does not coexist with MCP in normal use — pick
+one surface per session based on what's available, and
+under the rule above MCP wins when both are present. Host
+status check via Bash is `rexec -c`; transcript inspection
+is `rexec --list N` / `rexec --print <name>`. The
+equivalent MCP forms are `mcp__rexec__check_host` (no
+args, dedicated tool) and `mcp__rexec__exec` with
+`argv = ["rexec", "--list", "N"]` /
+`argv = ["rexec", "--print", "<name>"]` — the MCP `exec`
+runs the rexec binary inside the host's environment, so
+the read-only transcript commands hit the same surface as
+run-mode invocations and produce identical output.
 
 Usage shapes (from `rexec --help`, v0.2.0):
 
@@ -305,38 +329,49 @@ write the thing" → Codex unless it's plumbing/housekeeping.
      ```
      Write file_path=/tmp/<slug>-codex-prompt.txt content=<dispatch text>
      ```
-  2. Invoke `codex-companion.mjs task` through `rexec`. The
-     script lives under the resolved plugin cache root —
-     find it with `ls ~/.claude/plugins/cache/openai-codex/codex/*/scripts/codex-companion.mjs`
+  2. Invoke `codex-companion.mjs task` through the rexec
+     MCP `exec` tool. The script lives under the resolved
+     plugin cache root — find it with
+     `ls ~/.claude/plugins/cache/openai-codex/codex/*/scripts/codex-companion.mjs`
      (the version subdirectory changes over time). Pass
      `--cwd` for the workspace root, `--write` to enable
      workspace-write sandbox (without it the run is
      read-only), `--effort high` for substantive work, and
      `--background` so the run doesn't block this
      conversation:
-     ```sh
-     rexec --whoami claude --dir <workspace-root> -- \
-         node ~/.claude/plugins/cache/openai-codex/codex/<ver>/scripts/codex-companion.mjs \
-         task --background --write --effort high \
-         --cwd <workspace-root> \
-         --prompt-file /tmp/<slug>-codex-prompt.txt
+     ```
+     mcp__rexec__exec(
+       dir  = <workspace-root>,
+       argv = ["node",
+               "~/.claude/plugins/cache/openai-codex/codex/<ver>/scripts/codex-companion.mjs",
+               "task", "--background", "--write",
+               "--effort", "high",
+               "--cwd", <workspace-root>,
+               "--prompt-file", "/tmp/<slug>-codex-prompt.txt"]
+     )
      ```
   3. The script prints a `jobId` immediately. Monitor with
      `./scripts/codex-status.sh` and `./scripts/codex-logs.sh`
      (both filter on `originator: Claude Code` — they see
-     this dispatch).
-  4. Clean up the tempfile after `task_complete`.
+     this dispatch). Invoke them via MCP `exec` too —
+     `argv = ["./scripts/codex-status.sh"]` or
+     `argv = ["./scripts/codex-logs.sh", "--no-tool-output"]`.
+  4. Clean up the tempfile via MCP `exec` after
+     `task_complete`: `argv = ["rm", "-f",
+     "/tmp/<slug>-codex-prompt.txt"]`.
 
-  The companion script also supports `--prompt-file -` for
-  stdin; under `rexec` v0.1.1+ this works if you add
-  `--read-stdin` to the outer `rexec` invocation. The
-  tempfile-path form remains preferred for prompts because
-  the body lives on disk and can be re-read by Claude or by
-  a reviewer (same auditability argument as the
-  commit-message rule). The script supports `--resume` /
-  `--resume-last` / `--fresh` for continuing or starting
-  fresh threads; default-fresh is right for a new
-  prompt-archive round.
+  The companion script also accepts `--prompt-file -` to
+  read the prompt from stdin — under MCP, pass the prompt
+  body in the `exec` call's `stdin` parameter instead of
+  using a tempfile (same shape as the commit-message
+  recipe). The tempfile-path form remains preferred for
+  prompts because the body lives on disk and can be
+  re-read by Claude or by a reviewer (long-prompt
+  auditability), but stdin is the right surface for
+  shorter prompts where the tempfile is genuine ceremony.
+  The script supports `--resume` / `--resume-last` /
+  `--fresh` for continuing or starting fresh threads;
+  default-fresh is right for a new prompt-archive round.
 
 - **Human override.** If Yuka explicitly says a task goes to
   Codex, Claude MUST archive a prompt and dispatch regardless
