@@ -932,19 +932,27 @@ every one of them and burn context tokens unnecessarily.
 #### Passing the message to `commit-all.sh`
 
 **Always pass commit messages via `--message-file`, never as a
-positional argument.** Two viable surfaces under the workspace's
-`rexec`-mandated execution model:
+positional argument.** Three viable surfaces under the
+workspace's `rexec`-mandated execution model, in preference
+order:
 
-- **Canonical: `--message-file <path>`.** Body on disk; the
-  agent hands `rexec` a file path. Auditable, immune to
-  outer-quote slip-ups, and the path can be re-read by the
-  agent or by a reviewer.
-- **Alternative: `--message-file -` with `rexec --read-stdin`**
-  (rexec v0.1.1+; if `rexec --version` reports v0.1.0, fall
-  back to the canonical form or ask Yuka to upgrade). Pipes
-  the heredoc body through `rexec` to the script's stdin in
-  one shot. Use this when the message is short and the
-  tempfile is genuine ceremony.
+- **Canonical: MCP `exec` with the `stdin` field.** Single
+  tool call; the MCP server attaches a pipe to the child's
+  fd 0 and writes the bytes verbatim. No shell boundary
+  anywhere. The stdin parameter is part of the tool-call
+  JSON, so it's auditable in the agent's transcript without
+  needing a tempfile.
+- **Alternative: tempfile path.** Body on disk; the agent
+  hands the script a file path via `--message-file <path>`.
+  Reach for it when the body is large enough that having
+  it on disk for a second-look pass is worth the extra
+  steps (Write + exec + rm).
+- **Fallback: `rexec --read-stdin -- ... --message-file -`
+  with a bash heredoc.** Works under v0.1.1+ but still
+  routes through bash heredoc parsing — easy to slip into
+  the broken legacy `"$(cat <<'EOF' ... EOF)"` shape.
+  Reserved for sessions where the MCP rexec server isn't
+  loaded.
 
 Only Claude commits in this workspace. Codex never commits
 (the `codex-guard` in `scripts/lib/codex-guard.sh` hard-aborts
@@ -954,7 +962,28 @@ execution routes through `rexec` ([Hard]; see
 [CLAUDE.md §"Command execution via `rexec`"](CLAUDE.md); no
 direct-terminal exception).
 
-**Canonical recipe (Claude Code via `rexec`):**
+**Canonical recipe (Claude Code via the rexec MCP `exec`
+tool's `stdin` field):**
+
+```
+mcp__rexec__exec(
+  dir   = <workspace-root>,
+  argv  = ["./scripts/commit-all.sh", "--message-file", "-"],
+  stdin = <message body>
+)
+```
+
+The stdin bytes reach `commit-all.sh` verbatim — the MCP
+server attaches a pipe to fd 0 and closes it after writing,
+so the script sees a real EOF and reads the body without
+any shell parsing in between. Backticked
+`identifier` / `path/like/this` / `command(...)` tokens
+and `$VAR` / `$(cmd)` references all survive as literal
+text. The body is auditable in the tool-call JSON visible
+to the agent and to any reviewer reading the transcript.
+
+**Tempfile alternative (Write to `/tmp` → MCP `exec` with
+`--message-file <path>`):**
 
 1. Use the editor's `Write` tool to drop the message into a
    path under `/tmp` (the env block lists `/tmp` as an
@@ -963,24 +992,31 @@ direct-terminal exception).
    ```
    Write file_path=/tmp/<slug>-commit-msg.txt content=<the body>
    ```
-2. Invoke the commit through `rexec`:
-   ```sh
-   rexec --whoami <agent> --dir <workspace-root> -- \
-       ./scripts/commit-all.sh --message-file /tmp/<slug>-commit-msg.txt
+2. Invoke the commit through the MCP `exec` tool:
+   ```
+   mcp__rexec__exec(
+     dir  = <workspace-root>,
+     argv = ["./scripts/commit-all.sh",
+             "--message-file",
+             "/tmp/<slug>-commit-msg.txt"]
+   )
    ```
 3. Clean up:
-   ```sh
-   rexec --whoami <agent> --dir <workspace-root> -- \
-       rm -f /tmp/<slug>-commit-msg.txt
+   ```
+   mcp__rexec__exec(
+     dir  = <workspace-root>,
+     argv = ["rm", "-f", "/tmp/<slug>-commit-msg.txt"]
+   )
    ```
 
-The message body lands on disk verbatim — Bash never parses
-it as a shell argument or as command-substitution input, so
-backticked `identifier` / `path/like/this` / `command(...)`
-tokens and `$VAR` / `$(cmd)` references all survive as
-literal text.
+Same shell-expansion-safe guarantees as the canonical form
+(the path is the argument; Bash never parses the body). Use
+this when the body is long enough to merit re-reading from
+disk, or when the operator wants to inspect the body before
+the commit lands.
 
-**Alternative recipe (`--read-stdin`, single invocation):**
+**Bash fallback (`rexec --read-stdin`, single invocation,
+when MCP rexec isn't loaded):**
 
 ```sh
 rexec --whoami <agent> --dir <workspace-root> --read-stdin -- \
@@ -994,7 +1030,7 @@ suppresses shell expansion inside the heredoc body.
 EOF
 ```
 
-Two load-bearing pieces:
+Two load-bearing pieces in the Bash fallback:
 
 1. `rexec --read-stdin` (v0.1.1+) reads the client's stdin
    to EOF and forwards it to the inner child. Without this
@@ -1005,21 +1041,12 @@ Two load-bearing pieces:
    would still expand backticks and `$VAR` inside the body
    itself; the single quotes are mandatory.
 
-**Why the path form is still canonical:**
-- It's auditable: the body lives on disk and can be
-  re-read with `Read` or `cat` to confirm what landed in
-  the commit.
-- It survives the "one missing outer quote" failure mode
-  that the legacy `"$(cat <<'EOF' ... EOF)"` form is
-  vulnerable to — the path form has no quoting boundary at
-  all between the agent and the script.
-- It's the same shape whether or not `rexec` is in the
-  middle, which makes it portable across execution surfaces.
-
-The `--read-stdin` form is the better choice when the
-message is short, the tempfile would just be ceremony, and
-you're confident in the heredoc quoting. Both forms are
-legitimate; pick by readability.
+The Bash fallback is strictly less safe than either MCP form
+above — bash heredoc parsing is the failure surface that
+keeps biting (incident `a5833d5` lost ≈ 8 backticked tokens
+to a slip into the legacy `"$(cat <<'EOF' ... EOF)"` shape).
+Use only when the MCP rexec tools aren't available in the
+session's tool list.
 
 **Legacy positional form** (still accepted by the script, but
 fragile; do not use):
@@ -1034,9 +1061,10 @@ EOF
 This works in current bash but re-introduces a quoting
 boundary — a missing outer `"`, a stray `"` inside the
 body, or an unusual quote-removal semantics in some shell
-could re-introduce the expansion failure. Both
-`--message-file` surfaces above remove the boundary
-entirely.
+could re-introduce the expansion failure. All three
+`--message-file` surfaces above (MCP stdin, MCP path, Bash
+heredoc) remove the boundary entirely; the MCP stdin form
+removes the shell altogether.
 
 Why all this discipline: with the legacy positional form
 (or any plain `"message"` argument), bash silently:

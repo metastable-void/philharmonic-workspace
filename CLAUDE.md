@@ -155,17 +155,28 @@ Usage shapes (from `rexec --help`, v0.2.0):
   through MCP tools rather than the Bash form below.
   Tool-call shapes are discoverable via the agent's MCP tool
   list at session start (Anthropic's standard `mcp__<server>__<tool>`
-  naming). The server already knows the agent's `--whoami`
-  (baked into its startup args); the tool call supplies the
-  working directory, the inner command, and any
-  `--env` / `--read-stdin` flags. If the MCP rexec tools
-  aren't visible in your tool list, fall back to the Bash
-  form and surface the MCP-not-loaded mismatch (the
-  workspace config in
-  [`.claude/settings.json`](.claude/settings.json) /
-  [`.codex/config.toml`](.codex/config.toml) should make
-  them available; if they aren't, restart the session or
-  ask Yuka).
+  naming). The `exec` tool takes:
+  - `dir` — working directory the host should `chdir` into
+    before exec.
+  - `argv` — non-empty array; `argv[0]` is the program
+    (resolved via PATH), rest are arguments.
+  - `envs` — optional, each entry `"VAR=VAL"`; adds to (not
+    replaces) the host's environment.
+  - `stdin` — optional UTF-8 string fed to the child's fd 0
+    via a pipe that closes after writing (so the child sees
+    real EOF instead of blocking on the PTY slave). This is
+    the preferred surface for piping commit messages and
+    other stdin payloads — bytes land verbatim, with no
+    shell-expansion boundary between the tool call and the
+    child. The server already knows the agent's `--whoami`
+    (baked into its startup args), so the tool call doesn't
+    need to re-specify it. If the MCP rexec tools aren't
+    visible in your tool list, fall back to the Bash form
+    and surface the MCP-not-loaded mismatch (the workspace
+    config in [`.mcp.json`](.mcp.json) /
+    [`.codex/config.toml`](.codex/config.toml) should make
+    them available; if they aren't, restart the session or
+    ask Yuka).
 - **Run a command via the Bash form (fallback).** `--whoami`
   and `--dir` are mandatory, repeat `--env` per override,
   `--` separates the inner command from `rexec`'s flags:
@@ -430,29 +441,37 @@ anything non-trivial — this summary is a prompt, not a spec.
   at ≈ 72 cols.** Imperative subject; body covers per-file
   scope / rationale / residual risks. Hard-wrap the body by
   hand. ([§4.10](CONTRIBUTING.md#410-commit-message-format))
-- **[Soft] ALWAYS pass commit messages via
-  `--message-file <path>` (canonical) or `--message-file -`
-  with `rexec --read-stdin` (alternative, v0.1.1+).** Never as
-  a positional argument. Canonical recipe:
-  1. `Write` the message body to `/tmp/<slug>-commit-msg.txt`
-     (the `/tmp` directory is listed as an additional working
-     directory in the env block).
-  2. `rexec ... -- ./scripts/commit-all.sh --message-file /tmp/<slug>-commit-msg.txt`
-  3. `rexec ... -- rm -f /tmp/<slug>-commit-msg.txt`
+- **[Soft] ALWAYS pass commit messages via the MCP `exec`
+  tool's `stdin` field.** Never as a positional argument.
+  Canonical recipe (single tool call):
+  ```
+  mcp__rexec__exec(
+    dir   = <workspace-root>,
+    argv  = ["./scripts/commit-all.sh", "--message-file", "-"],
+    stdin = "<message body>"
+  )
+  ```
+  The stdin bytes reach `commit-all.sh` verbatim via a pipe
+  the MCP server attaches to fd 0 — no shell-expansion
+  boundary, so backticked `tokens`, `$VAR` references, and
+  `$(cmd)` substitutions all survive as literal text. The
+  stdin parameter is part of the tool-call JSON so the body
+  is auditable in the agent transcript without needing a
+  tempfile sitting around.
 
-  The body lands verbatim — backticked `tokens`, `$VAR`
-  references, and `$(cmd)` substitutions all survive because
-  the file path never goes through a shell-expansion boundary.
-  The tempfile form is canonical because it's auditable (body
-  on disk; re-readable with `Read`) and immune to outer-quote
-  slip-ups. The `rexec --read-stdin -- ... --message-file -
-  <<'EOF' ... EOF` form is now viable but still routes through
-  bash's heredoc parsing — fine for one-shot calls but easier
-  to slip into the broken legacy `"$(cat <<'EOF' ... EOF)"`
-  shape, which is fragile (incident `a5833d5` lost ≈ 8
-  backticked tokens to it). History is append-only, so a
-  mangled message is unfixable except via a fix-forward
-  errata note. Codex never commits — only Claude does.
+  **Tempfile alternative** (Write to
+  `/tmp/<slug>-commit-msg.txt` → MCP `exec` with
+  `argv = [..., "--message-file", "/tmp/<slug>-commit-msg.txt"]`
+  → `rm`) remains valid; reach for it when the body is large
+  enough that having it on disk for a second-look pass is
+  worth the extra steps. The Bash form via `rexec
+  --read-stdin -- ... --message-file - <<'EOF'` is fragile
+  (bash heredoc parsing — easy to slip into the broken
+  legacy `"$(cat <<'EOF' ... EOF)"` shape, which lost ≈ 8
+  backticked tokens at incident `a5833d5`); prefer the MCP
+  stdin form. History is append-only, so a mangled message
+  is unfixable except via a fix-forward errata note. Codex
+  never commits — only Claude does.
   ([§4.10](CONTRIBUTING.md#410-commit-message-format))
 - **[Hard] Git history is append-only.** No amend, no rebase, no
   reset, no force-push, no `git revert`. Two narrow
