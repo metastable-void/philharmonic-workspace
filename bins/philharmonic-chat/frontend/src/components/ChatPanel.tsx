@@ -39,23 +39,49 @@ export default function ChatPanel({
   const [error, setError] = useState<string | null>(null);
   const transcriptRef = useRef<HTMLDivElement | null>(null);
   const shouldAutoscroll = useRef(true);
+  // Single-shot guard so the 2s poll doesn't keep re-firing the
+  // empty-instance greeting execute while the first one is in
+  // flight. Reset when instanceId changes (handled by the effect
+  // below that depends on the new `refresh` callback).
+  const greetingAttempted = useRef(false);
 
-  const refresh = useCallback(() => {
-    fetchLatestStep(instanceId, token)
-      .then((step) => {
-        if (step !== null) {
-          setMessages(parseMessages(step.output));
+  const refresh = useCallback(async () => {
+    try {
+      const step = await fetchLatestStep(instanceId, token);
+      if (step === null) {
+        // Fresh instance with no steps yet — trigger the
+        // workflow's greeting by executing one step with empty
+        // input. Mirrors the legacy webui ChatPanel pattern; the
+        // workflow's script is expected to render an opening
+        // turn when it sees `{}`. Mock-test mode hits this on
+        // first open; agent mode never does (agents only land on
+        // chats that already have steps via the notify channel).
+        if (greetingAttempted.current) {
+          return;
         }
-        setError(null);
-      })
-      .catch((caught) => setError(messageFrom(caught, t.common.requestFailed)));
+        greetingAttempted.current = true;
+        setIsInflight(true);
+        try {
+          const response = await executeInstance(instanceId, token, {});
+          setMessages(parseMessages(response.output));
+        } finally {
+          setIsInflight(false);
+        }
+      } else {
+        setMessages(parseMessages(step.output));
+      }
+      setError(null);
+    } catch (caught) {
+      setError(messageFrom(caught, t.common.requestFailed));
+    }
   }, [instanceId, token, t.common.requestFailed]);
 
   useEffect(() => {
     setMessages([]);
     setDraft("");
     setError(null);
-    refresh();
+    greetingAttempted.current = false;
+    void refresh();
   }, [refresh]);
 
   usePoll(true, 2000, refresh);
