@@ -51,3 +51,6 @@ args = ["-m", "--whoami", "Codex"]
 
 [mcp_servers.rexec.tools.exec]
 approval_mode = "approve"
+
+[features]
+shell_tool = false
