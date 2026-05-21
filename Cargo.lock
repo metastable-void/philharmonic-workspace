@@ -4010,10 +4010,17 @@ dependencies = [
 name = "philharmonic-chat"
 version = "0.0.0"
 dependencies = [
+ "axum",
  "clap",
+ "http",
+ "mechanics-http-client",
+ "philharmonic",
+ "rust-embed",
  "serde",
+ "serde_json",
  "tokio",
  "toml",
+ "uuid",
 ]
 
 [[package]]

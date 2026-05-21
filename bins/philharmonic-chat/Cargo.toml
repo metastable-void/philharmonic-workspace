@@ -4,9 +4,23 @@ version = "0.0.0"
 edition = "2024"
 rust-version = "1.88"
 publish = false
+build = "build.rs"
 
 [dependencies]
+philharmonic = { path = "../../philharmonic", default-features = false, features = [
+    "server",
+] }
+axum = { version = "0.8", default-features = false, features = ["http1", "json", "tokio"] }
 clap = { version = "4", default-features = false, features = ["color", "derive", "error-context", "help", "std", "suggestions", "usage"] }
+http = { version = "1", default-features = false, features = ["std"] }
+mechanics-http-client = { version = "0.2", default-features = false, features = ["http3"] }
+rust-embed = { version = "8", default-features = false, features = [] }
 serde = { version = "1", default-features = false, features = ["derive", "std"] }
+serde_json = { version = "1", default-features = false, features = ["std"] }
 toml = { version = "0.8", default-features = false, features = ["display", "parse"] }
-tokio = { version = "1", default-features = false, features = ["macros", "rt-multi-thread"] }
+tokio = { version = "1", default-features = false, features = ["macros", "net", "rt-multi-thread"] }
+uuid = { version = "1", default-features = false, features = ["serde", "v4"] }
+
+[features]
+default = ["https"]
+https = ["philharmonic/server-https"]

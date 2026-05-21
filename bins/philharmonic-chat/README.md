@@ -24,12 +24,18 @@ Three jobs, in order of weight:
 1. Serves the chat frontend (static HTML / JS / CSS) at `/`.
 2. Exposes `POST /mint-ephemeral` — the only place the
    `minting_token` is touched. Creates a new chat-workflow
-   instance from the configured `chat_uuid` template and mints
-   an ephemeral token scoped to that instance (execute + view).
+   instance from the configured `chat_uuid` template with
+   `service_token` and mints an ephemeral token scoped to that
+   instance (execute + read).
    Returns `{ "ephemeral_token": "...", "instance_id": "..." }`.
-3. Exposes `GET /config` — returns `{ "api_url": "..." }` so
+3. Exposes `GET /config` — returns `{ "api_url": "...",
+   "notify_instance_uuid": "..." }` so
    the static frontend doesn't have to be rebuilt per
    deployment.
+4. Exposes `POST /sign-in` — compares the typed agent token
+   against configured `agent_token` and returns 204 or 401.
+5. Exposes `GET /version` — returns the bin crate version and
+   embedded git SHA for frontend refresh detection.
 
 That's the entire HTTP surface. Chat traffic itself goes browser
 → `api_url` directly with whichever token the browser holds
@@ -52,10 +58,14 @@ message is the agent-authenticated UI, not the end-user UI.
 - **Agent token** (`agent_token`): static, configured in the
   TOML. The support agent's UI loads it from `localStorage` (set
   on the first sign-in modal) and uses it directly against
-  `api_url`. Minimum permission set: `workflow:instance_create`,
-  `workflow:instance_execute`, `workflow:instance_view`. *Not*
+  `api_url`. Minimum permission set: `workflow:instance_execute`,
+  `workflow:instance_read`. *Not*
   an admin token — earlier sketches called it that; the name is
   retired.
+- **Service token** (`service_token`): static, configured in the
+  TOML and used only by the bin to create fresh chat workflow
+  instances for `POST /mint-ephemeral`. Minimum permission set:
+  `workflow:instance_create`.
 - **Ephemeral token**: minted per chat instance by
   `POST /mint-ephemeral`. Allows execute + view on a single
   instance. Used by the mock-testing UI and, in the future,
@@ -223,6 +233,7 @@ bind = "[::]:443"
 bind_h3 = "[::]:443"
 
 api_url       = "https://philharmonic-api.tld"
+service_token = "pht_..."
 agent_token   = "pht_..."
 minting_token = "..."
 chat_uuid            = "..." # UUID of the chat workflow template
@@ -233,10 +244,10 @@ cert_path = "/path/to/fullchain.pem"
 key_path  = "/path/to/privkey.pem"
 ```
 
-The bin's HTTP surface (`/`, `/config`, `/mint-ephemeral`) is
-served from `bind` (HTTPS); `bind_h3` runs the HTTP/3 path on
-the same authority. TLS material is rustls-loaded per the
-workspace's HTTP stack rules.
+The bin's HTTP surface (`/`, `/config`, `/sign-in`,
+`/mint-ephemeral`, `/version`) is served from `bind` (HTTPS);
+`bind_h3` runs the HTTP/3 path on the same authority. TLS
+material is rustls-loaded per the workspace's HTTP stack rules.
 
 ## Reference workflow template
 
