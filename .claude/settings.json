@@ -40,7 +40,9 @@
       "Skill(codex-prompt-archive)",
       "Skill(codex-prompt-archive:*)",
       "Skill(git-workflow)",
-      "Skill(git-workflow:*)"
+      "Skill(git-workflow:*)",
+      "mcp__rexec__check_host",
+      "mcp__rexec__exec"
     ],
     "additionalDirectories": [
       "/tmp"
@@ -70,16 +72,6 @@
         "source": "github",
         "repo": "openai/codex-plugin-cc"
       }
-    }
-  },
-  "mcpServers": {
-    "rexec": {
-      "command": "rexec",
-      "args": [
-        "-m",
-        "--whoami",
-        "Claude"
-      ]
     }
   },
   "theme": "auto"

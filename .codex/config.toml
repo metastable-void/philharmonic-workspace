@@ -48,3 +48,6 @@ model_verbosity = "concise"
 [mcp_servers.rexec]
 command = "rexec"
 args = ["-m", "--whoami", "Codex"]
+
+[mcp_servers.rexec.tools.exec]
+approval_mode = "approve"

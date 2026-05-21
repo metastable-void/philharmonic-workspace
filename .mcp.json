@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "rexec": {
+      "type": "stdio",
+      "command": "rexec",
+      "args": [
+        "-m",
+        "--whoami",
+        "Claude"
+      ],
+      "env": {}
+    }
+  }
+}

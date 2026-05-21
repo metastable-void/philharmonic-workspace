@@ -122,24 +122,31 @@ inner command.
 
 **Prefer the MCP tools over the Bash form (v0.2.0+).** The
 workspace exposes `rexec` as an MCP server in both
-[`.claude/settings.json`](.claude/settings.json) (for Claude
-Code) and [`.codex/config.toml`](.codex/config.toml) (for
-Codex). The server is started with the agent's identity baked
-in via `-m --whoami Claude` / `-m --whoami Codex`, so the
-per-call MCP tool invocations don't need to re-specify
-`--whoami`; they only need the working directory and the
-inner command. Use the MCP tools by default — they avoid the
-shell-quoting / heredoc traps the Bash form is vulnerable to,
-they integrate with the agent's permission model directly, and
+[`.mcp.json`](.mcp.json) (the standardised Anthropic MCP
+config; loaded by Claude Code workspace-wide) and
+[`.codex/config.toml`](.codex/config.toml) (the
+`[mcp_servers.rexec]` table for Codex). The server is
+started with the agent's identity baked in via
+`-m --whoami Claude` / `-m --whoami Codex`, so per-call MCP
+tool invocations don't need to re-specify `--whoami`; they
+only need the working directory and the inner command. Use
+the MCP tools by default — they avoid the shell-quoting /
+heredoc traps the Bash form is vulnerable to, they
+integrate with the agent's permission model directly (see
+the `mcp__rexec__*` allow entries in
+[`.claude/settings.json`](.claude/settings.json)), and
 they're the supported run-mode surface going forward.
 
 The Bash form (`rexec --whoami ... --dir ... -- <cmd>`) stays
-valid and is the right surface for transcript inspection
-(`rexec --list N`, `rexec --print <name>`) and host status
-(`rexec -c`) since those are read-only and don't need a
-`--whoami` / `--dir` pair. It's also the fallback when the
-MCP server isn't loaded for some reason (e.g. a session that
-predates the config).
+valid and is the fallback when the MCP server isn't loaded
+for some reason (e.g. a session that predates the config).
+Host status has a dedicated MCP tool (`check_host`);
+transcript inspection (`rexec --list N`, `rexec --print
+<name>`) rides on `exec` with `argv = ["rexec", "--list",
+"N"]` / `argv = ["rexec", "--print", "<name>"]` — the MCP
+tool runs the binary inside the host's environment, so the
+read-only transcript commands hit the same surface as
+run-mode invocations and produce the same output.
 
 Usage shapes (from `rexec --help`, v0.2.0):
 
@@ -173,12 +180,14 @@ Usage shapes (from `rexec --help`, v0.2.0):
 - **MCP-stdio server (`-m` / `--mcp-stdio`, new in v0.2.0):**
   starts a stdio MCP server that forwards tool calls to the
   rexec host. Configured workspace-wide via
-  `mcpServers.rexec` (Claude) and `[mcp_servers.rexec]`
-  (Codex). Agents don't invoke `rexec -m` directly — the
-  harness spawns it at session start with `--whoami` baked
-  in. The flag is mentioned here only so the configuration
-  is legible; touching the server config is a settings
-  task, not an agent task.
+  `mcpServers.rexec` in [`.mcp.json`](.mcp.json) (Claude)
+  and `[mcp_servers.rexec]` in
+  [`.codex/config.toml`](.codex/config.toml) (Codex).
+  Agents don't invoke `rexec -m` directly — the harness
+  spawns it at session start with `--whoami` baked in. The
+  flag is mentioned here only so the configuration is
+  legible; touching the server config is a settings task,
+  not an agent task.
 - **Forwarding stdin (`--read-stdin`, v0.1.1+):** without
   this flag, the inner child's stdin is the PTY slave and any
   read blocks because nothing is written to it. Pass
@@ -204,28 +213,38 @@ Usage shapes (from `rexec --help`, v0.2.0):
   vulnerable to. Use `--read-stdin` when piping small data
   inline (test fixtures, tarball pipes, ad-hoc `cat | tool`
   flows) where a tempfile would just be ceremony.
-- **Host status:** `rexec -c` / `--check-host` checks whether
-  a host is running for this user. A host must be up before
-  run-mode invocations. **Starting the host is a human's job,
-  not an agent's** — `rexec -s` / `--start-host` runs a
-  foreground process the operator owns (^C to stop). If
-  `--check-host` reports no host running, stop and ask Yuka
-  to start one; never run `--start-host` yourself.
+- **Host status:** check via the dedicated MCP tool
+  (`check_host`, no arguments — returns `HOST RUNNING` or
+  `HOST NOT FOUND`) or via the Bash form (`rexec -c` /
+  `--check-host`). A host must be up before run-mode
+  invocations. **Starting the host is a human's job, not an
+  agent's** — `rexec -s` / `--start-host` runs a foreground
+  process the operator owns (^C to stop). If `check_host`
+  reports `HOST NOT FOUND`, stop and ask Yuka to start one;
+  never run `--start-host` yourself.
 - **Transcripts:** `rexec --list <N>` lists the N most recent
   transcripts in `YYYY-MM-DD-hh:mm:ss commands=K` form (newest
   first). `rexec -p <name>` / `--print <name>` shows one by
   its name; add `-f` / `--follow` to stream new entries as
   they arrive. **Use them to verify executed commands** —
   especially after a multi-step run, when output capture got
-  truncated, or when something looks off:
-  ```sh
-  rexec --list 1                # → 2026-05-21-11:23:09 commands=4
-  rexec --print 2026-05-21-11:23:09
-  ```
-  The transcript carries timestamps + the `Yuka:/path $`
-  prompt line + the verbatim command + its full stdout/
-  stderr — what actually ran, not what the agent intended.
-  This is the post-hoc audit trail; lean on it when in doubt.
+  truncated, or when something looks off. Both commands work
+  via either surface:
+  - **MCP (preferred):** call `exec` with the rexec binary
+    inside, e.g. `argv = ["rexec", "--list", "1"]` or
+    `argv = ["rexec", "--print", "<name>"]`. `dir` can be
+    any valid path (the read-only commands ignore it; pass
+    the workspace root for consistency).
+  - **Bash form:**
+    ```sh
+    rexec --list 1                # → 2026-05-21-11:23:09 commands=4
+    rexec --print 2026-05-21-11:23:09
+    ```
+  Both produce the same output. The transcript carries
+  timestamps + the `<whoami>:<dir> $` prompt line + the
+  verbatim command + its full stdout/stderr — what actually
+  ran, not what the agent intended. This is the post-hoc
+  audit trail; lean on it when in doubt.
 
 **Caveat — beware pagers (stdin is no longer a caveat in v0.1.1).**
 With `--read-stdin`, the previous "stdin doesn't pass through"
