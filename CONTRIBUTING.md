@@ -948,11 +948,15 @@ order:
   it on disk for a second-look pass is worth the extra
   steps (Write + exec + rm).
 - **Fallback: `rexec --read-stdin -- ... --message-file -`
-  with a bash heredoc.** Works under v0.1.1+ but still
-  routes through bash heredoc parsing — easy to slip into
+  with a heredoc, invoked through the `Bash` tool.** Works
+  under v0.1.1+ but routes through the `Bash` tool's bash
+  shell, where the heredoc is parsed — easy to slip into
   the broken legacy `"$(cat <<'EOF' ... EOF)"` shape.
   Reserved for sessions where the MCP rexec server isn't
-  loaded.
+  loaded. (`rexec` itself doesn't run a shell — the shell
+  here is the one the `Bash` tool spawns to invoke
+  `rexec`; the inner command rexec runs after the `--` is
+  `exec`-ed directly via PATH.)
 
 Only Claude commits in this workspace. Codex never commits
 (the `codex-guard` in `scripts/lib/codex-guard.sh` hard-aborts
@@ -1010,13 +1014,15 @@ to the agent and to any reviewer reading the transcript.
    ```
 
 Same shell-expansion-safe guarantees as the canonical form
-(the path is the argument; Bash never parses the body). Use
-this when the body is long enough to merit re-reading from
-disk, or when the operator wants to inspect the body before
-the commit lands.
+(the path is the argument; the agent's harness never
+parses the body as shell input — under MCP no shell is
+involved at all). Use this when the body is long enough
+to merit re-reading from disk, or when the operator wants
+to inspect the body before the commit lands.
 
-**Bash fallback (`rexec --read-stdin`, single invocation,
-when MCP rexec isn't loaded):**
+**Shell-tool fallback (`rexec --read-stdin`, single
+invocation through the `Bash` tool, when MCP rexec isn't
+loaded):**
 
 ```sh
 rexec --whoami <agent> --dir <workspace-root> --read-stdin -- \
@@ -1030,23 +1036,26 @@ suppresses shell expansion inside the heredoc body.
 EOF
 ```
 
-Two load-bearing pieces in the Bash fallback:
+Two load-bearing pieces in the shell-tool fallback:
 
-1. `rexec --read-stdin` (v0.1.1+) reads the client's stdin
-   to EOF and forwards it to the inner child. Without this
-   flag, the inner child's stdin is the PTY slave and reads
-   hang because nothing is written to it.
+1. `rexec --read-stdin` (v0.1.1+) reads the calling shell's
+   stdin to EOF and forwards it to the inner child.
+   Without this flag, the inner child's stdin is the PTY
+   slave and reads hang because nothing is written to it.
 2. The single-quoted `<<'EOF'` heredoc delimiter suppresses
-   shell expansion inside the heredoc body. A bare `<<EOF`
-   would still expand backticks and `$VAR` inside the body
-   itself; the single quotes are mandatory.
+   shell expansion inside the heredoc body. A bare
+   `<<EOF` would still expand backticks and `$VAR` inside
+   the body itself; the single quotes are mandatory. The
+   shell doing this parsing is the bash that the `Bash`
+   tool spawned around the `rexec` invocation — not
+   `rexec` itself (which never spawns a shell).
 
-The Bash fallback is strictly less safe than either MCP form
-above — bash heredoc parsing is the failure surface that
-keeps biting (incident `a5833d5` lost ≈ 8 backticked tokens
-to a slip into the legacy `"$(cat <<'EOF' ... EOF)"` shape).
-Use only when the MCP rexec tools aren't available in the
-session's tool list.
+The shell-tool fallback is strictly less safe than either
+MCP form above — the bash-tool heredoc parsing is the
+failure surface that keeps biting (incident `a5833d5`
+lost ≈ 8 backticked tokens to a slip into the legacy
+`"$(cat <<'EOF' ... EOF)"` shape). Use only when the MCP
+rexec tools aren't available in the session's tool list.
 
 **Legacy positional form** (still accepted by the script, but
 fragile; do not use):
@@ -1062,9 +1071,9 @@ This works in current bash but re-introduces a quoting
 boundary — a missing outer `"`, a stray `"` inside the
 body, or an unusual quote-removal semantics in some shell
 could re-introduce the expansion failure. All three
-`--message-file` surfaces above (MCP stdin, MCP path, Bash
-heredoc) remove the boundary entirely; the MCP stdin form
-removes the shell altogether.
+`--message-file` surfaces above (MCP stdin, MCP path,
+shell-tool heredoc) remove the boundary entirely; the two
+MCP forms remove the shell altogether.
 
 Why all this discipline: with the legacy positional form
 (or any plain `"message"` argument), bash silently:

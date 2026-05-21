@@ -124,28 +124,44 @@ inner command.
 `Bash` tool.** All command execution — including read-only
 checks, transcript inspection, host status, anything — goes
 through `mcp__rexec__exec` (or `mcp__rexec__check_host` for
-the dedicated host-status call). The `Bash` tool is the
-fallback surface only, reserved for sessions where the MCP
-rexec server isn't loaded (a fresh session that predates the
-workspace config, a host where MCP isn't available, etc.).
+the dedicated host-status call). The Claude Code `Bash` tool
+is the fallback surface only, reserved for sessions where the
+MCP rexec server isn't loaded (a fresh session that predates
+the workspace config, a host where MCP isn't available, etc.).
 Verify presence at session start by looking for
-`mcp__rexec__*` in your tool list; if they're there, use
-them exclusively and treat the `Bash` tool as unavailable
-for this session.
+`mcp__rexec__*` in your tool list; if they're there, use them
+exclusively and treat the `Bash` tool as unavailable for this
+session.
 
-Rationale: the Bash tool adds a redundant layer (Bash shell
-→ `rexec` binary → rexec host) where MCP goes directly
-(MCP client → rexec MCP server → rexec host). The shell
-layer is where the workspace's quoting / heredoc / pager
-traps live; eliminating the shell altogether for the
-common path eliminates those traps entirely. The MCP
-server also integrates with the agent's permission model
-natively (see the `mcp__rexec__*` allow entries in
+Rationale: the `Bash` tool runs the agent's argument through a
+bash shell, which is where the workspace's quoting / heredoc
+/ command-substitution traps live. `mcp__rexec__exec` takes a
+typed `argv` array and forwards it to the rexec host, which
+`exec`s the program directly via PATH — **no shell is
+spawned** unless the inner command itself is a shell (e.g.
+`argv = ["sh", "-c", "<script>"]`). The MCP surface is
+shell-free by default, eliminating those traps for the
+common path. The MCP server also integrates with the
+agent's permission model natively (see the `mcp__rexec__*`
+allow entries in
 [`.claude/settings.json`](.claude/settings.json)) instead
-of routing through `Bash` permissions. The Bash form
-remains a documented fallback so the rule degrades
-gracefully when MCP isn't available — it doesn't go
-away, it just isn't the primary surface.
+of routing through `Bash` permissions. The `Bash` tool
+remains documented as a fallback so the rule degrades
+gracefully when MCP isn't available — it doesn't go away,
+it just isn't the primary surface.
+
+**Note on terminology:** `rexec` is not "Bash" — it's the
+command-execution aggregator. When run via the `Bash` tool,
+the outer wrapper around `rexec ...` is a bash invocation
+(that's where the traps live); the inner command `rexec`
+runs is then `exec`-ed directly without a shell. When run
+via MCP, even the outer wrapper goes away. **When agents
+need a shell inside an MCP exec call** — to chain commands,
+expand a glob, or evaluate a one-liner — they pass
+`argv = ["sh", "-c", "<script>"]`, invoking POSIX `sh`
+([§6 in CONTRIBUTING.md](CONTRIBUTING.md#6-shell-script-rules-posix-sh)),
+not bash. Workspace `scripts/*.sh` are `#!/bin/sh` and the
+ad-hoc `sh -c '...'` shape stays consistent with that.
 
 **Workspace config:** the rexec MCP server is declared in
 [`.mcp.json`](.mcp.json) (Anthropic's standard MCP config
@@ -157,26 +173,27 @@ identity into startup args (`-m --whoami Claude` /
 only need to supply the working directory and the inner
 command.
 
-**Bash form (`rexec --whoami ... --dir ... -- <cmd>`) is
-the documented fallback** when the MCP server isn't
-loaded. It does not coexist with MCP in normal use — pick
-one surface per session based on what's available, and
-under the rule above MCP wins when both are present. Host
-status check via Bash is `rexec -c`; transcript inspection
-is `rexec --list N` / `rexec --print <name>`. The
-equivalent MCP forms are `mcp__rexec__check_host` (no
-args, dedicated tool) and `mcp__rexec__exec` with
-`argv = ["rexec", "--list", "N"]` /
-`argv = ["rexec", "--print", "<name>"]` — the MCP `exec`
-runs the rexec binary inside the host's environment, so
-the read-only transcript commands hit the same surface as
-run-mode invocations and produce identical output.
+**The `Bash` tool form (`rexec --whoami ... --dir ... --
+<cmd>`) is the documented fallback** when the MCP server
+isn't loaded. It does not coexist with MCP in normal use
+— pick one surface per session based on what's available,
+and under the rule above MCP wins when both are present.
+Host status check via the `Bash` tool is `rexec -c`;
+transcript inspection is `rexec --list N` / `rexec
+--print <name>`. The equivalent MCP forms are
+`mcp__rexec__check_host` (no args, dedicated tool) and
+`mcp__rexec__exec` with `argv = ["rexec", "--list", "N"]`
+/ `argv = ["rexec", "--print", "<name>"]` — the MCP
+`exec` runs the rexec binary inside the host's
+environment, so the read-only transcript commands hit
+the same surface as run-mode invocations and produce
+identical output.
 
 Usage shapes (from `rexec --help`, v0.2.0):
 
 - **Run a command via MCP (preferred).** When the rexec MCP
   server is loaded for the session, run-mode invocations go
-  through MCP tools rather than the Bash form below.
+  through MCP tools rather than the `Bash` tool form below.
   Tool-call shapes are discoverable via the agent's MCP tool
   list at session start (Anthropic's standard `mcp__<server>__<tool>`
   naming). The `exec` tool takes:
@@ -195,23 +212,28 @@ Usage shapes (from `rexec --help`, v0.2.0):
     child. The server already knows the agent's `--whoami`
     (baked into its startup args), so the tool call doesn't
     need to re-specify it. If the MCP rexec tools aren't
-    visible in your tool list, fall back to the Bash form
-    and surface the MCP-not-loaded mismatch (the workspace
-    config in [`.mcp.json`](.mcp.json) /
+    visible in your tool list, fall back to the `Bash` tool
+    form (below) and surface the MCP-not-loaded mismatch
+    (the workspace config in [`.mcp.json`](.mcp.json) /
     [`.codex/config.toml`](.codex/config.toml) should make
     them available; if they aren't, restart the session or
     ask Yuka).
-- **Run a command via the Bash form (fallback).** `--whoami`
-  and `--dir` are mandatory, repeat `--env` per override,
-  `--` separates the inner command from `rexec`'s flags:
+- **Run a command via the `Bash` tool form (fallback).**
+  `--whoami` and `--dir` are mandatory, repeat `--env` per
+  override, `--` separates the inner command from `rexec`'s
+  flags:
   ```sh
   rexec --whoami <agent-id> --dir <workdir> \
       [--env VAR=VAL]... [--read-stdin] -- <command> [args...]
   ```
   This form remains valid; use it when MCP isn't loaded or
   when you have a specific reason (e.g. piping a tempfile
-  path that the MCP shape would obscure). Both forms hit the
-  same rexec host and produce the same transcripts.
+  path that the MCP shape would obscure). Both forms hit
+  the same rexec host and produce the same transcripts.
+  The outer wrapper *here* is a bash invocation (the
+  `Bash` tool's argv); the inner command rexec runs is
+  still `exec`-ed directly via PATH with no shell of its
+  own (same as the MCP path).
 - **MCP-stdio server (`-m` / `--mcp-stdio`, new in v0.2.0):**
   starts a stdio MCP server that forwards tool calls to the
   rexec host. Configured workspace-wide via
@@ -250,8 +272,8 @@ Usage shapes (from `rexec --help`, v0.2.0):
   flows) where a tempfile would just be ceremony.
 - **Host status:** check via the dedicated MCP tool
   (`check_host`, no arguments — returns `HOST RUNNING` or
-  `HOST NOT FOUND`) or via the Bash form (`rexec -c` /
-  `--check-host`). A host must be up before run-mode
+  `HOST NOT FOUND`) or via the `Bash` tool form (`rexec -c`
+  / `--check-host`). A host must be up before run-mode
   invocations. **Starting the host is a human's job, not an
   agent's** — `rexec -s` / `--start-host` runs a foreground
   process the operator owns (^C to stop). If `check_host`
@@ -270,7 +292,7 @@ Usage shapes (from `rexec --help`, v0.2.0):
     `argv = ["rexec", "--print", "<name>"]`. `dir` can be
     any valid path (the read-only commands ignore it; pass
     the workspace root for consistency).
-  - **Bash form:**
+  - **`Bash` tool form:**
     ```sh
     rexec --list 1                # → 2026-05-21-11:23:09 commands=4
     rexec --print 2026-05-21-11:23:09
@@ -499,14 +521,16 @@ anything non-trivial — this summary is a prompt, not a spec.
   `argv = [..., "--message-file", "/tmp/<slug>-commit-msg.txt"]`
   → `rm`) remains valid; reach for it when the body is large
   enough that having it on disk for a second-look pass is
-  worth the extra steps. The Bash form via `rexec
-  --read-stdin -- ... --message-file - <<'EOF'` is fragile
-  (bash heredoc parsing — easy to slip into the broken
-  legacy `"$(cat <<'EOF' ... EOF)"` shape, which lost ≈ 8
+  worth the extra steps. The legacy `Bash`-tool form via
+  `rexec --read-stdin -- ... --message-file - <<'EOF'` is
+  fragile (the heredoc body is parsed by the bash shell the
+  `Bash` tool spawned — easy to slip into the broken
+  `"$(cat <<'EOF' ... EOF)"` shape, which lost ≈ 8
   backticked tokens at incident `a5833d5`); prefer the MCP
-  stdin form. History is append-only, so a mangled message
-  is unfixable except via a fix-forward errata note. Codex
-  never commits — only Claude does.
+  stdin form, which doesn't involve a shell at all. History
+  is append-only, so a mangled message is unfixable except
+  via a fix-forward errata note. Codex never commits — only
+  Claude does.
   ([§4.10](CONTRIBUTING.md#410-commit-message-format))
 - **[Hard] Git history is append-only.** No amend, no rebase, no
   reset, no force-push, no `git revert`. Two narrow

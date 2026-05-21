@@ -219,7 +219,7 @@ wrappers, `xtask.sh`, raw read-only tools) rather than
 replacing them: `rexec` is the outer envelope; the inner
 wrapper is unchanged.
 
-**Prefer the MCP tools over the Bash form (v0.2.0+).** The
+**Prefer the MCP tools over the shell form (v0.2.0+).** The
 workspace exposes `rexec` as an MCP server in
 [`.codex/config.toml`](.codex/config.toml) for Codex
 (`[mcp_servers.rexec]` with `command = "rexec"`,
@@ -229,12 +229,16 @@ root. The server is started with your identity baked in, so
 per-call MCP tool invocations don't need to re-specify
 `--whoami` — they only need the working directory and the
 inner command. Use the MCP tools by default when they're
-available; they avoid the shell-quoting / heredoc traps the
-Bash form is vulnerable to and they integrate with your
-harness's permission model directly.
+available; they take a typed `argv` array, `exec` the
+program directly via PATH, and **don't spawn a shell**
+unless the inner command itself is a shell — eliminating
+the shell-quoting / heredoc traps the
+shell-wrapped form is vulnerable to. They also integrate
+with your harness's permission model directly.
 
-The Bash form (`rexec --whoami ... --dir ... -- <cmd>`)
-stays valid and is the fallback when the MCP server isn't
+The shell form (`rexec --whoami ... --dir ... -- <cmd>`,
+invoked through your harness's local shell tool) stays
+valid and is the fallback when the MCP server isn't
 loaded. Host status has a dedicated MCP tool (`check_host`);
 transcript inspection (`rexec --list N`, `rexec --print
 <name>`) rides on `exec` with `argv = ["rexec", "--list",
@@ -243,17 +247,28 @@ tool runs the rexec binary inside the host's environment,
 so the read-only transcript commands hit the same surface
 as run-mode invocations and produce the same output.
 
+**Terminology note:** `rexec` is not a shell; it's a
+command-execution aggregator. When invoked, it `exec`s the
+target program directly via PATH. **When you need a shell
+inside an MCP exec call** — to chain commands, expand a
+glob, or evaluate a one-liner — pass
+`argv = ["sh", "-c", "<script>"]`. The workspace's shell
+rule is POSIX `sh`
+([§6 below](#6-shell-script-rules-posix-sh)), not bash;
+workspace `scripts/*.sh` are `#!/bin/sh` and ad-hoc
+`sh -c '...'` follows the same.
+
 Usage shapes (from `rexec --help`, v0.2.0):
 
 - **Run a command via MCP (preferred).** When the rexec
   MCP server is loaded for your session, run-mode
-  invocations go through MCP tools rather than the Bash
+  invocations go through MCP tools rather than the shell
   form below. Tool-call shapes are discoverable via your
   MCP tool list at session start. The server already knows
   your `--whoami`; the tool call supplies the working
   directory, the inner command, and any
-  `--env` / `--read-stdin` flags.
-- **Run a command via the Bash form (fallback).**
+  `envs` / `stdin` parameters.
+- **Run a command via the shell form (fallback).**
   `--whoami` and `--dir` are mandatory, repeat `--env` per
   override, `--` separates the inner command from
   `rexec`'s flags:
@@ -262,7 +277,11 @@ Usage shapes (from `rexec --help`, v0.2.0):
       [--env VAR=VAL]... [--read-stdin] -- <command> [args...]
   ```
   Both forms hit the same rexec host and produce the same
-  transcripts.
+  transcripts. The outer wrapper *here* is a shell
+  invocation (parsed by your harness's shell tool); the
+  inner command rexec runs is still `exec`-ed directly
+  via PATH with no shell of its own (same as the MCP
+  path).
 - **MCP-stdio server (`-m` / `--mcp-stdio`, new in v0.2.0):**
   starts a stdio MCP server that forwards tool calls to
   the rexec host. Codex's harness spawns it at session
@@ -279,7 +298,7 @@ Usage shapes (from `rexec --help`, v0.2.0):
   style flows where a tempfile would be ceremony.
 - **Host status:** check via the dedicated MCP tool
   (`check_host`, no arguments — returns `HOST RUNNING` or
-  `HOST NOT FOUND`) or via the Bash form (`rexec -c` /
+  `HOST NOT FOUND`) or via the shell form (`rexec -c` /
   `--check-host`). A host must be up before run-mode
   invocations. **Starting the host is a human's job, not an
   agent's** — `rexec -s` / `--start-host` runs a foreground
@@ -299,7 +318,7 @@ Usage shapes (from `rexec --help`, v0.2.0):
     `argv = ["rexec", "--print", "<name>"]`. `dir` can be
     any valid path (the read-only commands ignore it; pass
     the workspace root for consistency).
-  - **Bash form:**
+  - **Shell form:**
     ```sh
     rexec --list 1                # → 2026-05-21-11:23:09 commands=4
     rexec --print 2026-05-21-11:23:09
