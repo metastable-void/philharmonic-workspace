@@ -931,36 +931,64 @@ every one of them and burn context tokens unnecessarily.
 
 #### Passing the message to `commit-all.sh`
 
-**Always pass commit messages via `--message-file -` plus a
-single-quoted heredoc.** Not "for long messages" — always,
-even for one-paragraph messages. The canonical form:
+**Always pass commit messages via `--message-file <path>`,
+never as a positional argument and never via stdin (`-`).** Not
+"for long messages" — always, even for one-paragraph messages.
 
-```sh
-./scripts/commit-all.sh --message-file - <<'EOF'
-subject line ≤ 72 chars
+Only Claude commits in this workspace. Codex never commits
+(the `codex-guard` in `scripts/lib/codex-guard.sh` hard-aborts
+`commit-all.sh` under any `*codex*` ancestor process —
+[§4 Git workflow](#4-git-workflow)). All Claude command
+execution routes through `rexec` ([Hard]; see
+[CLAUDE.md §"Command execution via `rexec`"](CLAUDE.md); no
+direct-terminal exception). `rexec` does not pipe the calling
+shell's stdin to the inner command, so `--message-file -` plus
+a heredoc **hangs**. The path form is the only working
+surface; the stdin form does not exist as an option here.
 
-body paragraph hard-wrapped at ≈ 72 cols, freely using
+**Canonical recipe (Claude Code via `rexec`):**
+
+1. Use the editor's `Write` tool to drop the message into a
+   path under `/tmp` (the env block lists `/tmp` as an
+   additional working directory, so writing there is
+   allowed):
+   ```
+   Write file_path=/tmp/<slug>-commit-msg.txt content=<the body>
+   ```
+2. Invoke the commit through `rexec`:
+   ```sh
+   rexec --whoami <agent> --dir <workspace-root> -- \
+       ./scripts/commit-all.sh --message-file /tmp/<slug>-commit-msg.txt
+   ```
+3. Clean up:
+   ```sh
+   rexec --whoami <agent> --dir <workspace-root> -- \
+       rm -f /tmp/<slug>-commit-msg.txt
+   ```
+
+The message body lands on disk verbatim — Bash never parses
+it as a shell argument or as command-substitution input, so
 backticked `identifier` / `path/like/this` / `command(...)`
-tokens that the body legitimately needs to mention. Mention
-`$VAR` and `$(cmd)` references too without worrying about
-expansion.
-EOF
-```
+tokens and `$VAR` / `$(cmd)` references all survive as
+literal text.
 
-**Two load-bearing pieces** that together make the form
-bulletproof:
+**Why the path form is bulletproof:**
+`--message-file <path>` reads the message body from the file
+verbatim. There is no command-substitution boundary, no
+double-quoted argument boundary, no shell-expansion pass
+between the message text and the script. Bash never looks
+inside the body. The `Write` tool writes the bytes the agent
+hands it; what's on disk is what lands in the commit.
 
-1. `--message-file -` reads the message body from stdin
-   verbatim — no command substitution boundary, no
-   double-quoted argument boundary between the heredoc and
-   the script. Bash never looks inside the body.
-2. The single-quoted `<<'EOF'` heredoc delimiter
-   suppresses shell expansion *inside* the heredoc body
-   before stdin is written. A bare `<<EOF` (unquoted)
-   would still expand backticks and `$VAR` inside the
-   heredoc itself; the single quotes are mandatory.
+**Stdin form (`--message-file -`) is not usable in this
+workspace.** `rexec` is the only execution surface (commits
+included), and `rexec` breaks the stdin pipe. The script
+still accepts `-` for completeness (e.g. an external user
+running it without `rexec`), but no in-workspace caller
+should reach for it.
 
-**Legacy positional form** (still accepted, but fragile):
+**Legacy positional form** (still accepted by the script, but
+fragile; do not use):
 
 ```sh
 ./scripts/commit-all.sh "$(cat <<'EOF'
@@ -972,8 +1000,9 @@ EOF
 This works in current bash but re-introduces a quoting
 boundary — a missing outer `"`, a stray `"` inside the
 body, or an unusual quote-removal semantics in some shell
-could re-introduce the expansion failure. Prefer
-`--message-file -`; it removes the boundary entirely.
+could re-introduce the expansion failure. Both
+`--message-file` surfaces above remove the boundary
+entirely.
 
 Why all this discipline: with the legacy positional form
 (or any plain `"message"` argument), bash silently:
@@ -989,14 +1018,15 @@ All silent from the committer's perspective —
 `commit-all.sh` exits 0 and the commit just loses the
 expanded tokens. **Combined with the append-only history
 rule (§4.4)**, a mangled message is unfixable except via a
-fix-forward errata note. `--message-file -` is the easy
+fix-forward errata note. `--message-file` is the easy
 mechanical guardrail; use it unconditionally.
 
 Same rule applies to any other script that takes a free-form
 message argument (today only `commit-all.sh`). If a future
 wrapper script grows a message argument, give it a
 `--message-file <path>` (with `-` for stdin) sibling and
-recommend that as the canonical form.
+recommend the path form as the canonical surface — it's the
+one that survives `rexec` without ceremony.
 
 ---
 

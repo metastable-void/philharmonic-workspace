@@ -145,13 +145,17 @@ Usage shapes (from `rexec --help`, v0.1.0):
 `rexec` runs the inner command attached to its own TTY context,
 not the agent's. Two consequences: (1) stdin from the agent's
 Bash tool isn't piped through, so heredoc / piped input
-(`--message-file -`, `cat | foo`) hangs — write input to a
-tempfile first and pass the path. (2) Commands that auto-page
-when stdout is a TTY (`git diff`, `git log`, `git show`,
-`less`-using tools) hang waiting for keystrokes — pass
-`--no-pager` (e.g. `git --no-pager diff`) or pipe through
-`cat`. Prefer the workspace `scripts/*.sh` wrappers; they
-already handle this.
+(`commit-all.sh --message-file -`, `cat | foo`) hangs — write
+input to a tempfile first and pass the path. For commits
+specifically: use the `Write` tool to drop the message into
+`/tmp/<slug>.txt`, then `rexec ... -- ./scripts/commit-all.sh
+--message-file /tmp/<slug>.txt`, then clean up. (`Write` to
+`/tmp` is allowed; the env block lists `/tmp` as an additional
+working directory.) (2) Commands that auto-page when stdout is
+a TTY (`git diff`, `git log`, `git show`, `less`-using tools)
+hang waiting for keystrokes — pass `--no-pager` (e.g.
+`git --no-pager diff`) or pipe through `cat`. Prefer the
+workspace `scripts/*.sh` wrappers; they already handle this.
 
 **ANSI colour is stripped automatically.** `rexec` removes
 ANSI escape sequences from the inner command's stdout / stderr
@@ -281,24 +285,24 @@ anything non-trivial — this summary is a prompt, not a spec.
   at ≈ 72 cols.** Imperative subject; body covers per-file
   scope / rationale / residual risks. Hard-wrap the body by
   hand. ([§4.10](CONTRIBUTING.md#410-commit-message-format))
-- **[Soft] ALWAYS pass commit messages via `--message-file -` +
-  single-quoted heredoc**, even for one-line commits:
-  ```sh
-  ./scripts/commit-all.sh --message-file - <<'EOF'
-  subject ≤ 72 chars
+- **[Soft] ALWAYS pass commit messages via
+  `--message-file <path>`**, even for one-line commits. Stdin
+  (`--message-file -`) does NOT work — `rexec` doesn't pipe
+  stdin through, so heredoc-to-stdin hangs. Recipe:
+  1. `Write` the message body to `/tmp/<slug>-commit-msg.txt`
+     (the `/tmp` directory is listed as an additional working
+     directory in the env block).
+  2. `rexec ... -- ./scripts/commit-all.sh --message-file /tmp/<slug>-commit-msg.txt`
+  3. `rexec ... -- rm -f /tmp/<slug>-commit-msg.txt`
 
-  body wrapped at ≈ 72 cols. Backticked `tokens`, `$VAR`
-  references, and `$(cmd)` substitutions land verbatim.
-  EOF
-  ```
-  `--message-file -` reads stdin without a command-substitution
-  boundary; `<<'EOF'` (single-quoted) suppresses expansion
-  inside the heredoc body. The legacy `"$(cat <<'EOF' ... EOF
-  )"` form is fragile — bash can still re-expand on a missing
-  outer quote or quirky `"` placement. History is append-only,
-  so a mangled message is unfixable except via a fix-forward
-  note. (Incident: `a5833d5` lost ≈ 8 backticked tokens to the
-  double-quoted-string form.)
+  The body lands verbatim — backticked `tokens`, `$VAR`
+  references, and `$(cmd)` substitutions all survive because
+  the file path never goes through a shell-expansion boundary.
+  The legacy positional `"$(cat <<'EOF' ... EOF)"` form is
+  fragile (incident: `a5833d5` lost ≈ 8 backticked tokens to
+  it); history is append-only, so a mangled message is
+  unfixable except via a fix-forward errata note. Codex never
+  commits — only Claude does, via the recipe above.
   ([§4.10](CONTRIBUTING.md#410-commit-message-format))
 - **[Hard] Git history is append-only.** No amend, no rebase, no
   reset, no force-push, no `git revert`. Two narrow
