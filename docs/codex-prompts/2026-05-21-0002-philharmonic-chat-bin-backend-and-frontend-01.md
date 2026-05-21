@@ -94,7 +94,83 @@ Yuka explicitly chose "Backend + full chat UI" + "react+redux
 
 ## Outcome
 
-Pending — will be updated after Codex run completes.
+Completed in one round. Codex shipped commit `64a1fe6`
+("Implement philharmonic chat bin"): backend body across
+`config.rs` / `error.rs` / `mint.rs` / `routes.rs` /
+`static_assets.rs` / `build.rs` / new `main.rs`; full React +
+Redux + Webpack frontend under `frontend/`; `dist/` artifacts
+committed; the new `scripts/philharmonic-chat-build.sh`;
+README updates for the new HTTP-surface endpoints and the
+new `service_token` config key. Scope discipline was clean:
+no edits outside `bins/philharmonic-chat/`,
+`scripts/philharmonic-chat-build.sh`, root `Cargo.lock`, the
+`docs/codex-reports/` entry, and the auto-refreshed
+`docs/stats.svg`.
+
+Design decisions Codex made:
+
+- **Introduced `chat.service_token`** as the prompt
+  preferred, used exclusively for the bin → API
+  instance-create call. `agent_token` stays scoped to the
+  sign-in challenge.
+- **Used `workflow:instance_read`** instead of the prompt's
+  `workflow:instance_view` — the latter isn't a real atom in
+  `philharmonic-policy` and would be rejected at mint
+  validation. (My prompt was wrong; Codex caught it.)
+- **`rust-embed` for asset serving** rather than the
+  `inline-blob` path the prompt suggested. Cleaner for the
+  static-asset case; the WebUI's `inline-blob` use is for
+  larger / streaming payloads.
+- **WebAudio-generated tone** for the notification sound
+  (no binary asset shipped).
+- **Constant-time compare written inline** rather than
+  pulling in `subtle`.
+- **Frontend transcript parser tolerates both** raw message
+  arrays and `{ messages: [...] }` envelopes (matches the
+  WebUI's existing chat-output parser precedent).
+- **MockTest.tsx** ended up as a thin `export { default }
+  from "./ChatTranscript"` re-export — the mock-mode flow
+  lives in `App.tsx`'s view switching and shares the
+  `ChatTranscript` page with the agent flow. Functional but
+  the file is effectively dead — easy round 02 cleanup.
+
+Residual risks (per Codex's report, mirrored here):
+
+- `POST /mint-ephemeral` is unauthenticated and
+  rate-limit-free. Anyone reaching the bin can mint
+  instance-scoped tokens. Intentional for v0 per the prompt;
+  needs abuse mitigation before production.
+- Notify-channel awaiting list is browser-local (not
+  persisted across reloads). The list is intentionally not
+  inbox-exhaustive, in line with the lossy-by-design
+  contract.
+- `/version`'s `virtualization` field is hardcoded to
+  `"unknown"` — not wired to `philharmonic-virt-detect` yet.
+- The new build script is a second Node-touching wrapper
+  (the WebUI build is the established exception); the
+  prompt explicitly required it.
+
+**Process error to remember (Claude-side):** I instructed
+Codex to commit via `scripts/commit-all.sh` in this prompt's
+Git section. The workspace rule is **Codex never commits to
+Git**; Claude reviews the dirty tree and commits. The
+codex-prompt-archive skill's "## Writing the prompt" bullet
+about Git rules was updated in a follow-on commit to make
+this explicit so it doesn't happen again. The `64a1fe6`
+commit landed before review, which is the wrong shape — fix
+forward by reviewing post-hoc.
+
+Verification (per Codex's report — not re-run by Claude per
+Yuka's "don't burn time on pre-landing" rule):
+
+- `./scripts/test-scripts.sh` — clean.
+- `./scripts/philharmonic-chat-build.sh --production` —
+  produced `dist/` artifacts.
+- `./scripts/pre-landing.sh` — clean.
+
+Git state at review time: local branch `main` one commit
+ahead of origin (`64a1fe6`); not pushed (held for Yuka's
+review).
 
 ---
 

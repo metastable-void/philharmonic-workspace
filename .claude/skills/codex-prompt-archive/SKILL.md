@@ -156,9 +156,24 @@ shape:
   `<completeness_contract>`, `<verification_loop>`,
   `<missing_context_gating>`, and `<action_safety>` blocks —
   see the existing prompts for the wording that works.
-- **Always** reiterate the Git rules: signed-off commits,
-  `scripts/commit-all.sh` only, no `push-all.sh`, no
-  `cargo publish`. Codex will run raw git otherwise.
+- **Always** instruct Codex *not to commit*. Codex never
+  commits in this workspace — Claude reviews the dirty
+  diff first, then commits via `scripts/commit-all.sh`. The
+  prompt's Git section should say "leave all changes dirty
+  in the working tree for Claude to commit and push after
+  review" and the `<action_safety>` block should forbid
+  `git commit`, `git push`, `scripts/commit-all.sh`,
+  `scripts/push-all.sh`, `cargo publish`, and `cargo yank`
+  outright. Codex's allowed git is read-only inspection via
+  `scripts/status.sh` / `scripts/log.sh` / `scripts/heads.sh`
+  only. The codex-guard hook will abort a `commit-all.sh`
+  invocation under a Codex ancestor process, but don't rely
+  on it — write the prompt as if the guard isn't there.
+  (Earlier wording told Codex to use `scripts/commit-all.sh`
+  for its own commits; that was wrong. Yuka's correction
+  on 2026-05-21 after the philharmonic-chat round 01 dispatch
+  produced a Codex commit that should have been a dirty
+  working tree.)
 - **Always** list the verification commands Codex must run before
   finalizing: `./scripts/pre-landing.sh` (auto-detects touched
   crates; runs lint + workspace test + `--ignored` per modified
