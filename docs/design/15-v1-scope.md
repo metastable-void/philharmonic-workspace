@@ -7,15 +7,19 @@ operational since 2026-05-02.** All items in "Core
 infrastructure" and "API + deployment" below are shipped.
 29 published-crate names on crates.io (cascade-publish on
 2026-05-14 brought 22 of them to current versions; per-crate
-state lives in each `CHANGELOG.md`). Three bin targets with
-key generation, musl static builds, Docker compose, full-
-pipeline e2e tests, opportunistic HTTP/3 on all three bins.
-Tier-2 connectors (D7 SMTP, D19 DNS) shipped at 0.1.0 on
-2026-05-18. Tier-3 LLM connectors (D8 Anthropic, D9 Gemini)
-are deferred post-MVP — `llm_openai_compat` already covers the
-OpenAI / vLLM / compatible-gateway shape the MVP needs. The
-remaining MVP-blocker is a separate-codebase production
-Chat UI (§3.M); see [`docs/ROADMAP.md`](../ROADMAP.md).
+state lives in each `CHANGELOG.md`). Four in-tree bin
+targets (`mechanics-worker`, `philharmonic-connector`,
+`philharmonic-api-server`, `philharmonic-chat`) with key
+generation, musl static builds, Docker compose, full-
+pipeline e2e tests, opportunistic HTTP/3. Tier-2 connectors
+(D7 SMTP, D19 DNS) shipped at 0.1.0 on 2026-05-18. Tier-3
+LLM connectors (D8 Anthropic, D9 Gemini) are deferred
+post-MVP — `llm_openai_compat` already covers the OpenAI /
+vLLM / compatible-gateway shape the MVP needs. The
+production Chat UI for customer support (§3.M) landed
+2026-05-21 as the in-tree `bins/philharmonic-chat/` (single-
+bin axum server with embedded React+Redux frontend); see
+[`docs/ROADMAP.md`](../ROADMAP.md).
 
 ## Core infrastructure
 

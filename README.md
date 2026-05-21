@@ -68,7 +68,8 @@ philharmonic-workspace/
 ├── bins/                                      # in-tree bin crates
 │   ├── mechanics-worker/                      #   JS executor server
 │   ├── philharmonic-connector/                #   per-realm connector service
-│   └── philharmonic-api-server/               #   API server + WebUI
+│   ├── philharmonic-api-server/               #   API server + WebUI
+│   └── philharmonic-chat/                     #   agent-facing chat UI + mock-test harness
 ├── xtask/                                     # in-tree workspace tooling
 └── docs-jp/                                   # submodule (docs only)
 ```
@@ -180,18 +181,16 @@ allowed (mhc and the server crates consume it for client and
 server paths respectively); only the `reqwest` abstraction
 layer is banned.
 
-**What's next (MVP-blocking)**: a **production Chat UI** for
-the first concrete use case — **customer-support chat**. The
-framework itself is not a chat app (chats are workflow
-knowledge), so the production Chat UI lives in a separate
-codebase from the framework's crate family — either an
-in-tree top-level bin (`bins/philharmonic-chat-app/` shape,
-frontend + backend unified, depends on `philharmonic` like
-any other consumer) or an entirely separate project that
-consumes the published `philharmonic-*` crates externally.
-The current `philharmonic/webui/` chat surface stays as the
-workflow-author testing chat; the production Chat UI is its
-own codebase. Tracked as
+**Production Chat UI** for the first concrete use case —
+**customer-support chat** — landed as `bins/philharmonic-chat/`
+(in-tree single-bin, musl-buildable, HTTPS+H3 axum server
+that depends on `philharmonic` for `server-https` like any
+other consumer). It bundles a React+Redux frontend, exposes
+`/sign-in` + `/mint-ephemeral` + `/config` + `/version`, and
+embeds the frontend bundle from `bins/philharmonic-chat/dist/`
+at compile time. The bin's local `README.md` is its design
+home. The existing `philharmonic/webui/` chat surface stays
+as the workflow-author testing chat. Tracked as
 [`docs/ROADMAP.md` §3.M](docs/ROADMAP.md#3-post-v1-dispatch-plan).
 
 **Post-MVP (not queued)**: Tier-3 LLM connector implementations

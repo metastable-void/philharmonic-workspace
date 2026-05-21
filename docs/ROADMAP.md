@@ -24,14 +24,15 @@ each crate's `CHANGELOG.md`.
   dep cleanup, `mechanics-dns` extraction, the §3.K Audit &
   refactor sweep, and the §3.B Tier-2 connector batch (D7 SMTP
   + D19 DNS, both at `0.1.0` as of 2026-05-18) have all landed.
-- **Open (MVP-blocking)**: §3.M **Production Chat UI** for
-  the first concrete use case (customer support chat). The
-  framework is not a chat app — chat is a separate concern;
-  the production Chat UI lives in a **separate codebase**
-  (either an in-tree `philharmonic-chat-app` bin or an
-  entirely separate project), not inside the framework's
-  crate family. Specs in §3.M below. This blocks MVP
-  deployment.
+- **§3.M Production Chat UI: landed 2026-05-21** as the
+  in-tree `bins/philharmonic-chat/` single-bin HTTPS+H3 axum
+  server with an embedded React+Redux frontend bundle.
+  Backend body + full frontend dispatched in one Codex round
+  (commit `64a1fe6`); subsequent fix-forward commits closed
+  `/mint-ephemeral` agent-token gating. The bin's local
+  `README.md` is the design home; this section's residual
+  text below is kept as historical context for the design
+  choices, not as an open work item.
 - **Open (post-MVP, deferred)**: §3.B Tier-3 LLM connector
   implementations — D8 Anthropic and D9 Gemini. **Not
   required for MVP deployment** (`llm_openai_compat` covers
@@ -144,80 +145,84 @@ substantive impl by implementing the
   OAuth2 access-token caching for Vertex AI) defers to
   D9's prompt-drafting time.
 
-D8 and D9 are independent of one another and of §3.M; safe
-to run in parallel whenever they get queued. They do **not**
-gate §3.M.
+D8 and D9 are independent of one another; safe to run in
+parallel whenever they get queued. Neither was a §3.M
+prerequisite (which has already landed; see below).
 
-### M. Production Chat UI (MVP-blocking, customer support — first use case)
+### M. Production Chat UI (landed 2026-05-21)
 
-First production deployment use case is a **customer-support
-chat** product. That requires a production-grade Chat UI —
-something polished and operable enough to put in front of
-real end users, distinct from the current `philharmonic/webui/`
-chat surface which exists for workflow-author end-to-end
-testing only and is sized accordingly.
+The first production deployment use case is a
+**customer-support chat** product, distinct from the
+`philharmonic/webui/` chat surface that exists for
+workflow-author end-to-end testing.
 
 **Architectural constraint (decided in HUMANS.md, confirmed
 2026-05-18):** the framework is **not** a chat app. Chats
 are workflow knowledge (per
 [§02 *Layered ignorance*](design/02-design-principles.md#layered-ignorance));
-the framework's crate family must not gain chat-app concepts.
-The production Chat UI therefore lives in a **separate
-codebase** from the framework's crate family:
+the framework's crate family must not gain chat-app
+concepts. The production Chat UI therefore lives in its own
+top-of-tree codebase: **`bins/philharmonic-chat/`**, in-tree
+single-bin, that consumes `philharmonic` via the
+`server-https` feature like any other consumer. Framework
+crates know nothing about chat-app concepts (sessions,
+conversation history UI, agent personas, customer-tenant
+mapping, support-queue routing, etc.); the chat bin consumes
+the framework's primitives (workflows, instances,
+`llm_generate` via `llm_openai_compat`, the embedding-dataset
+path for RAG grounding) and adds its own concerns on top.
 
-- **Either** an in-tree top-level bin (e.g.
-  `bins/philharmonic-chat-app/` with both frontend and
-  backend unified — same repo, distinct concern, distinct
-  directory tree; depends on the framework crates via
-  `philharmonic` like any other consumer).
-- **Or** an entirely separate project / repository that
-  consumes published `philharmonic-*` crates as an external
-  client.
+**Shape that landed (2026-05-21):**
 
-Yuka picks between those two shapes at scoping time. Either
-shape preserves the boundary: framework crates know nothing
-about chat-app concepts (sessions, conversation history
-UI, agent personas, customer-tenant mapping, support-queue
-routing, etc.); the chat app consumes the framework's
-existing primitives (workflows, instances, `llm_generate`
-via `llm_openai_compat`, the embedding-dataset path for
-RAG grounding, etc.) and adds its own chat-app concerns on
-top.
+- In-tree single-bin musl-buildable HTTPS+H3 axum server
+  (mirrors `bins/philharmonic-api-server`'s `https` feature
+  pattern).
+- Embedded React+Redux frontend bundle from
+  `bins/philharmonic-chat/dist/`, served at `/` with SPA
+  fallback. Build wrapper:
+  `scripts/philharmonic-chat-build.sh --production`.
+- HTTP surface: `/` (static assets), `/config` (returns
+  `{ api_url, notify_instance_uuid }`), `/sign-in`
+  (constant-time `agent_token` challenge),
+  `/mint-ephemeral` (creates a chat-template instance and
+  mints an instance-scoped ephemeral token; requires
+  `Authorization: Bearer <agent_token>` since 2026-05-21),
+  `/version`.
+- Three tokens in `[chat]` config: `agent_token` (support
+  agent's sign-in token), `service_token` (Principal token
+  the bin uses to create instances), `minting_token`
+  (MintingAuthority token the bin uses to mint
+  ephemerals). The earlier `admin_token` naming is retired.
+- Release-build wrapper: `scripts/chat-release-build.sh`
+  mirrors `scripts/release-build.sh` for the chat bin alone
+  (single binary, separate `philharmonic-chat-<sha>.tar.*`
+  archive name).
+- Design home: the bin's own
+  [`README.md`](../bins/philharmonic-chat/README.md), not
+  `docs/design/`.
 
 **Existing testing-grade Chat UI** at `philharmonic/webui/`
-stays in place for the foreseeable future as the workflow-
-author end-to-end test surface — it does not need to be
-removed when the production Chat UI lands. The two coexist,
-the testing one inside the framework webui, the production
-one in its separate codebase.
+stays in place as the workflow-author end-to-end test
+surface. The two coexist.
 
-**Scope to draft (next steps before dispatch):**
-
-- Codebase shape decision (in-tree bin vs. separate project)
-  — Yuka calls.
-- Product-side requirements for the customer-support use
-  case (conversation persistence model, end-user
-  authentication shape, operator console, queue routing,
-  handoff to human agents if applicable, audit-log
-  exposure to operators, etc.).
-- Which framework crates the Chat UI consumes and at what
-  versions; whether any new framework-side surface is
-  needed (anticipated: probably nothing new — workflows +
-  `llm_openai_compat` + RAG primitives already cover the
-  shape).
-- Operational deployment shape: same deployment binary set
-  as the framework MVP, or its own deployment.
-
-This arc is MVP-blocking. D8/D9 (§3.B above) are
-explicitly **post-MVP** — they don't block §3.M, and §3.M
-doesn't block them.
+**Out of scope for v0 (recorded in the bin's README and
+Codex round-01 report at
+[`docs/codex-reports/2026-05-21-0002-philharmonic-chat-bin-backend-and-frontend.md`](codex-reports/2026-05-21-0002-philharmonic-chat-bin-backend-and-frontend.md)):**
+rate-limiting / abuse mitigation on `/mint-ephemeral`,
+multi-tenancy (one bin = one tenant), agent assignment /
+claim / presence indicators, HUMAN → AI transition, the
+future EC embed widget, i18n. These are open follow-ups,
+not regressions.
 
 ### Suggested sequencing
 
-**Next dispatchable**: §3.M Production Chat UI scoping +
-dispatch. Specifics deferred to scoping time; the codebase-
-shape decision (in-tree `bins/philharmonic-chat-app/` vs.
-separate project) drives subsequent work.
+**Next dispatchable**: open. §3.M's in-tree
+`bins/philharmonic-chat/` round 01 has shipped (2026-05-21);
+follow-on rounds (rate-limiting on `/mint-ephemeral`,
+HUMAN → AI transition, EC embed widget, multi-tenancy) are
+deferred and not yet scoped. The crypto-review-aware
+`lowerer.rs` / `embed_job.rs` slice noted in §"Current
+status" / Deferred remains queued; D8 / D9 are post-MVP.
 
 **Post-MVP, no dispatch queued**: D8 + D9 (§3.B Tier-3 LLM
 connectors). When queued, both are independent and

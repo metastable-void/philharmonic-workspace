@@ -301,8 +301,9 @@ as `0.0.x` placeholders, no substantive implementation yet):
   binary.
 - **`philharmonic`** — meta-crate / WebUI asset host.
 - **In-tree binaries** (under `bins/`, never published):
-  `philharmonic-api-server`, `philharmonic-connector`, and
-  the workspace-internal `xtask/` crate. Under
+  `mechanics-worker`, `philharmonic-connector`,
+  `philharmonic-api-server`, `philharmonic-chat`, and the
+  workspace-internal `xtask/` crate. Under
   [§02 Bins are thin](02-design-principles.md#bins-are-thin)
   these own only Clap CLI + `main()` glue. Shared
   deployment helpers live at `philharmonic::server`
@@ -312,7 +313,12 @@ as `0.0.x` placeholders, no substantive implementation yet):
   workflow executor lives at
   `philharmonic_api::MechanicsWorkerExecutor` behind the
   `mechanics-worker-executor` feature (forwarded via the
-  meta-crate's `api-mechanics-worker-executor`). Remaining
+  meta-crate's `api-mechanics-worker-executor`).
+  `philharmonic-chat` is the production chat surface — a
+  single-bin HTTPS+H3 axum server that embeds a React+Redux
+  frontend bundle and exposes `/sign-in`, `/config`,
+  `/mint-ephemeral`, `/version`; its local `README.md` is
+  the design home rather than `docs/design/`. Remaining
   extraction candidates:
   `bins/philharmonic-api-server/src/{lowerer,embed_job,scope}.rs`
   (the SCK-touching paths are crypto-review-aware and want

@@ -204,7 +204,9 @@ into the crates.
   `0.0.x` placeholders on crates.io until they become MVP+1.
 - API layer: implemented. Published as `philharmonic-api` 0.1.0
   (2026-04-28, Phase 8). Real `ConfigLowerer` and `StepExecutor`
-  added in Phase 9 (2026-04-30). Three bin targets, WebUI, e2e
+  added in Phase 9 (2026-04-30). Four in-tree bin targets
+  (`mechanics-worker`, `philharmonic-connector`,
+  `philharmonic-api-server`, `philharmonic-chat`), WebUI, e2e
   tests, Docker compose, and `install` subcommand all landed.
 - Reference deployment operational since **2026-05-02**.
 - **Post-v1 dispatches (done)**: D1–D6 embedding datasets,
@@ -226,8 +228,9 @@ into the crates.
   `vendor-upstream` xtask + `check-no-registry` workspace-
   hardening guard + dev-profile incremental disable round out
   the 2026-05-14 batch. D7 SMTP + D19 DNS Tier-2 connectors
-  landed 2026-05-18 at 0.1.0. **Post-v1 remaining (MVP-
-  blocking)**: §3.M production Chat UI in a separate codebase
-  (in-tree `bins/philharmonic-chat-app/` or a wholly separate
-  project — Yuka picks the shape). **Post-MVP, deferred**:
-  D8 Anthropic, D9 Gemini Tier-3 LLM connectors.
+  landed 2026-05-18 at 0.1.0. §3.M production Chat UI landed
+  2026-05-21 as `bins/philharmonic-chat/` (in-tree single-bin
+  HTTPS+H3 axum server with embedded React+Redux frontend
+  bundle; the bin's local `README.md` is its design home).
+  **Post-MVP, deferred**: D8 Anthropic, D9 Gemini Tier-3 LLM
+  connectors.
