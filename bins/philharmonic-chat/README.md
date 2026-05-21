@@ -114,6 +114,16 @@ unauthenticated; the chat bin doesn't proxy it.
   workflow's script disambiguates and the `name` field on
   user-side messages is set by the workflow, never by the
   client.
+- On first open of a fresh instance (zero steps), the UI
+  triggers the workflow's greeting by calling
+  `POST workflows/instances/{id}/execute` with empty input
+  `{}` before the transcript loads. The workflow's script is
+  expected to render an opening assistant turn in response.
+  The trigger is single-shot per ChatPanel mount; subsequent
+  polls render the persisted transcript. Agent mode shares
+  the same code path but never hits the trigger in practice
+  (agents only land on chats that already have steps via the
+  notify channel).
 - This is also the shape the future embed widget will follow.
 
 ## Wire shapes

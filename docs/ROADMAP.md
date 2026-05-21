@@ -28,11 +28,25 @@ each crate's `CHANGELOG.md`.
   in-tree `bins/philharmonic-chat/` single-bin HTTPS+H3 axum
   server with an embedded React+Redux frontend bundle.
   Backend body + full frontend dispatched in one Codex round
-  (commit `64a1fe6`); subsequent fix-forward commits closed
-  `/mint-ephemeral` agent-token gating. The bin's local
-  `README.md` is the design home; this section's residual
-  text below is kept as historical context for the design
-  choices, not as an open work item.
+  (commit `64a1fe6`). Same-day follow-on rounds, all on
+  2026-05-21: `/mint-ephemeral` Bearer-`agent_token` gating
+  (`562fd51`); API server CORS headers + OPTIONS-preflight
+  short-circuit on `bins/philharmonic-api-server`
+  (`592bbb3`); chat frontend `/v1/whoami` discovery +
+  `X-Tenant-Id` header threading (`6b5d422`); EN+JA i18n
+  round 02 (`d2edfa2`) including a new `tenant_id` config
+  TOML key threaded into the bin's outbound API calls;
+  `injected_claims: {}` in the `/v1/tokens/mint` outbound
+  body (`c8de4e6`); `philharmonic-api`'s
+  `read_instance` / `instance_history` / `instance_steps`
+  handlers relaxed from `require_tenant_principal` to
+  `tenant_scope` so Ephemeral tokens scoped to an instance
+  can poll their own data (`168edb2` in the submodule;
+  parent pointer at `a7a5a72`); chat ChatPanel triggers a
+  workflow greeting (`execute({})`) on first open of a
+  fresh-instance chat (`be57127`). The bin's local
+  `README.md` is the design home and is kept current
+  per-commit.
 - **Open (post-MVP, deferred)**: §3.B Tier-3 LLM connector
   implementations — D8 Anthropic and D9 Gemini. **Not
   required for MVP deployment** (`llm_openai_compat` covers
@@ -211,8 +225,10 @@ Codex round-01 report at
 rate-limiting / abuse mitigation on `/mint-ephemeral`,
 multi-tenancy (one bin = one tenant), agent assignment /
 claim / presence indicators, HUMAN → AI transition, the
-future EC embed widget, i18n. These are open follow-ups,
-not regressions.
+future EC embed widget. These are open follow-ups, not
+regressions. (EN+JA i18n was originally on this list; it
+shipped same-day as Codex round 02 — see the summary
+above.)
 
 ### Suggested sequencing
 

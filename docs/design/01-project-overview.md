@@ -232,5 +232,13 @@ into the crates.
   2026-05-21 as `bins/philharmonic-chat/` (in-tree single-bin
   HTTPS+H3 axum server with embedded React+Redux frontend
   bundle; the bin's local `README.md` is its design home).
+  Same-day follow-on rounds completed: `/mint-ephemeral`
+  agent-token gating; API-server CORS + OPTIONS preflight;
+  chat frontend `/v1/whoami` tenant discovery + X-Tenant-Id
+  threading; EN+JA i18n with localStorage locale persistence
+  and a `tenant_id` config TOML key; `injected_claims`
+  payload support; `philharmonic-api` instance-scoped reads
+  accept Ephemeral tokens; chat ChatPanel greets on
+  fresh-instance open.
   **Post-MVP, deferred**: D8 Anthropic, D9 Gemini Tier-3 LLM
   connectors.

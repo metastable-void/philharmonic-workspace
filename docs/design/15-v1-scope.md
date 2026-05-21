@@ -18,7 +18,11 @@ post-MVP — `llm_openai_compat` already covers the OpenAI /
 vLLM / compatible-gateway shape the MVP needs. The
 production Chat UI for customer support (§3.M) landed
 2026-05-21 as the in-tree `bins/philharmonic-chat/` (single-
-bin axum server with embedded React+Redux frontend); see
+bin axum server with embedded React+Redux frontend), with
+same-day follow-on rounds for EN+JA i18n, tenant scoping
+via `/v1/whoami` + `X-Tenant-Id`, ephemeral-token support
+on instance-scoped reads, and a workflow-greeting trigger
+on fresh-instance open; see
 [`docs/ROADMAP.md`](../ROADMAP.md).
 
 ## Core infrastructure
