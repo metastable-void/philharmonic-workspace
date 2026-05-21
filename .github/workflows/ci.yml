@@ -6,6 +6,17 @@ on:
   pull_request:
     branches: [main]
 
+# Minimum GITHUB_TOKEN scope at workflow level: read-only on
+# repo contents (sufficient for `actions/checkout`). No
+# write-back, no issue/PR creation, no package or pages
+# access. Slack uses an external webhook URL (no GitHub
+# token), so no extra scope is needed there. The dedicated
+# `pages: write` / `id-token: write` scopes live in
+# `mdbook.yml` because that workflow actually deploys to
+# Pages; this CI workflow has no business with them.
+permissions:
+  contents: read
+
 # Avoid burning minutes on superseded runs: when a new commit lands
 # on a PR or branch, cancel any in-flight run for the same ref.
 concurrency:
