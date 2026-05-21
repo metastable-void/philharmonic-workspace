@@ -219,15 +219,22 @@ wrappers, `xtask.sh`, raw read-only tools) rather than
 replacing them: `rexec` is the outer envelope; the inner
 wrapper is unchanged.
 
-Usage shapes (from `rexec --help`, v0.1.0):
+Usage shapes (from `rexec --help`, v0.1.1):
 
 - **Run a command** (the common case; `--whoami` and `--dir`
   are mandatory, repeat `--env` per override, `--` separates
   the inner command from `rexec`'s flags):
   ```sh
   rexec --whoami <agent-id> --dir <workdir> \
-      [--env VAR=VAL]... -- <command> [args...]
+      [--env VAR=VAL]... [--read-stdin] -- <command> [args...]
   ```
+- **Forwarding stdin (`--read-stdin`, new in v0.1.1):** without
+  this flag, the inner child's stdin is the PTY slave and any
+  read blocks because nothing is written to it. Pass
+  `--read-stdin` to forward your harness's stdin to the inner
+  child to EOF — heredocs and pipes through `rexec` now work
+  end-to-end. Use this for ad-hoc `cat | tool` / `tool -i -`
+  style flows where a tempfile would be ceremony.
 - **Host status:** `rexec -c` / `--check-host` checks whether
   a host is running for this user. A host must be up before
   run-mode invocations. **Starting the host is a human's job,
@@ -235,21 +242,31 @@ Usage shapes (from `rexec --help`, v0.1.0):
   foreground process the operator owns (^C to stop). If
   `--check-host` reports no host running, stop and surface in
   your final summary; never run `--start-host` yourself.
-- **Transcripts:** `rexec --list <N>` lists the N most recent;
-  `rexec -p <name>` / `--print <name>` shows one by its name
-  (`YYYY-MM-DD-hh:mm:ss`); add `-f` / `--follow` to stream
-  new entries as they arrive.
+- **Transcripts:** `rexec --list <N>` lists the N most recent
+  transcripts in `YYYY-MM-DD-hh:mm:ss commands=K` form (newest
+  first). `rexec -p <name>` / `--print <name>` shows one by its
+  name; add `-f` / `--follow` to stream new entries as they
+  arrive. **Use them to verify executed commands** — after a
+  multi-step run, when your harness's output capture got
+  truncated, or when something looks off. The shape:
+  ```sh
+  rexec --list 1                # → 2026-05-21-11:23:09 commands=4
+  rexec --print 2026-05-21-11:23:09
+  ```
+  The transcript carries timestamps, the
+  `<whoami>:<dir> $` prompt line, the verbatim command, and
+  its full stdout/stderr — what actually ran, not what you
+  intended. This is the post-hoc audit trail; lean on it
+  when in doubt.
 
-**Caveat — run mode is interactive; no stdin, beware pagers.**
-`rexec` runs the inner command attached to its own TTY context,
-not yours. Two consequences: (1) stdin from your tool harness
-isn't piped through, so heredoc / piped input (`--message-file
--`, `cat | foo`) hangs — write the input to a tempfile first
-and pass the path. (2) Commands that auto-page when stdout is a
-TTY (`git diff`, `git log`, `git show`, `less`-using tools)
-hang waiting for keystrokes — pass `--no-pager` (e.g. `git
---no-pager diff`) or pipe through `cat`. Prefer the workspace
-`scripts/*.sh` wrappers; they already handle this.
+**Caveat — beware pagers (stdin is no longer a caveat in v0.1.1).**
+With `--read-stdin`, the previous "stdin doesn't pass through"
+trap is gone. The remaining gotcha: commands that auto-page
+when stdout is a TTY (`git diff`, `git log`, `git show`,
+`less`-using tools) hang waiting for keystrokes — pass
+`--no-pager` (e.g. `git --no-pager diff`) or pipe through
+`cat`. Prefer the workspace `scripts/*.sh` wrappers; they
+already handle this.
 
 **ANSI colour is stripped automatically.** `rexec` removes
 ANSI escape sequences from the inner command's stdout / stderr

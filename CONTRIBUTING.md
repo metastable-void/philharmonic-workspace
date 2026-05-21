@@ -931,9 +931,20 @@ every one of them and burn context tokens unnecessarily.
 
 #### Passing the message to `commit-all.sh`
 
-**Always pass commit messages via `--message-file <path>`,
-never as a positional argument and never via stdin (`-`).** Not
-"for long messages" — always, even for one-paragraph messages.
+**Always pass commit messages via `--message-file`, never as a
+positional argument.** Two viable surfaces under the workspace's
+`rexec`-mandated execution model:
+
+- **Canonical: `--message-file <path>`.** Body on disk; the
+  agent hands `rexec` a file path. Auditable, immune to
+  outer-quote slip-ups, and the path can be re-read by the
+  agent or by a reviewer.
+- **Alternative: `--message-file -` with `rexec --read-stdin`**
+  (rexec v0.1.1+; if `rexec --version` reports v0.1.0, fall
+  back to the canonical form or ask Yuka to upgrade). Pipes
+  the heredoc body through `rexec` to the script's stdin in
+  one shot. Use this when the message is short and the
+  tempfile is genuine ceremony.
 
 Only Claude commits in this workspace. Codex never commits
 (the `codex-guard` in `scripts/lib/codex-guard.sh` hard-aborts
@@ -941,10 +952,7 @@ Only Claude commits in this workspace. Codex never commits
 [§4 Git workflow](#4-git-workflow)). All Claude command
 execution routes through `rexec` ([Hard]; see
 [CLAUDE.md §"Command execution via `rexec`"](CLAUDE.md); no
-direct-terminal exception). `rexec` does not pipe the calling
-shell's stdin to the inner command, so `--message-file -` plus
-a heredoc **hangs**. The path form is the only working
-surface; the stdin form does not exist as an option here.
+direct-terminal exception).
 
 **Canonical recipe (Claude Code via `rexec`):**
 
@@ -972,20 +980,46 @@ backticked `identifier` / `path/like/this` / `command(...)`
 tokens and `$VAR` / `$(cmd)` references all survive as
 literal text.
 
-**Why the path form is bulletproof:**
-`--message-file <path>` reads the message body from the file
-verbatim. There is no command-substitution boundary, no
-double-quoted argument boundary, no shell-expansion pass
-between the message text and the script. Bash never looks
-inside the body. The `Write` tool writes the bytes the agent
-hands it; what's on disk is what lands in the commit.
+**Alternative recipe (`--read-stdin`, single invocation):**
 
-**Stdin form (`--message-file -`) is not usable in this
-workspace.** `rexec` is the only execution surface (commits
-included), and `rexec` breaks the stdin pipe. The script
-still accepts `-` for completeness (e.g. an external user
-running it without `rexec`), but no in-workspace caller
-should reach for it.
+```sh
+rexec --whoami <agent> --dir <workspace-root> --read-stdin -- \
+    ./scripts/commit-all.sh --message-file - <<'EOF'
+subject line ≤ 72 chars
+
+body paragraph hard-wrapped at ≈ 72 cols. Backticked
+`tokens`, `$VAR` references, and `$(cmd)` substitutions
+all survive because the single-quoted `<<'EOF'` delimiter
+suppresses shell expansion inside the heredoc body.
+EOF
+```
+
+Two load-bearing pieces:
+
+1. `rexec --read-stdin` (v0.1.1+) reads the client's stdin
+   to EOF and forwards it to the inner child. Without this
+   flag, the inner child's stdin is the PTY slave and reads
+   hang because nothing is written to it.
+2. The single-quoted `<<'EOF'` heredoc delimiter suppresses
+   shell expansion inside the heredoc body. A bare `<<EOF`
+   would still expand backticks and `$VAR` inside the body
+   itself; the single quotes are mandatory.
+
+**Why the path form is still canonical:**
+- It's auditable: the body lives on disk and can be
+  re-read with `Read` or `cat` to confirm what landed in
+  the commit.
+- It survives the "one missing outer quote" failure mode
+  that the legacy `"$(cat <<'EOF' ... EOF)"` form is
+  vulnerable to — the path form has no quoting boundary at
+  all between the agent and the script.
+- It's the same shape whether or not `rexec` is in the
+  middle, which makes it portable across execution surfaces.
+
+The `--read-stdin` form is the better choice when the
+message is short, the tempfile would just be ceremony, and
+you're confident in the heredoc quoting. Both forms are
+legitimate; pick by readability.
 
 **Legacy positional form** (still accepted by the script, but
 fragile; do not use):

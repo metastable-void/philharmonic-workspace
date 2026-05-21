@@ -120,15 +120,40 @@ other execution rules (`scripts/*.sh` Git / cargo wrappers,
 `rexec` is the outer envelope; the existing wrapper is the
 inner command.
 
-Usage shapes (from `rexec --help`, v0.1.0):
+Usage shapes (from `rexec --help`, v0.1.1):
 
 - **Run a command** (the common case; `--whoami` and `--dir`
   are mandatory, repeat `--env` per override, `--` separates
   the inner command from `rexec`'s flags):
   ```sh
   rexec --whoami <agent-id> --dir <workdir> \
-      [--env VAR=VAL]... -- <command> [args...]
+      [--env VAR=VAL]... [--read-stdin] -- <command> [args...]
   ```
+- **Forwarding stdin (`--read-stdin`, new in v0.1.1):** without
+  this flag, the inner child's stdin is the PTY slave and any
+  read blocks because nothing is written to it. Pass
+  `--read-stdin` to read the client's stdin to EOF and forward
+  it to the inner child. With it, heredocs and pipes through
+  `rexec` now work end-to-end — e.g.:
+  ```sh
+  rexec --whoami claude --dir <workdir> --read-stdin -- \
+      ./scripts/commit-all.sh --message-file - <<'EOF'
+  subject line ≤ 72
+
+  body wrapped at ≈ 72 cols. `backticked` / `$VAR` /
+  `$(cmd)` references all land verbatim under the
+  single-quoted `<<'EOF'` delimiter.
+  EOF
+  ```
+  This is now a viable second form for the commit-message
+  recipe (see [§4.10](CONTRIBUTING.md#410-commit-message-format)).
+  **The tempfile form (Write to `/tmp` → `--message-file <path>`)
+  remains the canonical recipe** for commits — it's auditable
+  (the body lives on disk, can be re-read with `Read`) and
+  immune to outer-quote slip-ups that the heredoc form is still
+  vulnerable to. Use `--read-stdin` when piping small data
+  inline (test fixtures, tarball pipes, ad-hoc `cat | tool`
+  flows) where a tempfile would just be ceremony.
 - **Host status:** `rexec -c` / `--check-host` checks whether
   a host is running for this user. A host must be up before
   run-mode invocations. **Starting the host is a human's job,
@@ -136,26 +161,30 @@ Usage shapes (from `rexec --help`, v0.1.0):
   foreground process the operator owns (^C to stop). If
   `--check-host` reports no host running, stop and ask Yuka
   to start one; never run `--start-host` yourself.
-- **Transcripts:** `rexec --list <N>` lists the N most recent;
-  `rexec -p <name>` / `--print <name>` shows one by its name
-  (`YYYY-MM-DD-hh:mm:ss`); add `-f` / `--follow` to stream
-  new entries as they arrive.
+- **Transcripts:** `rexec --list <N>` lists the N most recent
+  transcripts in `YYYY-MM-DD-hh:mm:ss commands=K` form (newest
+  first). `rexec -p <name>` / `--print <name>` shows one by
+  its name; add `-f` / `--follow` to stream new entries as
+  they arrive. **Use them to verify executed commands** —
+  especially after a multi-step run, when output capture got
+  truncated, or when something looks off:
+  ```sh
+  rexec --list 1                # → 2026-05-21-11:23:09 commands=4
+  rexec --print 2026-05-21-11:23:09
+  ```
+  The transcript carries timestamps + the `Yuka:/path $`
+  prompt line + the verbatim command + its full stdout/
+  stderr — what actually ran, not what the agent intended.
+  This is the post-hoc audit trail; lean on it when in doubt.
 
-**Caveat — run mode is interactive; no stdin, beware pagers.**
-`rexec` runs the inner command attached to its own TTY context,
-not the agent's. Two consequences: (1) stdin from the agent's
-Bash tool isn't piped through, so heredoc / piped input
-(`commit-all.sh --message-file -`, `cat | foo`) hangs — write
-input to a tempfile first and pass the path. For commits
-specifically: use the `Write` tool to drop the message into
-`/tmp/<slug>.txt`, then `rexec ... -- ./scripts/commit-all.sh
---message-file /tmp/<slug>.txt`, then clean up. (`Write` to
-`/tmp` is allowed; the env block lists `/tmp` as an additional
-working directory.) (2) Commands that auto-page when stdout is
-a TTY (`git diff`, `git log`, `git show`, `less`-using tools)
-hang waiting for keystrokes — pass `--no-pager` (e.g.
-`git --no-pager diff`) or pipe through `cat`. Prefer the
-workspace `scripts/*.sh` wrappers; they already handle this.
+**Caveat — beware pagers (stdin is no longer a caveat in v0.1.1).**
+With `--read-stdin`, the previous "stdin doesn't pass through"
+trap is gone. The remaining gotcha: commands that auto-page
+when stdout is a TTY (`git diff`, `git log`, `git show`,
+`less`-using tools) hang waiting for keystrokes — pass
+`--no-pager` (e.g. `git --no-pager diff`) or pipe through
+`cat`. Prefer the workspace `scripts/*.sh` wrappers; they
+already handle this.
 
 **ANSI colour is stripped automatically.** `rexec` removes
 ANSI escape sequences from the inner command's stdout / stderr
@@ -219,9 +248,12 @@ write the thing" → Codex unless it's plumbing/housekeeping.
   4. Clean up the tempfile after `task_complete`.
 
   The companion script also supports `--prompt-file -` for
-  stdin, but `rexec` doesn't pipe stdin through (same
-  reason as the commit-message rule above) — always pass
-  a path, never stdin. The script supports `--resume` /
+  stdin; under `rexec` v0.1.1+ this works if you add
+  `--read-stdin` to the outer `rexec` invocation. The
+  tempfile-path form remains preferred for prompts because
+  the body lives on disk and can be re-read by Claude or by
+  a reviewer (same auditability argument as the
+  commit-message rule). The script supports `--resume` /
   `--resume-last` / `--fresh` for continuing or starting
   fresh threads; default-fresh is right for a new
   prompt-archive round.
@@ -330,9 +362,9 @@ anything non-trivial — this summary is a prompt, not a spec.
   scope / rationale / residual risks. Hard-wrap the body by
   hand. ([§4.10](CONTRIBUTING.md#410-commit-message-format))
 - **[Soft] ALWAYS pass commit messages via
-  `--message-file <path>`**, even for one-line commits. Stdin
-  (`--message-file -`) does NOT work — `rexec` doesn't pipe
-  stdin through, so heredoc-to-stdin hangs. Recipe:
+  `--message-file <path>` (canonical) or `--message-file -`
+  with `rexec --read-stdin` (alternative, v0.1.1+).** Never as
+  a positional argument. Canonical recipe:
   1. `Write` the message body to `/tmp/<slug>-commit-msg.txt`
      (the `/tmp` directory is listed as an additional working
      directory in the env block).
@@ -342,11 +374,16 @@ anything non-trivial — this summary is a prompt, not a spec.
   The body lands verbatim — backticked `tokens`, `$VAR`
   references, and `$(cmd)` substitutions all survive because
   the file path never goes through a shell-expansion boundary.
-  The legacy positional `"$(cat <<'EOF' ... EOF)"` form is
-  fragile (incident: `a5833d5` lost ≈ 8 backticked tokens to
-  it); history is append-only, so a mangled message is
-  unfixable except via a fix-forward errata note. Codex never
-  commits — only Claude does, via the recipe above.
+  The tempfile form is canonical because it's auditable (body
+  on disk; re-readable with `Read`) and immune to outer-quote
+  slip-ups. The `rexec --read-stdin -- ... --message-file -
+  <<'EOF' ... EOF` form is now viable but still routes through
+  bash's heredoc parsing — fine for one-shot calls but easier
+  to slip into the broken legacy `"$(cat <<'EOF' ... EOF)"`
+  shape, which is fragile (incident `a5833d5` lost ≈ 8
+  backticked tokens to it). History is append-only, so a
+  mangled message is unfixable except via a fix-forward
+  errata note. Codex never commits — only Claude does.
   ([§4.10](CONTRIBUTING.md#410-commit-message-format))
 - **[Hard] Git history is append-only.** No amend, no rebase, no
   reset, no force-push, no `git revert`. Two narrow
