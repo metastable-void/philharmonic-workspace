@@ -686,7 +686,36 @@ If you skip the report, say so in the session summary.
 
 ## Outcome
 
-Pending — will be updated after the Codex run.
+INCOMPLETE — blocked before any edits. Codex read the prompt
+end-to-end, verified `./scripts/status.sh (clean)`, then
+checked `philharmonic/webui/src/App.tsx` and found that the
+app uses `<BrowserRouter>` (line 88) rather than
+`createBrowserRouter` + `<RouterProvider>`. The installed
+React Router v7's `useBlocker` calls
+`useDataRouterContext("useBlocker")` internally and therefore
+requires a data router — under `BrowserRouter` the hook would
+compile but throw at runtime when first invoked. The prompt's
+`<missing_context_gating>` block explicitly told Codex to
+STOP and report rather than silently swap the router or
+proceed with a half-migration, which is what happened.
+
+No files edited; no dist artefacts regenerated; no commit
+attempted. Codex session ID
+`019e482b-42aa-7af1-a98c-fbcdc566a89a` (resumable with
+`codex resume`, though the round-02 follow-up dispatches a
+fresh thread).
+
+Resolution: round 02
+([`2026-05-21-0001-webui-modal-component-and-duplicate-template-button-02.md`](2026-05-21-0001-webui-modal-component-and-duplicate-template-button-02.md))
+adds an explicit task 0 — convert `App.tsx` from
+`BrowserRouter` to `createBrowserRouter` + `RouterProvider`
+— ahead of the original scope. The rest of the prompt
+(component build, `window.confirm` migration, duplicate
+button, unsaved-changes guard, dist regeneration) is
+re-imported by reference from this round, with the
+`<missing_context_gating>` updated to no longer treat
+`BrowserRouter` as a blocker (since the conversion is now
+part of the task).
 
 ---
 
