@@ -345,7 +345,31 @@ session summary covers it.
 
 ## Outcome
 
-Pending — will be updated after the Codex run.
+COMPLETE — Codex converted `philharmonic/webui/src/App.tsx`
+from `<BrowserRouter>` / `<Routes>` to a module-level
+`createBrowserRouter` data-router tree and `App()` now returns
+only `<RouterProvider router={router} />`; `VersionRefresh`
+moved into the new local `RootLayout` route element. The WebUI
+now has shared `Modal`, `ConfirmModal`, and
+`DuplicateTemplateModal` components plus a `useUnsavedChanges`
+hook, and the duplicate-template action is wired on both the
+template list and detail views. All eight `window.confirm()`
+sites were replaced with `ConfirmModal`, the embedding-dataset
+import dialog now uses `Modal`, and unsaved-change guards were
+added to `TemplateDetail`, `RoleDetail`, `EndpointDetail`, and
+`TenantSettings`.
+
+New i18n keys landed in both English and Japanese, and the
+committed WebUI `dist/` artifacts were regenerated with the
+script-required `./scripts/webui-build.sh --production` form
+(the bare command now exits with a usage error). Verification
+passed: `npx tsc --noEmit`, production WebUI build,
+`./scripts/pre-landing.sh` ending in
+`=== pre-landing: all checks passed ===`, and the final
+`grep -rn 'window\.confirm\|window\.prompt\|window\.alert' philharmonic/webui/src/`
+returned no hits. A Codex report was added at
+`docs/codex-reports/2026-05-21-0001-webui-modal-component-and-duplicate-template-button.md`
+to record the build-script flag drift.
 
 ---
 
