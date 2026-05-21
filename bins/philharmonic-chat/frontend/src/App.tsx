@@ -3,7 +3,9 @@ import { type JSX, useEffect, useState } from "react";
 import {
   fetchBranding,
   fetchChatConfig,
+  fetchWhoami,
   setRuntimeConfig,
+  setRuntimeTenantId,
   type ChatConfigResponse,
 } from "./api/client";
 import AgentNamePrompt from "./components/AgentNamePrompt";
@@ -47,6 +49,23 @@ export default function App(): JSX.Element {
       .then((branding) => dispatch(setBranding(branding)))
       .catch(() => {});
   }, [agentToken, config, dispatch]);
+
+  // Discover the agent's tenant id once signed in so subsequent
+  // API calls carry X-Tenant-Id and resolve into Tenant scope
+  // instead of falling back to Operator (which the steps handler
+  // rejects).
+  useEffect(() => {
+    if (config === null) {
+      return;
+    }
+    if (!isSignedIn || agentToken.length === 0) {
+      setRuntimeTenantId("");
+      return;
+    }
+    fetchWhoami(agentToken)
+      .then((whoami) => setRuntimeTenantId(whoami.tenant_id))
+      .catch(() => {});
+  }, [agentToken, config, isSignedIn]);
 
   if (configError !== null) {
     return (

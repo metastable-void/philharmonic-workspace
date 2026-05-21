@@ -49,6 +49,13 @@ export interface MintEphemeralResponse {
   instance_id: string;
 }
 
+export interface WhoamiResponse {
+  tenant_id: string;
+  auth_type: string;
+  permissions: string[];
+  principal_display_name: string | null;
+}
+
 export interface ChatMessage {
   role: string;
   content: string;
@@ -79,6 +86,40 @@ export function currentConfig(): ChatConfigResponse | null {
   return runtimeConfig;
 }
 
+// Tenant id discovered from /v1/whoami after sign-in. Sent as the
+// X-Tenant-Id header on cross-origin API calls so the API server's
+// HeaderTenantScopeResolver resolves the request into the agent's
+// tenant scope instead of falling back to Operator (which the
+// `workflows/instances/{id}/steps` handler rejects with 403).
+const TENANT_ID_STORAGE_KEY = "agent_tenant_id";
+let runtimeTenantId: string = storedRuntimeTenantId();
+
+function storedRuntimeTenantId(): string {
+  try {
+    return window.localStorage.getItem(TENANT_ID_STORAGE_KEY) ?? "";
+  } catch {
+    return "";
+  }
+}
+
+export function setRuntimeTenantId(id: string): void {
+  runtimeTenantId = id;
+  try {
+    if (id.length === 0) {
+      window.localStorage.removeItem(TENANT_ID_STORAGE_KEY);
+    } else {
+      window.localStorage.setItem(TENANT_ID_STORAGE_KEY, id);
+    }
+  } catch {
+    // Browser storage can be unavailable in private or restricted
+    // contexts; runtimeTenantId is still in-memory.
+  }
+}
+
+export function currentTenantId(): string {
+  return runtimeTenantId;
+}
+
 export async function fetchChatConfig(): Promise<ChatConfigResponse> {
   return localCall<ChatConfigResponse>("/config");
 }
@@ -100,6 +141,10 @@ export async function mintEphemeral(agentToken: string): Promise<MintEphemeralRe
 
 export async function fetchBranding(token: string): Promise<BrandingResponse> {
   return apiCall<BrandingResponse>("_meta/branding", token);
+}
+
+export async function fetchWhoami(token: string): Promise<WhoamiResponse> {
+  return apiCall<WhoamiResponse>("whoami", token);
 }
 
 export async function fetchLatestStep(
@@ -147,6 +192,9 @@ function requestOptions(options: RequestInit, token = ""): RequestInit {
   const method = options.method?.toUpperCase();
   if (token.length > 0) {
     headers.set("Authorization", `Bearer ${token}`);
+  }
+  if (runtimeTenantId.length > 0) {
+    headers.set("X-Tenant-Id", runtimeTenantId);
   }
   if ((method === "POST" || method === "PATCH") && !headers.has("Content-Type")) {
     headers.set("Content-Type", "application/json");
