@@ -1,7 +1,7 @@
 use axum::{
     Json, Router,
     extract::State,
-    http::StatusCode,
+    http::{HeaderMap, StatusCode, header},
     routing::{get, post},
 };
 use mechanics_http_client::Client as HttpClient;
@@ -67,10 +67,25 @@ async fn sign_in(
 
 async fn mint_ephemeral(
     State(state): State<AppState>,
+    headers: HeaderMap,
 ) -> Result<Json<mint::MintEphemeralResponse>, AppError> {
+    require_agent_token_bearer(&headers, &state.config.chat.agent_token)?;
     mint::mint_ephemeral(&state.config.chat, &state.client)
         .await
         .map(Json)
+}
+
+fn require_agent_token_bearer(headers: &HeaderMap, expected: &str) -> Result<(), AppError> {
+    let presented = headers
+        .get(header::AUTHORIZATION)
+        .and_then(|value| value.to_str().ok())
+        .and_then(|value| value.strip_prefix("Bearer "))
+        .ok_or_else(AppError::unauthorized)?;
+    if constant_time_eq(presented.as_bytes(), expected.as_bytes()) {
+        Ok(())
+    } else {
+        Err(AppError::unauthorized())
+    }
 }
 
 #[derive(Serialize)]

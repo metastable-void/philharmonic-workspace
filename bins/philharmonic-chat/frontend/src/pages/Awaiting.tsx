@@ -48,7 +48,7 @@ export default function Awaiting({
     setIsStartingMock(true);
     setError(null);
     try {
-      const minted = await mintEphemeral();
+      const minted = await mintEphemeral(agentToken);
       window.localStorage.setItem(
         `ephemeral_${minted.instance_id}_token`,
         minted.ephemeral_token,

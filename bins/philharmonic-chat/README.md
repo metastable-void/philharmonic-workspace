@@ -28,6 +28,10 @@ Three jobs, in order of weight:
    `service_token` and mints an ephemeral token scoped to that
    instance (execute + read).
    Returns `{ "ephemeral_token": "...", "instance_id": "..." }`.
+   Requires `Authorization: Bearer <agent_token>`; the bin
+   compares the presented token against the configured
+   `agent_token` in constant time and returns 401 on mismatch.
+   Only signed-in agents can mint (no public mock-test flow).
 3. Exposes `GET /config` — returns `{ "api_url": "...",
    "notify_instance_uuid": "..." }` so
    the static frontend doesn't have to be rebuilt per

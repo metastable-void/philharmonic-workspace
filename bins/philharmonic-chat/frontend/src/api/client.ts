@@ -94,8 +94,8 @@ export async function signIn(agentToken: string): Promise<void> {
   });
 }
 
-export async function mintEphemeral(): Promise<MintEphemeralResponse> {
-  return localCall<MintEphemeralResponse>("/mint-ephemeral", { method: "POST" });
+export async function mintEphemeral(agentToken: string): Promise<MintEphemeralResponse> {
+  return localCall<MintEphemeralResponse>("/mint-ephemeral", { method: "POST" }, agentToken);
 }
 
 export async function fetchBranding(token: string): Promise<BrandingResponse> {
@@ -138,8 +138,8 @@ export async function apiCall<T>(
   return fetchJson<T>(url, requestOptions(options, token));
 }
 
-async function localCall<T>(path: string, options: RequestInit = {}): Promise<T> {
-  return fetchJson<T>(path, requestOptions(options));
+async function localCall<T>(path: string, options: RequestInit = {}, token = ""): Promise<T> {
+  return fetchJson<T>(path, requestOptions(options, token));
 }
 
 function requestOptions(options: RequestInit, token = ""): RequestInit {
