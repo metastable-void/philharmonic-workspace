@@ -120,16 +120,66 @@ other execution rules (`scripts/*.sh` Git / cargo wrappers,
 `rexec` is the outer envelope; the existing wrapper is the
 inner command.
 
-Usage shapes (from `rexec --help`, v0.1.1):
+**Prefer the MCP tools over the Bash form (v0.2.0+).** The
+workspace exposes `rexec` as an MCP server in both
+[`.claude/settings.json`](.claude/settings.json) (for Claude
+Code) and [`.codex/config.toml`](.codex/config.toml) (for
+Codex). The server is started with the agent's identity baked
+in via `-m --whoami Claude` / `-m --whoami Codex`, so the
+per-call MCP tool invocations don't need to re-specify
+`--whoami`; they only need the working directory and the
+inner command. Use the MCP tools by default — they avoid the
+shell-quoting / heredoc traps the Bash form is vulnerable to,
+they integrate with the agent's permission model directly, and
+they're the supported run-mode surface going forward.
 
-- **Run a command** (the common case; `--whoami` and `--dir`
-  are mandatory, repeat `--env` per override, `--` separates
-  the inner command from `rexec`'s flags):
+The Bash form (`rexec --whoami ... --dir ... -- <cmd>`) stays
+valid and is the right surface for transcript inspection
+(`rexec --list N`, `rexec --print <name>`) and host status
+(`rexec -c`) since those are read-only and don't need a
+`--whoami` / `--dir` pair. It's also the fallback when the
+MCP server isn't loaded for some reason (e.g. a session that
+predates the config).
+
+Usage shapes (from `rexec --help`, v0.2.0):
+
+- **Run a command via MCP (preferred).** When the rexec MCP
+  server is loaded for the session, run-mode invocations go
+  through MCP tools rather than the Bash form below.
+  Tool-call shapes are discoverable via the agent's MCP tool
+  list at session start (Anthropic's standard `mcp__<server>__<tool>`
+  naming). The server already knows the agent's `--whoami`
+  (baked into its startup args); the tool call supplies the
+  working directory, the inner command, and any
+  `--env` / `--read-stdin` flags. If the MCP rexec tools
+  aren't visible in your tool list, fall back to the Bash
+  form and surface the MCP-not-loaded mismatch (the
+  workspace config in
+  [`.claude/settings.json`](.claude/settings.json) /
+  [`.codex/config.toml`](.codex/config.toml) should make
+  them available; if they aren't, restart the session or
+  ask Yuka).
+- **Run a command via the Bash form (fallback).** `--whoami`
+  and `--dir` are mandatory, repeat `--env` per override,
+  `--` separates the inner command from `rexec`'s flags:
   ```sh
   rexec --whoami <agent-id> --dir <workdir> \
       [--env VAR=VAL]... [--read-stdin] -- <command> [args...]
   ```
-- **Forwarding stdin (`--read-stdin`, new in v0.1.1):** without
+  This form remains valid; use it when MCP isn't loaded or
+  when you have a specific reason (e.g. piping a tempfile
+  path that the MCP shape would obscure). Both forms hit the
+  same rexec host and produce the same transcripts.
+- **MCP-stdio server (`-m` / `--mcp-stdio`, new in v0.2.0):**
+  starts a stdio MCP server that forwards tool calls to the
+  rexec host. Configured workspace-wide via
+  `mcpServers.rexec` (Claude) and `[mcp_servers.rexec]`
+  (Codex). Agents don't invoke `rexec -m` directly — the
+  harness spawns it at session start with `--whoami` baked
+  in. The flag is mentioned here only so the configuration
+  is legible; touching the server config is a settings
+  task, not an agent task.
+- **Forwarding stdin (`--read-stdin`, v0.1.1+):** without
   this flag, the inner child's stdin is the PTY slave and any
   read blocks because nothing is written to it. Pass
   `--read-stdin` to read the client's stdin to EOF and forward

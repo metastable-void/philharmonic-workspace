@@ -219,16 +219,54 @@ wrappers, `xtask.sh`, raw read-only tools) rather than
 replacing them: `rexec` is the outer envelope; the inner
 wrapper is unchanged.
 
-Usage shapes (from `rexec --help`, v0.1.1):
+**Prefer the MCP tools over the Bash form (v0.2.0+).** The
+workspace exposes `rexec` as an MCP server in
+[`.codex/config.toml`](.codex/config.toml) for Codex
+(`[mcp_servers.rexec]` with `command = "rexec"`,
+`args = ["-m", "--whoami", "Codex"]`). The server is started
+with your identity baked in, so the per-call MCP tool
+invocations don't need to re-specify `--whoami` — they only
+need the working directory and the inner command. Use the
+MCP tools by default when they're available; they avoid the
+shell-quoting / heredoc traps the Bash form is vulnerable
+to and they integrate with your harness's permission model
+directly.
 
-- **Run a command** (the common case; `--whoami` and `--dir`
-  are mandatory, repeat `--env` per override, `--` separates
-  the inner command from `rexec`'s flags):
+The Bash form (`rexec --whoami ... --dir ... -- <cmd>`)
+stays valid and is the right surface for transcript
+inspection (`rexec --list N`, `rexec --print <name>`) and
+host status (`rexec -c`) since those are read-only and
+don't need a `--whoami` / `--dir` pair. It's also the
+fallback when the MCP server isn't loaded.
+
+Usage shapes (from `rexec --help`, v0.2.0):
+
+- **Run a command via MCP (preferred).** When the rexec
+  MCP server is loaded for your session, run-mode
+  invocations go through MCP tools rather than the Bash
+  form below. Tool-call shapes are discoverable via your
+  MCP tool list at session start. The server already knows
+  your `--whoami`; the tool call supplies the working
+  directory, the inner command, and any
+  `--env` / `--read-stdin` flags.
+- **Run a command via the Bash form (fallback).**
+  `--whoami` and `--dir` are mandatory, repeat `--env` per
+  override, `--` separates the inner command from
+  `rexec`'s flags:
   ```sh
   rexec --whoami <agent-id> --dir <workdir> \
       [--env VAR=VAL]... [--read-stdin] -- <command> [args...]
   ```
-- **Forwarding stdin (`--read-stdin`, new in v0.1.1):** without
+  Both forms hit the same rexec host and produce the same
+  transcripts.
+- **MCP-stdio server (`-m` / `--mcp-stdio`, new in v0.2.0):**
+  starts a stdio MCP server that forwards tool calls to
+  the rexec host. Codex's harness spawns it at session
+  start per the config above; you don't invoke
+  `rexec -m` directly. Mentioned here so the config is
+  legible; touching the server config is a settings task,
+  not an agent task.
+- **Forwarding stdin (`--read-stdin`, v0.1.1+):** without
   this flag, the inner child's stdin is the PTY slave and any
   read blocks because nothing is written to it. Pass
   `--read-stdin` to forward your harness's stdin to the inner

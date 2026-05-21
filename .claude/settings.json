@@ -72,5 +72,15 @@
       }
     }
   },
+  "mcpServers": {
+    "rexec": {
+      "command": "rexec",
+      "args": [
+        "-m",
+        "--whoami",
+        "Claude"
+      ]
+    }
+  },
   "theme": "auto"
 }

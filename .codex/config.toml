@@ -1,22 +1,5 @@
 # Project-local Codex CLI config for the philharmonic workspace.
 #
-# === Activation ===
-#
-# Codex reads config.toml from $CODEX_HOME (default ~/.codex), so
-# this file is NOT auto-loaded. To use it, point CODEX_HOME at
-# this directory before invoking Codex:
-#
-#     export CODEX_HOME="$(git rev-parse --show-toplevel)/.codex"
-#     codex ...
-#
-# Or pass it inline:
-#
-#     CODEX_HOME="$(git rev-parse --show-toplevel)/.codex" codex ...
-#
-# When CODEX_HOME points here, Codex will also write its session
-# state (rollouts, auth tokens, etc.) under this directory. Only
-# this config.toml is tracked in Git; session state is gitignored.
-#
 # === Intent ===
 #
 # Settings are baselines. The Codex plugin (invoked by Claude via
@@ -61,3 +44,7 @@ fast_mode = true
 # Concise output matches the workspace's terse review style;
 # Claude-side review prefers diffs over long narrations.
 model_verbosity = "concise"
+
+[mcp_servers.rexec]
+command = "rexec"
+args = ["-m", "--whoami", "Codex"]
