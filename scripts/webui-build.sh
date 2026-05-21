@@ -3,7 +3,12 @@
 # philharmonic-api binary.
 #
 # Usage:
-#   ./scripts/webui-build.sh [--production]
+#   ./scripts/webui-build.sh --production
+#
+# `--production` is REQUIRED (not optional). Dev builds use
+# style-loader and skip source maps, so they do not produce the
+# artifacts the Rust binary embeds. The bare command exits with
+# exit code 2 and a usage error.
 #
 # EXCEPTION TO THE NO-NODE.JS RULE (CONTRIBUTING.md §7):
 # This is the ONLY script in the workspace that invokes Node.js
