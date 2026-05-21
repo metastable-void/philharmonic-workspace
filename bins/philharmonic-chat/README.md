@@ -64,6 +64,13 @@ message is the agent-authenticated UI, not the end-user UI.
   expiry the UI re-mints against the bin using the bin's
   configured `minting_token`.
 
+## Branding
+
+Tenant branding (name + monogram) is fetched by the chat
+frontend from `GET {api_url}/v1/_meta/branding` directly,
+mirroring the philharmonic WebUI's surface. The endpoint is
+unauthenticated; the chat bin doesn't proxy it.
+
 ## UI modes
 
 ### Agent mode (default)
