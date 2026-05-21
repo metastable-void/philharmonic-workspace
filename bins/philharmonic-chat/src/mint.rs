@@ -27,6 +27,11 @@ struct MintTokenRequest {
     lifetime_seconds: u64,
     subject: String,
     instance_id: Uuid,
+    // The mint endpoint deserializes `injected_claims` as a
+    // required `JsonValue`; omitting the field is a 422. We
+    // have nothing to inject here, so an empty object passes
+    // size + canonicalisation checks while saying "no claims".
+    injected_claims: Value,
 }
 
 #[derive(Debug, Deserialize)]
@@ -87,6 +92,7 @@ async fn mint_token(
             lifetime_seconds: EPHEMERAL_LIFETIME_SECONDS,
             subject: format!("chat-end-user-{}", Uuid::new_v4()),
             instance_id,
+            injected_claims: json!({}),
         })
         .send()
         .await
