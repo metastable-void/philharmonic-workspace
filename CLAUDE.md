@@ -182,6 +182,50 @@ bypasses rexec's filter.
 Rule of thumb: "what should this look like?" → Claude. "Now
 write the thing" → Codex unless it's plumbing/housekeeping.
 
+- **How to dispatch Codex from a Claude session.** The
+  `codex:codex-rescue` subagent is **not** available via the
+  `Agent` tool here — that path errors with "agent type not
+  found". The `/codex:rescue` slash command is the
+  user-facing entry point and Claude can't fire slash
+  commands itself. The canonical Claude-driven dispatch
+  uses the plugin's companion script directly:
+
+  1. Write the dispatch prompt body to a tempfile via the
+     `Write` tool (long prompts hit shell arg-length limits
+     otherwise):
+     ```
+     Write file_path=/tmp/<slug>-codex-prompt.txt content=<dispatch text>
+     ```
+  2. Invoke `codex-companion.mjs task` through `rexec`. The
+     script lives under the resolved plugin cache root —
+     find it with `ls ~/.claude/plugins/cache/openai-codex/codex/*/scripts/codex-companion.mjs`
+     (the version subdirectory changes over time). Pass
+     `--cwd` for the workspace root, `--write` to enable
+     workspace-write sandbox (without it the run is
+     read-only), `--effort high` for substantive work, and
+     `--background` so the run doesn't block this
+     conversation:
+     ```sh
+     rexec --whoami claude --dir <workspace-root> -- \
+         node ~/.claude/plugins/cache/openai-codex/codex/<ver>/scripts/codex-companion.mjs \
+         task --background --write --effort high \
+         --cwd <workspace-root> \
+         --prompt-file /tmp/<slug>-codex-prompt.txt
+     ```
+  3. The script prints a `jobId` immediately. Monitor with
+     `./scripts/codex-status.sh` and `./scripts/codex-logs.sh`
+     (both filter on `originator: Claude Code` — they see
+     this dispatch).
+  4. Clean up the tempfile after `task_complete`.
+
+  The companion script also supports `--prompt-file -` for
+  stdin, but `rexec` doesn't pipe stdin through (same
+  reason as the commit-message rule above) — always pass
+  a path, never stdin. The script supports `--resume` /
+  `--resume-last` / `--fresh` for continuing or starting
+  fresh threads; default-fresh is right for a new
+  prompt-archive round.
+
 - **Human override.** If Yuka explicitly says a task goes to
   Codex, Claude MUST archive a prompt and dispatch regardless
   of scope. No pushback.
