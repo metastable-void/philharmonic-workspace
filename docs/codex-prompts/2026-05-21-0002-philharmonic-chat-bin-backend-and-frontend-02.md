@@ -72,7 +72,70 @@ Confirmed by Yuka via `AskUserQuestion` answer
 
 ## Outcome
 
-Pending — will be updated after Codex run completes.
+Completed in one round (task `task-mpfcqelk-4ic6ep`). Codex
+shipped the full i18n machinery as dirty changes — **did not
+commit** this time, correctly following the round-02 prompt's
+"Codex never commits" rule (lesson learned from round 01).
+
+Files Codex touched (all inside `bins/philharmonic-chat/`):
+
+- New: `frontend/src/i18n/{en.ts,ja.ts,index.ts}` with
+  `Translations` type derived from the `as const` literal via
+  `WidenTranslations`, matching the WebUI's shape.
+- New: `frontend/src/store/i18nSlice.ts` — slice with
+  `setLocale`, persists to `localStorage` under
+  `philharmonic.chat.locale` (the scope tweak Yuka asked for).
+- New: `frontend/src/hooks/useT.ts` — typed hook reading
+  `state.i18n.locale`.
+- Modified: `frontend/src/store/index.ts` (register
+  `i18nReducer` under `i18n`).
+- Modified: every chat page + component listed in the prompt
+  (`App`, `SignIn`, `Awaiting`, `ChatTranscript`, `ChatPanel`,
+  `BrandHeader`, `AgentNamePrompt`, `VersionRefresh`) —
+  hardcoded English replaced with `useT()` keys.
+- Modified: `frontend/src/app.css` — language-switcher styling
+  added near the brand-header rules.
+- Modified: `dist/{main.css,main.css.map,main.js,main.js.map}`
+  — webpack rebuild.
+- Modified: `README.md` — added §Internationalisation
+  (EN+JA, localStorage key, language-switcher location,
+  detection fallback) and the `philharmonic.chat.locale`
+  storage entry.
+
+Japanese translations Codex picked are natural everyday-
+business Japanese (担当者 for "agent", サインイン /
+サインアウト, 対応待ち for "Awaiting", 模擬テスト for
+"Mock test", 担当者トランスクリプト, 表示言語 for
+"Language", 顧客 / アシスタント for ChatBubble role
+fallbacks, リクエストに失敗しました and friends for errors).
+No flagging-for-Yuka-review per the prompt's instruction.
+
+Language switcher placement: signed-in section of
+`BrandHeader` (no switcher pre-sign-in), mirroring the WebUI
+behaviour where the language pref lives inside the layout
+chrome.
+
+No codex-report written (smooth round, no design surprises).
+
+Verification per Codex: `philharmonic-chat-build.sh
+--production` and `./scripts/pre-landing.sh` both clean.
+Claude re-ran pre-landing once more before committing the
+combined diff (1m56s) — still clean.
+
+**Bundled side-fix in the same commit**: the chat bin's
+`/mint-ephemeral` flow was producing
+`instance create failed with API status 403 Forbidden`
+because its outbound API calls (`POST /v1/workflows/instances`
+with `service_token`, then `POST /v1/tokens/mint` with
+`minting_token`) didn't send `X-Tenant-Id`. The agent UI's
+polling had the same shape and was fixed earlier today at
+`6b5d422` by calling `/v1/whoami` from the frontend. The
+server-side calls have no `whoami` shortcut, so a new
+`tenant_id: Uuid` field was added to `[chat]` TOML config and
+threaded through to both outbound requests via
+`.header("X-Tenant-Id", config.tenant_id.to_string())`. The
+operator's existing chat config will need the new key added
+before this revision boots cleanly.
 
 ---
 

@@ -1,11 +1,13 @@
 import { type JSX, useCallback, useEffect, useState } from "react";
 
 import { fetchVersion, type VersionResponse } from "../api/client";
+import { useT } from "../hooks/useT";
 import { usePoll } from "../hooks/usePoll";
 
 const VERSION_REFRESH_INTERVAL_MS = 60_000;
 
 export default function VersionRefresh(): JSX.Element | null {
+  const t = useT();
   const [initial, setInitial] = useState<VersionResponse | null>(null);
   const [changed, setChanged] = useState(false);
 
@@ -38,9 +40,9 @@ export default function VersionRefresh(): JSX.Element | null {
 
   return (
     <div className="version-banner">
-      <span>A new chat UI version is available.</span>
+      <span>{t.version.updateAvailable}</span>
       <button className="button primary" type="button" onClick={() => window.location.reload()}>
-        Reload
+        {t.version.reload}
       </button>
     </div>
   );

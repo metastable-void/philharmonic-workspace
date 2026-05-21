@@ -26,6 +26,7 @@ pub(crate) struct ChatConfig {
     pub(crate) bind: SocketAddr,
     pub(crate) bind_h3: Option<SocketAddr>,
     pub(crate) api_url: String,
+    pub(crate) tenant_id: Uuid,
     pub(crate) service_token: String,
     pub(crate) agent_token: String,
     pub(crate) minting_token: String,

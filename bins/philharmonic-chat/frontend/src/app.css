@@ -28,6 +28,7 @@ body {
 
 button,
 input,
+select,
 textarea {
   font: inherit;
 }
@@ -99,12 +100,14 @@ button:disabled {
 }
 
 .agent-name-field,
+.language-field,
 .field {
   display: grid;
   gap: 6px;
 }
 
 .agent-name-field span,
+.language-field span,
 .field span {
   color: var(--muted);
   font-size: 12px;
@@ -113,6 +116,7 @@ button:disabled {
 }
 
 input,
+select,
 textarea {
   width: 100%;
   border: 1px solid var(--line);
@@ -124,6 +128,11 @@ textarea {
 input {
   min-height: 38px;
   padding: 8px 10px;
+}
+
+select {
+  min-height: 38px;
+  padding: 8px 32px 8px 10px;
 }
 
 textarea {

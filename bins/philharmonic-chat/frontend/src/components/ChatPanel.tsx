@@ -15,6 +15,7 @@ import {
   type ChatMessage,
   type JsonValue,
 } from "../api/client";
+import { useT } from "../hooks/useT";
 import { usePoll } from "../hooks/usePoll";
 import { formatTimestamp } from "../util/formatTimestamp";
 
@@ -31,6 +32,7 @@ export default function ChatPanel({
   mode,
   agentName,
 }: ChatPanelProps): JSX.Element {
+  const t = useT();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [draft, setDraft] = useState("");
   const [isInflight, setIsInflight] = useState(false);
@@ -46,8 +48,8 @@ export default function ChatPanel({
         }
         setError(null);
       })
-      .catch((caught) => setError(messageFrom(caught)));
-  }, [instanceId, token]);
+      .catch((caught) => setError(messageFrom(caught, t.common.requestFailed)));
+  }, [instanceId, token, t.common.requestFailed]);
 
   useEffect(() => {
     setMessages([]);
@@ -82,7 +84,7 @@ export default function ChatPanel({
       setMessages(parseMessages(response.output));
       setDraft("");
     } catch (caught) {
-      setError(messageFrom(caught));
+      setError(messageFrom(caught, t.common.requestFailed));
     } finally {
       setIsInflight(false);
     }
@@ -111,14 +113,14 @@ export default function ChatPanel({
         {messages.map((message, index) => (
           <ChatBubble key={`${index}-${message.role}-${message.date ?? ""}`} message={message} />
         ))}
-        {messages.length === 0 && <div className="empty-cell">No transcript yet</div>}
-        {isInflight && <div className="chat-bubble assistant pending">Sending...</div>}
+        {messages.length === 0 && <div className="empty-cell">{t.transcript.empty}</div>}
+        {isInflight && <div className="chat-bubble assistant pending">{t.common.sending}</div>}
       </div>
       <form className="chat-composer" onSubmit={(event) => void sendMessage(event)}>
         <textarea
           value={draft}
           disabled={isInflight}
-          placeholder={mode === "agent" ? "Reply as support" : "Write as customer"}
+          placeholder={mode === "agent" ? t.transcript.composer.agent : t.transcript.composer.customer}
           onChange={(event) => setDraft(event.target.value)}
           onKeyDown={handleComposerKeyDown}
         />
@@ -127,7 +129,7 @@ export default function ChatPanel({
           type="submit"
           disabled={isInflight || draft.trim().length === 0}
         >
-          Send
+          {t.common.send}
         </button>
       </form>
     </section>
@@ -139,8 +141,9 @@ interface ChatBubbleProps {
 }
 
 function ChatBubble({ message }: ChatBubbleProps): JSX.Element {
+  const t = useT();
   const roleClass = message.role === "user" ? "user" : "assistant";
-  const label = message.name ?? (message.role === "user" ? "Customer" : "Assistant");
+  const label = message.name ?? (message.role === "user" ? t.transcript.role.customer : t.transcript.role.assistant);
 
   return (
     <article className={`chat-row ${roleClass}`}>
@@ -155,6 +158,6 @@ function ChatBubble({ message }: ChatBubbleProps): JSX.Element {
   );
 }
 
-function messageFrom(caught: unknown): string {
-  return caught instanceof Error ? caught.message : "request failed";
+function messageFrom(caught: unknown, fallback: string): string {
+  return caught instanceof Error ? caught.message : fallback;
 }

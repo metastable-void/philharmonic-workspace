@@ -225,9 +225,21 @@ future work.
   widget session.
 - `seen_chat_uuids` — the agent's debouncer for notify-channel
   events.
+- `philharmonic.chat.locale` — English / Japanese UI language
+  preference, set by the language switcher in the signed-in
+  header.
 
 "Server-stateless" describes the *bin*, not the browser; the
 browser holds session state per the keys above.
+
+## Internationalisation
+
+The frontend supports English and Japanese. Locale preference is
+stored in `localStorage` under `philharmonic.chat.locale`; when no
+valid stored value exists, the UI checks `navigator.language`,
+uses Japanese for `ja*`, and falls back to English for every other
+language. The language switcher lives in the signed-in
+`BrandHeader`.
 
 ## Configuration
 
@@ -237,6 +249,7 @@ bind = "[::]:443"
 bind_h3 = "[::]:443"
 
 api_url       = "https://philharmonic-api.tld"
+tenant_id     = "..." # UUID of the tenant the bin operates within
 service_token = "pht_..."
 agent_token   = "pht_..."
 minting_token = "..."

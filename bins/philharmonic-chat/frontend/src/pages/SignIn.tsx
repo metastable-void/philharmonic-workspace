@@ -1,10 +1,12 @@
 import { type FormEvent, type JSX, useState } from "react";
 
 import { signIn } from "../api/client";
+import { useT } from "../hooks/useT";
 import { setAgentToken } from "../store/authSlice";
 import { useAppDispatch } from "../store";
 
 export default function SignIn(): JSX.Element {
+  const t = useT();
   const dispatch = useAppDispatch();
   const [token, setToken] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -22,7 +24,7 @@ export default function SignIn(): JSX.Element {
       await signIn(value);
       dispatch(setAgentToken(value));
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "sign-in failed");
+      setError(caught instanceof Error ? caught.message : t.signIn.failureFallback);
     } finally {
       setIsSubmitting(false);
     }
@@ -31,10 +33,10 @@ export default function SignIn(): JSX.Element {
   return (
     <main className="page sign-in-page">
       <section className="panel sign-in-panel">
-        <h1>Support sign-in</h1>
+        <h1>{t.signIn.title}</h1>
         <form className="stack" onSubmit={(event) => void submit(event)}>
           <label className="field">
-            <span>Agent token</span>
+            <span>{t.signIn.tokenLabel}</span>
             <input
               type="password"
               value={token}
@@ -48,7 +50,7 @@ export default function SignIn(): JSX.Element {
             type="submit"
             disabled={isSubmitting || token.trim().length === 0}
           >
-            Sign in
+            {t.signIn.submit}
           </button>
         </form>
       </section>

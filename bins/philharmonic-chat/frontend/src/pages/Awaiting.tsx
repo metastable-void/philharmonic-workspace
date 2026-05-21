@@ -1,6 +1,7 @@
 import { type JSX, useCallback, useState } from "react";
 
 import { fetchLatestStep, mintEphemeral, notifyInstances } from "../api/client";
+import { useT } from "../hooks/useT";
 import { usePoll } from "../hooks/usePoll";
 import { addAwaiting } from "../store/notifySlice";
 import { useAppDispatch, useAppSelector } from "../store";
@@ -18,6 +19,7 @@ export default function Awaiting({
   onOpenAgentChat,
   onOpenMockChat,
 }: AwaitingProps): JSX.Element {
+  const t = useT();
   const dispatch = useAppDispatch();
   const { awaiting, seenChatUuids } = useAppSelector((state) => state.notify);
   const agentToken = useAppSelector((state) => state.auth.agentToken);
@@ -32,15 +34,15 @@ export default function Awaiting({
         for (const instanceId of instances) {
           if (!seenChatUuids.includes(instanceId)) {
             dispatch(addAwaiting(instanceId));
-            setToast(`New chat ${shortId(instanceId)}`);
+            setToast(t.awaiting.toast(shortId(instanceId)));
             playNotificationSound();
             window.setTimeout(() => setToast(null), 4000);
           }
         }
         setError(null);
       })
-      .catch((caught) => setError(caught instanceof Error ? caught.message : "poll failed"));
-  }, [agentToken, dispatch, notifyInstanceUuid, seenChatUuids]);
+      .catch((caught) => setError(caught instanceof Error ? caught.message : t.awaiting.errors.poll));
+  }, [agentToken, dispatch, notifyInstanceUuid, seenChatUuids, t]);
 
   usePoll(agentToken.length > 0, 2000, pollNotify);
 
@@ -55,7 +57,7 @@ export default function Awaiting({
       );
       onOpenMockChat(minted.instance_id, minted.ephemeral_token);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "mock test failed");
+      setError(caught instanceof Error ? caught.message : t.awaiting.errors.mockTest);
     } finally {
       setIsStartingMock(false);
     }
@@ -65,7 +67,7 @@ export default function Awaiting({
     <main className="page">
       <div className="page-header">
         <div>
-          <h1>Awaiting chats</h1>
+          <h1>{t.awaiting.title}</h1>
           <p className="muted mono">{notifyInstanceUuid}</p>
         </div>
         <button
@@ -74,7 +76,7 @@ export default function Awaiting({
           disabled={isStartingMock}
           onClick={() => void startMockTest()}
         >
-          Start mock test
+          {t.awaiting.startMockTest}
         </button>
       </div>
       {toast !== null && <div className="toast">{toast}</div>}
@@ -83,8 +85,8 @@ export default function Awaiting({
         <table>
           <thead>
             <tr>
-              <th>Instance</th>
-              <th>First seen</th>
+              <th>{t.awaiting.columns.instance}</th>
+              <th>{t.awaiting.columns.firstSeen}</th>
               <th />
             </tr>
           </thead>
@@ -99,7 +101,7 @@ export default function Awaiting({
                     type="button"
                     onClick={() => onOpenAgentChat(item.instanceId)}
                   >
-                    Open
+                    {t.awaiting.openAction}
                   </button>
                 </td>
               </tr>

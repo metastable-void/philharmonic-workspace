@@ -3,12 +3,14 @@ import { useDispatch, useSelector } from "react-redux";
 
 import authReducer, { persistAuth } from "./authSlice";
 import brandingReducer from "./brandingSlice";
+import i18nReducer from "./i18nSlice";
 import notifyReducer, { persistSeenChatUuids } from "./notifySlice";
 
 export const store = configureStore({
   reducer: {
     auth: authReducer,
     branding: brandingReducer,
+    i18n: i18nReducer,
     notify: notifyReducer,
   },
 });

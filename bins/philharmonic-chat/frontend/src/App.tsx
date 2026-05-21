@@ -14,6 +14,7 @@ import VersionRefresh from "./components/VersionRefresh";
 import Awaiting from "./pages/Awaiting";
 import ChatTranscript from "./pages/ChatTranscript";
 import SignIn from "./pages/SignIn";
+import { useT } from "./hooks/useT";
 import { useAppDispatch, useAppSelector } from "./store";
 import { setBranding } from "./store/brandingSlice";
 
@@ -23,6 +24,7 @@ type View =
   | { kind: "mock-chat"; instanceId: string; token: string };
 
 export default function App(): JSX.Element {
+  const t = useT();
   const dispatch = useAppDispatch();
   const isSignedIn = useAppSelector((state) => state.auth.isSignedIn);
   const agentToken = useAppSelector((state) => state.auth.agentToken);
@@ -37,9 +39,9 @@ export default function App(): JSX.Element {
         setConfig(loaded);
       })
       .catch((caught) =>
-        setConfigError(caught instanceof Error ? caught.message : "config load failed"),
+        setConfigError(caught instanceof Error ? caught.message : t.common.configLoadFailed),
       );
-  }, []);
+  }, [t.common.configLoadFailed]);
 
   useEffect(() => {
     if (config === null) {
@@ -76,7 +78,7 @@ export default function App(): JSX.Element {
   }
 
   if (config === null) {
-    return <main className="page loading">Loading...</main>;
+    return <main className="page loading">{t.common.loading}</main>;
   }
 
   if (!isSignedIn) {

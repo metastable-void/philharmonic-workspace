@@ -59,6 +59,7 @@ async fn create_instance(
     let response = client
         .post(config.api_endpoint("/v1/workflows/instances"))
         .bearer_auth(&config.service_token)
+        .header("X-Tenant-Id", config.tenant_id.to_string())
         .json(&CreateInstanceRequest {
             template_id: config.chat_uuid,
             args: json!({}),
@@ -80,6 +81,7 @@ async fn mint_token(
     let response = client
         .post(config.api_endpoint("/v1/tokens/mint"))
         .bearer_auth(&config.minting_token)
+        .header("X-Tenant-Id", config.tenant_id.to_string())
         .json(&MintTokenRequest {
             requested_permissions: vec![PERMISSION_INSTANCE_EXECUTE, PERMISSION_INSTANCE_READ],
             lifetime_seconds: EPHEMERAL_LIFETIME_SECONDS,

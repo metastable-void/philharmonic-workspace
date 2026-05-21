@@ -1,10 +1,12 @@
 import { type FormEvent, type JSX, useState } from "react";
 
+import { useT } from "../hooks/useT";
 import { setAgentName } from "../store/authSlice";
 import { useAppDispatch, useAppSelector } from "../store";
 import Modal from "./Modal";
 
 export default function AgentNamePrompt(): JSX.Element | null {
+  const t = useT();
   const dispatch = useAppDispatch();
   const agentName = useAppSelector((state) => state.auth.agentName);
   const isSignedIn = useAppSelector((state) => state.auth.isSignedIn);
@@ -24,15 +26,15 @@ export default function AgentNamePrompt(): JSX.Element | null {
 
   return (
     <Modal
-      ariaLabel="Agent name"
+      ariaLabel={t.agentName.promptTitle}
       onClose={() => {}}
       closeOnBackdropClick={false}
       closeOnEscape={false}
     >
       <form className="stack" onSubmit={submit}>
-        <h2>Agent name</h2>
+        <h2>{t.agentName.promptTitle}</h2>
         <label className="field">
-          <span>Name shown in chat</span>
+          <span>{t.agentName.fieldLabel}</span>
           <input
             autoFocus
             value={draft}
@@ -42,7 +44,7 @@ export default function AgentNamePrompt(): JSX.Element | null {
         </label>
         <div className="actions right">
           <button className="button primary" type="submit" disabled={draft.trim().length === 0}>
-            Save
+            {t.common.save}
           </button>
         </div>
       </form>
